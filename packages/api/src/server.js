@@ -3,9 +3,11 @@ import {
   closeDatabasePool,
   createCoreServiceRegistry,
   createDatabasePool,
+  createStorageRegistry,
   HookEmitter,
   loadConfig,
   loadEnvFileIfPresent,
+  LocalStorageDriver,
   SchemaCache,
 } from '@yuncms/core';
 import { createApp } from './app.js';
@@ -14,6 +16,9 @@ import { loadExtensionRuntime } from './extensions/runtime.js';
 loadEnvFileIfPresent();
 const config = loadConfig();
 const pool = createDatabasePool(config.database);
+const storage = createStorageRegistry({
+  local: new LocalStorageDriver({ root: config.storage.localRoot }),
+});
 let server = null;
 let shuttingDown = false;
 
@@ -29,6 +34,7 @@ async function start() {
     database: pool,
     schemaCache,
     emitter,
+    storage,
     logger: console,
     env: config,
   });
@@ -39,6 +45,7 @@ async function start() {
     serviceRegistry,
     schemaCache,
     emitter,
+    storage,
     endpointExtensions: extensionRuntime.endpointExtensions,
   });
 
