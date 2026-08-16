@@ -31,5 +31,15 @@ export function createAuditRouter() {
     res.json({ data });
   });
 
+  router.post('/cleanup', async (req, res) => {
+    const defaults = req.context.env?.audit ?? {};
+    const data = await auditService(req).cleanup({
+      retentionDays: req.body?.retentionDays ?? defaults.retentionDays,
+      batchSize: req.body?.batchSize ?? defaults.cleanupBatchSize,
+      maxBatches: req.body?.maxBatches ?? defaults.cleanupMaxBatches,
+    });
+    res.json({ data });
+  });
+
   return router;
 }
