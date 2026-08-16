@@ -69,6 +69,7 @@ export class ItemsService extends BaseService {
     return {
       accountability: this.accountability,
       collection: this.collection,
+      requestId: this.requestId,
       ...extra,
     };
   }
