@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
+import { enforcePermissionValidation } from '../permission-validation.js';
 import {
   compileFilter,
   compileSelectFields,
@@ -13,6 +14,7 @@ import { BaseService } from './base-service.js';
 import { PermissionsService } from './permissions-service.js';
 
 const defaultSchemaCache = new SchemaCache();
+const MAX_BULK_VALIDATION_ROWS = 5000;
 
 function serviceError(code, message, path = null) {
   const error = new Error(message);
@@ -58,6 +60,28 @@ function combineCompiledFilters(...filters) {
   };
 }
 
+function createCandidateRecord(schema, id, entries) {
+  const provided = Object.fromEntries(entries);
+  const candidate = {};
+
+  for (const fieldSchema of Object.values(schema.fields)) {
+    if (fieldSchema.field === schema.primary_key) {
+      candidate[fieldSchema.field] = id;
+      continue;
+    }
+    if (Object.hasOwn(provided, fieldSchema.field)) {
+      candidate[fieldSchema.field] = provided[fieldSchema.field];
+      continue;
+    }
+    const metadata = parseMetadata(fieldSchema.schema_metadata);
+    candidate[fieldSchema.field] = Object.hasOwn(metadata, 'defaultValue')
+      ? metadata.defaultValue
+      : null;
+  }
+
+  return candidate;
+}
+
 export class ItemsService extends BaseService {
   constructor(collection, options = {}) {
     super(options);
@@ -101,6 +125,8 @@ export class ItemsService extends BaseService {
       schemaCache: this.schemaCache,
       emitter: this.emitter,
       logger: this.logger,
+      permissionCache: this.permissionCache,
+      requestId: this.requestId,
     });
     return permissions.resolve(action, this.collection);
   }
@@ -206,6 +232,9 @@ export class ItemsService extends BaseService {
     const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create' });
     const entries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
     const id = randomUUID();
+    const candidate = createCandidateRecord(schema, id, entries);
+    enforcePermissionValidation(candidate, permission.validation, schema);
+
     const values = { [schema.primary_key]: id, ...Object.fromEntries(entries) };
     const fields = Object.keys(values);
     const table = quoteIdentifier(this.collection, 'collection name');
@@ -237,8 +266,12 @@ export class ItemsService extends BaseService {
       });
       const entries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
       const id = randomUUID();
-      const values = { [schema.primary_key]: id, ...Object.fromEntries(entries) };
-      staged.push({ id, values });
+      const candidate = createCandidateRecord(schema, id, entries);
+      enforcePermissionValidation(candidate, permission.validation, schema);
+      staged.push({
+        id,
+        values: { [schema.primary_key]: id, ...Object.fromEntries(entries) },
+      });
     }
 
     await withTransaction(this.database, async (connection) => {
@@ -277,11 +310,22 @@ export class ItemsService extends BaseService {
     if (entries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
 
     const table = quoteIdentifier(this.collection, 'collection name');
-    const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
     const filter = combineCompiledFilters(
       compileFilter(permission.filter, schema),
       compileFilter({ [schema.primary_key]: { _eq: id } }, schema),
     );
+
+    if (permission.validation) {
+      const [currentRows] = await this.database.query(
+        `SELECT * FROM ${table}${filter.sql} LIMIT 1`,
+        filter.params,
+      );
+      const current = currentRows[0];
+      if (!current) return null;
+      enforcePermissionValidation({ ...current, ...filteredPayload }, permission.validation, schema);
+    }
+
+    const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
     const [result] = await this.database.query(
       `UPDATE ${table} SET ${setSql}${filter.sql}`,
       [...entries.map(([, value]) => value), ...filter.params],
@@ -314,6 +358,23 @@ export class ItemsService extends BaseService {
     if (entries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
     const filter = this.compileActionFilters(filterInput, permission.filter, accessSchema, schema);
     const table = quoteIdentifier(this.collection, 'collection name');
+
+    if (permission.validation) {
+      const [rows] = await this.database.query(
+        `SELECT * FROM ${table}${filter.sql} LIMIT ?`,
+        [...filter.params, MAX_BULK_VALIDATION_ROWS + 1],
+      );
+      if (rows.length > MAX_BULK_VALIDATION_ROWS) {
+        throw serviceError(
+          'VALIDATION_BULK_LIMIT',
+          `Permission validation can inspect at most ${MAX_BULK_VALIDATION_ROWS} rows per bulk update`,
+        );
+      }
+      for (const row of rows) {
+        enforcePermissionValidation({ ...row, ...filteredPayload }, permission.validation, schema);
+      }
+    }
+
     const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
     const [result] = await this.database.query(
       `UPDATE ${table} SET ${setSql}${filter.sql}`,
@@ -380,3 +441,5 @@ export class ItemsService extends BaseService {
     return result.affectedRows;
   }
 }
+
+export { MAX_BULK_VALIDATION_ROWS, createCandidateRecord };
