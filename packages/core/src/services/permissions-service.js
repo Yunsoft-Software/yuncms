@@ -37,6 +37,35 @@ function assertPermissionManager(accountability) {
   throw forbidden('Permission management requires administrator accountability');
 }
 
+function normalizePermissionFields(fields, collectionSchema) {
+  if (fields == null) return null;
+  if (!Array.isArray(fields) || fields.length === 0) {
+    const error = new Error('Permission fields must be a non-empty array or null');
+    error.code = 'INVALID_PERMISSION';
+    throw error;
+  }
+
+  const normalized = [...new Set(fields)];
+  for (const field of normalized) {
+    if (typeof field !== 'string' || !collectionSchema.fields?.[field]) {
+      const error = new Error(`Unknown permission field: ${String(field)}`);
+      error.code = 'INVALID_PERMISSION';
+      throw error;
+    }
+  }
+  return normalized;
+}
+
+function normalizePermissionRow(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    fields: parseJson(row.fields, null),
+    filter: parseJson(row.filter, null),
+    validation: parseJson(row.validation, null),
+  };
+}
+
 export class PermissionsService extends BaseService {
   constructor(options = {}) {
     super(options);
@@ -69,14 +98,10 @@ export class PermissionsService extends BaseService {
        LIMIT 1`,
       [this.accountability.role, collection, action],
     );
-    const row = rows[0];
+    const row = normalizePermissionRow(rows[0]);
     if (!row) throw forbidden(`Role has no ${action} permission for ${collection}`);
 
-    const fields = parseJson(row.fields, null);
-    const filter = parseJson(row.filter, null);
-    const validation = parseJson(row.validation, null);
-
-    if (fields !== null && (!Array.isArray(fields) || fields.some((field) => typeof field !== 'string'))) {
+    if (row.fields !== null && (!Array.isArray(row.fields) || row.fields.some((field) => typeof field !== 'string'))) {
       const error = new Error(`Permission ${row.id} contains invalid field metadata`);
       error.code = 'INVALID_PERMISSION';
       throw error;
@@ -88,9 +113,9 @@ export class PermissionsService extends BaseService {
       role: row.role,
       collection: row.collection,
       action: row.action,
-      fields,
-      filter,
-      validation,
+      fields: row.fields,
+      filter: row.filter,
+      validation: row.validation,
     };
   }
 
@@ -101,7 +126,28 @@ export class PermissionsService extends BaseService {
        FROM yuncms_permissions
        ORDER BY role, collection, action`,
     );
-    return rows;
+    return rows.map(normalizePermissionRow);
+  }
+
+  async readOne(id) {
+    assertPermissionManager(this.accountability);
+    const [rows] = await this.database.query(
+      `SELECT id, role, collection, action, fields, filter, validation, created_at, updated_at
+       FROM yuncms_permissions WHERE id = ? LIMIT 1`,
+      [id],
+    );
+    return normalizePermissionRow(rows[0]);
+  }
+
+  async #collectionSchema(collection) {
+    const snapshot = this.schema ?? await this.schemaCache.get(this.database);
+    const collectionSchema = snapshot.collections?.[collection];
+    if (!collectionSchema) {
+      const error = new Error(`Unknown permission collection: ${collection}`);
+      error.code = 'COLLECTION_NOT_FOUND';
+      throw error;
+    }
+    return collectionSchema;
   }
 
   async createOne(input = {}) {
@@ -123,31 +169,8 @@ export class PermissionsService extends BaseService {
       throw error;
     }
 
-    const snapshot = this.schema ?? await this.schemaCache.get(this.database);
-    const collectionSchema = snapshot.collections?.[input.collection];
-    if (!collectionSchema) {
-      const error = new Error(`Unknown permission collection: ${input.collection}`);
-      error.code = 'COLLECTION_NOT_FOUND';
-      throw error;
-    }
-
-    let fields = input.fields ?? null;
-    if (fields !== null) {
-      if (!Array.isArray(fields) || fields.length === 0) {
-        const error = new Error('Permission fields must be a non-empty array or null');
-        error.code = 'INVALID_PERMISSION';
-        throw error;
-      }
-      fields = [...new Set(fields)];
-      for (const field of fields) {
-        if (!collectionSchema.fields?.[field]) {
-          const error = new Error(`Unknown permission field: ${field}`);
-          error.code = 'INVALID_PERMISSION';
-          throw error;
-        }
-      }
-    }
-
+    const collectionSchema = await this.#collectionSchema(input.collection);
+    const fields = normalizePermissionFields(input.fields ?? null, collectionSchema);
     const filter = input.filter ?? null;
     if (filter !== null) compileFilter(filter, collectionSchema);
 
@@ -175,11 +198,71 @@ export class PermissionsService extends BaseService {
       ],
     );
 
-    const [rows] = await this.database.query(
-      `SELECT id, role, collection, action, fields, filter, validation, created_at, updated_at
-       FROM yuncms_permissions WHERE id = ? LIMIT 1`,
+    return this.readOne(id);
+  }
+
+  async updateOne(id, patch = {}) {
+    assertPermissionManager(this.accountability);
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+      const error = new Error('Permission patch must be an object');
+      error.code = 'INVALID_PERMISSION';
+      throw error;
+    }
+    const keys = Object.keys(patch);
+    if (keys.length === 0 || keys.some((key) => !['fields', 'filter', 'validation'].includes(key))) {
+      const error = new Error('Permission update supports fields and filter only in V1');
+      error.code = 'INVALID_PERMISSION';
+      throw error;
+    }
+    if (Object.hasOwn(patch, 'validation') && patch.validation != null) {
+      const error = new Error('Permission validation rules are not enforced yet and cannot be stored in V1');
+      error.code = 'PERMISSION_VALIDATION_NOT_READY';
+      throw error;
+    }
+
+    const existing = await this.readOne(id);
+    if (!existing) {
+      const error = new Error(`Unknown permission: ${id}`);
+      error.code = 'PERMISSION_NOT_FOUND';
+      throw error;
+    }
+    const collectionSchema = await this.#collectionSchema(existing.collection);
+
+    const assignments = [];
+    const params = [];
+    if (Object.hasOwn(patch, 'fields')) {
+      const fields = normalizePermissionFields(patch.fields, collectionSchema);
+      assignments.push('fields = ?');
+      params.push(fields == null ? null : JSON.stringify(fields));
+    }
+    if (Object.hasOwn(patch, 'filter')) {
+      if (patch.filter != null) compileFilter(patch.filter, collectionSchema);
+      assignments.push('filter = ?');
+      params.push(patch.filter == null ? null : JSON.stringify(patch.filter));
+    }
+    if (Object.hasOwn(patch, 'validation')) {
+      assignments.push('validation = NULL');
+    }
+
+    params.push(id);
+    await this.database.query(
+      `UPDATE yuncms_permissions SET ${assignments.join(', ')} WHERE id = ?`,
+      params,
+    );
+    return this.readOne(id);
+  }
+
+  async deleteOne(id) {
+    assertPermissionManager(this.accountability);
+    const [result] = await this.database.query(
+      'DELETE FROM yuncms_permissions WHERE id = ?',
       [id],
     );
-    return rows[0] ?? null;
+    if (result.affectedRows !== 1) {
+      const error = new Error(`Unknown permission: ${id}`);
+      error.code = 'PERMISSION_NOT_FOUND';
+      throw error;
+    }
+    return true;
   }
 }
