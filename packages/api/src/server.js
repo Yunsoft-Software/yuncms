@@ -1,11 +1,15 @@
 import {
   assertDatabaseCompatible,
   closeDatabasePool,
+  createCoreServiceRegistry,
   createDatabasePool,
+  HookEmitter,
   loadConfig,
   loadEnvFileIfPresent,
+  SchemaCache,
 } from '@yuncms/core';
 import { createApp } from './app.js';
+import { loadExtensionRuntime } from './extensions/runtime.js';
 
 loadEnvFileIfPresent();
 const config = loadConfig();
@@ -16,7 +20,29 @@ let shuttingDown = false;
 async function start() {
   await assertDatabaseCompatible(pool);
 
-  const app = createApp({ pool, config });
+  const serviceRegistry = createCoreServiceRegistry();
+  const services = serviceRegistry.toObject();
+  const schemaCache = new SchemaCache();
+  const emitter = new HookEmitter();
+  const extensionRuntime = await loadExtensionRuntime({
+    services,
+    database: pool,
+    schemaCache,
+    emitter,
+    logger: console,
+    env: config,
+  });
+
+  const app = createApp({
+    pool,
+    config,
+    serviceRegistry,
+    schemaCache,
+    emitter,
+    endpointExtensions: extensionRuntime.endpointExtensions,
+  });
+
+  await extensionRuntime.init('app.start');
   server = app.listen(config.server.port, config.server.host, () => {
     console.log(`YunCMS API listening on http://${config.server.host}:${config.server.port}`);
   });
