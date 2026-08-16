@@ -57,6 +57,14 @@ export function loadConfig(env = process.env) {
         min: 1,
         max: 1024 * 1024 * 1024,
       }),
+      s3: {
+        bucket: readString(env.S3_BUCKET, ''),
+        region: readString(env.S3_REGION, 'us-east-1'),
+        endpoint: readString(env.S3_ENDPOINT, '') || null,
+        accessKeyId: readString(env.S3_ACCESS_KEY_ID, '') || null,
+        secretAccessKey: readString(env.S3_SECRET_ACCESS_KEY, '') || null,
+        forcePathStyle: readBoolean(env.S3_FORCE_PATH_STYLE, false),
+      },
     },
   };
 }
