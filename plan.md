@@ -47,7 +47,7 @@ yuncms/
 │   ├── extensions-sdk/
 │   └── cli/
 ├── docs/
-├── examples/               # later
+├── examples/
 ├── AGENTS.md
 ├── plan.md
 └── todo.md
@@ -107,7 +107,7 @@ Target service names:
 
 - [x] Define base service contract.
 - [x] Implement service registry and expose current core services to API request context.
-- [ ] Expose the same registry through the extension runtime once discovery/loading exists.
+- [x] Expose the same service registry through the trusted extension runtime.
 - [x] Ensure dedicated system services own special behavior such as password hashing/session invalidation.
 
 ### 2.3 MySQL foundation
@@ -320,7 +320,7 @@ Tasks:
 
 ## 8. Extension system
 
-V1 extensions are trusted server-side JavaScript. Discovery should support local packages and later npm packages with a `yuncms` manifest.
+V1 extensions are trusted server-side JavaScript. Discovery supports local packages and npm-installed project dependencies with a `yuncms` manifest.
 
 Familiar developer API:
 
@@ -343,13 +343,16 @@ Tasks:
 - [x] Implement `defineEndpoint`.
 - [x] Implement `defineHook`.
 - [x] Add basic SDK definition test sources.
-- [ ] Implement extension discovery/manifest validation.
-- [ ] Mount endpoint extensions under `/extensions/<name>`.
-- [ ] Implement filter/action emitter with recursion-protection metadata.
-- [ ] Expose services/database/schema/accountability/logger/env in runtime context.
-- [ ] Add runtime test proving extension service calls do not self-request HTTP.
-- [ ] Add extension examples.
-- [ ] Add extension authoring docs.
+- [x] Implement local/npm extension discovery and manifest validation.
+- [x] Mount endpoint extensions under `/extensions/<id>` after authentication middleware.
+- [x] Implement filter/action/init emitter with AsyncLocalStorage recursion-protection metadata.
+- [x] Expose services/database/schema/accountability/logger/env/emitter in trusted runtime context.
+- [x] Wire `app.beforeStart` and `app.afterStart` extension lifecycle around HTTP listen.
+- [x] Add runtime test source proving hooks receive services/database directly without self-HTTP.
+- [x] Add endpoint/hook extension examples.
+- [x] Add extension authoring docs.
+- [x] Align SDK/runtime extension marker contract so SDK definitions load correctly.
+- [ ] Run local and npm-packed extension startup/accountability smoke tests.
 
 ## 9. Files and storage
 
@@ -508,7 +511,7 @@ Critical regressions:
 - deadlock retry correctness;
 - session rotation/revocation;
 - one-time reset/verification token replay;
-- extension accountability;
+- extension definition/runtime/accountability;
 - file path traversal.
 
 Tasks:
@@ -518,6 +521,7 @@ Tasks:
 - [x] Add unit test sources for field/query compiler and generic `ItemsService` SQL boundaries.
 - [x] Add unit test sources for RBAC permission resolution, row filters, field restrictions and fail-closed access.
 - [x] Add unit test sources for login/session/API-token/auth-action-token boundaries.
+- [x] Add extension manifest/discovery/duplicate-id/runtime-context test sources.
 - [x] Add API canonical-error unit test sources.
 - [ ] Run current tests after local `npm install`.
 - [ ] Real-MySQL integration harness.
@@ -536,7 +540,7 @@ Write docs as behavior stabilizes; never document planned behavior as shipped.
 - [x] `docs/rest-api.md`.
 - [x] `docs/auth.md` for current auth/session/token surface and known transport limitation.
 - [x] `docs/permissions.md` for current RBAC surface.
-- [ ] `docs/extensions.md` after runtime loading exists.
+- [x] `docs/extensions.md` for discovery, endpoint/hook APIs, context, trust model and lifecycle.
 - [ ] `docs/studio.md` when real Studio workflows exist.
 - [x] `docs/setup-cli.md` for current bootstrap CLI surface.
 - [ ] `docs/security.md`.
@@ -579,7 +583,7 @@ Definition of done:
 - extensions receive services/context directly;
 - Studio supports login, collections, CRUD, Data Model basics, users/roles basics.
 
-- [ ] Milestone D complete.
+- [ ] Milestone D complete. **Extension runtime/source-level coverage is implemented; Studio workflows and local/npm runtime verification remain.**
 
 ### Milestone E — useful production V1
 - files local + S3-compatible;
@@ -613,8 +617,11 @@ Definition of done:
 - [x] Wire authenticated and explicit public-role accountability into the REST/RBAC path.
 - [x] Add password-reset and email-verification one-time token lifecycle with migration `0004`.
 - [x] Add reusable first-administrator creation helper.
-- [x] Add/update database, REST, auth, permission and CLI documentation for shipped behavior.
-- [x] Add non-MySQL unit test sources for bootstrap/context/query/CRUD/RBAC/auth/API contracts.
-- [x] Record npm install/build/test and real-MySQL schema/CRUD/RBAC/auth/API checks in `todo.md`.
-- [ ] Local/Codex: run dependency install, tests, Studio build, bootstrap/API smoke and real-MySQL verification; check Milestone A/B/C only after they pass.
-- [ ] Next code slice: finish destructive schema operations + M2M helper, then extension discovery/runtime before expanding Studio.
+- [x] Wire local/npm extension discovery, hook runtime, endpoint mounting and startup lifecycle.
+- [x] Fix extension SDK/runtime definition-marker mismatch and add runtime-context regression source.
+- [x] Keep extension code on direct services/context; no local self-HTTP behavior.
+- [x] Add/update database, REST, auth, permission, extension and CLI documentation for shipped behavior.
+- [x] Add non-MySQL unit test sources for bootstrap/context/query/CRUD/RBAC/auth/extensions/API contracts.
+- [x] Record npm install/build/test and real-MySQL/schema/CRUD/RBAC/auth/API verification in `todo.md`.
+- [ ] Local/Codex: run dependency install, tests, Studio build, bootstrap/API/extension smoke and real-MySQL verification; check Milestone A/B/C only after they pass.
+- [ ] Next code slice: finish destructive schema operations + physical field mutation policy + M2M helper, then move into authenticated Studio workflows.
