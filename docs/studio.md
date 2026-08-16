@@ -1,99 +1,104 @@
 # YunCMS Studio
 
-Studio is the React 19.2/Vite 8 administration UI in `apps/studio`.
-
-It is intentionally generic and schema-driven rather than a collection-specific application.
+Studio is the React 19.2/Vite 8 administration UI in `apps/studio`. It is generic/schema-driven rather than collection-specific.
 
 ## Authentication
 
-Studio stores the current opaque access/refresh credentials in `sessionStorage`.
+Studio stores opaque access/refresh credentials in `sessionStorage`.
 
 The API client:
 
 - attaches the access token to bearer requests;
-- serializes refresh so concurrent 401 responses do not start multiple refresh rotations;
-- retries the original request once with the rotated access token;
-- clears the session and returns to login when refresh fails.
+- serializes refresh so concurrent 401s do not start multiple refresh rotations;
+- retries the original request once;
+- clears the session and returns to login if refresh fails.
 
-Login includes a password-reset request mode. Reset/verification mail links are handled through URL query parameters:
+Login includes password-reset request mode. Reset/verification links are consumed through:
 
 ```text
 ?auth_action=reset&token=...
 ?auth_action=verify&token=...
 ```
 
-The token is consumed through the corresponding auth API and removed from the browser URL when the flow finishes.
-
 ## Content
 
-The Content screen:
+Content supports:
 
-- loads available schema collections;
-- selects a collection;
-- loads records with generic `/items/:collection` REST;
-- renders a generic table;
-- creates/edits/deletes records;
-- builds primitive controls from field metadata;
-- supports string/text/integer/bigint/decimal/boolean/date/datetime/timestamp/json/uuid input basics;
-- shows loading/error/empty states.
+- collection selection;
+- generic record table;
+- schema-generated create/edit form;
+- create/update/delete;
+- primitive controls for current V1 field types;
+- loading/error/empty states;
+- direct M2O relation pickers;
+- direct M2O display labels in tables.
 
-Relation expansion/display labels are intentionally not a full Directus-style relational explorer yet. Relation fields currently use the generic primitive record form unless a later relation-picker enhancement is added.
+For relation pickers Studio chooses a readable target label using this order:
+
+1. `name`;
+2. `title`;
+3. `label`;
+4. first visible string/text field;
+5. target key/id.
+
+The V1 picker loads up to 200 readable target records through the normal `/items` API, so target RBAC remains effective. Search/paginated relation-picker UX for very large target sets is a later UI optimization.
+
+Generic M2M content editing is intentionally not faked as a relation multi-select; M2M remains an explicit junction lifecycle in V1.
 
 ## Data Model
 
-The Data Model screen uses the administrator `/schema` API to:
+Data Model supports:
 
 - list/create/delete collections;
 - list/create/delete fields;
-- toggle required/nullability through the physical field mutation API;
+- required/nullability mutation;
 - create/delete M2O relations;
 - create M2M junctions;
-- display current relation metadata.
+- group M2M metadata by junction;
+- destructive high-level M2M junction delete.
 
-Destructive operations require explicit confirmation and send the API's `destructive=true` flag where required.
-
-The backend supports high-level M2M junction deletion; the Studio M2M delete control can be expanded further as UX is refined.
+M2M deletion calls the backend lifecycle endpoint with explicit `destructive=true` and warns that junction link records will be removed.
 
 ## Users
 
-The Users screen supports:
+Users supports:
 
-- list users;
-- create a user with password/role/status;
-- change role/status;
-- prevent dangerous current-admin self-disable/delete actions;
+- list/create users;
+- role/status updates;
+- current-admin self-disable/delete protection;
 - delete other users;
-- display email verification status;
-- send a verification email when SMTP is configured.
+- email verification status;
+- send verification mail when SMTP is configured.
 
 ## Roles & Permissions
 
-The Roles/Permissions screen supports:
+Roles/Permissions supports:
 
 - create/rename/delete non-protected roles;
-- mark a new role public;
-- create/update/delete permission records;
-- configure collection/action;
+- create a public role;
+- permission create/update/delete;
+- collection/action selection;
 - field allowlists;
-- row filter JSON.
+- row-filter JSON;
+- create/update prospective-record validation JSON.
 
-The backend also supports create/update `validation` rules. Studio can expose a dedicated validation editor as the permission UX is refined; the REST/service capability already exists.
+Validation input is disabled for read/delete permissions because validation is a write-policy concept.
 
 ## Files
 
-The Files screen supports:
+Files supports:
 
-- list file metadata;
-- upload to the default storage driver;
+- metadata list;
+- upload to default storage;
 - authenticated download;
-- edit title/download filename;
+- title/download-filename edit;
 - delete.
 
-The current UI uploads to default local storage. The REST API can target configured S3-compatible storage using `?storage=s3`; a storage-selector UI is optional follow-up UX rather than a backend requirement.
+The REST layer can also upload to configured S3 with `?storage=s3`. A Studio storage selector and maintenance/reconciliation UI are optional operator UX; backend reconciliation already exists at `POST /files/reconcile`.
 
 ## Accessibility baseline
 
-Current controls use semantic buttons/forms/labels and keyboard-focus styles. Formal accessibility verification is still a manual/local task and is not considered complete solely from source inspection.
+Controls use semantic buttons/forms/labels and focus styles. Formal keyboard/screen-reader/accessibility verification remains manual in `todo.md`.
 
 ## Local commands
 
@@ -102,4 +107,4 @@ npm run dev:studio
 npm run build --workspace=@yuncms/studio
 ```
 
-Build/runtime verification remains in `todo.md` until executed locally.
+Build/runtime verification remains in `todo.md` until it is actually executed.
