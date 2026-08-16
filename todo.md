@@ -38,6 +38,11 @@ Use a disposable local MySQL 8 database; do not point early bootstrap/schema/CRU
 - [ ] Create an M2O through `RelationsService` and verify the physical FK, metadata row, target type validation and `RESTRICT`/`CASCADE`/valid `SET NULL` behavior.
 - [ ] Verify `readO2M()` returns inverse metadata for the target collection without creating a second physical FK.
 - [ ] Delete the M2O through `deleteM2O()` and verify both physical FK and metadata disappear; force metadata-delete failure and confirm FK restoration is attempted.
+- [ ] Create an M2M junction between two disposable collections and verify one physical junction table contains `id`, two required FK fields, both FK constraints, and one unique pair index; confirm junction collection + three fields + two `kind=m2m` relation records are written and schema version increments exactly once.
+- [ ] Insert the same M2M pair twice and confirm the physical unique pair constraint rejects the duplicate link.
+- [ ] Create a self-M2M using explicit distinct junction field names and confirm both FKs point to the same target collection; confirm default colliding field names are rejected before DB access.
+- [ ] Force M2M metadata creation to fail after physical table creation and confirm partial metadata is removed and the junction table is dropped; a failed operation must not increment schema version.
+- [ ] Confirm M2M `SET NULL` is rejected because junction FK fields are required. Do not treat M2M deletion as a single supported lifecycle until a dedicated high-level delete helper lands.
 - [ ] Verify collection/field delete refuses without `destructive: true`, refuses system schema objects, and refuses objects still participating in relation metadata.
 - [ ] Delete a disposable collection with `destructive: true`; confirm tombstone rename happens before metadata deletion, permissions for the collection are removed, schema version increments once, and the tombstone table is dropped after logical commit.
 - [ ] Delete a disposable field with `destructive: true`; confirm tombstone column rename happens before metadata deletion, schema version increments once, and the tombstone column is dropped after logical commit.
