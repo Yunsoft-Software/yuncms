@@ -27,13 +27,21 @@ Use a disposable local MySQL 8 database; do not point early bootstrap/schema/CRU
 - [ ] Confirm migrations `0001` through `0004` are journaled exactly once; `0004-auth-action-tokens` must create `yuncms_auth_tokens` with its unique token hash, user/type and expiry indexes/FK.
 - [ ] Inspect `yuncms_schema_migrations`, `yuncms_schema_state`, `yuncms_collections`, `yuncms_fields`, `yuncms_relations`, auth/file/audit system tables and their indexes/FKs after bootstrap.
 - [ ] Verify the schema advisory lock with two independent Node processes; only one schema mutation should own `yuncms:schema` at a time and lock timeout must fail cleanly.
+- [ ] Verify non-admin/non-system accountability cannot read or mutate `CollectionsService`, `FieldsService` or `RelationsService`, including when invoked from an extension context.
 - [ ] Create two disposable collections through `CollectionsService`; confirm physical MySQL tables, `id CHAR(36)` primary keys and metadata rows agree.
 - [ ] Update safe collection metadata and verify only metadata changes while schema version increments once.
 - [ ] Add representative primitive fields through `FieldsService` (`string`, `integer`, `decimal`, `boolean`, `date/datetime`, `json`, `uuid`) and compare `INFORMATION_SCHEMA` with `yuncms_fields`.
 - [ ] Update field UI metadata (`hidden`, `readonly`, `sort`, `interface`, `options`) and confirm physical column definitions are unchanged while schema version increments once.
+- [ ] Use `FieldsService.updateSchema()` to toggle nullable/required, add/change/remove supported defaults and add/remove an engine-managed index; verify `INFORMATION_SCHEMA`, `yuncms_fields.required`, `schema_metadata` and schema version stay aligned.
+- [ ] Force a physical field ALTER/index step to fail partway through and verify compensation restores the previous column definition/index state; no false metadata/version update may remain.
+- [ ] Confirm a relation using `ON DELETE SET NULL` cannot have its many-side field changed to required/not-null.
 - [ ] Create an M2O through `RelationsService` and verify the physical FK, metadata row, target type validation and `RESTRICT`/`CASCADE`/valid `SET NULL` behavior.
 - [ ] Verify `readO2M()` returns inverse metadata for the target collection without creating a second physical FK.
 - [ ] Delete the M2O through `deleteM2O()` and verify both physical FK and metadata disappear; force metadata-delete failure and confirm FK restoration is attempted.
+- [ ] Verify collection/field delete refuses without `destructive: true`, refuses system schema objects, and refuses objects still participating in relation metadata.
+- [ ] Delete a disposable collection with `destructive: true`; confirm tombstone rename happens before metadata deletion, permissions for the collection are removed, schema version increments once, and the tombstone table is dropped after logical commit.
+- [ ] Delete a disposable field with `destructive: true`; confirm tombstone column rename happens before metadata deletion, schema version increments once, and the tombstone column is dropped after logical commit.
+- [ ] Force metadata failure during destructive collection/field delete and verify the tombstone object is renamed back with original data intact; separately force final tombstone cleanup failure and confirm `SCHEMA_PARTIAL_FAILURE` exposes the cleanup object instead of hiding drift.
 - [ ] Force a metadata failure after physical collection/field/FK creation and verify compensation removes the newly created physical object instead of leaving silent drift.
 - [ ] Verify every successful schema mutation increments `yuncms_schema_state.version` exactly once and failed/compensated mutations do not increment it.
 - [ ] Verify `SchemaCache` reloads after a committed version increment and does not observe an uncommitted metadata/version pair.
