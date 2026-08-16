@@ -23,6 +23,7 @@ function identityFromRow(row) {
     admin: Boolean(row.role_admin),
     email: row.email,
     session: row.session_id,
+    authMethod: 'session',
   };
 }
 
