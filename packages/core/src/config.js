@@ -78,6 +78,14 @@ export function loadConfig(env = process.env) {
     },
     auth: {
       publicUrl: readString(env.AUTH_PUBLIC_URL, studioOrigin).replace(/\/$/, ''),
+      rateLimit: {
+        loginWindowMs: readInteger(env.AUTH_LOGIN_RATE_WINDOW_MS, 60_000, 'AUTH_LOGIN_RATE_WINDOW_MS', { min: 1000, max: 24 * 60 * 60 * 1000 }),
+        loginMax: readInteger(env.AUTH_LOGIN_RATE_MAX, 10, 'AUTH_LOGIN_RATE_MAX', { min: 1, max: 100_000 }),
+        refreshWindowMs: readInteger(env.AUTH_REFRESH_RATE_WINDOW_MS, 60_000, 'AUTH_REFRESH_RATE_WINDOW_MS', { min: 1000, max: 24 * 60 * 60 * 1000 }),
+        refreshMax: readInteger(env.AUTH_REFRESH_RATE_MAX, 30, 'AUTH_REFRESH_RATE_MAX', { min: 1, max: 100_000 }),
+        actionWindowMs: readInteger(env.AUTH_ACTION_RATE_WINDOW_MS, 15 * 60_000, 'AUTH_ACTION_RATE_WINDOW_MS', { min: 1000, max: 24 * 60 * 60 * 1000 }),
+        actionMax: readInteger(env.AUTH_ACTION_RATE_MAX, 5, 'AUTH_ACTION_RATE_MAX', { min: 1, max: 100_000 }),
+      },
     },
   };
 }
