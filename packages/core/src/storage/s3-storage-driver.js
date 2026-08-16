@@ -2,6 +2,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -94,6 +95,42 @@ export class S3StorageDriver {
       }
       throw error;
     }
+  }
+
+  async list() {
+    const objects = [];
+    let continuationToken;
+
+    do {
+      const response = await this.client.send(new ListObjectsV2Command({
+        Bucket: this.bucket,
+        ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
+      }));
+
+      for (const object of response.Contents ?? []) {
+        if (!object.Key) continue;
+        try {
+          const key = assertStorageKey(object.Key);
+          objects.push({
+            key,
+            size: Number(object.Size ?? 0),
+            modifiedAt: object.LastModified ?? null,
+            etag: object.ETag ?? null,
+          });
+        } catch (error) {
+          if (error?.code !== 'INVALID_STORAGE_KEY') throw error;
+        }
+      }
+
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+      if (response.IsTruncated && !continuationToken) {
+        const error = new Error('S3 inventory response was truncated without a continuation token');
+        error.code = 'STORAGE_INVENTORY_FAILED';
+        throw error;
+      }
+    } while (continuationToken);
+
+    return objects;
   }
 
   async delete(key) {
