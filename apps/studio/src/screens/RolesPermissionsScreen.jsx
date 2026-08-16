@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 
-function parseFilterInput(value) {
+function parseJsonInput(value) {
   if (!value.trim()) return null;
   return JSON.parse(value);
 }
@@ -10,6 +10,10 @@ function parseFilterInput(value) {
 function normalizeFieldsInput(value) {
   const fields = value.split(',').map((field) => field.trim()).filter(Boolean);
   return fields.length > 0 ? fields : null;
+}
+
+function supportsValidation(action) {
+  return action === 'create' || action === 'update';
 }
 
 export function RolesPermissionsScreen() {
@@ -22,7 +26,7 @@ export function RolesPermissionsScreen() {
 
   const [roleForm, setRoleForm] = useState({ name: '', description: '', public: false });
   const [permissionForm, setPermissionForm] = useState({
-    role: '', collection: '', action: 'read', fields: '', filter: '',
+    role: '', collection: '', action: 'read', fields: '', filter: '', validation: '',
   });
 
   async function load() {
@@ -106,16 +110,17 @@ export function RolesPermissionsScreen() {
     setError('');
     setNotice('');
     try {
-      const fields = normalizeFieldsInput(permissionForm.fields);
-      const filter = parseFilterInput(permissionForm.filter);
       await apiRequest('/permissions', {
         method: 'POST',
         body: {
           role: permissionForm.role,
           collection: permissionForm.collection,
           action: permissionForm.action,
-          fields,
-          filter,
+          fields: normalizeFieldsInput(permissionForm.fields),
+          filter: parseJsonInput(permissionForm.filter),
+          validation: supportsValidation(permissionForm.action)
+            ? parseJsonInput(permissionForm.validation)
+            : null,
         },
       });
       setPermissionForm((current) => ({
@@ -123,6 +128,7 @@ export function RolesPermissionsScreen() {
         action: 'read',
         fields: '',
         filter: '',
+        validation: '',
       }));
       setNotice('Permission created');
       await load();
@@ -139,6 +145,13 @@ export function RolesPermissionsScreen() {
     const filter = window.prompt('Row filter JSON (empty = none)', currentFilter);
     if (filter == null) return;
 
+    let validation = null;
+    if (supportsValidation(permission.action)) {
+      const currentValidation = permission.validation ? JSON.stringify(permission.validation) : '';
+      validation = window.prompt('Write validation JSON (empty = none)', currentValidation);
+      if (validation == null) return;
+    }
+
     setError('');
     setNotice('');
     try {
@@ -146,7 +159,8 @@ export function RolesPermissionsScreen() {
         method: 'PATCH',
         body: {
           fields: normalizeFieldsInput(fields),
-          filter: parseFilterInput(filter),
+          filter: parseJsonInput(filter),
+          validation: supportsValidation(permission.action) ? parseJsonInput(validation) : null,
         },
       });
       setNotice('Permission updated');
@@ -182,18 +196,11 @@ export function RolesPermissionsScreen() {
           <form className="form-stack compact" onSubmit={createRole}>
             <label className="field-label">
               <span>Name</span>
-              <input
-                value={roleForm.name}
-                onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))}
-                required
-              />
+              <input value={roleForm.name} onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))} required />
             </label>
             <label className="field-label">
               <span>Description</span>
-              <input
-                value={roleForm.description}
-                onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))}
-              />
+              <input value={roleForm.description} onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))} />
             </label>
             <label className="checkbox-label">
               <input
@@ -228,41 +235,33 @@ export function RolesPermissionsScreen() {
           <div>
             <p className="eyebrow">Permissions</p>
             <h2>Create permission</h2>
-            <p>Fields and row filters are enforced by ItemsService, including extension calls.</p>
+            <p>Fields, row filters and create/update validation are enforced by ItemsService, including extension calls.</p>
           </div>
 
           <form className="form-stack compact" onSubmit={createPermission}>
             <label className="field-label">
               <span>Role</span>
-              <select
-                value={permissionForm.role}
-                onChange={(event) => setPermissionForm((current) => ({ ...current, role: event.target.value }))}
-                required
-              >
+              <select value={permissionForm.role} onChange={(event) => setPermissionForm((current) => ({ ...current, role: event.target.value }))} required>
                 <option value="">Select role</option>
-                {roles.filter((role) => !role.admin).map((role) => (
-                  <option key={role.id} value={role.id}>{role.name}</option>
-                ))}
+                {roles.filter((role) => !role.admin).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
               </select>
             </label>
             <label className="field-label">
               <span>Collection</span>
-              <select
-                value={permissionForm.collection}
-                onChange={(event) => setPermissionForm((current) => ({ ...current, collection: event.target.value }))}
-                required
-              >
+              <select value={permissionForm.collection} onChange={(event) => setPermissionForm((current) => ({ ...current, collection: event.target.value }))} required>
                 <option value="">Select collection</option>
-                {collections.map((entry) => (
-                  <option key={entry.collection} value={entry.collection}>{entry.collection}</option>
-                ))}
+                {collections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}
               </select>
             </label>
             <label className="field-label">
               <span>Action</span>
               <select
                 value={permissionForm.action}
-                onChange={(event) => setPermissionForm((current) => ({ ...current, action: event.target.value }))}
+                onChange={(event) => setPermissionForm((current) => ({
+                  ...current,
+                  action: event.target.value,
+                  validation: supportsValidation(event.target.value) ? current.validation : '',
+                }))}
               >
                 <option value="read">read</option>
                 <option value="create">create</option>
@@ -287,6 +286,16 @@ export function RolesPermissionsScreen() {
                 placeholder='{"status":{"_eq":"active"}}'
               />
             </label>
+            <label className="field-label">
+              <span>Write validation JSON</span>
+              <textarea
+                rows="4"
+                value={permissionForm.validation}
+                disabled={!supportsValidation(permissionForm.action)}
+                onChange={(event) => setPermissionForm((current) => ({ ...current, validation: event.target.value }))}
+                placeholder={supportsValidation(permissionForm.action) ? '{"status":{"_in":["draft","active"]}}' : 'Only create/update permissions use validation'}
+              />
+            </label>
             <button className="primary-button" type="submit">Create permission</button>
           </form>
         </article>
@@ -298,7 +307,9 @@ export function RolesPermissionsScreen() {
       <section className="table-panel">
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Role</th><th>Collection</th><th>Action</th><th>Fields</th><th>Filter</th><th /></tr></thead>
+            <thead>
+              <tr><th>Role</th><th>Collection</th><th>Action</th><th>Fields</th><th>Filter</th><th>Validation</th><th /></tr>
+            </thead>
             <tbody>
               {permissions.map((permission) => (
                 <tr key={permission.id}>
@@ -307,6 +318,7 @@ export function RolesPermissionsScreen() {
                   <td>{permission.action}</td>
                   <td>{permission.fields?.join(', ') || 'all'}</td>
                   <td><code>{permission.filter ? JSON.stringify(permission.filter) : '—'}</code></td>
+                  <td><code>{permission.validation ? JSON.stringify(permission.validation) : '—'}</code></td>
                   <td className="row-actions">
                     <button className="text-button" type="button" onClick={() => editPermission(permission)}>Edit</button>
                     <button className="danger-button" type="button" onClick={() => deletePermission(permission)}>Delete</button>
