@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 
 const STORAGE_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,190}$/;
@@ -58,6 +58,33 @@ export class LocalStorageDriver {
       if (error?.code === 'ENOENT') return null;
       throw error;
     }
+  }
+
+  async list() {
+    let entries;
+    try {
+      entries = await readdir(this.root, { withFileTypes: true });
+    } catch (error) {
+      if (error?.code === 'ENOENT') return [];
+      throw error;
+    }
+
+    const objects = [];
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      try {
+        const key = assertStorageKey(entry.name);
+        const info = await stat(this.pathFor(key));
+        objects.push({
+          key,
+          size: info.size,
+          modifiedAt: info.mtime,
+        });
+      } catch (error) {
+        if (error?.code !== 'INVALID_STORAGE_KEY') throw error;
+      }
+    }
+    return objects;
   }
 
   async delete(key) {
