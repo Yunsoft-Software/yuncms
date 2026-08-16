@@ -22,8 +22,8 @@ See [`plan.md`](./plan.md) for the roadmap/status, [`AGENTS.md`](./AGENTS.md) fo
 
 ```text
 apps/studio                React Studio shell
-packages/api               Express HTTP runtime
-packages/core              MySQL, bootstrap, schema/query and service foundations
+packages/api               Express HTTP runtime and thin REST adapters
+packages/core              MySQL, bootstrap, schema/query/RBAC service foundations
 packages/extensions-sdk    extension authoring helpers
 packages/cli               YunCMS CLI; bootstrap command is implemented
 ```
@@ -37,16 +37,20 @@ Current code includes:
 - versioned system bootstrap with a migration journal and MySQL advisory lock;
 - `yuncms_*` metadata/auth/file/audit foundation tables;
 - schema version state and a version-aware schema snapshot cache;
-- `CollectionsService` create/read/list for user collections;
-- `FieldsService` primitive field create/read;
-- `RelationsService` validated M2O creation;
+- `CollectionsService` create/read/list plus safe metadata-only updates;
+- `FieldsService` primitive field create/read plus safe metadata-only updates;
+- `RelationsService` validated M2O create/delete and O2M inverse reads;
 - allowlisted item filter/sort/field query compiler;
-- generic `ItemsService` CRUD foundation;
+- generic `ItemsService` CRUD with service-layer role permission enforcement;
+- `RolesService` and `PermissionsService` foundations with field allowlists and row filters;
+- generic `/items/:collection` REST CRUD adapters and a canonical API error response middleware;
 - `defineEndpoint` / `defineHook` extension SDK helpers;
 - `yuncms bootstrap` CLI command;
 - minimal React Studio shell and API health indicator.
 
-Schema update/delete paths, M2M, auth/RBAC, real REST item routes, extension loading, files, the interactive setup wizard and most Studio screens are still roadmap work. `ItemsService` deliberately rejects non-admin/non-system accountability until RBAC enforcement is implemented, so unfinished permissions cannot accidentally become permissive.
+M2M, destructive schema deletes, authentication/session middleware, permission validation rules, extension loading, files, the interactive setup wizard and most Studio screens are still roadmap work.
+
+The HTTP API currently assigns role-less public accountability because authentication is not implemented yet. Item routes therefore fail closed with `FORBIDDEN` rather than temporarily exposing CRUD. Explicit public-role and authenticated-role assignment will land with auth.
 
 ## Local development
 
@@ -70,6 +74,8 @@ Current API probes:
 GET /health   process/API health after the server has passed startup compatibility checks
 GET /ready    live MySQL readiness; returns 503 when DB access fails after startup
 ```
+
+See [`docs/database.md`](./docs/database.md), [`docs/rest-api.md`](./docs/rest-api.md) and [`docs/setup-cli.md`](./docs/setup-cli.md) for the currently implemented database/API/CLI behavior.
 
 ## Design rule that matters most
 
