@@ -68,6 +68,20 @@ export function loadConfig(env = process.env) {
         forcePathStyle: readBoolean(env.S3_FORCE_PATH_STYLE, false),
       },
     },
+    audit: {
+      retentionDays: readInteger(env.AUDIT_RETENTION_DAYS, 90, 'AUDIT_RETENTION_DAYS', {
+        min: 1,
+        max: 3650,
+      }),
+      cleanupBatchSize: readInteger(env.AUDIT_CLEANUP_BATCH_SIZE, 1000, 'AUDIT_CLEANUP_BATCH_SIZE', {
+        min: 1,
+        max: 5000,
+      }),
+      cleanupMaxBatches: readInteger(env.AUDIT_CLEANUP_MAX_BATCHES, 100, 'AUDIT_CLEANUP_MAX_BATCHES', {
+        min: 1,
+        max: 1000,
+      }),
+    },
     mail: {
       host: readString(env.SMTP_HOST, ''),
       port: readInteger(env.SMTP_PORT, 587, 'SMTP_PORT', { min: 1, max: 65535 }),
