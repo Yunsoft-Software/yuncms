@@ -19,7 +19,14 @@ function isPublicAuthRoute(req) {
   return req.method === 'POST' && (req.path === '/auth/login' || req.path === '/auth/refresh');
 }
 
-export function createAuthenticationMiddleware({ pool, config, logger, services }) {
+export function createAuthenticationMiddleware({
+  pool,
+  config,
+  logger,
+  services,
+  schemaCache = null,
+  emitter = null,
+}) {
   return async (req, _res, next) => {
     try {
       const AuthService = services.AuthService;
@@ -28,6 +35,7 @@ export function createAuthenticationMiddleware({ pool, config, logger, services 
         accountability: bootstrapAccountability,
         database: pool,
         logger,
+        emitter,
       });
 
       const token = bearerToken(req.get('authorization'));
@@ -58,13 +66,16 @@ export function createAuthenticationMiddleware({ pool, config, logger, services 
         req.apiTokenId = null;
       }
 
+      const schema = schemaCache ? await schemaCache.get(pool) : null;
       req.accountability = accountability;
       req.context = createRequestContext({
         accountability,
         services,
         database: pool,
+        schema,
         logger,
         env: config,
+        emitter,
         requestId: req.id,
       });
       next();
