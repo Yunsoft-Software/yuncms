@@ -4,11 +4,12 @@ This file contains only work that cannot be completed or truthfully verified fro
 
 ## Next Codex/local-machine session
 
-- [ ] Clone/switch to branch `16-08-2026` and run `npm install` after the workspace/package files land. Commit the generated `package-lock.json` if dependency resolution succeeds without unexpected major-version drift.
+- [ ] Clone/switch to branch `16-08-2026` and run `npm install`. Commit the generated `package-lock.json` if dependency resolution succeeds without unexpected major-version drift.
 - [ ] Confirm the local runtime is Node.js 24 LTS with `node --version`. Do not continue on an EOL Node release.
-- [ ] Run all non-MySQL tests with `npm test` after dependencies are installed.
-- [ ] Run Studio build with `npm run build --workspace=@yuncms/studio` (or the final workspace name if adjusted during implementation).
-- [ ] Run API start/smoke check and verify `/health` returns process health without requiring a DB, while `/ready` reports DB readiness accurately.
+- [ ] Run all non-MySQL tests with `npm test` after dependencies are installed. Fix actual failures before checking related `plan.md` verification items.
+- [ ] Run Studio build with `npm run build --workspace=@yuncms/studio`.
+- [ ] Confirm the API refuses to listen on an unbootstrapped database with `DATABASE_MIGRATION_REQUIRED` rather than silently creating application schema at startup.
+- [ ] After bootstrapping the test DB, run the API and verify `/health` returns process health and `/ready` reports MySQL readiness accurately.
 
 ## Real MySQL required
 
@@ -17,9 +18,15 @@ Use a disposable local MySQL 8 database; do not point early bootstrap/schema tes
 - [ ] Create an empty database and a least-privilege test user able to create/alter/drop tables inside that database.
 - [ ] Copy `.env.example` to `.env` and fill the MySQL connection values.
 - [ ] Verify `mysql2/promise` can connect and `SELECT 1` succeeds.
-- [ ] Once bootstrap code exists, run it twice against the same empty database and verify the second run is idempotent.
-- [ ] Inspect created `yuncms_*` system tables manually after first bootstrap.
-- [ ] Run real-MySQL integration tests for transactions, rollback, duplicate-key normalization, FK behavior, advisory schema locking, deadlock retry, and schema metadata/physical-schema consistency as those tests are added.
+- [ ] Run `bootstrapDatabase()` against the empty database, then run it a second time and verify the second run reports no newly applied migration and changes nothing destructive.
+- [ ] Inspect `yuncms_schema_migrations`, `yuncms_schema_state`, `yuncms_collections`, `yuncms_fields`, `yuncms_relations`, auth/file/audit system tables and their indexes/FKs after bootstrap.
+- [ ] Verify the schema advisory lock with two independent Node processes; only one schema mutation should own `yuncms:schema` at a time and lock timeout must fail cleanly.
+- [ ] Create two disposable collections through `CollectionsService`; confirm physical MySQL tables, `id CHAR(36)` primary keys and metadata rows agree.
+- [ ] Add representative primitive fields through `FieldsService` (`string`, `integer`, `decimal`, `boolean`, `date/datetime`, `json`, `uuid`) and compare `INFORMATION_SCHEMA` with `yuncms_fields`.
+- [ ] Create an M2O through `RelationsService` and verify the physical FK, metadata row, target type validation and `RESTRICT`/`CASCADE`/valid `SET NULL` behavior.
+- [ ] Force a metadata failure after physical collection/field/FK creation and verify compensation removes the newly created physical object instead of leaving silent drift.
+- [ ] Verify every successful schema mutation increments `yuncms_schema_state.version` exactly once and failed/compensated mutations do not increment it.
+- [ ] Run real-MySQL integration tests for transactions, rollback, duplicate-key normalization, FK behavior, advisory schema locking, deadlock retry, concurrent DDL and schema metadata/physical-schema consistency as those tests are added.
 
 ## npm/package publishing decisions
 
