@@ -4,6 +4,7 @@ import { AuthService } from './auth-service.js';
 import { AuthTokensService } from './auth-tokens-service.js';
 import { CollectionsService } from './collections-service.js';
 import { FieldsService } from './fields-service.js';
+import { FileReconciliationService } from './file-reconciliation-service.js';
 import { FilesService } from './files-service.js';
 import { ItemsService } from './items-service.js';
 import { PermissionsService } from './permissions-service.js';
@@ -26,5 +27,6 @@ export function createCoreServiceRegistry() {
     RolesService,
     PermissionsService,
     FilesService,
+    FileReconciliationService,
   });
 }
