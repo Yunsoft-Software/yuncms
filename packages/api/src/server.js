@@ -42,10 +42,15 @@ async function start() {
     endpointExtensions: extensionRuntime.endpointExtensions,
   });
 
-  await extensionRuntime.init('app.start');
-  server = app.listen(config.server.port, config.server.host, () => {
-    console.log(`YunCMS API listening on http://${config.server.host}:${config.server.port}`);
+  await extensionRuntime.init('app.beforeStart');
+  server = await new Promise((resolve, reject) => {
+    const listeningServer = app.listen(config.server.port, config.server.host, () => {
+      console.log(`YunCMS API listening on http://${config.server.host}:${config.server.port}`);
+      resolve(listeningServer);
+    });
+    listeningServer.once('error', reject);
   });
+  await extensionRuntime.init('app.afterStart');
 }
 
 async function shutdown(signal) {
