@@ -4,7 +4,7 @@ import { withAdvisoryLock } from './advisory-lock.js';
 import { assertIdentifier, quoteIdentifier } from './identifier.js';
 import { SchemaMetadataRepository } from './schema-metadata-repository.js';
 import { incrementSchemaVersion } from './schema-version.js';
-import { assertSchemaManager } from './services/schema-authorization.js';
+import { assertSchemaManager } from './services/schema-access.js';
 import { withConnectionTransaction } from './transaction.js';
 
 function lifecycleError(code, message) {
