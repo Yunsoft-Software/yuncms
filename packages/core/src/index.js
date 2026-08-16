@@ -15,6 +15,12 @@ export { createInitialAdmin, findExistingAdmin } from './setup.js';
 export { HookEmitter } from './hooks.js';
 export { createJsonLogger, LEVELS as LOG_LEVELS } from './logger.js';
 export { deleteM2MJunction } from './m2m-lifecycle.js';
+export {
+  MAX_EXPAND_FIELDS,
+  parseExpandInput,
+  readManyWithRelations,
+  readOneWithRelations,
+} from './relation-expansion.js';
 export { SmtpMailer } from './mail/smtp-mailer.js';
 export { LocalStorageDriver, assertStorageKey } from './storage/local-storage-driver.js';
 export { S3StorageDriver } from './storage/s3-storage-driver.js';
