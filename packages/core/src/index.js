@@ -11,7 +11,7 @@ export {
   requireAccountability,
 } from './accountability.js';
 export { createRequestContext } from './context.js';
-export { createInitialAdmin } from './setup.js';
+export { createInitialAdmin, findExistingAdmin } from './setup.js';
 export { BaseService } from './services/base-service.js';
 export { createServiceRegistry } from './services/service-registry.js';
 export { createCoreServiceRegistry } from './services/core-services.js';
