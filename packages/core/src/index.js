@@ -13,6 +13,12 @@ export {
 export { createRequestContext } from './context.js';
 export { BaseService } from './services/base-service.js';
 export { createServiceRegistry } from './services/service-registry.js';
+export { createCoreServiceRegistry } from './services/core-services.js';
+export { CollectionsService } from './services/collections-service.js';
+export { FieldsService } from './services/fields-service.js';
+export { RelationsService } from './services/relations-service.js';
+export { SchemaMetadataRepository } from './schema-metadata-repository.js';
+export { assertFieldType, compileFieldColumn } from './field-types.js';
 export { withAdvisoryLock } from './advisory-lock.js';
 export {
   ensureMigrationJournal,
