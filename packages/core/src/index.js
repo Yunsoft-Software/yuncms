@@ -16,6 +16,7 @@ export { BaseService } from './services/base-service.js';
 export { createServiceRegistry } from './services/service-registry.js';
 export { createCoreServiceRegistry } from './services/core-services.js';
 export { AuthService } from './services/auth-service.js';
+export { ApiTokensService } from './services/api-tokens-service.js';
 export { ItemsService } from './services/items-service.js';
 export { CollectionsService } from './services/collections-service.js';
 export { FieldsService } from './services/fields-service.js';
