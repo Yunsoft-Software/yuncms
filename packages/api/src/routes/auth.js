@@ -1,5 +1,6 @@
 import express from 'express';
 
+import { createFixedWindowRateLimit } from '../rate-limit.js';
 import { serviceOptionsFromRequest } from '../service-options.js';
 
 function service(req, name) {
@@ -44,8 +45,21 @@ function actionUrl(config, action, token) {
 
 export function createAuthRouter({ mailer = null, config = null, logger = console } = {}) {
   const router = express.Router();
+  const limits = config?.auth?.rateLimit ?? {};
+  const loginLimit = createFixedWindowRateLimit({
+    windowMs: limits.loginWindowMs ?? 60_000,
+    max: limits.loginMax ?? 10,
+  });
+  const refreshLimit = createFixedWindowRateLimit({
+    windowMs: limits.refreshWindowMs ?? 60_000,
+    max: limits.refreshMax ?? 30,
+  });
+  const actionLimit = createFixedWindowRateLimit({
+    windowMs: limits.actionWindowMs ?? 15 * 60_000,
+    max: limits.actionMax ?? 5,
+  });
 
-  router.post('/login', async (req, res) => {
+  router.post('/login', loginLimit, async (req, res) => {
     const result = await authService(req).login({
       email: req.body?.email,
       password: req.body?.password,
@@ -55,7 +69,7 @@ export function createAuthRouter({ mailer = null, config = null, logger = consol
     res.json({ data: result });
   });
 
-  router.post('/refresh', async (req, res) => {
+  router.post('/refresh', refreshLimit, async (req, res) => {
     const result = await authService(req).refresh(req.body?.refresh_token);
     res.json({ data: result });
   });
@@ -72,7 +86,7 @@ export function createAuthRouter({ mailer = null, config = null, logger = consol
     res.status(204).end();
   });
 
-  router.post('/password-reset/request', async (req, res) => {
+  router.post('/password-reset/request', actionLimit, async (req, res) => {
     const transport = requireMailer(mailer);
     const result = await authTokensService(req).requestPasswordReset(req.body?.email);
 
@@ -96,12 +110,12 @@ export function createAuthRouter({ mailer = null, config = null, logger = consol
     res.status(202).json({ data: { accepted: true } });
   });
 
-  router.post('/password-reset/confirm', async (req, res) => {
+  router.post('/password-reset/confirm', actionLimit, async (req, res) => {
     await authTokensService(req).resetPassword(req.body?.token, req.body?.password);
     res.status(204).end();
   });
 
-  router.post('/email-verification/request', async (req, res) => {
+  router.post('/email-verification/request', actionLimit, async (req, res) => {
     const transport = requireMailer(mailer);
     if (!req.accountability?.user) {
       const error = new Error('Authentication is required to request email verification');
@@ -126,7 +140,7 @@ export function createAuthRouter({ mailer = null, config = null, logger = consol
     res.status(202).json({ data: { accepted: true } });
   });
 
-  router.post('/email-verification/confirm', async (req, res) => {
+  router.post('/email-verification/confirm', actionLimit, async (req, res) => {
     await authTokensService(req).verifyEmail(req.body?.token);
     res.status(204).end();
   });
