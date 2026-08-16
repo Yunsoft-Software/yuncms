@@ -1,118 +1,180 @@
 # Environment / Manual TODO
 
-This file contains only work that cannot be completed or truthfully verified from the current GitHub-connector environment. Product roadmap work belongs in `plan.md`.
+This file contains only work that cannot be completed or truthfully verified from the GitHub-connector environment. Product/source roadmap work belongs in `plan.md`.
 
-## Next Codex/local-machine session
+## 1. Fresh local checkout / dependency graph
 
-- [ ] Clone/switch to branch `16-08-2026` and run `npm install`. Commit the generated `package-lock.json` if dependency resolution succeeds without unexpected major-version drift.
-- [ ] Confirm the local runtime is Node.js 24 LTS with `node --version`. Do not continue on an EOL Node release.
-- [ ] Run all non-MySQL tests with `npm test` after dependencies are installed. Fix actual failures before checking related `plan.md` verification items.
-- [ ] Run Studio build with `npm run build --workspace=@yuncms/studio`.
-- [ ] Run `node packages/cli/bin/yuncms.js help` and verify only actually implemented CLI commands are advertised as available.
-- [ ] Confirm the API refuses to listen on an unbootstrapped database with `DATABASE_MIGRATION_REQUIRED` rather than silently creating application schema at startup.
-- [ ] Run `npm run bootstrap` on a disposable MySQL database and then start the API; verify `/health` returns process health and `/ready` reports MySQL readiness accurately.
-- [ ] Call a generic `/items/<existing-collection>` route without credentials and confirm role-less/no-permission public access fails closed with canonical HTTP 403 rather than exposing data.
-- [ ] Verify unknown routed errors do not expose stack traces, DB messages or secrets in HTTP responses; confirm request ids correlate with server logs.
+- [ ] Switch to branch `16-08-2026` and confirm the working tree is clean before validation.
+- [ ] Confirm Node.js 24 LTS with `node --version`.
+- [ ] Run `npm install` and review dependency resolution, including `mysql2`, `@aws-sdk/client-s3` and `nodemailer`.
+- [ ] Commit the generated/reviewed `package-lock.json` only after dependency installation succeeds without unexpected major-version drift.
+- [ ] Run `npm test` and fix real failures before marking any verification milestone complete.
+- [ ] Run `npm run build --workspace=@yuncms/studio`.
+- [ ] Run CLI help and confirm only shipped commands are advertised: `init`, `bootstrap`, `start`, `help`.
+- [ ] Run `yuncms start`/the workspace equivalent and verify the child API process inherits the project cwd/environment and exits cleanly.
 
-## Real MySQL required
+## 2. Disposable MySQL 8 bootstrap
 
-Use a disposable local MySQL 8 database; do not point early bootstrap/schema/CRUD/RBAC/auth tests at production data.
+Use a disposable database, never production data.
 
-### Bootstrap and schema
+- [ ] Create a least-privilege test database user that can perform the DDL required inside only the YunCMS test database.
+- [ ] Copy `.env.example` to `.env` and fill test DB values.
+- [ ] Verify `mysql2/promise` connection and `SELECT 1`.
+- [ ] Confirm the API refuses to listen on an empty/unbootstrapped DB with `DATABASE_MIGRATION_REQUIRED` rather than silently creating schema.
+- [ ] Run `yuncms bootstrap`; confirm migrations `0001` through `0004` are journaled exactly once.
+- [ ] Run bootstrap a second time and confirm it is idempotent/no-op.
+- [ ] Inspect all core `yuncms_*` tables, indexes, FKs and `yuncms_schema_state`.
+- [ ] Start API after bootstrap; verify `/health` and `/ready` semantics.
+- [ ] Confirm request ids are returned and correlate with structured server logs.
 
-- [ ] Create an empty database and a least-privilege test user able to create/alter/drop tables inside that database.
-- [ ] Copy `.env.example` to `.env` and fill the MySQL connection values.
-- [ ] Verify `mysql2/promise` can connect and `SELECT 1` succeeds.
-- [ ] Run `bootstrapDatabase()`/`npm run bootstrap` against the empty database, then run it a second time and verify the second run reports no newly applied migration and changes nothing destructive.
-- [ ] Confirm migrations `0001` through `0004` are journaled exactly once; `0004-auth-action-tokens` must create `yuncms_auth_tokens` with its unique token hash, user/type and expiry indexes/FK.
-- [ ] Inspect `yuncms_schema_migrations`, `yuncms_schema_state`, `yuncms_collections`, `yuncms_fields`, `yuncms_relations`, auth/file/audit system tables and their indexes/FKs after bootstrap.
-- [ ] Verify the schema advisory lock with two independent Node processes; only one schema mutation should own `yuncms:schema` at a time and lock timeout must fail cleanly.
-- [ ] Verify non-admin/non-system accountability cannot read or mutate `CollectionsService`, `FieldsService` or `RelationsService`, including when invoked from an extension context.
-- [ ] Create two disposable collections through `CollectionsService`; confirm physical MySQL tables, `id CHAR(36)` primary keys and metadata rows agree.
-- [ ] Update safe collection metadata and verify only metadata changes while schema version increments once.
-- [ ] Add representative primitive fields through `FieldsService` (`string`, `integer`, `decimal`, `boolean`, `date/datetime`, `json`, `uuid`) and compare `INFORMATION_SCHEMA` with `yuncms_fields`.
-- [ ] Update field UI metadata (`hidden`, `readonly`, `sort`, `interface`, `options`) and confirm physical column definitions are unchanged while schema version increments once.
-- [ ] Use `FieldsService.updateSchema()` to toggle nullable/required, add/change/remove supported defaults and add/remove an engine-managed index; verify `INFORMATION_SCHEMA`, `yuncms_fields.required`, `schema_metadata` and schema version stay aligned.
-- [ ] Force a physical field ALTER/index step to fail partway through and verify compensation restores the previous column definition/index state; no false metadata/version update may remain.
-- [ ] Confirm a relation using `ON DELETE SET NULL` cannot have its many-side field changed to required/not-null.
-- [ ] Create an M2O through `RelationsService` and verify the physical FK, metadata row, target type validation and `RESTRICT`/`CASCADE`/valid `SET NULL` behavior.
-- [ ] Verify `readO2M()` returns inverse metadata for the target collection without creating a second physical FK.
-- [ ] Delete the M2O through `deleteM2O()` and verify both physical FK and metadata disappear; force metadata-delete failure and confirm FK restoration is attempted.
-- [ ] Create an M2M junction between two disposable collections and verify one physical junction table contains `id`, two required FK fields, both FK constraints, and one unique pair index; confirm junction collection + three fields + two `kind=m2m` relation records are written and schema version increments exactly once.
-- [ ] Insert the same M2M pair twice and confirm the physical unique pair constraint rejects the duplicate link.
-- [ ] Create a self-M2M using explicit distinct junction field names and confirm both FKs point to the same target collection; confirm default colliding field names are rejected before DB access.
-- [ ] Force M2M metadata creation to fail after physical table creation and confirm partial metadata is removed and the junction table is dropped; a failed operation must not increment schema version.
-- [ ] Confirm M2M `SET NULL` is rejected because junction FK fields are required. Do not treat M2M deletion as a single supported lifecycle until a dedicated high-level delete helper lands.
-- [ ] Verify collection/field delete refuses without `destructive: true`, refuses system schema objects, and refuses objects still participating in relation metadata.
-- [ ] Delete a disposable collection with `destructive: true`; confirm tombstone rename happens before metadata deletion, permissions for the collection are removed, schema version increments once, and the tombstone table is dropped after logical commit.
-- [ ] Delete a disposable field with `destructive: true`; confirm tombstone column rename happens before metadata deletion, schema version increments once, and the tombstone column is dropped after logical commit.
-- [ ] Force metadata failure during destructive collection/field delete and verify the tombstone object is renamed back with original data intact; separately force final tombstone cleanup failure and confirm `SCHEMA_PARTIAL_FAILURE` exposes the cleanup object instead of hiding drift.
-- [ ] Force a metadata failure after physical collection/field/FK creation and verify compensation removes the newly created physical object instead of leaving silent drift.
-- [ ] Verify every successful schema mutation increments `yuncms_schema_state.version` exactly once and failed/compensated mutations do not increment it.
-- [ ] Verify `SchemaCache` reloads after a committed version increment and does not observe an uncommitted metadata/version pair.
-- [ ] Run real-MySQL integration tests for transactions, rollback, duplicate-key normalization, FK behavior, advisory schema locking, deadlock retry, concurrent DDL and schema metadata/physical-schema consistency.
+## 3. Dynamic schema / DDL compensation
 
-### Generic CRUD/query compiler
+- [ ] Verify non-admin/non-system accountability cannot read or mutate Collections/Fields/Relations services or `/schema` routes.
+- [ ] Create collections and confirm `id CHAR(36)` PK + metadata agree with `INFORMATION_SCHEMA`.
+- [ ] Add each supported primitive field family and compare metadata vs physical columns.
+- [ ] Verify metadata-only collection/field updates do not accidentally alter physical schema.
+- [ ] Verify `FieldsService.updateSchema()` required/null/default/index behavior against real MySQL.
+- [ ] Confirm `SET NULL` relations cannot be made required/not-null.
+- [ ] Create/delete M2O and verify FK metadata/physical state plus restoration compensation.
+- [ ] Create M2M and verify junction table, two FKs, unique pair and paired relation metadata.
+- [ ] Delete M2M through the high-level destructive lifecycle; verify tombstone rename, metadata removal, schema-version increment and final DROP.
+- [ ] Force M2M metadata failure after tombstone rename and verify the original junction table name/data is restored.
+- [ ] Verify collection/field destructive delete refuses without `destructive=true` and refuses related/system objects.
+- [ ] Force metadata failures during collection/field destructive delete and confirm tombstone objects restore with data intact.
+- [ ] Force final tombstone cleanup failure and confirm `SCHEMA_PARTIAL_FAILURE` exposes the cleanup object rather than hiding drift.
+- [ ] Verify every successful schema mutation increments schema version exactly once and failed/compensated mutations do not.
+- [ ] Verify `SchemaCache` sees only committed version/metadata pairs.
+- [ ] Run concurrent schema mutations from two independent Node processes and verify `yuncms:schema` advisory serialization/timeouts.
+- [ ] Run deadlock/lock-wait retry scenarios against real MySQL.
 
-- [ ] Create records through `ItemsService` using explicit system accountability and verify generated UUID primary keys, required/read-only behavior and placeholder-bound values.
-- [ ] Verify `readManyWithMeta()` fields/filter/sort/limit/offset/count against real MySQL, including `_and/_or`, `_in/_nin`, NULL and escaped LIKE cases.
-- [ ] Attempt SQL-injection payloads through collection names, field selection, sort, filter operators and values; identifiers/operators must fail closed and values must remain data parameters.
-- [ ] Verify `createMany()` rolls back the whole transaction when a later row fails.
-- [ ] Verify `updateMany()` and `deleteMany()` reject missing/empty caller filters even for admin/system accountability.
-- [ ] Verify `/items/:collection` REST responses/error shapes with authenticated admin, normal-role, public-role and role-less requests.
+## 4. Generic CRUD / query compiler
 
-### Authentication and sessions
+- [ ] Create/read/update/delete records through `ItemsService` and `/items` with explicit admin/system accountability.
+- [ ] Verify UUID generation, required/read-only/default behavior.
+- [ ] Verify `fields`, filters, sort, limit, offset and count metadata against real MySQL.
+- [ ] Cover `_and/_or`, `_in/_nin`, NULL and escaped LIKE operators.
+- [ ] Attempt SQL-injection payloads through collection names, field names, sort, filter operators and values; identifiers/operators must fail closed and values remain bound parameters.
+- [ ] Verify `createMany()` rolls back the full transaction when a later row fails.
+- [ ] Verify bulk update/delete reject empty/missing caller filters even for admin/system.
+- [ ] Verify item filter hooks transform payload before validation/mutation and thrown filters prevent DB writes.
+- [ ] Verify item action hooks run after successful mutation, and bulk-create actions only after transaction commit.
+- [ ] Verify recursive hook chains stop at `HOOK_RECURSION_LIMIT` without affecting unrelated concurrent requests.
 
-- [ ] Create the first admin through `createInitialAdmin()` on a bootstrapped DB; rerun and confirm it refuses to silently create a second initial admin.
-- [ ] Login with valid/invalid credentials and verify unknown user, bad password and inactive user all fail with the same public credential error shape.
-- [ ] Verify access tokens authenticate only while both access/session TTLs are valid and while the owning user is active.
-- [ ] Refresh a session and verify both access and refresh tokens rotate; replay the old refresh token and confirm it fails.
-- [ ] Run two concurrent refreshes with the same refresh token and confirm only one succeeds.
-- [ ] Verify `logout` revokes only the current session and `logout-all` revokes every session for the authenticated user.
-- [ ] Change a password and confirm all existing sessions are revoked in the same transaction.
-- [ ] Create/list/revoke API tokens; confirm token secrets/hashes never appear in list responses, expiry is enforced, and disabling the owning user disables authentication.
-- [ ] Request a password-reset token for an active user and confirm previous unused reset tokens are replaced; malformed/unknown/inactive accounts must not expose account existence.
-- [ ] Consume a reset token once; confirm password changes, all sessions are revoked, outstanding sibling reset tokens are removed and replay fails.
-- [ ] Issue email-verification only for self/admin/system accountability; consume once, set `email_verified_at`, and verify replay/expired/wrong-prefix tokens fail.
-- [ ] Confirm raw reset/verification tokens are not exposed by a generic public HTTP endpoint before mail transport is implemented.
+## 5. Authentication / sessions / recovery
 
-### Roles and permissions
+- [ ] Run `yuncms init` against the bootstrapped test DB; verify first administrator creation and rerun behavior (no second silent initial admin).
+- [ ] Verify valid login plus unknown-user/bad-password/inactive-user identical credential error behavior.
+- [ ] Verify access/session expiry and disabled-user behavior.
+- [ ] Verify refresh rotates both credentials; replay of the old refresh fails.
+- [ ] Run two concurrent refreshes using the same refresh token and verify only one succeeds.
+- [ ] Verify current-session logout and logout-all semantics.
+- [ ] Change a password and confirm all sessions are revoked in the same transaction.
+- [ ] Create/list/revoke API tokens; verify raw token/hash never appears in list responses and disabled owner disables authentication.
+- [ ] Verify password reset token replacement, one-time consumption, sibling-token removal, session revocation and replay/expiry/wrong-prefix failure.
+- [ ] Verify email verification is self/admin/system-only, consumes once and sets `email_verified_at`.
 
-- [ ] Create an ordinary role and separate `read/create/update/delete` permission rows against a disposable collection; verify each missing action permission is denied independently.
-- [ ] Give a read permission only `id,title` fields plus server row filter `status = active`; verify only active rows are returned and `status` cannot be selected, sorted or used in a caller filter.
-- [ ] Verify write field allowlists reject payload keys not granted for create/update.
-- [ ] Verify update/delete permission row filters prevent touching rows outside the allowed scope, including single-item operations by id.
-- [ ] Verify a normal role cannot use `RolesService`/permission management APIs that require administrator/system accountability.
-- [ ] Verify explicit system/admin accountability bypasses ordinary permission rows, while `public + role:null` and a role with no matching permission both fail closed.
-- [ ] Verify malformed/stale permission metadata fails safely rather than broadening access.
-- [ ] Keep permission `validation` null for now; confirm attempts to store validation metadata fail with `PERMISSION_VALIDATION_NOT_READY` until enforcement is implemented.
+### SMTP/recovery delivery
 
-### Extensions
+Use a disposable/test mailbox/SMTP service.
 
-- [ ] Copy/install the endpoint and hook examples into a disposable project's active `extensions/` directory and confirm both are discovered during startup.
-- [ ] Confirm an endpoint extension id such as `hello` is reachable only under `/extensions/hello` and runs after normal authentication/accountability middleware.
-- [ ] From an endpoint extension, instantiate `ItemsService` using `context.serviceOptions(req)` and verify normal-role/public row+field restrictions are identical to `/items` REST behavior; do not forward an auth token to a self-HTTP request.
-- [ ] Verify `filter` hooks can transform a payload before mutation, transformed payload still passes normal validation/RBAC, and thrown filter errors prevent the DB mutation.
-- [ ] Verify `action` hooks run only after successful mutations/commits and do not run after rejected/rolled-back mutations.
-- [ ] Verify `app.beforeStart` executes before listen and `app.afterStart` executes only after the HTTP server is listening.
-- [ ] Trigger a deliberate recursive hook/service chain and confirm `HOOK_RECURSION_LIMIT` terminates it at the configured depth without affecting unrelated concurrent requests.
-- [ ] Verify invalid manifest entry path, unknown extension type, duplicate id, invalid default export and manifest/definition type mismatch fail startup cleanly.
-- [ ] Pack a sample extension as an npm tarball, install it as a project dependency and verify dependency discovery loads the same manifest/runtime contract as a local extension.
+- [ ] Configure `SMTP_HOST`, `SMTP_FROM` and credentials if required; verify reset mail arrives.
+- [ ] Confirm reset-request HTTP response is indistinguishable for active vs nonexistent email addresses.
+- [ ] Confirm raw reset/verification tokens never appear in the public request response or structured logs.
+- [ ] Follow the Studio reset mail link, set a new password and confirm URL token parameters are removed afterward.
+- [ ] Send verification from Studio Users, follow the link and verify the account.
+- [ ] Simulate SMTP delivery failure and confirm unrelated API startup/traffic remains available and the failure is logged safely.
 
-## npm/package publishing decisions
+### Rate limits
+
+- [ ] Exceed login/refresh/action limits and verify HTTP 429, `Retry-After` and rate-limit headers.
+- [ ] Confirm new window restores access.
+- [ ] For any multi-instance deployment, explicitly decide whether process-local limits are sufficient; if not, add a shared limiter before relying on cluster-wide protection.
+
+## 6. Roles / permissions / validation
+
+- [ ] Create a normal role and separate create/read/update/delete permission rows.
+- [ ] Verify each missing action permission denies independently.
+- [ ] Verify read field allowlists prevent selection, filtering and sorting through hidden fields.
+- [ ] Verify server-side row filters restrict read/update/delete, including single-item-by-id operations.
+- [ ] Verify write field allowlists reject extra create/update keys.
+- [ ] Store a create/update `validation` rule and verify prospective records that fail it are rejected before mutation.
+- [ ] Verify update validation uses current-row + patch final state rather than patch alone.
+- [ ] Verify bulk update validation checks every affected prospective row and fails closed above the configured source-level safety cap.
+- [ ] Verify request-local permission cache prevents duplicate resolution within one request but does not leak/stale across requests/processes.
+- [ ] Verify permission mutation invalidates the current request cache.
+- [ ] Verify explicit admin/system bypass, role-less public fail-closed and malformed/stale permission metadata fail-safe behavior.
+- [ ] Verify protected administrator/public role rules and current-admin self-protection.
+
+## 7. Management REST + Studio smoke
+
+Run the actual built Studio against the disposable API/DB.
+
+- [ ] Login and verify automatic access-token refresh/retry then logout.
+- [ ] Content: collection list, generic table, create/edit/delete primitive records, loading/error/empty states.
+- [ ] Data Model: create/delete collection, add/delete fields, required toggle, M2O create/delete, M2M create/delete once UI control is present.
+- [ ] Users: create, role/status changes, self-protection, delete, verification-mail action.
+- [ ] Roles/Permissions: create/update/delete role and permissions, field/row rules, validation editor once UI control is present.
+- [ ] Files: upload/list/download/edit/delete.
+- [ ] Check narrow-screen responsive behavior.
+- [ ] Perform a formal keyboard/focus/label/accessibility review; source semantics alone are not considered verification.
+
+## 8. Files / local storage
+
+- [ ] Verify `FILES_LOCAL_ROOT` permissions and persistence with the actual deployment user.
+- [ ] Upload binary/Unicode filename files; confirm UUID physical keys are independent from user filenames.
+- [ ] Verify authenticated download MIME, length and Content-Disposition behavior.
+- [ ] Verify upload body larger than `FILES_MAX_UPLOAD_BYTES` returns 413.
+- [ ] Attempt traversal/path-separator storage keys and confirm rejection before filesystem access.
+- [ ] Force metadata insert failure after storage write and verify object cleanup.
+- [ ] Force storage delete failure after metadata deletion and confirm `FILE_STORAGE_CLEANUP_FAILED` is surfaced/logged for reconciliation.
+
+## 9. S3-compatible provider
+
+Use the provider actually intended for production.
+
+- [ ] Configure `S3_BUCKET`, region, endpoint/path-style/credentials as appropriate.
+- [ ] Upload/list/download/delete through `?storage=s3` and confirm metadata/storage consistency.
+- [ ] Verify credential-chain behavior if explicit keys are intentionally omitted.
+- [ ] Test provider-specific behavior (MinIO/R2/AWS/etc.) rather than assuming every S3-compatible service is identical.
+- [ ] Force S3 errors and verify no credentials/secrets are returned to clients or logs.
+
+## 10. Audit / logging / security headers
+
+- [ ] Verify item create/update/delete audit rows contain actor/action/collection/item/request id/timestamp.
+- [ ] Verify file lifecycle and schema admin mutations are audited.
+- [ ] Verify schema/file update events retain before/after metadata where implemented.
+- [ ] Put password/token/secret/authorization/api-key-shaped keys in audited/logged metadata and confirm recursive `[REDACTED]` output.
+- [ ] Force audit write failure after a committed mutation and confirm the client still receives the committed mutation result while the audit failure is logged.
+- [ ] Verify `/audit` is admin/system-only and pagination/filter basics work.
+- [ ] Confirm runtime output is valid line-delimited JSON at configured log levels.
+- [ ] Confirm `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` and configured-origin CORS behavior.
+- [ ] Verify unexpected errors/DB messages/stacks/secrets are not leaked through HTTP responses.
+
+## 11. Extensions
+
+- [ ] Copy/install endpoint and hook examples into a disposable project's active extensions directory and confirm startup discovery.
+- [ ] Confirm endpoint extension is mounted only under `/extensions/<id>` after authentication middleware.
+- [ ] Instantiate ItemsService/FilesService from `context.services` + `context.serviceOptions(req)` and verify accountability/RBAC/storage behavior without self-HTTP/token forwarding.
+- [ ] Confirm extension request services share the request-local permission cache.
+- [ ] Verify `app.beforeStart` before listen and `app.afterStart` only after listen.
+- [ ] Verify malformed manifest, root escape, unknown type, duplicate id, invalid default export and manifest/definition mismatch fail startup cleanly.
+- [ ] Pack/install a sample extension as an npm tarball and verify dependency discovery matches local behavior.
+
+## 12. Graceful shutdown / runtime behavior
+
+- [ ] Start an active request and DB transaction, send SIGTERM/SIGINT and verify graceful shutdown/drain behavior before force timeout.
+- [ ] Confirm DB pool closes once and startup failure also closes it.
+- [ ] Verify extension startup failure prevents partially running API.
+- [ ] Verify SMTP outage does not fail unrelated API startup.
+
+## 13. npm/package release decisions
 
 Do not publish from this environment.
 
-- [ ] Confirm which npm scope/name YunCMS will own before public package names are considered stable (`yuncms`, `@yunsoft/*`, `@yuncms/*`, etc.). Internal workspace names may be renamed before first publish.
-- [ ] Confirm npm authentication and organization permissions.
-- [ ] Run `npm pack` for publishable packages and inspect package contents before any `npm publish`.
-- [ ] Only after the CLI/bootstrap milestone is functional, test installation from a packed tarball in a brand-new directory so the setup flow is tested like a real user would install it.
-
-## Manual security/production checks for later milestones
-
-- [ ] Run full auth/RBAC integration tests with separate admin, normal-role, explicit public-role and role-less identities against real MySQL.
-- [ ] Add/verify authentication rate limiting before public production deployment.
-- [ ] Test schema mutations concurrently from two processes, not only two promises in one process.
-- [ ] Test graceful shutdown while requests and a DB transaction are active.
-- [ ] Test local file storage permissions/path traversal once FilesService lands.
-- [ ] Test S3-compatible storage against the actual provider intended for production once that driver lands.
+- [ ] Decide final public package/scope names (`yuncms`, `@yunsoft/*`, `@yuncms/*`, etc.).
+- [ ] Confirm npm organization/authentication/permissions.
+- [ ] Remove/adjust `private` package flags only when naming/release structure is final.
+- [ ] Run `npm pack` for publishable packages and inspect included files.
+- [ ] Install packed tarball(s) in a brand-new directory.
+- [ ] From the packed install verify `npx yuncms init`, `bootstrap` and `start` as a real consumer would use them.
+- [ ] Only publish after the above release gate passes.
