@@ -9,7 +9,10 @@ import { createAuthenticationMiddleware } from './authentication.js';
 import { apiErrorHandler } from './error-response.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createItemsRouter } from './routes/items.js';
+import { createPermissionsRouter } from './routes/permissions.js';
+import { createRolesRouter } from './routes/roles.js';
 import { createSchemaRouter } from './routes/schema.js';
+import { createUsersRouter } from './routes/users.js';
 
 function studioCors(config) {
   return (req, res, next) => {
@@ -82,6 +85,9 @@ export function createApp({
   app.use('/auth', createAuthRouter());
   app.use('/items', createItemsRouter());
   app.use('/schema', createSchemaRouter());
+  app.use('/users', createUsersRouter());
+  app.use('/roles', createRolesRouter());
+  app.use('/permissions', createPermissionsRouter());
 
   for (const extension of endpointExtensions) {
     if (!extension?.id || !extension?.router) {
