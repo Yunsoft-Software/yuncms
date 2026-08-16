@@ -5,19 +5,23 @@ const ISOLATION_LEVELS = new Set([
   'SERIALIZABLE',
 ]);
 
-export async function withTransaction(pool, operation, options = {}) {
-  const connection = await pool.getConnection();
+async function setIsolationLevel(connection, isolationLevel) {
+  if (!isolationLevel) return;
+  const level = String(isolationLevel).toUpperCase();
+  if (!ISOLATION_LEVELS.has(level)) {
+    throw new Error(`Unsupported transaction isolation level: ${isolationLevel}`);
+  }
+  await connection.query(`SET TRANSACTION ISOLATION LEVEL ${level}`);
+}
+
+export async function withConnectionTransaction(connection, operation, options = {}) {
+  if (!connection) throw new Error('Database connection is required');
+  if (typeof operation !== 'function') throw new Error('Transaction operation is required');
+
+  await setIsolationLevel(connection, options.isolationLevel);
+  await connection.beginTransaction();
 
   try {
-    if (options.isolationLevel) {
-      const level = String(options.isolationLevel).toUpperCase();
-      if (!ISOLATION_LEVELS.has(level)) {
-        throw new Error(`Unsupported transaction isolation level: ${options.isolationLevel}`);
-      }
-      await connection.query(`SET TRANSACTION ISOLATION LEVEL ${level}`);
-    }
-
-    await connection.beginTransaction();
     const result = await operation(connection);
     await connection.commit();
     return result;
@@ -28,6 +32,14 @@ export async function withTransaction(pool, operation, options = {}) {
       error.rollbackError = rollbackError;
     }
     throw error;
+  }
+}
+
+export async function withTransaction(pool, operation, options = {}) {
+  const connection = await pool.getConnection();
+
+  try {
+    return await withConnectionTransaction(connection, operation, options);
   } finally {
     connection.release();
   }
