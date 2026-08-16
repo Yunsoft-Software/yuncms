@@ -40,6 +40,25 @@ export class RolesService extends BaseService {
       throw error;
     }
 
+    const admin = input.admin === true;
+    const publicRole = input.public === true;
+    if (admin && publicRole) {
+      const error = new Error('A role cannot be both administrator and public');
+      error.code = 'INVALID_ROLE';
+      throw error;
+    }
+
+    if (publicRole) {
+      const [rows] = await this.database.query(
+        'SELECT id FROM yuncms_roles WHERE public = 1 LIMIT 1',
+      );
+      if (rows[0]) {
+        const error = new Error('A public role already exists');
+        error.code = 'PUBLIC_ROLE_EXISTS';
+        throw error;
+      }
+    }
+
     const id = randomUUID();
     await this.database.query(
       `INSERT INTO yuncms_roles (id, name, description, admin, public)
@@ -48,8 +67,8 @@ export class RolesService extends BaseService {
         id,
         input.name.trim(),
         input.description ?? null,
-        input.admin === true ? 1 : 0,
-        input.public === true ? 1 : 0,
+        admin ? 1 : 0,
+        publicRole ? 1 : 0,
       ],
     );
     return this.readOne(id);
