@@ -2,14 +2,25 @@ import express from 'express';
 
 import { serviceOptionsFromRequest } from '../service-options.js';
 
-function authService(req) {
-  const Service = req.context.services.AuthService;
+function service(req, name) {
+  const Service = req.context.services[name];
   return new Service(serviceOptionsFromRequest(req));
 }
 
+function authService(req) {
+  return service(req, 'AuthService');
+}
+
+function authTokensService(req) {
+  return service(req, 'AuthTokensService');
+}
+
 function apiTokensService(req) {
-  const Service = req.context.services.ApiTokensService;
-  return new Service(serviceOptionsFromRequest(req));
+  return service(req, 'ApiTokensService');
+}
+
+function usersService(req) {
+  return service(req, 'UsersService');
 }
 
 function requireSessionAuthentication(req) {
@@ -20,7 +31,18 @@ function requireSessionAuthentication(req) {
   }
 }
 
-export function createAuthRouter() {
+function requireMailer(mailer) {
+  if (mailer) return mailer;
+  const error = new Error('SMTP mail delivery is not configured');
+  error.code = 'MAIL_NOT_CONFIGURED';
+  throw error;
+}
+
+function actionUrl(config, action, token) {
+  return `${config.auth.publicUrl}/?auth_action=${encodeURIComponent(action)}&token=${encodeURIComponent(token)}`;
+}
+
+export function createAuthRouter({ mailer = null, config = null, logger = console } = {}) {
   const router = express.Router();
 
   router.post('/login', async (req, res) => {
@@ -50,6 +72,65 @@ export function createAuthRouter() {
     res.status(204).end();
   });
 
+  router.post('/password-reset/request', async (req, res) => {
+    const transport = requireMailer(mailer);
+    const result = await authTokensService(req).requestPasswordReset(req.body?.email);
+
+    if (result) {
+      try {
+        const url = actionUrl(config, 'reset', result.token);
+        await transport.send({
+          to: String(req.body.email).trim(),
+          subject: 'Reset your YunCMS password',
+          text: `A password reset was requested for your YunCMS account.\n\nOpen this link to choose a new password:\n${url}\n\nIf you did not request this, you can ignore this message.`,
+        });
+      } catch (error) {
+        logger.error?.('YunCMS password reset mail delivery failed', {
+          requestId: req.id,
+          code: error?.code,
+          message: error?.message,
+        });
+      }
+    }
+
+    res.status(202).json({ data: { accepted: true } });
+  });
+
+  router.post('/password-reset/confirm', async (req, res) => {
+    await authTokensService(req).resetPassword(req.body?.token, req.body?.password);
+    res.status(204).end();
+  });
+
+  router.post('/email-verification/request', async (req, res) => {
+    const transport = requireMailer(mailer);
+    if (!req.accountability?.user) {
+      const error = new Error('Authentication is required to request email verification');
+      error.code = 'UNAUTHORIZED';
+      throw error;
+    }
+
+    const userId = req.body?.user ?? req.accountability.user;
+    const user = await usersService(req).readOne(userId);
+    if (!user) {
+      const error = new Error(`User not found: ${userId}`);
+      error.code = 'USER_NOT_FOUND';
+      throw error;
+    }
+    const result = await authTokensService(req).createEmailVerification(userId);
+    const url = actionUrl(config, 'verify', result.token);
+    await transport.send({
+      to: user.email,
+      subject: 'Verify your YunCMS email',
+      text: `Verify your YunCMS email address by opening this link:\n${url}\n\nIf you did not request this, you can ignore this message.`,
+    });
+    res.status(202).json({ data: { accepted: true } });
+  });
+
+  router.post('/email-verification/confirm', async (req, res) => {
+    await authTokensService(req).verifyEmail(req.body?.token);
+    res.status(204).end();
+  });
+
   router.get('/tokens', async (req, res) => {
     const data = await apiTokensService(req).readMany();
     res.json({ data });
@@ -73,4 +154,4 @@ export function createAuthRouter() {
   return router;
 }
 
-export { requireSessionAuthentication };
+export { actionUrl, requireMailer, requireSessionAuthentication };
