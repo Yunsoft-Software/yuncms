@@ -31,13 +31,14 @@ async function importExtension(manifest) {
   return assertDefinition(imported.default, manifest);
 }
 
-function createBaseContext({ services, database, schemaCache, emitter, logger, env }) {
+function createBaseContext({ services, database, schemaCache, emitter, storage, logger, env }) {
   return Object.freeze({
     services,
     database,
     logger,
     env,
     emitter,
+    storage,
     getSchema: () => schemaCache.get(database),
     getAccountability: (req) => req?.accountability ?? null,
     serviceOptions: async (req) => ({
@@ -46,6 +47,8 @@ function createBaseContext({ services, database, schemaCache, emitter, logger, e
       schema: req?.context?.schema ?? await schemaCache.get(database),
       logger,
       emitter,
+      storage,
+      requestId: req?.id ?? null,
     }),
   });
 }
@@ -75,6 +78,7 @@ export async function loadExtensionRuntime({
   database,
   schemaCache,
   emitter,
+  storage = null,
   logger = console,
   env,
 } = {}) {
@@ -83,7 +87,7 @@ export async function loadExtensionRuntime({
   }
 
   const manifests = await discoverExtensions({ rootDir, localDirectory, includeDependencies });
-  const baseContext = createBaseContext({ services, database, schemaCache, emitter, logger, env });
+  const baseContext = createBaseContext({ services, database, schemaCache, emitter, storage, logger, env });
   const endpointExtensions = [];
   const hookApi = hookRegistrationApi(emitter, baseContext);
 
