@@ -12,14 +12,32 @@ test('node guard accepts only node 24 baseline', () => {
   );
 });
 
-test('help advertises init and bootstrap without claiming start exists', async () => {
+test('help advertises init, bootstrap and start', async () => {
   const lines = [];
   await runCli(['help'], { output: { log: (line) => lines.push(line) }, env: {} });
   const help = lines.join('\n');
 
   assert.match(help, /yuncms init/);
   assert.match(help, /yuncms bootstrap/);
-  assert.match(help, /start wrapper is planned/);
+  assert.match(help, /yuncms start/);
+});
+
+test('start command receives current environment and working directory', async () => {
+  const calls = [];
+  const result = await runCli(['start'], {
+    output: { log() {} },
+    env: { DB_HOST: 'db.internal' },
+    cwd: '/srv/yuncms-project',
+    startCommand: async (options) => {
+      calls.push(options);
+      return { code: 0 };
+    },
+  });
+
+  assert.deepEqual(result, { code: 0 });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].cwd, '/srv/yuncms-project');
+  assert.equal(calls[0].env.DB_HOST, 'db.internal');
 });
 
 test('env serialization quotes values and rejects multiline secrets', () => {
