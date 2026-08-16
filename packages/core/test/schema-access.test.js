@@ -62,3 +62,26 @@ test('field delete requires explicit destructive intent before DB access', async
     (error) => error.code === 'DESTRUCTIVE_OPERATION_REQUIRED',
   );
 });
+
+test('self M2M requires distinct explicit junction field names before DB access', async () => {
+  await assert.rejects(
+    new RelationsService(adminOptions()).createM2M({
+      junctionCollection: 'article_links',
+      leftCollection: 'articles',
+      rightCollection: 'articles',
+    }),
+    (error) => error.code === 'INVALID_SCHEMA_PAYLOAD',
+  );
+});
+
+test('M2M rejects SET NULL because junction FK fields are required', async () => {
+  await assert.rejects(
+    new RelationsService(adminOptions()).createM2M({
+      junctionCollection: 'article_tags',
+      leftCollection: 'articles',
+      rightCollection: 'tags',
+      leftOnDelete: 'SET NULL',
+    }),
+    (error) => error.code === 'INVALID_ON_DELETE',
+  );
+});
