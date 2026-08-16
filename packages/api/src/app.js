@@ -7,6 +7,7 @@ import {
 
 import { createAuthenticationMiddleware } from './authentication.js';
 import { apiErrorHandler } from './error-response.js';
+import { createAuditRouter } from './routes/audit.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createFilesRouter } from './routes/files.js';
 import { createItemsRouter } from './routes/items.js';
@@ -92,6 +93,7 @@ export function createApp({
   app.use('/roles', createRolesRouter());
   app.use('/permissions', createPermissionsRouter());
   app.use('/files', createFilesRouter({ maxUploadBytes: config.storage?.maxUploadBytes }));
+  app.use('/audit', createAuditRouter());
 
   for (const extension of endpointExtensions) {
     if (!extension?.id || !extension?.router) {
