@@ -41,6 +41,7 @@ export function createApp({
   schemaCache = null,
   emitter = null,
   storage = null,
+  mailer = null,
   endpointExtensions = [],
 }) {
   if (!pool) throw new Error('Database pool is required');
@@ -86,7 +87,7 @@ export function createApp({
     emitter,
     storage,
   }));
-  app.use('/auth', createAuthRouter());
+  app.use('/auth', createAuthRouter({ mailer, config, logger }));
   app.use('/items', createItemsRouter());
   app.use('/schema', createSchemaRouter());
   app.use('/users', createUsersRouter());
