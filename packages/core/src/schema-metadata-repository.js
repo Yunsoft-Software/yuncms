@@ -182,6 +182,28 @@ export class SchemaMetadataRepository {
     return this.readField(collection, field);
   }
 
+  async updateFieldPhysicalMetadata(collection, field, { required, schemaMetadata } = {}) {
+    const assignments = [];
+    const params = [];
+
+    if (required !== undefined) {
+      assignments.push('required = ?');
+      params.push(required ? 1 : 0);
+    }
+    if (schemaMetadata !== undefined) {
+      assignments.push('schema_metadata = ?');
+      params.push(encodeJson(schemaMetadata));
+    }
+
+    if (assignments.length === 0) return this.readField(collection, field);
+    params.push(collection, field);
+    await this.database.query(
+      `UPDATE yuncms_fields SET ${assignments.join(', ')} WHERE collection = ? AND field = ?`,
+      params,
+    );
+    return this.readField(collection, field);
+  }
+
   async deleteField(collection, field) {
     const [result] = await this.database.query(
       'DELETE FROM yuncms_fields WHERE collection = ? AND field = ?',
