@@ -90,15 +90,35 @@ function directRelation(snapshot, collection, field) {
   return relation;
 }
 
-async function expandRows({ collection, rows, expandFields, options, ItemsServiceClass }) {
-  if (expandFields.length === 0 || rows.length === 0) return rows;
+async function validateSourceExpansions({ collection, expandFields, options, service }) {
   const snapshot = await schemaSnapshot(options);
+  const sourceSchema = snapshot.collections?.[collection];
+  if (!sourceSchema) {
+    throw expansionError('COLLECTION_NOT_FOUND', `Unknown collection: ${collection}`);
+  }
+  if (expandFields.length === 0) return snapshot;
+
+  const permission = await service.resolvePermission('read');
+  for (const field of expandFields) {
+    if (!sourceSchema.fields?.[field] || (permission.fields && !permission.fields.includes(field))) {
+      throw expansionError('INVALID_QUERY', `Unknown field: ${field}`, `expand.${field}`);
+    }
+    directRelation(snapshot, collection, field);
+  }
+  return snapshot;
+}
+
+async function expandRows({ collection, rows, expandFields, options, ItemsServiceClass, snapshot }) {
+  if (expandFields.length === 0 || rows.length === 0) return rows;
+  const effectiveSnapshot = snapshot ?? await schemaSnapshot(options);
   let expandedRows = rows.map((row) => ({ ...row }));
 
   for (const field of expandFields) {
-    const relation = directRelation(snapshot, collection, field);
+    const relation = directRelation(effectiveSnapshot, collection, field);
     const targetCollection = relation.one_collection;
-    const targetKey = relation.one_field || snapshot.collections?.[targetCollection]?.primary_key || 'id';
+    const targetKey = relation.one_field
+      || effectiveSnapshot.collections?.[targetCollection]?.primary_key
+      || 'id';
     const values = [...new Set(
       expandedRows
         .map((row) => row[field])
@@ -149,6 +169,7 @@ export async function readManyWithRelations({
   assertIdentifier(collection, 'collection name');
   const expandFields = parseExpandInput(query.expand);
   const service = new ItemsServiceClass(collection, options);
+  const snapshot = await validateSourceExpansions({ collection, expandFields, options, service });
   const result = await service.readManyWithMeta(withoutExpand(query, expandFields));
   const data = await expandRows({
     collection,
@@ -156,6 +177,7 @@ export async function readManyWithRelations({
     expandFields,
     options,
     ItemsServiceClass,
+    snapshot,
   });
   return { ...result, data };
 }
@@ -176,6 +198,7 @@ export async function readOneWithRelations({
 
   const expandFields = parseExpandInput(query.expand);
   const service = new ItemsServiceClass(collection, options);
+  const snapshot = await validateSourceExpansions({ collection, expandFields, options, service });
   const fields = withExpansionFields(query.fields ?? null, expandFields);
   const record = await service.readOne(id, { fields });
   if (!record) return null;
@@ -185,6 +208,7 @@ export async function readOneWithRelations({
     expandFields,
     options,
     ItemsServiceClass,
+    snapshot,
   });
   return expanded;
 }
