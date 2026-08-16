@@ -1,3 +1,5 @@
+import { normalizeDatabaseError } from '@yuncms/core';
+
 const STATUS_BY_CODE = new Map([
   ['INVALID_CREDENTIALS', 401],
   ['UNAUTHORIZED', 401],
@@ -19,6 +21,9 @@ const STATUS_BY_CODE = new Map([
   ['PUBLIC_ROLE_EXISTS', 409],
   ['ROLE_IN_USE', 409],
   ['SCHEMA_METADATA_DRIFT', 409],
+  ['DUPLICATE_KEY', 409],
+  ['FOREIGN_KEY_MISSING', 409],
+  ['FOREIGN_KEY_RESTRICTED', 409],
   ['INVALID_QUERY', 400],
   ['INVALID_PAYLOAD', 400],
   ['INVALID_PASSWORD', 400],
@@ -38,7 +43,42 @@ const STATUS_BY_CODE = new Map([
   ['FILTER_REQUIRED', 400],
   ['PERMISSION_VALIDATION_NOT_READY', 400],
   ['DATABASE_MIGRATION_REQUIRED', 503],
+  ['DEADLOCK', 503],
+  ['LOCK_WAIT_TIMEOUT', 503],
+  ['CONNECTION_LOST', 503],
+  ['CONNECTION_REFUSED', 503],
 ]);
+
+const MYSQL_CODES = new Set([
+  'ER_DUP_ENTRY',
+  'ER_NO_REFERENCED_ROW_2',
+  'ER_ROW_IS_REFERENCED_2',
+  'ER_LOCK_DEADLOCK',
+  'ER_LOCK_WAIT_TIMEOUT',
+  'PROTOCOL_CONNECTION_LOST',
+  'ECONNREFUSED',
+]);
+
+const SAFE_DATABASE_MESSAGES = new Map([
+  ['DUPLICATE_KEY', 'A record with the same unique value already exists'],
+  ['FOREIGN_KEY_MISSING', 'A referenced record does not exist'],
+  ['FOREIGN_KEY_RESTRICTED', 'The record is still referenced and cannot be removed'],
+  ['DEADLOCK', 'The database transaction could not complete; retry the request'],
+  ['LOCK_WAIT_TIMEOUT', 'The database operation timed out waiting for a lock'],
+  ['CONNECTION_LOST', 'Database connection was lost'],
+  ['CONNECTION_REFUSED', 'Database connection is unavailable'],
+]);
+
+function normalizeApiError(error) {
+  if (!MYSQL_CODES.has(error?.code)) return error;
+  const databaseError = normalizeDatabaseError(error);
+  const normalized = new Error(
+    SAFE_DATABASE_MESSAGES.get(databaseError.code) ?? 'Database operation failed',
+  );
+  normalized.code = databaseError.code;
+  normalized.cause = databaseError;
+  return normalized;
+}
 
 export function statusForError(error) {
   return STATUS_BY_CODE.get(error?.code) ?? 500;
@@ -62,16 +102,19 @@ export function errorBody(error, requestId) {
 
 export function apiErrorHandler(logger = console) {
   return (error, req, res, _next) => {
-    const status = statusForError(error);
+    const normalized = normalizeApiError(error);
+    const status = statusForError(normalized);
 
     if (status >= 500) {
       logger.error?.('YunCMS API request failed', {
         requestId: req.id,
-        code: error?.code,
+        code: normalized?.code,
         error,
       });
     }
 
-    res.status(status).json(errorBody(error, req.id));
+    res.status(status).json(errorBody(normalized, req.id));
   };
 }
+
+export { normalizeApiError };
