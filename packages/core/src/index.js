@@ -1,4 +1,4 @@
-export { loadConfig } from './config.js';
+export { loadConfig, loadEnvFileIfPresent } from './config.js';
 export { createDatabasePool, pingDatabase, closeDatabasePool } from './database.js';
 export { withTransaction, withConnectionTransaction } from './transaction.js';
 export { assertIdentifier, quoteIdentifier } from './identifier.js';
