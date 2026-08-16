@@ -48,6 +48,7 @@ function createBaseContext({ services, database, schemaCache, emitter, storage, 
       logger,
       emitter,
       storage,
+      permissionCache: req?.context?.permissionCache ?? new Map(),
       requestId: req?.id ?? null,
     }),
   });
