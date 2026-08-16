@@ -57,8 +57,16 @@ let shuttingDown = false;
 function registerInternalAudit({ emitter, services }) {
   const AuditService = services.AuditService;
   const systemAccountability = createSystemAccountability();
+  const events = [
+    'items.create',
+    'items.update',
+    'items.delete',
+    'files.create',
+    'files.update',
+    'files.delete',
+  ];
 
-  for (const event of ['items.create', 'items.update', 'items.delete']) {
+  for (const event of events) {
     emitter.registerAction(event, async (payload, context) => {
       try {
         const audit = new AuditService({
