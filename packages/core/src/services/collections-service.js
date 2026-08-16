@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { withAdvisoryLock } from '../advisory-lock.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
@@ -37,6 +39,10 @@ function assertCollectionMetadataPatch(patch) {
     error.code = 'INVALID_SCHEMA_PAYLOAD';
     throw error;
   }
+}
+
+function temporaryDropName() {
+  return `_yuncms_drop_${randomUUID().replaceAll('-', '').slice(0, 24)}`;
 }
 
 export class CollectionsService extends BaseService {
@@ -155,6 +161,89 @@ export class CollectionsService extends BaseService {
         const schemaVersion = await incrementSchemaVersion(connection);
         return { ...updated, schemaVersion };
       });
+    });
+  }
+
+  async deleteOne(collection, { destructive = false } = {}) {
+    assertSchemaManager(this.accountability);
+    assertIdentifier(collection, 'collection name');
+    if (destructive !== true) {
+      const error = new Error('Collection deletion requires destructive: true');
+      error.code = 'DESTRUCTIVE_OPERATION_REQUIRED';
+      throw error;
+    }
+
+    return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      const metadata = new SchemaMetadataRepository(connection);
+      const existing = await metadata.readCollection(collection);
+      if (!existing) {
+        const error = new Error(`Unknown collection: ${collection}`);
+        error.code = 'COLLECTION_NOT_FOUND';
+        throw error;
+      }
+      if (existing.system) {
+        const error = new Error('System collections cannot be deleted through the dynamic schema API');
+        error.code = 'SYSTEM_SCHEMA_READ_ONLY';
+        throw error;
+      }
+
+      const relations = await metadata.listRelations();
+      const blockingRelations = relations.filter((relation) =>
+        relation.many_collection === collection ||
+        relation.one_collection === collection ||
+        relation.junction_collection === collection);
+      if (blockingRelations.length > 0) {
+        const error = new Error(`Collection has relations and cannot be deleted: ${collection}`);
+        error.code = 'COLLECTION_HAS_RELATIONS';
+        error.relations = blockingRelations.map((relation) => ({
+          many_collection: relation.many_collection,
+          many_field: relation.many_field,
+          one_collection: relation.one_collection,
+        }));
+        throw error;
+      }
+
+      const originalTable = quoteIdentifier(collection, 'collection name');
+      const tombstoneName = temporaryDropName();
+      const tombstoneTable = quoteIdentifier(tombstoneName, 'temporary collection name');
+
+      await connection.query(`RENAME TABLE ${originalTable} TO ${tombstoneTable}`);
+
+      let result;
+      try {
+        result = await withConnectionTransaction(connection, async () => {
+          await connection.query('DELETE FROM yuncms_permissions WHERE collection = ?', [collection]);
+          const deleted = await metadata.deleteCollection(collection);
+          if (deleted !== 1) {
+            const error = new Error(`Collection metadata disappeared during delete: ${collection}`);
+            error.code = 'SCHEMA_METADATA_DRIFT';
+            throw error;
+          }
+          const schemaVersion = await incrementSchemaVersion(connection);
+          return { deleted: true, collection, schemaVersion };
+        });
+      } catch (error) {
+        try {
+          await connection.query(`RENAME TABLE ${tombstoneTable} TO ${originalTable}`);
+        } catch (restoreError) {
+          error.restoreError = restoreError;
+          error.code ||= 'SCHEMA_PARTIAL_FAILURE';
+        }
+        throw error;
+      }
+
+      try {
+        await connection.query(`DROP TABLE ${tombstoneTable}`);
+      } catch (cleanupError) {
+        const error = new Error(`Collection was logically deleted but physical cleanup failed: ${collection}`);
+        error.code = 'SCHEMA_PARTIAL_FAILURE';
+        error.cleanupError = cleanupError;
+        error.cleanupTable = tombstoneName;
+        error.logicalDelete = result;
+        throw error;
+      }
+
+      return result;
     });
   }
 }
