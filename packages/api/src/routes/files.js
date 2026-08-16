@@ -7,6 +7,11 @@ function filesService(req) {
   return new Service(serviceOptionsFromRequest(req));
 }
 
+function reconciliationService(req) {
+  const Service = req.context.services.FileReconciliationService;
+  return new Service(serviceOptionsFromRequest(req));
+}
+
 function notFound(id) {
   const error = new Error(`File not found: ${id}`);
   error.code = 'FILE_NOT_FOUND';
@@ -52,6 +57,15 @@ export function createFilesRouter({ maxUploadBytes = 25 * 1024 * 1024 } = {}) {
       storage,
     });
     res.status(201).json({ data });
+  });
+
+  router.post('/reconcile', async (req, res) => {
+    const data = await reconciliationService(req).scan({
+      storage: req.body?.storage ?? 'local',
+      deleteOrphans: req.body?.deleteOrphans === true,
+      minimumAgeMs: req.body?.minimumAgeMs,
+    });
+    res.json({ data });
   });
 
   router.get('/:id', async (req, res) => {
