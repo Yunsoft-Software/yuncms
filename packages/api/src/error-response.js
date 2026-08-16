@@ -14,6 +14,7 @@ const STATUS_BY_CODE = new Map([
   ['USER_NOT_FOUND', 404],
   ['ROLE_NOT_FOUND', 404],
   ['PERMISSION_NOT_FOUND', 404],
+  ['FILE_NOT_FOUND', 404],
   ['NOT_FOUND', 404],
   ['COLLECTION_EXISTS', 409],
   ['FIELD_EXISTS', 409],
@@ -24,6 +25,7 @@ const STATUS_BY_CODE = new Map([
   ['DUPLICATE_KEY', 409],
   ['FOREIGN_KEY_MISSING', 409],
   ['FOREIGN_KEY_RESTRICTED', 409],
+  ['PAYLOAD_TOO_LARGE', 413],
   ['INVALID_QUERY', 400],
   ['INVALID_PAYLOAD', 400],
   ['INVALID_PASSWORD', 400],
@@ -31,6 +33,9 @@ const STATUS_BY_CODE = new Map([
   ['INVALID_PERMISSION', 400],
   ['INVALID_SCHEMA_PAYLOAD', 400],
   ['INVALID_ON_DELETE', 400],
+  ['INVALID_STORAGE_KEY', 400],
+  ['INVALID_FILE_CONTENT', 400],
+  ['STORAGE_NOT_FOUND', 400],
   ['UNSUPPORTED_SCHEMA_UPDATE', 400],
   ['UNSUPPORTED_FIELD_TYPE', 400],
   ['UNSUPPORTED_FIELD_DEFAULT', 400],
@@ -70,6 +75,12 @@ const SAFE_DATABASE_MESSAGES = new Map([
 ]);
 
 function normalizeApiError(error) {
+  if (error?.type === 'entity.too.large') {
+    const normalized = new Error('Request body exceeds the configured upload limit');
+    normalized.code = 'PAYLOAD_TOO_LARGE';
+    normalized.cause = error;
+    return normalized;
+  }
   if (!MYSQL_CODES.has(error?.code)) return error;
   const databaseError = normalizeDatabaseError(error);
   const normalized = new Error(
