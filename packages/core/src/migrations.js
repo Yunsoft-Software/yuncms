@@ -54,8 +54,20 @@ export async function applyMigrations(database, migrations) {
 }
 
 export async function assertMigrationsApplied(database, requiredMigrationIds) {
-  await ensureMigrationJournal(database);
-  const applied = await readAppliedMigrations(database);
+  let applied;
+
+  try {
+    applied = await readAppliedMigrations(database);
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') {
+      const migrationError = new Error('Database bootstrap is required');
+      migrationError.code = 'DATABASE_MIGRATION_REQUIRED';
+      migrationError.missingMigrations = [...requiredMigrationIds];
+      throw migrationError;
+    }
+    throw error;
+  }
+
   const missing = requiredMigrationIds.filter((id) => !applied.has(id));
 
   if (missing.length > 0) {
