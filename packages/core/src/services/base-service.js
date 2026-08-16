@@ -1,7 +1,15 @@
 import { requireAccountability } from '../accountability.js';
 
 export class BaseService {
-  constructor({ accountability, database, schema = null, emitter = null, logger = console } = {}) {
+  constructor({
+    accountability,
+    database,
+    schema = null,
+    emitter = null,
+    logger = console,
+    storage = null,
+    requestId = null,
+  } = {}) {
     requireAccountability(accountability);
     if (!database) throw new Error('Database handle is required');
 
@@ -10,5 +18,7 @@ export class BaseService {
     this.schema = schema;
     this.emitter = emitter;
     this.logger = logger;
+    this.storage = storage;
+    this.requestId = requestId;
   }
 }
