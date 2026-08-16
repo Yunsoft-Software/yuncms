@@ -13,6 +13,8 @@ export {
 export { createRequestContext } from './context.js';
 export { createInitialAdmin, findExistingAdmin } from './setup.js';
 export { HookEmitter } from './hooks.js';
+export { LocalStorageDriver, assertStorageKey } from './storage/local-storage-driver.js';
+export { createStorageRegistry } from './storage/storage-registry.js';
 export { BaseService } from './services/base-service.js';
 export { createServiceRegistry } from './services/service-registry.js';
 export { createCoreServiceRegistry } from './services/core-services.js';
@@ -26,6 +28,7 @@ export { RelationsService } from './services/relations-service.js';
 export { UsersService } from './services/users-service.js';
 export { RolesService } from './services/roles-service.js';
 export { PermissionsService } from './services/permissions-service.js';
+export { FilesService } from './services/files-service.js';
 export { SchemaMetadataRepository } from './schema-metadata-repository.js';
 export { loadSchemaSnapshot, SchemaCache } from './schema.js';
 export { assertFieldType, compileFieldColumn } from './field-types.js';
