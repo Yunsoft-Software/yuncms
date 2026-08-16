@@ -4,6 +4,7 @@ import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { incrementSchemaVersion } from '../schema-version.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
+import { assertSchemaManager } from './schema-access.js';
 
 const COLLECTION_METADATA_KEYS = new Set(['note', 'singleton', 'hidden', 'metadata']);
 
@@ -40,15 +41,18 @@ function assertCollectionMetadataPatch(patch) {
 
 export class CollectionsService extends BaseService {
   async readMany() {
+    assertSchemaManager(this.accountability);
     return new SchemaMetadataRepository(this.database).listCollections();
   }
 
   async readOne(collection) {
+    assertSchemaManager(this.accountability);
     assertIdentifier(collection, 'collection name');
     return new SchemaMetadataRepository(this.database).readCollection(collection);
   }
 
   async createOne(input = {}) {
+    assertSchemaManager(this.accountability);
     const collection = assertUserCollectionName(input.collection);
     const primaryKey = input.primaryKey ?? 'id';
 
@@ -128,6 +132,7 @@ export class CollectionsService extends BaseService {
   }
 
   async updateOne(collection, patch) {
+    assertSchemaManager(this.accountability);
     assertIdentifier(collection, 'collection name');
     assertCollectionMetadataPatch(patch);
 
