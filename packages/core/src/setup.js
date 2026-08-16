@@ -3,23 +3,29 @@ import { withTransaction } from './transaction.js';
 import { RolesService } from './services/roles-service.js';
 import { UsersService } from './services/users-service.js';
 
+export async function findExistingAdmin(database) {
+  if (!database) throw new Error('Database handle is required');
+  const [rows] = await database.query(
+    `SELECT u.id, u.email, u.role
+     FROM yuncms_users u
+     INNER JOIN yuncms_roles r ON r.id = u.role
+     WHERE r.admin = 1
+     ORDER BY u.created_at ASC
+     LIMIT 1`,
+  );
+  return rows[0] ?? null;
+}
+
 export async function createInitialAdmin(pool, { email, password } = {}) {
   if (!pool) throw new Error('Database pool is required');
   const accountability = createSystemAccountability();
 
   return withTransaction(pool, async (connection) => {
-    const [existingAdminUsers] = await connection.query(
-      `SELECT u.id, u.email
-       FROM yuncms_users u
-       INNER JOIN yuncms_roles r ON r.id = u.role
-       WHERE r.admin = 1
-       ORDER BY u.created_at ASC
-       LIMIT 1`,
-    );
-
-    if (existingAdminUsers[0]) {
-      const error = new Error(`An administrator user already exists: ${existingAdminUsers[0].email}`);
+    const existingAdmin = await findExistingAdmin(connection);
+    if (existingAdmin) {
+      const error = new Error(`An administrator user already exists: ${existingAdmin.email}`);
       error.code = 'INITIAL_ADMIN_EXISTS';
+      error.admin = existingAdmin;
       throw error;
     }
 
