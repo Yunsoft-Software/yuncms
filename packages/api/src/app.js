@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import express from 'express';
-import { pingDatabase } from '@yuncms/core';
+import {
+  createPublicAccountability,
+  createRequestContext,
+  createServiceRegistry,
+  pingDatabase,
+} from '@yuncms/core';
 
 function studioCors(config) {
   return (req, res, next) => {
@@ -19,10 +24,11 @@ function studioCors(config) {
   };
 }
 
-export function createApp({ pool, config, logger = console }) {
+export function createApp({ pool, config, logger = console, serviceRegistry = createServiceRegistry() }) {
   if (!pool) throw new Error('Database pool is required');
   if (!config) throw new Error('Config is required');
 
+  const services = serviceRegistry.toObject();
   const app = express();
   app.disable('x-powered-by');
   app.use(studioCors(config));
@@ -30,6 +36,15 @@ export function createApp({ pool, config, logger = console }) {
   app.use((req, res, next) => {
     req.id = req.get('x-request-id') || randomUUID();
     res.set('x-request-id', req.id);
+    req.accountability = createPublicAccountability();
+    req.context = createRequestContext({
+      accountability: req.accountability,
+      services,
+      database: pool,
+      logger,
+      env: config,
+      requestId: req.id,
+    });
     next();
   });
 
