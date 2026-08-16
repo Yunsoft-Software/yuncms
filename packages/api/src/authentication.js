@@ -34,22 +34,28 @@ export function createAuthenticationMiddleware({ pool, config, logger, services 
       let accountability;
 
       if (token) {
-        const identity = await auth.authenticateAccessToken(token);
+        const identity = await auth.authenticateBearerToken(token);
         accountability = createAccountability({
           user: identity.user,
           role: identity.role,
           admin: identity.admin === true,
         });
         req.authToken = token;
-        req.sessionId = identity.session;
+        req.authMethod = identity.authMethod;
+        req.sessionId = identity.session ?? null;
+        req.apiTokenId = identity.apiToken ?? null;
       } else if (isPublicAuthRoute(req)) {
         accountability = bootstrapAccountability;
         req.authToken = null;
+        req.authMethod = 'public';
         req.sessionId = null;
+        req.apiTokenId = null;
       } else {
         accountability = await auth.resolvePublicAccountability();
         req.authToken = null;
+        req.authMethod = 'public';
         req.sessionId = null;
+        req.apiTokenId = null;
       }
 
       req.accountability = accountability;
