@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { API_URL, health, logout, readSession, subscribeSession } from './api.js';
 import { ContentScreen } from './screens/ContentScreen.jsx';
 import { DataModelScreen } from './screens/DataModelScreen.jsx';
+import { FilesScreen } from './screens/FilesScreen.jsx';
 import { LoginScreen } from './screens/LoginScreen.jsx';
 import { RolesPermissionsScreen } from './screens/RolesPermissionsScreen.jsx';
 import { UsersScreen } from './screens/UsersScreen.jsx';
@@ -12,7 +13,7 @@ const sections = [
   { id: 'data-model', label: 'Data Model' },
   { id: 'users', label: 'Users' },
   { id: 'roles', label: 'Roles & Permissions' },
-  { id: 'files', label: 'Files', pending: true },
+  { id: 'files', label: 'Files' },
 ];
 
 const sectionCopy = {
@@ -20,20 +21,8 @@ const sectionCopy = {
   'data-model': ['Data Model', 'Create collections, fields and relations backed by MySQL.'],
   users: ['Users', 'Manage administrator-created users, roles and account status.'],
   roles: ['Roles & Permissions', 'Configure role access, field allowlists and row filters.'],
-  files: ['Files', 'Storage drivers and FilesService are the next backend milestone.'],
+  files: ['Files', 'Upload, download and manage files through the configured storage driver.'],
 };
-
-function PendingFilesScreen() {
-  return (
-    <section className="panel empty-state">
-      <div>
-        <p className="eyebrow">Files</p>
-        <h2>Storage backend not shipped yet</h2>
-        <p>Local and S3-compatible storage, FilesService and upload/download routes are still pending.</p>
-      </div>
-    </section>
-  );
-}
 
 export function App() {
   const [session, setSession] = useState(() => readSession());
@@ -44,14 +33,9 @@ export function App() {
   useEffect(() => subscribeSession(() => setSession(readSession())), []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    health({ signal: controller.signal })
+    health()
       .then(() => setHealthState({ state: 'online', message: 'API online' }))
-      .catch((error) => {
-        if (error.name === 'AbortError') return;
-        setHealthState({ state: 'offline', message: 'API unavailable' });
-      });
-    return () => controller.abort();
+      .catch(() => setHealthState({ state: 'offline', message: 'API unavailable' }));
   }, []);
 
   const [title, description] = sectionCopy[section];
@@ -59,7 +43,7 @@ export function App() {
     if (section === 'data-model') return <DataModelScreen />;
     if (section === 'users') return <UsersScreen currentUserId={session?.user?.id} />;
     if (section === 'roles') return <RolesPermissionsScreen />;
-    if (section === 'files') return <PendingFilesScreen />;
+    if (section === 'files') return <FilesScreen />;
     return <ContentScreen />;
   }, [section, session?.user?.id]);
 
@@ -93,7 +77,6 @@ export function App() {
               onClick={() => setSection(item.id)}
             >
               <span>{item.label}</span>
-              {item.pending && <small>pending backend</small>}
             </button>
           ))}
         </nav>
