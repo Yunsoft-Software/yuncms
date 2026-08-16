@@ -54,6 +54,36 @@ export class SchemaMetadataRepository {
     return this.readCollection(collection);
   }
 
+  async updateCollectionMetadata(collection, patch = {}) {
+    const assignments = [];
+    const params = [];
+
+    if (Object.hasOwn(patch, 'note')) {
+      assignments.push('note = ?');
+      params.push(patch.note ?? null);
+    }
+    if (Object.hasOwn(patch, 'singleton')) {
+      assignments.push('singleton = ?');
+      params.push(patch.singleton ? 1 : 0);
+    }
+    if (Object.hasOwn(patch, 'hidden')) {
+      assignments.push('hidden = ?');
+      params.push(patch.hidden ? 1 : 0);
+    }
+    if (Object.hasOwn(patch, 'metadata')) {
+      assignments.push('metadata = ?');
+      params.push(encodeJson(patch.metadata));
+    }
+
+    if (assignments.length === 0) return this.readCollection(collection);
+    params.push(collection);
+    await this.database.query(
+      `UPDATE yuncms_collections SET ${assignments.join(', ')} WHERE collection = ?`,
+      params,
+    );
+    return this.readCollection(collection);
+  }
+
   async deleteCollection(collection) {
     const [result] = await this.database.query(
       'DELETE FROM yuncms_collections WHERE collection = ?',
@@ -118,6 +148,40 @@ export class SchemaMetadataRepository {
     return this.readField(collection, field);
   }
 
+  async updateFieldMetadata(collection, field, patch = {}) {
+    const assignments = [];
+    const params = [];
+
+    if (Object.hasOwn(patch, 'readonly')) {
+      assignments.push('readonly = ?');
+      params.push(patch.readonly ? 1 : 0);
+    }
+    if (Object.hasOwn(patch, 'hidden')) {
+      assignments.push('hidden = ?');
+      params.push(patch.hidden ? 1 : 0);
+    }
+    if (Object.hasOwn(patch, 'sort')) {
+      assignments.push('sort = ?');
+      params.push(patch.sort ?? null);
+    }
+    if (Object.hasOwn(patch, 'interface')) {
+      assignments.push('interface = ?');
+      params.push(patch.interface ?? null);
+    }
+    if (Object.hasOwn(patch, 'options')) {
+      assignments.push('options = ?');
+      params.push(encodeJson(patch.options));
+    }
+
+    if (assignments.length === 0) return this.readField(collection, field);
+    params.push(collection, field);
+    await this.database.query(
+      `UPDATE yuncms_fields SET ${assignments.join(', ')} WHERE collection = ? AND field = ?`,
+      params,
+    );
+    return this.readField(collection, field);
+  }
+
   async deleteField(collection, field) {
     const [result] = await this.database.query(
       'DELETE FROM yuncms_fields WHERE collection = ? AND field = ?',
@@ -132,6 +196,18 @@ export class SchemaMetadataRepository {
               junction_field, on_delete, metadata, created_at
        FROM yuncms_relations
        ORDER BY many_collection, many_field`,
+    );
+    return rows;
+  }
+
+  async listRelationsForOne(oneCollection) {
+    const [rows] = await this.database.query(
+      `SELECT id, many_collection, many_field, one_collection, one_field, junction_collection,
+              junction_field, on_delete, metadata, created_at
+       FROM yuncms_relations
+       WHERE one_collection = ?
+       ORDER BY many_collection, many_field`,
+      [oneCollection],
     );
     return rows;
   }
