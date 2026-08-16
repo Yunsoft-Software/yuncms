@@ -3,9 +3,11 @@ import {
   closeDatabasePool,
   createDatabasePool,
   loadConfig,
+  loadEnvFileIfPresent,
 } from '@yuncms/core';
 import { createApp } from './app.js';
 
+loadEnvFileIfPresent();
 const config = loadConfig();
 const pool = createDatabasePool(config.database);
 let server = null;
