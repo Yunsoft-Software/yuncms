@@ -8,6 +8,7 @@ import {
 import { createAuthenticationMiddleware } from './authentication.js';
 import { apiErrorHandler } from './error-response.js';
 import { createAuthRouter } from './routes/auth.js';
+import { createFilesRouter } from './routes/files.js';
 import { createItemsRouter } from './routes/items.js';
 import { createPermissionsRouter } from './routes/permissions.js';
 import { createRolesRouter } from './routes/roles.js';
@@ -22,7 +23,7 @@ function studioCors(config) {
     if (origin && allowedOrigin && origin === allowedOrigin) {
       res.set('access-control-allow-origin', origin);
       res.set('vary', 'Origin');
-      res.set('access-control-allow-headers', 'content-type, authorization, x-request-id');
+      res.set('access-control-allow-headers', 'content-type, authorization, x-request-id, x-filename, x-title, x-mimetype');
       res.set('access-control-allow-methods', 'GET,POST,PATCH,DELETE,OPTIONS');
     }
 
@@ -38,6 +39,7 @@ export function createApp({
   serviceRegistry = createCoreServiceRegistry(),
   schemaCache = null,
   emitter = null,
+  storage = null,
   endpointExtensions = [],
 }) {
   if (!pool) throw new Error('Database pool is required');
@@ -81,6 +83,7 @@ export function createApp({
     services,
     schemaCache,
     emitter,
+    storage,
   }));
   app.use('/auth', createAuthRouter());
   app.use('/items', createItemsRouter());
@@ -88,6 +91,7 @@ export function createApp({
   app.use('/users', createUsersRouter());
   app.use('/roles', createRolesRouter());
   app.use('/permissions', createPermissionsRouter());
+  app.use('/files', createFilesRouter({ maxUploadBytes: config.storage?.maxUploadBytes }));
 
   for (const extension of endpointExtensions) {
     if (!extension?.id || !extension?.router) {
