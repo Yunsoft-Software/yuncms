@@ -7,5 +7,7 @@ export function serviceOptionsFromRequest(req) {
     schema: req.context.schema,
     logger: req.context.logger,
     emitter: req.context.emitter,
+    storage: req.context.storage,
+    requestId: req.id,
   };
 }
