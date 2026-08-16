@@ -8,6 +8,7 @@ export function serviceOptionsFromRequest(req) {
     logger: req.context.logger,
     emitter: req.context.emitter,
     storage: req.context.storage,
+    permissionCache: req.context.permissionCache,
     requestId: req.id,
   };
 }
