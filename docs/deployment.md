@@ -1,36 +1,32 @@
 # Deployment Baseline
 
-YunCMS V1 targets Node.js 24 LTS with MySQL 8-compatible servers.
+YunCMS V1 targets Node.js 24 LTS with a MySQL 8-compatible server.
 
-## Runtime
-
-Required:
+## Required runtime pieces
 
 - Node.js 24 LTS;
-- npm workspace install / reviewed lockfile;
+- reviewed npm install/lockfile;
 - MySQL database/user;
-- writable local storage directory or configured S3-compatible bucket;
+- persistent local storage or configured S3-compatible bucket;
 - optional SMTP for password reset/email verification.
 
-The API should run behind a production reverse proxy/TLS terminator when exposed to the internet.
+Expose the API through a production reverse proxy/TLS terminator when internet-facing.
 
-## Startup sequence
-
-Recommended deployment flow:
+## Startup flow
 
 ```text
-1. install package/dependencies
+1. install dependencies/package
 2. provide environment variables
 3. yuncms bootstrap
 4. yuncms start
-5. serve/build Studio separately or from the chosen web deployment
+5. serve the built Studio separately/from the chosen web deployment
 ```
 
-`yuncms start` never silently bootstraps an outdated database. API startup checks required migrations before listening.
+`yuncms start` does not silently migrate an outdated DB. Startup checks required migrations before listening.
 
 ## Environment
 
-Minimum DB example:
+Minimal DB/API example:
 
 ```text
 HOST=127.0.0.1
@@ -45,74 +41,112 @@ DB_SSL=false
 STUDIO_ORIGIN=https://studio.example.com
 ```
 
-Use a least-privilege MySQL user scoped to the YunCMS database but able to perform the DDL required by dynamic schema operations.
+Use a least-privilege MySQL user scoped to the YunCMS database but able to perform the DDL required by the dynamic schema engine.
 
-See `.env.example` for file/S3/SMTP/rate-limit values.
+`.env.example` also documents local/S3 storage, SMTP, auth rate limits, audit cleanup defaults and logging.
 
 ## Local storage
 
-`FILES_LOCAL_ROOT` must be on persistent storage with permissions restricted to the YunCMS process identity. Do not use an ephemeral container filesystem unless losing uploads is acceptable.
+`FILES_LOCAL_ROOT` must be persistent and writable only by the intended YunCMS runtime identity.
 
-When horizontally scaling multiple API instances, local storage is not shared automatically. Use a shared/persistent filesystem or S3-compatible driver.
+When multiple API instances run, local disks are not shared automatically. Use shared persistent storage or S3-compatible storage.
 
 ## S3-compatible storage
 
-Set `S3_BUCKET` to register the `s3` driver. `S3_ENDPOINT` and `S3_FORCE_PATH_STYLE` support compatible providers that do not use default AWS endpoint/addressing behavior.
+Set `S3_BUCKET` to register the `s3` driver. Custom endpoint/path-style settings support providers such as self-hosted S3-compatible services.
 
-Before production, verify the exact provider listed in `todo.md` rather than assuming AWS-S3 compatibility implies identical behavior.
+Verify the exact production provider from `todo.md`; compatibility claims should not replace real provider testing.
+
+## File reconciliation
+
+`POST /files/reconcile` is an admin maintenance operation.
+
+Recommended operational practice:
+
+1. run dry-run first;
+2. investigate missing storage objects separately;
+3. only use `deleteOrphans:true` after reviewing the report;
+4. keep an age guard large enough to avoid racing in-flight uploads;
+5. keep backups independent from reconciliation.
+
+The service never automatically deletes DB metadata merely because the storage object is missing.
 
 ## SMTP
 
-If SMTP delivery is configured, `SMTP_HOST` and `SMTP_FROM` are both required. Temporary SMTP unavailability does not prevent the API from starting; recovery/verification delivery fails independently.
+If SMTP is configured, `SMTP_HOST` and `SMTP_FROM` are required together. Temporary SMTP unavailability does not stop the whole API from starting.
+
+## Audit retention
+
+Defaults:
+
+```text
+AUDIT_RETENTION_DAYS=90
+AUDIT_CLEANUP_BATCH_SIZE=1000
+AUDIT_CLEANUP_MAX_BATCHES=100
+```
+
+These values configure an explicit cleanup request; they do **not** schedule automatic deletion.
+
+Run `POST /audit/cleanup` from an authenticated administrator/operator workflow when retention cleanup is desired. Cleanup uses bounded batches so one request does not attempt an unbounded table delete.
 
 ## Multi-instance considerations
 
-Shared MySQL is supported by schema advisory locking for intentional dynamic-schema mutations.
+Shared MySQL schema mutation is serialized through advisory locks, but multi-instance deployments must still consider:
 
-Still consider:
+- DB pool sizing per instance;
+- shared file storage;
+- process-local auth rate limits are not one cluster-wide budget;
+- request/schema caches are process-local;
+- trusted extension code executes in each API process;
+- graceful deployment/draining before force termination.
 
-- per-instance DB pool sizing;
-- shared S3/storage;
-- process-local auth rate limits are not cluster-wide;
-- in-memory schema/permission request caches are local to each process;
-- extension code runs in-process and must be trusted;
-- graceful deployment should allow active requests to drain before force termination.
+Redis/shared rate-limit infrastructure is not required for a single-process V1, but may become necessary when horizontally scaling authentication traffic.
 
-A future shared rate-limit/cache store may be useful at larger scale, but YunCMS V1 does not require Redis to run.
+## TLS and HTTP headers
+
+The API applies baseline application headers and narrow Studio CORS. Configure at the real reverse proxy/TLS layer:
+
+- HTTPS certificates;
+- HTTP-to-HTTPS redirect;
+- HSTS once HTTPS is guaranteed;
+- trusted proxy/client IP behavior as appropriate;
+- body/request limits consistent with `FILES_MAX_UPLOAD_BYTES`.
 
 ## Backups
 
 Back up both:
 
-- the MySQL database;
+- MySQL, including dynamic collection tables and `yuncms_*` metadata;
 - file storage objects.
 
-Dynamic collection tables and `yuncms_*` metadata must be restored consistently. Do not restore metadata alone without the corresponding physical collection tables/files.
+Restore DB metadata, physical dynamic tables and file objects consistently.
 
 ## Observability
 
-Runtime logs are structured JSON. Preserve request ids in reverse-proxy/application logs so API errors and audit records can be correlated.
+Runtime logs are structured JSON. Preserve/request-log `X-Request-Id` so API errors and audit records can be correlated.
 
 Monitor at minimum:
 
-- API process restarts;
+- process restarts;
 - `/ready` failures;
-- MySQL connection/lock errors;
+- DB connection/lock/deadlock errors;
 - `SCHEMA_PARTIAL_FAILURE`;
 - `FILE_STORAGE_CLEANUP_FAILED`;
-- audit-write failures;
+- reconciliation drift counts;
+- audit-write/cleanup failures;
 - auth rate-limit spikes;
 - extension startup failures.
 
 ## Release gate
 
-Do not call a deployment production-ready solely because source code exists. Before release, complete the relevant `todo.md` items for:
+Do not call a deployment production-ready because source code exists. Complete applicable `todo.md` checks for:
 
-- dependency install/lockfile/build;
+- dependency install/lockfile/tests/build;
 - bootstrap idempotency;
-- real-MySQL schema/CRUD/RBAC/auth integration;
-- Studio smoke path;
-- local/S3 file behavior;
+- real MySQL schema/CRUD/relation/RBAC/auth behavior;
+- Studio smoke/accessibility;
+- local/S3 file behavior + reconciliation;
 - SMTP recovery/verification;
+- audit cleanup/logging/security headers;
 - concurrency/graceful shutdown;
-- npm package/tarball installation.
+- npm naming/tarball/fresh-install flow.
