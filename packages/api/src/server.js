@@ -9,6 +9,7 @@ import {
   loadConfig,
   loadEnvFileIfPresent,
   LocalStorageDriver,
+  S3StorageDriver,
   SchemaCache,
 } from '@yuncms/core';
 import { createApp } from './app.js';
@@ -17,9 +18,20 @@ import { loadExtensionRuntime } from './extensions/runtime.js';
 loadEnvFileIfPresent();
 const config = loadConfig();
 const pool = createDatabasePool(config.database);
-const storage = createStorageRegistry({
+const storageDrivers = {
   local: new LocalStorageDriver({ root: config.storage.localRoot }),
-});
+};
+if (config.storage.s3.bucket) {
+  storageDrivers.s3 = new S3StorageDriver({
+    bucket: config.storage.s3.bucket,
+    region: config.storage.s3.region,
+    endpoint: config.storage.s3.endpoint ?? undefined,
+    accessKeyId: config.storage.s3.accessKeyId ?? undefined,
+    secretAccessKey: config.storage.s3.secretAccessKey ?? undefined,
+    forcePathStyle: config.storage.s3.forcePathStyle,
+  });
+}
+const storage = createStorageRegistry(storageDrivers);
 let server = null;
 let shuttingDown = false;
 
