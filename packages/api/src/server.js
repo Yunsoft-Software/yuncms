@@ -3,6 +3,7 @@ import {
   closeDatabasePool,
   createCoreServiceRegistry,
   createDatabasePool,
+  createJsonLogger,
   createStorageRegistry,
   createSystemAccountability,
   HookEmitter,
@@ -18,6 +19,7 @@ import { loadExtensionRuntime } from './extensions/runtime.js';
 
 loadEnvFileIfPresent();
 const config = loadConfig();
+const logger = createJsonLogger({ level: config.logging.level });
 const pool = createDatabasePool(config.database);
 const storageDrivers = {
   local: new LocalStorageDriver({ root: config.storage.localRoot }),
@@ -72,7 +74,7 @@ function registerInternalAudit({ emitter, services }) {
         const audit = new AuditService({
           accountability: systemAccountability,
           database: pool,
-          logger: console,
+          logger,
           requestId: context.requestId ?? null,
         });
         await audit.record({
@@ -84,11 +86,11 @@ function registerInternalAudit({ emitter, services }) {
           payload,
         });
       } catch (error) {
-        console.error('YunCMS audit write failed after committed mutation', {
+        logger.error('YunCMS audit write failed after committed mutation', {
           event,
           requestId: context.requestId ?? null,
           code: error?.code,
-          message: error?.message,
+          error,
         });
       }
     });
@@ -110,13 +112,14 @@ async function start() {
     schemaCache,
     emitter,
     storage,
-    logger: console,
+    logger,
     env: config,
   });
 
   const app = createApp({
     pool,
     config,
+    logger,
     serviceRegistry,
     schemaCache,
     emitter,
@@ -128,7 +131,10 @@ async function start() {
   await extensionRuntime.init('app.beforeStart');
   server = await new Promise((resolve, reject) => {
     const listeningServer = app.listen(config.server.port, config.server.host, () => {
-      console.log(`YunCMS API listening on http://${config.server.host}:${config.server.port}`);
+      logger.info('YunCMS API listening', {
+        host: config.server.host,
+        port: config.server.port,
+      });
       resolve(listeningServer);
     });
     listeningServer.once('error', reject);
@@ -139,10 +145,10 @@ async function start() {
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`Received ${signal}; shutting down YunCMS API`);
+  logger.info('YunCMS API shutting down', { signal });
 
   const forceExit = setTimeout(() => {
-    console.error('Graceful shutdown timed out');
+    logger.error('Graceful shutdown timed out', { signal });
     process.exit(1);
   }, 10_000);
   forceExit.unref();
@@ -152,6 +158,7 @@ async function shutdown(signal) {
   }
   await closeDatabasePool(pool);
   clearTimeout(forceExit);
+  logger.info('YunCMS API shutdown complete', { signal });
 }
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
@@ -159,16 +166,16 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     shutdown(signal)
       .then(() => process.exit(0))
       .catch((error) => {
-        console.error('Graceful shutdown failed', error);
+        logger.error('Graceful shutdown failed', { signal, error });
         process.exit(1);
       });
   });
 }
 
 start().catch(async (error) => {
-  console.error('YunCMS API failed to start', {
+  logger.error('YunCMS API failed to start', {
     code: error?.code,
-    message: error?.message,
+    error,
   });
   await closeDatabasePool(pool).catch(() => {});
   process.exit(1);
