@@ -5,6 +5,14 @@ import { loadConfig } from '../src/config.js';
 import { quoteIdentifier } from '../src/identifier.js';
 import { normalizeDatabaseError } from '../src/errors.js';
 import { withDatabaseRetry } from '../src/retry.js';
+import {
+  createAccountability,
+  createPublicAccountability,
+  createSystemAccountability,
+} from '../src/accountability.js';
+import { createRequestContext } from '../src/context.js';
+import { BaseService } from '../src/services/base-service.js';
+import { createServiceRegistry } from '../src/services/service-registry.js';
 
 test('loadConfig uses stable defaults and parses numeric values', () => {
   const config = loadConfig({ PORT: '9000', DB_CONNECTION_LIMIT: '20', DB_SSL: 'true' });
@@ -53,4 +61,58 @@ test('retry helper fails closed for unrelated errors', async () => {
   );
 
   assert.equal(calls, 1);
+});
+
+test('accountability helpers never infer elevated access', () => {
+  const user = createAccountability({ user: 'user-1', role: 'role-1' });
+  const publicAccess = createPublicAccountability({ role: 'public-role' });
+  const system = createSystemAccountability();
+
+  assert.deepEqual(user, {
+    user: 'user-1',
+    role: 'role-1',
+    admin: false,
+    public: false,
+    system: false,
+  });
+  assert.equal(publicAccess.public, true);
+  assert.equal(publicAccess.admin, false);
+  assert.equal(system.system, true);
+  assert.equal(system.admin, true);
+  assert.throws(() => createAccountability({ public: true, admin: true }), /Public accountability/);
+});
+
+test('request context propagates explicit dependencies', () => {
+  const accountability = createAccountability({ user: 'user-1' });
+  const database = {};
+  const services = {};
+  const context = createRequestContext({
+    accountability,
+    database,
+    services,
+    requestId: 'req-1',
+  });
+
+  assert.equal(context.accountability, accountability);
+  assert.equal(context.database, database);
+  assert.equal(context.services, services);
+  assert.equal(context.requestId, 'req-1');
+  assert.throws(() => createRequestContext({ database, services }), /Explicit accountability/);
+});
+
+test('service registry rejects duplicates and base services require context', () => {
+  class ExampleService extends BaseService {}
+  const registry = createServiceRegistry({ ExampleService });
+
+  assert.equal(registry.has('ExampleService'), true);
+  assert.equal(registry.get('ExampleService'), ExampleService);
+  assert.equal(registry.toObject().ExampleService, ExampleService);
+  assert.throws(() => registry.register('ExampleService', ExampleService), /already registered/);
+  assert.throws(() => new ExampleService({ database: {} }), /Explicit accountability/);
+
+  const instance = new ExampleService({
+    database: {},
+    accountability: createPublicAccountability(),
+  });
+  assert.equal(instance.accountability.public, true);
 });
