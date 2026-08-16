@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { assertPermissionValidationRule } from '../permission-validation.js';
 import { compileFilter } from '../query.js';
 import { SchemaCache } from '../schema.js';
 import { BaseService } from './base-service.js';
@@ -66,6 +67,14 @@ function normalizePermissionRow(row) {
   };
 }
 
+function cacheKey(accountability, action, collection) {
+  return [
+    accountability.system === true ? 'system' : accountability.admin === true ? 'admin' : accountability.role ?? 'none',
+    collection,
+    action,
+  ].join(':');
+}
+
 export class PermissionsService extends BaseService {
   constructor(options = {}) {
     super(options);
@@ -74,9 +83,12 @@ export class PermissionsService extends BaseService {
 
   async resolve(action, collection) {
     assertAction(action);
+    const key = cacheKey(this.accountability, action, collection);
+    if (this.permissionCache?.has(key)) return this.permissionCache.get(key);
 
+    let permission;
     if (this.accountability.admin === true || this.accountability.system === true) {
-      return {
+      permission = {
         fullAccess: true,
         role: this.accountability.role,
         collection,
@@ -85,38 +97,41 @@ export class PermissionsService extends BaseService {
         filter: null,
         validation: null,
       };
+    } else {
+      if (!this.accountability.role) {
+        throw forbidden(`No role is available for ${action} access to ${collection}`);
+      }
+
+      const [rows] = await this.database.query(
+        `SELECT id, role, collection, action, fields, filter, validation
+         FROM yuncms_permissions
+         WHERE role = ? AND collection = ? AND action = ?
+         LIMIT 1`,
+        [this.accountability.role, collection, action],
+      );
+      const row = normalizePermissionRow(rows[0]);
+      if (!row) throw forbidden(`Role has no ${action} permission for ${collection}`);
+
+      if (row.fields !== null && (!Array.isArray(row.fields) || row.fields.some((field) => typeof field !== 'string'))) {
+        const error = new Error(`Permission ${row.id} contains invalid field metadata`);
+        error.code = 'INVALID_PERMISSION';
+        throw error;
+      }
+
+      permission = {
+        fullAccess: false,
+        id: row.id,
+        role: row.role,
+        collection: row.collection,
+        action: row.action,
+        fields: row.fields,
+        filter: row.filter,
+        validation: row.validation,
+      };
     }
 
-    if (!this.accountability.role) {
-      throw forbidden(`No role is available for ${action} access to ${collection}`);
-    }
-
-    const [rows] = await this.database.query(
-      `SELECT id, role, collection, action, fields, filter, validation
-       FROM yuncms_permissions
-       WHERE role = ? AND collection = ? AND action = ?
-       LIMIT 1`,
-      [this.accountability.role, collection, action],
-    );
-    const row = normalizePermissionRow(rows[0]);
-    if (!row) throw forbidden(`Role has no ${action} permission for ${collection}`);
-
-    if (row.fields !== null && (!Array.isArray(row.fields) || row.fields.some((field) => typeof field !== 'string'))) {
-      const error = new Error(`Permission ${row.id} contains invalid field metadata`);
-      error.code = 'INVALID_PERMISSION';
-      throw error;
-    }
-
-    return {
-      fullAccess: false,
-      id: row.id,
-      role: row.role,
-      collection: row.collection,
-      action: row.action,
-      fields: row.fields,
-      filter: row.filter,
-      validation: row.validation,
-    };
+    this.permissionCache?.set(key, permission);
+    return permission;
   }
 
   async readMany() {
@@ -163,16 +178,13 @@ export class PermissionsService extends BaseService {
       error.code = 'INVALID_PERMISSION';
       throw error;
     }
-    if (input.validation != null) {
-      const error = new Error('Permission validation rules are not enforced yet and cannot be stored in V1');
-      error.code = 'PERMISSION_VALIDATION_NOT_READY';
-      throw error;
-    }
 
     const collectionSchema = await this.#collectionSchema(input.collection);
     const fields = normalizePermissionFields(input.fields ?? null, collectionSchema);
     const filter = input.filter ?? null;
+    const validation = input.validation ?? null;
     if (filter !== null) compileFilter(filter, collectionSchema);
+    assertPermissionValidationRule(validation, collectionSchema);
 
     const [roleRows] = await this.database.query(
       'SELECT id FROM yuncms_roles WHERE id = ? LIMIT 1',
@@ -187,7 +199,7 @@ export class PermissionsService extends BaseService {
     const id = randomUUID();
     await this.database.query(
       `INSERT INTO yuncms_permissions (id, role, collection, action, fields, filter, validation)
-       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.role,
@@ -195,9 +207,10 @@ export class PermissionsService extends BaseService {
         action,
         fields == null ? null : JSON.stringify(fields),
         filter == null ? null : JSON.stringify(filter),
+        validation == null ? null : JSON.stringify(validation),
       ],
     );
-
+    this.permissionCache?.clear();
     return this.readOne(id);
   }
 
@@ -210,13 +223,8 @@ export class PermissionsService extends BaseService {
     }
     const keys = Object.keys(patch);
     if (keys.length === 0 || keys.some((key) => !['fields', 'filter', 'validation'].includes(key))) {
-      const error = new Error('Permission update supports fields and filter only in V1');
+      const error = new Error('Permission update supports fields, filter and validation only');
       error.code = 'INVALID_PERMISSION';
-      throw error;
-    }
-    if (Object.hasOwn(patch, 'validation') && patch.validation != null) {
-      const error = new Error('Permission validation rules are not enforced yet and cannot be stored in V1');
-      error.code = 'PERMISSION_VALIDATION_NOT_READY';
       throw error;
     }
 
@@ -241,7 +249,9 @@ export class PermissionsService extends BaseService {
       params.push(patch.filter == null ? null : JSON.stringify(patch.filter));
     }
     if (Object.hasOwn(patch, 'validation')) {
-      assignments.push('validation = NULL');
+      assertPermissionValidationRule(patch.validation, collectionSchema);
+      assignments.push('validation = ?');
+      params.push(patch.validation == null ? null : JSON.stringify(patch.validation));
     }
 
     params.push(id);
@@ -249,6 +259,7 @@ export class PermissionsService extends BaseService {
       `UPDATE yuncms_permissions SET ${assignments.join(', ')} WHERE id = ?`,
       params,
     );
+    this.permissionCache?.clear();
     return this.readOne(id);
   }
 
@@ -263,6 +274,9 @@ export class PermissionsService extends BaseService {
       error.code = 'PERMISSION_NOT_FOUND';
       throw error;
     }
+    this.permissionCache?.clear();
     return true;
   }
 }
+
+export { cacheKey };
