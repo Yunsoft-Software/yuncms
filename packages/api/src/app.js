@@ -16,6 +16,15 @@ import { createRolesRouter } from './routes/roles.js';
 import { createSchemaRouter } from './routes/schema.js';
 import { createUsersRouter } from './routes/users.js';
 
+function securityHeaders(req, res, next) {
+  res.set('x-content-type-options', 'nosniff');
+  res.set('x-frame-options', 'DENY');
+  res.set('referrer-policy', 'no-referrer');
+  res.set('permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+  res.set('cross-origin-resource-policy', 'same-origin');
+  next();
+}
+
 function studioCors(config) {
   return (req, res, next) => {
     const origin = req.get('origin');
@@ -51,6 +60,7 @@ export function createApp({
   const services = serviceRegistry.toObject();
   const app = express();
   app.disable('x-powered-by');
+  app.use(securityHeaders);
   app.use(studioCors(config));
   app.use(express.json({ limit: '1mb' }));
   app.use((req, res, next) => {
@@ -112,3 +122,5 @@ export function createApp({
   app.use(apiErrorHandler(logger));
   return app;
 }
+
+export { securityHeaders, studioCors };
