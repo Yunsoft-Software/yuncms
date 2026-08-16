@@ -51,10 +51,11 @@ Implemented:
 - create a user collection;
 - create an `id CHAR(36)` primary key with matching field metadata;
 - reject the reserved `yuncms_` prefix;
+- metadata-only updates for `note`, `singleton`, `hidden` and custom metadata;
 - increment schema version only after metadata work succeeds;
 - best-effort cleanup of a newly created table if metadata/version work fails.
 
-Safe metadata update and destructive delete are not implemented yet.
+Destructive collection delete is not implemented yet.
 
 ## FieldsService
 
@@ -72,7 +73,7 @@ Implemented physical field families:
 - `json` -> `JSON`
 - `uuid` -> `CHAR(36)`
 
-Create/read are implemented. Type conversion, index mutation, general field update and destructive delete are not yet shipped.
+Create/read and metadata-only updates for `readonly`, `hidden`, `sort`, `interface` and `options` are implemented. Type conversion, index/null/default mutation and destructive delete are not yet shipped.
 
 Defaults remain parameterized. Defaults for `TEXT` and `JSON` are intentionally postponed in the current compiler.
 
@@ -89,7 +90,9 @@ M2O creation is implemented when:
 
 The physical foreign key is created first. Relation metadata and schema-version increment are then committed together. If the metadata step fails, YunCMS attempts to remove the newly created FK.
 
-Relation deletion, explicit O2M read helpers and M2M junction creation are still pending.
+M2O deletion is implemented with the inverse compensation strategy: YunCMS drops the FK, removes metadata and increments schema version transactionally, and attempts to recreate the FK if the metadata transaction fails. O2M is currently exposed as inverse metadata reads over matching M2O records.
+
+M2M junction creation is still pending.
 
 ## Schema cache
 
@@ -97,12 +100,16 @@ Relation deletion, explicit O2M read helpers and M2M junction creation are still
 
 The important invariant is that failed metadata transactions do not advance the schema version, while committed schema metadata changes do.
 
-## Items query safety foundation
+## Items query and permission foundation
 
-The current query compiler validates requested fields and sort keys against schema metadata and only accepts an explicit filter-operator allowlist. Filter values, item values, limit and offset are bound as values rather than concatenated as raw user SQL.
+The query compiler validates requested fields and sort keys against schema metadata and only accepts an explicit filter-operator allowlist. Filter values, item values, limit and offset are bound as values rather than concatenated as raw user SQL.
 
-`ItemsService` currently remains restricted to explicit admin/system accountability until the RBAC milestone is implemented. REST item routes are intentionally not mounted yet.
+`ItemsService` now resolves action permissions inside the service layer. A permission may restrict both fields and rows. User-provided select/filter/sort expressions are compiled against the permitted field view, while the server-side permission row filter is compiled against the full collection schema and ANDed with the user filter.
+
+This prevents a role from using an inaccessible field as an inference side channel through filtering or sorting. Missing permission rows and role-less accountability fail closed. Explicit admin/system accountability bypasses ordinary permission rows.
+
+Generic `/items/:collection` REST adapters are mounted, but the current API request context is still role-less public because authentication middleware is not implemented. Therefore ordinary HTTP item requests are intentionally denied until auth or explicit public-role wiring lands.
 
 ## Required real-MySQL verification
 
-The connector environment cannot truthfully validate MySQL DDL, lock behavior or compensation. `todo.md` contains the exact local/Codex checks that must be run against a disposable MySQL 8 database before those verification items can be marked complete.
+The connector environment cannot truthfully validate MySQL DDL, lock behavior, compensation or RBAC SQL behavior. `todo.md` contains the exact local/Codex checks that must be run against a disposable MySQL 8 database before those verification items can be marked complete.
