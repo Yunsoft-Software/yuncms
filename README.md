@@ -127,7 +127,7 @@ GET /health
 GET /ready
 ```
 
-API default: `http://127.0.0.1:8055`
+API default: `http://127.0.0.1:3008`
 Studio default: `http://localhost:5173`
 
 ## Core design rule
