@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { API_URL, health, logout, readSession, subscribeSession } from './api.js';
+import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
 import { ContentScreen } from './screens/ContentScreen.jsx';
 import { DataModelScreen } from './screens/DataModelScreen.jsx';
 import { FilesScreen } from './screens/FilesScreen.jsx';
@@ -24,8 +25,24 @@ const sectionCopy = {
   files: ['Files', 'Upload, download and manage files through the configured storage driver.'],
 };
 
+function readAuthAction() {
+  const params = new URLSearchParams(window.location.search);
+  const action = params.get('auth_action');
+  const token = params.get('token');
+  if (!token || !['reset', 'verify'].includes(action)) return null;
+  return { action, token };
+}
+
+function clearAuthAction() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('auth_action');
+  url.searchParams.delete('token');
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 export function App() {
   const [session, setSession] = useState(() => readSession());
+  const [authAction, setAuthAction] = useState(() => readAuthAction());
   const [section, setSection] = useState('content');
   const [healthState, setHealthState] = useState({ state: 'checking', message: 'Checking API…' });
   const [loggingOut, setLoggingOut] = useState(false);
@@ -54,6 +71,19 @@ export function App() {
     } finally {
       setLoggingOut(false);
     }
+  }
+
+  if (authAction) {
+    return (
+      <AuthActionScreen
+        action={authAction.action}
+        token={authAction.token}
+        onDone={() => {
+          clearAuthAction();
+          setAuthAction(null);
+        }}
+      />
+    );
   }
 
   if (!session) {
