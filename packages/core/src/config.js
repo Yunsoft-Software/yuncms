@@ -51,5 +51,12 @@ export function loadConfig(env = process.env) {
       connectionLimit: readInteger(env.DB_CONNECTION_LIMIT, 10, 'DB_CONNECTION_LIMIT', { min: 1, max: 1000 }),
       ssl: readBoolean(env.DB_SSL, false),
     },
+    storage: {
+      localRoot: readString(env.FILES_LOCAL_ROOT, '.yuncms/uploads'),
+      maxUploadBytes: readInteger(env.FILES_MAX_UPLOAD_BYTES, 25 * 1024 * 1024, 'FILES_MAX_UPLOAD_BYTES', {
+        min: 1,
+        max: 1024 * 1024 * 1024,
+      }),
+    },
   };
 }
