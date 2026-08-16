@@ -3,6 +3,7 @@ import { compileFieldColumn } from '../field-types.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { incrementSchemaVersion } from '../schema-version.js';
+import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 
 function assertFieldName(field) {
@@ -59,7 +60,6 @@ export class FieldsService extends BaseService {
       const tableName = quoteIdentifier(collection, 'collection name');
       const fieldName = quoteIdentifier(field, 'field name');
       let physicalFieldCreated = false;
-      let metadataCreated = false;
 
       try {
         await connection.query(
@@ -68,31 +68,30 @@ export class FieldsService extends BaseService {
         );
         physicalFieldCreated = true;
 
-        const created = await metadata.createField({
-          collection,
-          field,
-          type: input.type,
-          required: input.required === true,
-          readonly: input.readonly === true,
-          hidden: input.hidden === true,
-          sort: input.sort ?? null,
-          interface: input.interface ?? null,
-          options: input.options ?? null,
-          schemaMetadata: compiled.schemaMetadata,
-        });
-        metadataCreated = true;
+        return await withConnectionTransaction(connection, async () => {
+          const created = await metadata.createField({
+            collection,
+            field,
+            type: input.type,
+            required: input.required === true,
+            readonly: input.readonly === true,
+            hidden: input.hidden === true,
+            sort: input.sort ?? null,
+            interface: input.interface ?? null,
+            options: input.options ?? null,
+            schemaMetadata: compiled.schemaMetadata,
+          });
 
-        const schemaVersion = await incrementSchemaVersion(connection);
-        return { ...created, schemaVersion };
+          const schemaVersion = await incrementSchemaVersion(connection);
+          return { ...created, schemaVersion };
+        });
       } catch (error) {
         const cleanupErrors = [];
 
-        if (metadataCreated) {
-          try {
-            await metadata.deleteField(collection, field);
-          } catch (cleanupError) {
-            cleanupErrors.push(cleanupError);
-          }
+        try {
+          await metadata.deleteField(collection, field);
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError);
         }
 
         if (physicalFieldCreated) {
