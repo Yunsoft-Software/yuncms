@@ -22,10 +22,10 @@ See [`plan.md`](./plan.md) for the roadmap/status, [`AGENTS.md`](./AGENTS.md) fo
 
 ```text
 apps/studio                React Studio shell
-packages/api               Express HTTP runtime and thin REST adapters
-packages/core              MySQL, bootstrap, schema/query/RBAC service foundations
+packages/api               Express HTTP/auth runtime and thin REST adapters
+packages/core              MySQL, bootstrap, schema/query/auth/RBAC services
 packages/extensions-sdk    extension authoring helpers
-packages/cli               YunCMS CLI; bootstrap command is implemented
+packages/cli               YunCMS init/bootstrap CLI
 ```
 
 ## Implemented backend slice
@@ -42,43 +42,58 @@ Current code includes:
 - `RelationsService` validated M2O create/delete and O2M inverse reads;
 - allowlisted item filter/sort/field query compiler;
 - generic `ItemsService` CRUD with service-layer role permission enforcement;
-- `RolesService` and `PermissionsService` foundations with field allowlists and row filters;
-- generic `/items/:collection` REST CRUD adapters and a canonical API error response middleware;
+- `RolesService` and `PermissionsService` with field allowlists and row filters;
+- opaque session access/refresh tokens with refresh rotation and server-side revocation;
+- scrypt password hashing and session invalidation on password change;
+- static hashed API tokens with one-time secret return;
+- authenticated/public-role request accountability;
+- login/refresh/logout/logout-all/API-token REST routes;
+- generic `/items/:collection` REST CRUD adapters and canonical API error handling;
+- one-public-role constraints at service and MySQL levels;
 - `defineEndpoint` / `defineHook` extension SDK helpers;
-- `yuncms bootstrap` CLI command;
+- interactive `yuncms init` and idempotent `yuncms bootstrap` commands;
 - minimal React Studio shell and API health indicator.
 
-M2M, destructive schema deletes, authentication/session middleware, permission validation rules, extension loading, files, the interactive setup wizard and most Studio screens are still roadmap work.
+M2M, destructive schema deletes, password-reset/email-verification lifecycles, auth rate limiting, permission validation rules, extension loading, files and most Studio screens are still roadmap work.
 
-The HTTP API currently assigns role-less public accountability because authentication is not implemented yet. Item routes therefore fail closed with `FORBIDDEN` rather than temporarily exposing CRUD. Explicit public-role and authenticated-role assignment will land with auth.
-
-## Local development
+## Setup / local development
 
 The repository is intentionally committed before dependency installation so the first local/Codex session can verify the dependency graph and create the lockfile explicitly.
 
+Interactive first setup:
+
 ```bash
 npm install
-cp .env.example .env
+npm run init
+npm run dev:api
+npm run dev:studio
+```
+
+`npm run init` creates `.env` when missing, verifies MySQL, applies migrations and creates the first administrator exactly once. Existing `.env` and existing administrator state are reused on rerun rather than silently overwritten/recreated.
+
+For an already configured environment:
+
+```bash
 npm run bootstrap
 npm run dev:api
 npm run dev:studio
 ```
 
-`npm run bootstrap` must succeed before the API will listen. Startup performs a read-only compatibility check and refuses an unbootstrapped/incompatible database instead of silently mutating it.
+The API performs a read-only migration compatibility check before listening; it does not silently bootstrap application state on startup.
 
 API defaults to `http://127.0.0.1:8055` and Studio to `http://localhost:5173`.
 
-Current API probes:
+Current probes:
 
 ```text
-GET /health   process/API health after the server has passed startup compatibility checks
-GET /ready    live MySQL readiness; returns 503 when DB access fails after startup
+GET /health   process/API health without authentication/public-role lookup
+GET /ready    live MySQL readiness; returns 503 when DB access fails
 ```
 
-See [`docs/database.md`](./docs/database.md), [`docs/rest-api.md`](./docs/rest-api.md) and [`docs/setup-cli.md`](./docs/setup-cli.md) for the currently implemented database/API/CLI behavior.
+See [`docs/database.md`](./docs/database.md), [`docs/rest-api.md`](./docs/rest-api.md), [`docs/auth.md`](./docs/auth.md), [`docs/permissions.md`](./docs/permissions.md) and [`docs/setup-cli.md`](./docs/setup-cli.md) for current shipped behavior.
 
 ## Design rule that matters most
 
-HTTP is an adapter, not the internal API. YunCMS services and extensions call service/database APIs directly with explicit accountability instead of making self-HTTP requests back into the same server.
+HTTP is an adapter, not the internal API. YunCMS services and future extensions call service/database APIs directly with explicit accountability instead of making self-HTTP requests back into the same server.
 
 This keeps authorization, transactions and error handling in one process boundary and avoids the class of self-request problems that appear in larger plugin-heavy backends.
