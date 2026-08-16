@@ -4,6 +4,7 @@ import { withAdvisoryLock } from '../advisory-lock.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { incrementSchemaVersion } from '../schema-version.js';
+import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 
 const ON_DELETE_ACTIONS = new Set(['RESTRICT', 'CASCADE', 'SET NULL']);
@@ -105,7 +106,6 @@ export class RelationsService extends BaseService {
       const oneFieldSql = quoteIdentifier(oneField, 'one field');
       const constraintSql = quoteIdentifier(fkName, 'constraint name');
       let physicalRelationCreated = false;
-      let metadataCreated = false;
 
       try {
         await connection.query(
@@ -116,27 +116,26 @@ export class RelationsService extends BaseService {
         );
         physicalRelationCreated = true;
 
-        const created = await metadata.createRelation({
-          manyCollection,
-          manyField,
-          oneCollection,
-          oneField,
-          onDelete,
-          metadata: { constraintName: fkName, kind: 'm2o' },
-        });
-        metadataCreated = true;
+        return await withConnectionTransaction(connection, async () => {
+          const created = await metadata.createRelation({
+            manyCollection,
+            manyField,
+            oneCollection,
+            oneField,
+            onDelete,
+            metadata: { constraintName: fkName, kind: 'm2o' },
+          });
 
-        const schemaVersion = await incrementSchemaVersion(connection);
-        return { ...created, schemaVersion };
+          const schemaVersion = await incrementSchemaVersion(connection);
+          return { ...created, schemaVersion };
+        });
       } catch (error) {
         const cleanupErrors = [];
 
-        if (metadataCreated) {
-          try {
-            await metadata.deleteRelation(manyCollection, manyField);
-          } catch (cleanupError) {
-            cleanupErrors.push(cleanupError);
-          }
+        try {
+          await metadata.deleteRelation(manyCollection, manyField);
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError);
         }
 
         if (physicalRelationCreated) {
