@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { withAdvisoryLock } from '../advisory-lock.js';
 import { compileFieldColumn } from '../field-types.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
@@ -33,6 +35,10 @@ function assertFieldMetadataPatch(patch) {
     error.code = 'INVALID_SCHEMA_PAYLOAD';
     throw error;
   }
+}
+
+function temporaryDropName() {
+  return `_yuncms_drop_${randomUUID().replaceAll('-', '').slice(0, 24)}`;
 }
 
 export class FieldsService extends BaseService {
@@ -177,6 +183,103 @@ export class FieldsService extends BaseService {
         const schemaVersion = await incrementSchemaVersion(connection);
         return { ...updated, schemaVersion };
       });
+    });
+  }
+
+  async deleteOne(collection, field, { destructive = false } = {}) {
+    assertSchemaManager(this.accountability);
+    assertIdentifier(collection, 'collection name');
+    assertFieldName(field);
+    if (destructive !== true) {
+      const error = new Error('Field deletion requires destructive: true');
+      error.code = 'DESTRUCTIVE_OPERATION_REQUIRED';
+      throw error;
+    }
+    if (field === 'id') {
+      const error = new Error('Primary key fields cannot be deleted in V1');
+      error.code = 'SYSTEM_SCHEMA_READ_ONLY';
+      throw error;
+    }
+
+    return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      const metadata = new SchemaMetadataRepository(connection);
+      const [collectionMetadata, existing, relations] = await Promise.all([
+        metadata.readCollection(collection),
+        metadata.readField(collection, field),
+        metadata.listRelations(),
+      ]);
+
+      if (!collectionMetadata) {
+        const error = new Error(`Unknown collection: ${collection}`);
+        error.code = 'COLLECTION_NOT_FOUND';
+        throw error;
+      }
+      if (collectionMetadata.system) {
+        const error = new Error('System collection fields cannot be deleted through the dynamic schema API');
+        error.code = 'SYSTEM_SCHEMA_READ_ONLY';
+        throw error;
+      }
+      if (!existing) {
+        const error = new Error(`Unknown field: ${collection}.${field}`);
+        error.code = 'FIELD_NOT_FOUND';
+        throw error;
+      }
+
+      const blockingRelation = relations.find((relation) =>
+        (relation.many_collection === collection && relation.many_field === field) ||
+        (relation.one_collection === collection && relation.one_field === field) ||
+        (relation.junction_collection === collection && relation.junction_field === field));
+      if (blockingRelation) {
+        const error = new Error(`Field participates in a relation and cannot be deleted: ${collection}.${field}`);
+        error.code = 'FIELD_HAS_RELATION';
+        throw error;
+      }
+
+      const tableName = quoteIdentifier(collection, 'collection name');
+      const fieldName = quoteIdentifier(field, 'field name');
+      const tombstoneName = temporaryDropName();
+      const tombstoneField = quoteIdentifier(tombstoneName, 'temporary field name');
+
+      await connection.query(
+        `ALTER TABLE ${tableName} RENAME COLUMN ${fieldName} TO ${tombstoneField}`,
+      );
+
+      let result;
+      try {
+        result = await withConnectionTransaction(connection, async () => {
+          const deleted = await metadata.deleteField(collection, field);
+          if (deleted !== 1) {
+            const error = new Error(`Field metadata disappeared during delete: ${collection}.${field}`);
+            error.code = 'SCHEMA_METADATA_DRIFT';
+            throw error;
+          }
+          const schemaVersion = await incrementSchemaVersion(connection);
+          return { deleted: true, collection, field, schemaVersion };
+        });
+      } catch (error) {
+        try {
+          await connection.query(
+            `ALTER TABLE ${tableName} RENAME COLUMN ${tombstoneField} TO ${fieldName}`,
+          );
+        } catch (restoreError) {
+          error.restoreError = restoreError;
+          error.code ||= 'SCHEMA_PARTIAL_FAILURE';
+        }
+        throw error;
+      }
+
+      try {
+        await connection.query(`ALTER TABLE ${tableName} DROP COLUMN ${tombstoneField}`);
+      } catch (cleanupError) {
+        const error = new Error(`Field was logically deleted but physical cleanup failed: ${collection}.${field}`);
+        error.code = 'SCHEMA_PARTIAL_FAILURE';
+        error.cleanupError = cleanupError;
+        error.cleanupField = tombstoneName;
+        error.logicalDelete = result;
+        throw error;
+      }
+
+      return result;
     });
   }
 }
