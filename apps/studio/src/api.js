@@ -67,9 +67,19 @@ function errorFromResponse(response, body) {
   });
 }
 
+function isRawBody(body) {
+  if (body == null || typeof body === 'string') return true;
+  if (typeof Blob !== 'undefined' && body instanceof Blob) return true;
+  if (typeof FormData !== 'undefined' && body instanceof FormData) return true;
+  if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) return true;
+  if (typeof ArrayBuffer !== 'undefined' && (body instanceof ArrayBuffer || ArrayBuffer.isView(body))) return true;
+  return false;
+}
+
 async function rawRequest(path, options = {}, accessToken = null) {
   const headers = new Headers(options.headers || {});
-  if (options.body != null && !headers.has('content-type')) {
+  const rawBody = isRawBody(options.body);
+  if (options.body != null && !rawBody && !headers.has('content-type')) {
     headers.set('content-type', 'application/json');
   }
   if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
@@ -77,7 +87,7 @@ async function rawRequest(path, options = {}, accessToken = null) {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers,
-    body: options.body == null || typeof options.body === 'string'
+    body: options.body == null || rawBody
       ? options.body
       : JSON.stringify(options.body),
   });
