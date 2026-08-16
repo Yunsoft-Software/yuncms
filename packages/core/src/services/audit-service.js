@@ -2,6 +2,8 @@ import { BaseService } from './base-service.js';
 
 const SENSITIVE_KEY = /(password|passwd|token|secret|authorization|cookie|api[_-]?key|credential)/i;
 const MAX_DEPTH = 12;
+const DEFAULT_RETENTION_DAYS = 90;
+const DEFAULT_CLEANUP_BATCH_SIZE = 1000;
 
 function auditError(code, message) {
   const error = new Error(message);
@@ -12,6 +14,14 @@ function auditError(code, message) {
 function assertAuditReader(accountability) {
   if (accountability.admin === true || accountability.system === true) return;
   throw auditError('FORBIDDEN', 'Audit log access requires administrator accountability');
+}
+
+function boundedInteger(value, fallback, { min, max, label }) {
+  const normalized = value ?? fallback;
+  if (!Number.isInteger(normalized) || normalized < min || normalized > max) {
+    throw auditError('INVALID_PAYLOAD', `${label} must be an integer between ${min} and ${max}`);
+  }
+  return normalized;
 }
 
 export function redactAuditValue(value, depth = 0, seen = new WeakSet()) {
@@ -109,4 +119,64 @@ export class AuditService extends BaseService {
     );
     return rows.map((row) => ({ ...row, payload: decodePayload(row.payload) }));
   }
+
+  async cleanup({
+    retentionDays = DEFAULT_RETENTION_DAYS,
+    batchSize = DEFAULT_CLEANUP_BATCH_SIZE,
+    maxBatches = 100,
+  } = {}) {
+    assertAuditReader(this.accountability);
+    const days = boundedInteger(retentionDays, DEFAULT_RETENTION_DAYS, {
+      min: 1,
+      max: 3650,
+      label: 'Audit retention days',
+    });
+    const size = boundedInteger(batchSize, DEFAULT_CLEANUP_BATCH_SIZE, {
+      min: 1,
+      max: 5000,
+      label: 'Audit cleanup batch size',
+    });
+    const batchesLimit = boundedInteger(maxBatches, 100, {
+      min: 1,
+      max: 1000,
+      label: 'Audit cleanup max batches',
+    });
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    let deleted = 0;
+    let batches = 0;
+    let complete = false;
+
+    while (batches < batchesLimit) {
+      const [result] = await this.database.query(
+        `DELETE FROM yuncms_audit_log
+         WHERE created_at < ?
+         ORDER BY id ASC
+         LIMIT ?`,
+        [cutoff, size],
+      );
+      const affected = Number(result.affectedRows ?? 0);
+      deleted += affected;
+      batches += 1;
+      if (affected < size) {
+        complete = true;
+        break;
+      }
+    }
+
+    return {
+      retentionDays: days,
+      batchSize: size,
+      maxBatches: batchesLimit,
+      cutoff,
+      deleted,
+      batches,
+      complete,
+    };
+  }
 }
+
+export {
+  DEFAULT_CLEANUP_BATCH_SIZE,
+  DEFAULT_RETENTION_DAYS,
+};
