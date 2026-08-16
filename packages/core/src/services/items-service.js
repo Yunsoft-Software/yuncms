@@ -65,6 +65,24 @@ export class ItemsService extends BaseService {
     this.schemaCache = options.schemaCache ?? defaultSchemaCache;
   }
 
+  hookContext(extra = {}) {
+    return {
+      accountability: this.accountability,
+      collection: this.collection,
+      ...extra,
+    };
+  }
+
+  async filterMutation(event, payload, context = {}) {
+    if (!this.emitter) return payload;
+    return this.emitter.filter(event, payload, this.hookContext(context));
+  }
+
+  async actionMutation(event, payload, context = {}) {
+    if (!this.emitter) return;
+    await this.emitter.action(event, payload, this.hookContext(context));
+  }
+
   async getCollectionSchema(database = this.database) {
     const snapshot = this.schema ?? await this.schemaCache.get(database);
     const collectionSchema = snapshot?.collections?.[this.collection];
@@ -184,7 +202,8 @@ export class ItemsService extends BaseService {
   async createOne(payload = {}) {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('create');
-    const entries = this.validatePayload(payload, schema, permission, { creating: true });
+    const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create' });
+    const entries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
     const id = randomUUID();
     const values = { [schema.primary_key]: id, ...Object.fromEntries(entries) };
     const fields = Object.keys(values);
@@ -196,7 +215,9 @@ export class ItemsService extends BaseService {
       fields.map((field) => values[field]),
     );
 
-    return this.returnCreatedOrUpdated(id, schema);
+    const record = await this.returnCreatedOrUpdated(id, schema);
+    await this.actionMutation('items.create', { key: id, item: record }, { operation: 'create' });
+    return record;
   }
 
   async createMany(payloads = []) {
@@ -206,35 +227,52 @@ export class ItemsService extends BaseService {
 
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('create');
-    const createdIds = [];
+    const staged = [];
+
+    for (const payload of payloads) {
+      const filteredPayload = await this.filterMutation('items.create', payload, {
+        operation: 'create',
+        bulk: true,
+      });
+      const entries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
+      const id = randomUUID();
+      const values = { [schema.primary_key]: id, ...Object.fromEntries(entries) };
+      staged.push({ id, values });
+    }
 
     await withTransaction(this.database, async (connection) => {
       const table = quoteIdentifier(this.collection, 'collection name');
 
-      for (const payload of payloads) {
-        const entries = this.validatePayload(payload, schema, permission, { creating: true });
-        const id = randomUUID();
-        const values = { [schema.primary_key]: id, ...Object.fromEntries(entries) };
-        const fields = Object.keys(values);
-
+      for (const entry of staged) {
+        const fields = Object.keys(entry.values);
         await connection.query(
           `INSERT INTO ${table} (${fields.map((field) => quoteIdentifier(field, 'field name')).join(', ')})
            VALUES (${fields.map(() => '?').join(', ')})`,
-          fields.map((field) => values[field]),
+          fields.map((field) => entry.values[field]),
         );
-        createdIds.push(id);
       }
     });
 
     const records = [];
-    for (const id of createdIds) records.push(await this.returnCreatedOrUpdated(id, schema));
+    for (const entry of staged) {
+      const record = await this.returnCreatedOrUpdated(entry.id, schema);
+      records.push(record);
+      await this.actionMutation('items.create', { key: entry.id, item: record }, {
+        operation: 'create',
+        bulk: true,
+      });
+    }
     return records;
   }
 
   async updateOne(id, payload = {}) {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('update');
-    const entries = this.validatePayload(payload, schema, permission);
+    const filteredPayload = await this.filterMutation('items.update', payload, {
+      operation: 'update',
+      key: id,
+    });
+    const entries = this.validatePayload(filteredPayload, schema, permission);
     if (entries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
 
     const table = quoteIdentifier(this.collection, 'collection name');
@@ -249,7 +287,13 @@ export class ItemsService extends BaseService {
     );
 
     if (result.affectedRows === 0) return null;
-    return this.returnCreatedOrUpdated(id, schema);
+    const record = await this.returnCreatedOrUpdated(id, schema);
+    await this.actionMutation('items.update', {
+      key: id,
+      item: record,
+      changes: filteredPayload,
+    }, { operation: 'update' });
+    return record;
   }
 
   async updateMany(filterInput, payload = {}) {
@@ -260,7 +304,12 @@ export class ItemsService extends BaseService {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('update');
     const accessSchema = schemaForFields(schema, permission.fields);
-    const entries = this.validatePayload(payload, schema, permission);
+    const filteredPayload = await this.filterMutation('items.update', payload, {
+      operation: 'update',
+      bulk: true,
+      filter: filterInput,
+    });
+    const entries = this.validatePayload(filteredPayload, schema, permission);
     if (entries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
     const filter = this.compileActionFilters(filterInput, permission.filter, accessSchema, schema);
     const table = quoteIdentifier(this.collection, 'collection name');
@@ -269,22 +318,36 @@ export class ItemsService extends BaseService {
       `UPDATE ${table} SET ${setSql}${filter.sql}`,
       [...entries.map(([, value]) => value), ...filter.params],
     );
+    await this.actionMutation('items.update', {
+      filter: filterInput,
+      changes: filteredPayload,
+      affected: result.affectedRows,
+    }, { operation: 'update', bulk: true });
     return result.affectedRows;
   }
 
   async deleteOne(id) {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('delete');
+    const filtered = await this.filterMutation('items.delete', { key: id }, {
+      operation: 'delete',
+      key: id,
+    });
+    const key = filtered?.key ?? id;
     const table = quoteIdentifier(this.collection, 'collection name');
     const filter = combineCompiledFilters(
       compileFilter(permission.filter, schema),
-      compileFilter({ [schema.primary_key]: { _eq: id } }, schema),
+      compileFilter({ [schema.primary_key]: { _eq: key } }, schema),
     );
     const [result] = await this.database.query(
       `DELETE FROM ${table}${filter.sql}`,
       filter.params,
     );
-    return result.affectedRows > 0;
+    const deleted = result.affectedRows > 0;
+    if (deleted) {
+      await this.actionMutation('items.delete', { key }, { operation: 'delete' });
+    }
+    return deleted;
   }
 
   async deleteMany(filterInput) {
@@ -295,12 +358,24 @@ export class ItemsService extends BaseService {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('delete');
     const accessSchema = schemaForFields(schema, permission.fields);
-    const filter = this.compileActionFilters(filterInput, permission.filter, accessSchema, schema);
+    const filtered = await this.filterMutation('items.delete', { filter: filterInput }, {
+      operation: 'delete',
+      bulk: true,
+    });
+    const effectiveFilter = filtered?.filter ?? filterInput;
+    if (!effectiveFilter || typeof effectiveFilter !== 'object' || Array.isArray(effectiveFilter) || Object.keys(effectiveFilter).length === 0) {
+      throw serviceError('FILTER_REQUIRED', 'deleteMany hook result must preserve a non-empty filter');
+    }
+    const filter = this.compileActionFilters(effectiveFilter, permission.filter, accessSchema, schema);
     const table = quoteIdentifier(this.collection, 'collection name');
     const [result] = await this.database.query(
       `DELETE FROM ${table}${filter.sql}`,
       filter.params,
     );
+    await this.actionMutation('items.delete', {
+      filter: effectiveFilter,
+      affected: result.affectedRows,
+    }, { operation: 'delete', bulk: true });
     return result.affectedRows;
   }
 }
