@@ -5,6 +5,7 @@ import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { incrementSchemaVersion } from '../schema-version.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
+import { assertSchemaManager } from './schema-access.js';
 
 const FIELD_METADATA_KEYS = new Set(['readonly', 'hidden', 'sort', 'interface', 'options']);
 
@@ -36,17 +37,20 @@ function assertFieldMetadataPatch(patch) {
 
 export class FieldsService extends BaseService {
   async readMany(collection) {
+    assertSchemaManager(this.accountability);
     assertIdentifier(collection, 'collection name');
     return new SchemaMetadataRepository(this.database).listFields(collection);
   }
 
   async readOne(collection, field) {
+    assertSchemaManager(this.accountability);
     assertIdentifier(collection, 'collection name');
     assertFieldName(field);
     return new SchemaMetadataRepository(this.database).readField(collection, field);
   }
 
   async createOne(collection, input = {}) {
+    assertSchemaManager(this.accountability);
     assertIdentifier(collection, 'collection name');
     const field = assertFieldName(input.field);
 
@@ -134,6 +138,7 @@ export class FieldsService extends BaseService {
   }
 
   async updateOne(collection, field, patch) {
+    assertSchemaManager(this.accountability);
     assertIdentifier(collection, 'collection name');
     assertFieldName(field);
     assertFieldMetadataPatch(patch);
