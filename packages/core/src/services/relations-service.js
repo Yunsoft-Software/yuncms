@@ -6,6 +6,7 @@ import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { incrementSchemaVersion } from '../schema-version.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
+import { assertSchemaManager } from './schema-access.js';
 
 const ON_DELETE_ACTIONS = new Set(['RESTRICT', 'CASCADE', 'SET NULL']);
 
@@ -39,21 +40,25 @@ function parseRelationMetadata(value) {
 
 export class RelationsService extends BaseService {
   async readMany() {
+    assertSchemaManager(this.accountability);
     return new SchemaMetadataRepository(this.database).listRelations();
   }
 
   async readOne(manyCollection, manyField) {
+    assertSchemaManager(this.accountability);
     assertIdentifier(manyCollection, 'collection name');
     assertIdentifier(manyField, 'field name');
     return new SchemaMetadataRepository(this.database).readRelation(manyCollection, manyField);
   }
 
   async readO2M(oneCollection) {
+    assertSchemaManager(this.accountability);
     assertIdentifier(oneCollection, 'one collection');
     return new SchemaMetadataRepository(this.database).listRelationsForOne(oneCollection);
   }
 
   async createM2O(input = {}) {
+    assertSchemaManager(this.accountability);
     const manyCollection = assertIdentifier(input.manyCollection, 'many collection');
     const manyField = assertIdentifier(input.manyField, 'many field');
     const oneCollection = assertIdentifier(input.oneCollection, 'one collection');
@@ -173,6 +178,7 @@ export class RelationsService extends BaseService {
   }
 
   async deleteM2O(manyCollection, manyField) {
+    assertSchemaManager(this.accountability);
     assertIdentifier(manyCollection, 'many collection');
     assertIdentifier(manyField, 'many field');
 
