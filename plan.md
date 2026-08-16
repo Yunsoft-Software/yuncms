@@ -1,15 +1,15 @@
 # YunCMS Development Plan
 
-> Live status document for branch `16-08-2026`. Check an item only when source implementation exists. Runtime/install/real-MySQL/provider verification belongs in `todo.md` and does **not** get converted into a source-complete checkbox here.
+> Live status document for branch `16-08-2026`. Check an item only when source implementation exists. Runtime/install/real-MySQL/provider verification belongs in `todo.md`; source presence is not the same thing as a verified release.
 
 ## 0. Fixed product constraints
 
-- [x] Independent implementation inspired by the Directus features we actually use; not a fork.
+- [x] Independent Directus-inspired implementation; not a fork.
 - [x] Node.js 24 LTS baseline.
 - [x] JavaScript/ESM; no TypeScript by default.
 - [x] Express 5 HTTP layer.
 - [x] MySQL only.
-- [x] `mysql2/promise` directly; no ORM/query-builder/second database driver.
+- [x] `mysql2/promise` directly; no ORM/query-builder/second DB driver.
 - [x] React 19.2 + Vite 8 Studio.
 - [x] npm workspaces.
 - [x] REST only; no GraphQL.
@@ -38,8 +38,9 @@
 - [x] `AGENTS.md` working rules.
 - [x] `todo.md` manual/environment handoff rules.
 - [x] Node/toolchain engines pinned in package metadata.
-- [ ] Generate/review `package-lock.json` after real `npm install` — **environment task in `todo.md`**.
-- [ ] Finalize public npm package/scope names before release — **release decision**.
+- [x] Package naming direction documented: primary `yuncms` + `@yuncms/*`, Yunsoft-branded fallback if npm ownership requires it.
+- [ ] Generate/review `package-lock.json` after real `npm install` — `todo.md`.
+- [ ] Verify final npm scope/name ownership, auth, tarballs and fresh install — `todo.md`.
 
 ## 2. Core request/service architecture
 
@@ -48,8 +49,8 @@
 - [x] Request-local permission cache in context.
 - [x] Base service contract.
 - [x] Core service registry.
-- [x] Same registry/service options available to trusted extension runtime.
-- [x] Dedicated auth/user/session/token/file/audit services own special behavior.
+- [x] Same service/accountability model exposed to trusted extension runtime.
+- [x] Dedicated auth/user/session/token/file/audit/maintenance services own special behavior.
 
 ## 3. MySQL/bootstrap foundation
 
@@ -60,7 +61,7 @@
 - [x] Multi-statements disabled.
 - [x] Placeholder-bound data values throughout current services.
 - [x] MySQL duplicate/FK/deadlock/lock/connection normalization.
-- [x] Bounded retry helper for retryable DB lock/deadlock classes.
+- [x] Bounded retry helper for retryable lock/deadlock classes.
 - [x] Migration journal.
 - [x] Versioned core migrations (`0001`–`0004`).
 - [x] Bootstrap advisory lock.
@@ -78,11 +79,9 @@
 - [x] Reserved `yuncms_` prefix protection.
 - [x] Safe metadata update.
 - [x] Explicit destructive delete.
-- [x] Tombstone rename + metadata compensation strategy.
+- [x] Tombstone rename + metadata compensation.
 
 ### Fields
-
-Supported physical families:
 
 - [x] integer / bigint.
 - [x] decimal.
@@ -91,9 +90,6 @@ Supported physical families:
 - [x] date / datetime / timestamp.
 - [x] json.
 - [x] uuid (`CHAR(36)`).
-
-Operations:
-
 - [x] Create/read field.
 - [x] Metadata-only update.
 - [x] Validated required/null mutation.
@@ -108,10 +104,13 @@ Operations:
 - [x] M2O delete with FK restoration compensation.
 - [x] O2M inverse metadata read.
 - [x] M2M junction create with two FKs + unique pair + paired metadata.
-- [x] High-level destructive M2M junction delete lifecycle helper.
+- [x] High-level destructive M2M junction delete lifecycle with tombstone restore/cleanup behavior.
 - [x] M2M delete REST surface with schema audit.
-- [ ] Direct relation expansion in generic item responses — **V1 polish; keep behind real-MySQL CRUD verification**.
-- [ ] Full Studio relation picker/display-label UX — **V1 polish**.
+- [x] One-level direct M2O expansion in generic item responses.
+- [x] Expansion reuses target `ItemsService` RBAC and source field visibility checks.
+- [x] Studio direct-M2O relation picker/display-label UX.
+- [x] Studio M2M junction create/delete lifecycle controls.
+- [x] O2M/M2M nested expansion intentionally remains outside V1.
 
 ### Schema consistency
 
@@ -121,11 +120,9 @@ Operations:
 - [x] Admin/system-only schema service access.
 - [x] Explicit destructive intent guards.
 - [x] Source-level invalid M2M/FK/schema combination guards.
-- [ ] Real-MySQL DDL compensation/concurrency/drift tests — `todo.md`.
+- [ ] Real-MySQL DDL compensation/concurrency/drift verification — `todo.md`.
 
 ## 5. Generic ItemsService + REST
-
-REST:
 
 ```text
 GET    /items/:collection
@@ -139,16 +136,17 @@ DELETE /items/:collection/:id
 - [x] Query parser.
 - [x] Allowlisted SQL filter compiler.
 - [x] `fields`, `filter`, `sort`, `limit`, `offset`, count metadata.
+- [x] `expand` for direct M2O reads, max-eight guard.
 - [x] `readMany/readOne`.
 - [x] `createOne/createMany`.
-- [x] single/bulk update.
-- [x] single/bulk delete.
+- [x] Single/bulk update.
+- [x] Single/bulk delete.
 - [x] Bulk update/delete require explicit non-empty caller filter.
 - [x] Mutation filter/action hook integration.
 - [x] Bulk create actions only after transaction commit.
 - [x] Request id/accountability propagated to hook context.
-- [ ] Relation expansion — tracked in section 4.
-- [ ] Real-MySQL/API SQL-injection/rollback verification — `todo.md`.
+- [x] Relation expansion preserves target permission row/field restrictions.
+- [ ] Real-MySQL/API SQL-injection/rollback/relation-expansion verification — `todo.md`.
 
 ## 6. Authentication and sessions
 
@@ -158,38 +156,40 @@ DELETE /items/:collection/:id
 - [x] Access + refresh session creation.
 - [x] Refresh rotation/replay-safe update condition.
 - [x] Logout current/all sessions.
-- [x] Password-change session revocation policy.
+- [x] Password-change session revocation.
 - [x] Bearer authentication middleware.
 - [x] Explicit public-role resolution.
 - [x] API token create/list/revoke/authentication.
 - [x] Password-reset one-time hashed-token lifecycle.
 - [x] Email-verification one-time hashed-token lifecycle.
 - [x] SMTP transport using Nodemailer with file/URL message access disabled.
-- [x] Public reset request endpoint with non-enumerating accepted response.
+- [x] Non-enumerating public reset request endpoint.
 - [x] Reset confirmation endpoint.
 - [x] Authenticated verification-mail request endpoint.
 - [x] Verification confirmation endpoint.
 - [x] Raw reset/verification tokens are not returned by public request endpoints.
 - [x] Configurable process-local login/refresh/action rate limiting.
-- [ ] Shared-store/cluster-wide rate limiter — **multi-instance follow-up, not required for single-process V1**.
+- [x] Auth responses explicitly use `Cache-Control: no-store`.
+- [x] Shared-store/cluster-wide limiter intentionally remains a multi-instance follow-up, not a single-process V1 requirement.
 - [ ] Real MySQL/SMTP/replay/rate-limit verification — `todo.md`.
 
 ## 7. Roles and permissions
 
-- [x] Administrator/system-managed role CRUD foundation.
+- [x] Administrator/system-managed role CRUD.
 - [x] Protected admin/public role rules.
 - [x] Permission CRUD.
 - [x] Exact role + collection + action resolution.
 - [x] Field allowlists.
 - [x] Server-side row filters.
-- [x] Hidden-field filter/sort inference protection.
+- [x] Hidden-field filter/sort/expand inference protection.
 - [x] Fail-closed role-less/missing-permission behavior.
 - [x] Explicit admin/system bypass.
 - [x] Request-local effective-permission cache.
-- [x] Permission mutation clears the current request cache.
-- [x] Create/update prospective-record validation rules.
-- [x] Validation uses the same safe field/operator schema allowlist.
-- [x] Bulk update validation fail-closed limit.
+- [x] Permission mutation clears current request cache.
+- [x] Create/update prospective-record validation.
+- [x] Validation uses safe field/operator allowlist.
+- [x] Bulk update validation fail-closed row limit.
+- [x] Studio permission filter + validation editor.
 - [ ] Real privilege-escalation/validation integration tests — `todo.md`.
 
 ## 8. Extension system
@@ -213,11 +213,12 @@ DELETE /items/:collection/:id
 
 ## 9. Files and storage
 
-- [x] Storage registry/driver contract.
+- [x] Storage registry/core driver contract.
 - [x] Local filesystem driver.
 - [x] Platform-aware traversal/path containment checks.
 - [x] S3-compatible driver using AWS SDK v3.
 - [x] Custom endpoint/path-style/credential-chain configuration.
+- [x] Built-in local/S3 inventory listing capability.
 - [x] `FilesService` metadata/storage coordination.
 - [x] UUID physical storage keys independent from download filename.
 - [x] Upload cleanup when metadata insert fails.
@@ -228,8 +229,11 @@ DELETE /items/:collection/:id
 - [x] Unicode-safe download filename handling.
 - [x] `files.create/update/delete` hook/audit events.
 - [x] Studio file list/upload/download/edit/delete.
-- [ ] Full storage inventory/orphan reconciliation command — **follow-up; cleanup failures are surfaced today**.
-- [ ] Real local filesystem/S3-provider verification — `todo.md`.
+- [x] Admin/system storage reconciliation service + REST endpoint.
+- [x] Reconciliation defaults to dry-run and reports missing/orphan objects.
+- [x] Destructive orphan cleanup requires explicit request + object-age guard.
+- [x] Reconciliation has a bounded V1 inventory safety limit.
+- [ ] Real local filesystem/S3-provider/reconciliation verification — `todo.md`.
 
 ## 10. Audit/history
 
@@ -239,10 +243,12 @@ DELETE /items/:collection/:id
 - [x] Item create/update/delete audit through internal hook subscriber.
 - [x] File create/update/delete audit through service events.
 - [x] Schema admin create/update/delete audit.
-- [x] Before/after metadata captured for schema/file updates where practical.
-- [x] Admin `/audit` read API with pagination/filter basics.
-- [x] Audit write failure after committed mutation is logged rather than converting the committed operation into a false client rollback.
-- [ ] Configurable audit retention/cleanup — **post-V1 operational policy**.
+- [x] Before/after metadata captured where practical.
+- [x] Admin `/audit` read API.
+- [x] Audit write failure after committed mutation is logged rather than faking a client rollback.
+- [x] Configurable retention defaults.
+- [x] Explicit bounded batch cleanup service/API; no surprise automatic purge.
+- [ ] Real cleanup/retention/load verification — `todo.md`.
 
 ## 11. CLI/setup
 
@@ -260,10 +266,11 @@ yuncms help
 - [x] `.env` writer/reuse behavior.
 - [x] DB connection verification.
 - [x] Bootstrap command.
-- [x] Initial admin creation/reuse behavior wired into `init`.
-- [x] Environment-driven non-interactive `bootstrap` for servers/containers.
-- [x] `start` command wrapper resolving the API server package entry.
-- [ ] Final public npm naming/auth/`npm pack`/fresh-install verification — `todo.md`.
+- [x] Initial admin creation/reuse wired into `init`.
+- [x] Environment-driven non-interactive `bootstrap`.
+- [x] `start` wrapper resolving API server package entry and preserving caller cwd/env.
+- [x] Publishing/naming policy documented.
+- [ ] Final npm ownership/auth/`npm pack`/fresh-install verification — `todo.md`.
 
 ## 12. React Studio V1
 
@@ -277,17 +284,18 @@ yuncms help
 - [x] Email-verification action-link screen.
 - [x] Generic collection table.
 - [x] Generic create/edit record form.
+- [x] Direct M2O relation pickers/display labels.
 - [x] Data Model collection/field workflows.
 - [x] M2O/M2M creation UI.
+- [x] M2M delete UI.
 - [x] Users management UI.
-- [x] Email-verification send action in Users UI.
+- [x] Email-verification send action.
 - [x] Roles/Permissions management UI.
+- [x] Permission validation JSON editor.
 - [x] Files management UI.
 - [x] Loading/error/empty-state basics.
-- [ ] Dedicated permission-validation JSON editor in Studio — **backend support exists; UX polish**.
-- [ ] M2M delete button in Studio — **backend/API support exists; UX polish**.
-- [ ] Relation picker/display labels in generic record form — **UX polish**.
-- [ ] Formal accessibility/keyboard review — `todo.md`/manual verification.
+- [x] Relation picker V1 intentionally caps target list at 200; paginated/search picker is scale polish rather than a V1 correctness blocker.
+- [ ] Formal accessibility/keyboard review — `todo.md`.
 - [ ] Studio build/runtime smoke — `todo.md`.
 
 ## 13. API/runtime/observability
@@ -298,15 +306,16 @@ yuncms help
 - [x] `/ready`.
 - [x] Graceful HTTP + MySQL shutdown path.
 - [x] Narrow configured Studio CORS origin.
-- [x] Basic security headers.
+- [x] Baseline security headers (`nosniff`, frame deny, no-referrer, restrictive permissions policy, same-origin resource policy).
+- [x] HSTS intentionally left to the TLS/reverse-proxy deployment layer.
 - [x] Read-only migration compatibility check before listen.
 - [x] Canonical error body/status mapping.
 - [x] Raw unexpected internal messages hidden from clients.
-- [x] Raw known MySQL errors normalized to stable safe API errors.
-- [x] Structured line-delimited JSON logger.
+- [x] Known MySQL errors normalized to stable safe API errors.
+- [x] Structured line-delimited JSON logger wired into runtime.
 - [x] Runtime logger secret redaction.
 - [x] Auth rate-limit headers/HTTP 429.
-- [ ] API/runtime smoke and graceful-shutdown verification — `todo.md`.
+- [ ] API/runtime/security-header/graceful-shutdown smoke — `todo.md`.
 
 ## 14. Documentation
 
@@ -323,61 +332,50 @@ yuncms help
 - [x] `docs/files.md`.
 - [x] `docs/security.md`.
 - [x] `docs/deployment.md`.
-- [ ] Final release/npm installation guide after package names are fixed.
+- [x] `docs/publishing.md` naming/release policy.
+- [ ] Convert publishing policy into final npm install guide after real npm ownership/pack verification — `todo.md`.
 
 ## 15. Source-level regression coverage present
 
-- [x] DB config/identifier/error/retry sources.
-- [x] bootstrap/advisory-lock sources.
-- [x] schema/query/ItemsService sources.
-- [x] schema service authorization/destructive/M2M preflight sources.
-- [x] auth/session/API-token/action-token sources.
-- [x] RBAC/permission cache/validation evaluator sources.
-- [x] hook recursion/item hook sources.
-- [x] extension manifest/discovery/runtime-context sources.
-- [x] API error-contract/MySQL normalization sources.
-- [x] CLI start dispatch source.
-- [x] local storage/FilesService security/cleanup sources.
-- [x] S3 driver contract sources.
-- [ ] Run these tests after dependency install — `todo.md`.
+- [x] DB config/identifier/error/retry.
+- [x] Bootstrap/advisory-lock.
+- [x] Schema/query/ItemsService.
+- [x] Schema service authorization/destructive/M2M preflight/lifecycle.
+- [x] Direct relation expansion + source permission guard.
+- [x] Auth/session/API-token/action-token.
+- [x] RBAC/permission cache/validation evaluator.
+- [x] Hook recursion/item hooks.
+- [x] Extension manifest/discovery/runtime context.
+- [x] API error-contract/MySQL normalization.
+- [x] Security/auth cache-header middleware.
+- [x] CLI start dispatch.
+- [x] Local storage/FilesService security/cleanup.
+- [x] S3 driver contract.
+- [x] Guarded storage reconciliation.
+- [x] Audit redaction + bounded cleanup.
+- [ ] Execute tests after dependency install — `todo.md`.
 
-## 16. Milestones
+## 16. Verification milestones
 
-### Milestone A — runnable skeleton
-Source implementation exists. Completion requires dependency install, Node 24 runtime, API/Studio start/build and non-MySQL test execution.
+The major V1 feature source implementations now exist. These milestone boxes stay open until the corresponding runtime checks are actually executed.
 
-- [ ] Milestone A verified — blocked only on `todo.md` execution.
+- [ ] Milestone A — dependency install/lockfile + Node 24 + tests + API/Studio build/start verified.
+- [ ] Milestone B — real MySQL bootstrap/schema/CRUD/query/relation lifecycle and rollback behavior verified.
+- [ ] Milestone C — real auth/SMTP/replay/RBAC/validation/rate-limit behavior verified.
+- [ ] Milestone D — extension local/npm runtime + Studio end-to-end smoke verified.
+- [ ] Milestone E — local/S3 files, reconciliation, audit cleanup, logging/security headers and graceful shutdown verified.
+- [ ] Release — npm naming ownership, tarballs, fresh install and `yuncms init/bootstrap/start` verified.
 
-### Milestone B — schema + CRUD
-Source implementation exists for bootstrap/schema/CRUD/query/RBAC/schema lifecycle. Completion requires real-MySQL integration and API smoke.
+## 17. Remaining source work excluding manual verification
 
-- [ ] Milestone B verified — blocked only on `todo.md` execution.
+There is no known blocking V1 source feature left in the current roadmap.
 
-### Milestone C — auth + RBAC
-Source implementation exists for login/session/API tokens/recovery/verification/rate limits/field-row-validation permissions.
+Future/non-blocking follow-ups are deliberately outside the V1 release gate unless product requirements change:
 
-- [ ] Milestone C verified — blocked on real MySQL/SMTP/auth/replay/privilege checks in `todo.md`.
-
-### Milestone D — extensions + useful Studio
-Source implementation exists for extension runtime and the main Studio workflows. Remaining relation/M2M/validation editor items are UX polish rather than blockers for the generic V1 workflow.
-
-- [ ] Milestone D verified — blocked on install/build/runtime/extension/Studio smoke in `todo.md`.
-
-### Milestone E — production-useful V1
-Files local+S3, audit, recovery mail, logging/security headers and CLI lifecycle now have source implementations.
-
-- [ ] Milestone E verified — production claim remains blocked on the full `todo.md` release gate and npm packaging decisions.
-
-## 17. Remaining source work (excluding tests/manual verification)
-
-These are the actual feature/code items left after the current branch work:
-
-- [ ] Generic ItemsService relation expansion.
-- [ ] Studio relation picker/display-label UX.
-- [ ] Studio M2M delete control.
-- [ ] Studio permission-validation editor.
-- [ ] Full storage inventory/orphan reconciliation command.
-- [ ] Optional configurable audit-retention command/policy.
-- [ ] Final npm package naming/public release wiring after owner decision.
-
-Everything else that is still unchecked above is an environment/provider/runtime verification task and belongs in `todo.md`.
+- cluster-wide/shared-store rate limiting for multi-instance deployments;
+- O2M/M2M nested item expansion;
+- paginated/search relation picker beyond the current 200-item Studio picker;
+- M2M multi-select content editor on top of explicit junction records;
+- session-management UI, MFA and SSO families;
+- extension sandbox/marketplace isolation;
+- automatic scheduled maintenance/retention jobs if operators later want them.
