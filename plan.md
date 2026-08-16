@@ -190,22 +190,25 @@ Operations:
 - support `RESTRICT`, `CASCADE`, `SET NULL` only when structurally valid.
 
 Tasks:
+- [x] Require administrator/system accountability across collection/field/relation schema services.
 - [x] Build schema metadata repository for collections/fields/relations.
 - [x] Build collections create/read/list path with physical table + metadata compensation on failure.
 - [x] Build collection metadata-only safe update path.
-- [ ] Build collection explicit destructive delete path.
+- [x] Build collection explicit destructive delete path using tombstone rename + metadata rollback protection.
 - [x] Build primitive field type compiler and fields create/read path.
 - [x] Build field metadata-only safe update path.
-- [ ] Build physical nullable/default/index mutation policy and implementation.
-- [ ] Build field explicit destructive delete path.
+- [x] Build physical nullable/default/index mutation policy and implementation without type conversion.
+- [x] Build field explicit destructive delete path using tombstone rename + metadata rollback protection.
 - [x] Build M2O creation with FK/type/on-delete validation and cleanup compensation.
 - [x] Build M2O delete path with FK restore compensation on metadata failure.
 - [x] Build O2M inverse representation/read API.
 - [ ] Build M2M junction helper.
 - [x] Add schema cache keyed by schema version.
 - [x] Make metadata + schema-version changes atomic and let version changes invalidate cached snapshots only after commit.
+- [x] Add source-level guards for non-admin schema access and explicit destructive intent.
 - [ ] Add concurrent DDL tests against real MySQL.
 - [ ] Add partial-failure recovery tests against real MySQL.
+- [ ] Verify tombstone cleanup and physical field ALTER/index compensation against real MySQL.
 
 ## 5. Generic ItemsService + REST query language
 
@@ -507,6 +510,8 @@ Critical regressions:
 - SQL injection via collection/field/filter/sort;
 - cross-role access and hidden-field inference;
 - schema metadata/physical drift;
+- non-admin schema mutation;
+- destructive schema intent/compensation;
 - concurrent DDL;
 - deadlock retry correctness;
 - session rotation/revocation;
@@ -522,6 +527,7 @@ Tasks:
 - [x] Add unit test sources for RBAC permission resolution, row filters, field restrictions and fail-closed access.
 - [x] Add unit test sources for login/session/API-token/auth-action-token boundaries.
 - [x] Add extension manifest/discovery/duplicate-id/runtime-context test sources.
+- [x] Add schema-service authorization and destructive-intent test sources.
 - [x] Add API canonical-error unit test sources.
 - [ ] Run current tests after local `npm install`.
 - [ ] Real-MySQL integration harness.
@@ -568,7 +574,7 @@ Definition of done:
 - filters/sort/pagination;
 - real-MySQL integration tests.
 
-- [ ] Milestone B complete. **Code paths are implemented; completion remains blocked on real-MySQL/API verification in `todo.md`.**
+- [ ] Milestone B complete. **Code paths now include explicit destructive delete and safe physical field mutation; completion remains blocked on real-MySQL/API verification in `todo.md`.**
 
 ### Milestone C — auth + RBAC
 - users/sessions/login/refresh/logout;
@@ -620,8 +626,11 @@ Definition of done:
 - [x] Wire local/npm extension discovery, hook runtime, endpoint mounting and startup lifecycle.
 - [x] Fix extension SDK/runtime definition-marker mismatch and add runtime-context regression source.
 - [x] Keep extension code on direct services/context; no local self-HTTP behavior.
+- [x] Restrict all dynamic schema services to administrator/system accountability.
+- [x] Add explicit collection/field destructive delete with tombstone compensation strategy.
+- [x] Add field `required`/default/index physical mutation path while keeping type conversion disabled.
 - [x] Add/update database, REST, auth, permission, extension and CLI documentation for shipped behavior.
-- [x] Add non-MySQL unit test sources for bootstrap/context/query/CRUD/RBAC/auth/extensions/API contracts.
-- [x] Record npm install/build/test and real-MySQL/schema/CRUD/RBAC/auth/API verification in `todo.md`.
+- [x] Add non-MySQL unit test sources for bootstrap/context/query/CRUD/RBAC/auth/extensions/schema-access/API contracts.
+- [x] Record npm install/build/test and real-MySQL/schema/CRUD/RBAC/auth/API/extension verification in `todo.md`.
 - [ ] Local/Codex: run dependency install, tests, Studio build, bootstrap/API/extension smoke and real-MySQL verification; check Milestone A/B/C only after they pass.
-- [ ] Next code slice: finish destructive schema operations + physical field mutation policy + M2M helper, then move into authenticated Studio workflows.
+- [ ] Next code slice: build M2M junction helper, then expose authenticated schema/admin APIs required by Studio and move into real Studio workflows.
