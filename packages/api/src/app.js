@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import {
+  createCoreServiceRegistry,
   createPublicAccountability,
   createRequestContext,
-  createServiceRegistry,
   pingDatabase,
 } from '@yuncms/core';
 
@@ -24,7 +24,7 @@ function studioCors(config) {
   };
 }
 
-export function createApp({ pool, config, logger = console, serviceRegistry = createServiceRegistry() }) {
+export function createApp({ pool, config, logger = console, serviceRegistry = createCoreServiceRegistry() }) {
   if (!pool) throw new Error('Database pool is required');
   if (!config) throw new Error('Config is required');
 
