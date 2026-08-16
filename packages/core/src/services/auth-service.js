@@ -1,3 +1,4 @@
+import { createPublicAccountability } from '../accountability.js';
 import { verifyPassword } from '../auth/password.js';
 import { readAuthenticationUserByEmail } from '../auth/users-repository.js';
 import { BaseService } from './base-service.js';
@@ -37,6 +38,24 @@ export class AuthService extends BaseService {
       emitter: this.emitter,
       logger: this.logger,
     });
+  }
+
+  async resolvePublicAccountability() {
+    const [rows] = await this.database.query(
+      `SELECT id
+       FROM yuncms_roles
+       WHERE public = 1
+       ORDER BY created_at ASC
+       LIMIT 2`,
+    );
+
+    if (rows.length > 1) {
+      const error = new Error('Multiple public roles are configured');
+      error.code = 'PUBLIC_ROLE_AMBIGUOUS';
+      throw error;
+    }
+
+    return createPublicAccountability({ role: rows[0]?.id ?? null });
   }
 
   async login({ email, password, ip = null, userAgent = null } = {}) {
