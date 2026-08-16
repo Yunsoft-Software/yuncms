@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { errorBody, statusForError } from '../src/error-response.js';
+import { errorBody, normalizeApiError, statusForError } from '../src/error-response.js';
 
 test('known client errors map to stable http statuses', () => {
   assert.equal(statusForError({ code: 'INVALID_QUERY' }), 400);
   assert.equal(statusForError({ code: 'FORBIDDEN' }), 403);
   assert.equal(statusForError({ code: 'COLLECTION_NOT_FOUND' }), 404);
+  assert.equal(statusForError({ code: 'DUPLICATE_KEY' }), 409);
 });
 
 test('unknown internal errors do not expose server messages', () => {
@@ -38,4 +39,16 @@ test('client error includes path and request id', () => {
       },
     ],
   });
+});
+
+test('raw MySQL duplicate errors become safe conflict errors', () => {
+  const mysqlError = new Error("Duplicate entry 'secret@example.com' for key 'uq_users_email'");
+  mysqlError.code = 'ER_DUP_ENTRY';
+  mysqlError.errno = 1062;
+
+  const normalized = normalizeApiError(mysqlError);
+  assert.equal(normalized.code, 'DUPLICATE_KEY');
+  assert.equal(statusForError(normalized), 409);
+  assert.equal(normalized.message, 'A record with the same unique value already exists');
+  assert.doesNotMatch(normalized.message, /secret@example\.com/);
 });
