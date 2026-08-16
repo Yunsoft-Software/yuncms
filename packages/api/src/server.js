@@ -11,6 +11,7 @@ import {
   LocalStorageDriver,
   S3StorageDriver,
   SchemaCache,
+  SmtpMailer,
 } from '@yuncms/core';
 import { createApp } from './app.js';
 import { loadExtensionRuntime } from './extensions/runtime.js';
@@ -32,6 +33,24 @@ if (config.storage.s3.bucket) {
   });
 }
 const storage = createStorageRegistry(storageDrivers);
+
+const hasAnyMailConfig = Boolean(
+  config.mail.host || config.mail.from || config.mail.user || config.mail.password,
+);
+if (hasAnyMailConfig && (!config.mail.host || !config.mail.from)) {
+  throw new Error('SMTP_HOST and SMTP_FROM are both required when SMTP delivery is configured');
+}
+const mailer = config.mail.host
+  ? new SmtpMailer({
+    host: config.mail.host,
+    port: config.mail.port,
+    secure: config.mail.secure,
+    user: config.mail.user,
+    password: config.mail.password,
+    from: config.mail.from,
+  })
+  : null;
+
 let server = null;
 let shuttingDown = false;
 
@@ -94,6 +113,7 @@ async function start() {
     schemaCache,
     emitter,
     storage,
+    mailer,
     endpointExtensions: extensionRuntime.endpointExtensions,
   });
 
