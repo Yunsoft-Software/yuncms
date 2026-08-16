@@ -27,9 +27,18 @@ function studioCors(config) {
   };
 }
 
-export function createApp({ pool, config, logger = console, serviceRegistry = createCoreServiceRegistry() }) {
+export function createApp({
+  pool,
+  config,
+  logger = console,
+  serviceRegistry = createCoreServiceRegistry(),
+  schemaCache = null,
+  emitter = null,
+  endpointExtensions = [],
+}) {
   if (!pool) throw new Error('Database pool is required');
   if (!config) throw new Error('Config is required');
+  if (!Array.isArray(endpointExtensions)) throw new Error('endpointExtensions must be an array');
 
   const services = serviceRegistry.toObject();
   const app = express();
@@ -61,9 +70,23 @@ export function createApp({ pool, config, logger = console, serviceRegistry = cr
     }
   });
 
-  app.use(createAuthenticationMiddleware({ pool, config, logger, services }));
+  app.use(createAuthenticationMiddleware({
+    pool,
+    config,
+    logger,
+    services,
+    schemaCache,
+    emitter,
+  }));
   app.use('/auth', createAuthRouter());
   app.use('/items', createItemsRouter());
+
+  for (const extension of endpointExtensions) {
+    if (!extension?.id || !extension?.router) {
+      throw new Error('Invalid endpoint extension runtime entry');
+    }
+    app.use(`/extensions/${encodeURIComponent(extension.id)}`, extension.router);
+  }
 
   app.use((req, res) => {
     res.status(404).json({
