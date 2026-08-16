@@ -4,14 +4,16 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
+import { HookEmitter } from '@yuncms/core';
 import { discoverExtensions } from '../src/extensions/discovery.js';
 import { validateExtensionManifest } from '../src/extensions/manifest.js';
+import { loadExtensionRuntime } from '../src/extensions/runtime.js';
 
-async function createLocalExtension(root, name, yuncms) {
+async function createLocalExtension(root, name, yuncms, source = 'export default {};\n') {
   const packageRoot = join(root, 'extensions', name);
   await mkdir(join(packageRoot, 'src'), { recursive: true });
   await writeFile(join(packageRoot, 'package.json'), JSON.stringify({ name, type: 'module', yuncms }), 'utf8');
-  await writeFile(join(packageRoot, 'src/index.js'), 'export default {};\n', 'utf8');
+  await writeFile(join(packageRoot, 'src/index.js'), source, 'utf8');
   return packageRoot;
 }
 
@@ -78,4 +80,53 @@ test('duplicate extension ids fail startup discovery', async (t) => {
     discoverExtensions({ rootDir: root, includeDependencies: false }),
     (error) => error.code === 'DUPLICATE_EXTENSION_ID',
   );
+});
+
+test('runtime accepts SDK marker and exposes services directly to hooks', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'yuncms-ext-runtime-'));
+  t.after(() => {
+    delete globalThis.__yuncmsRuntimeProbe;
+    return rm(root, { recursive: true, force: true });
+  });
+
+  await createLocalExtension(
+    root,
+    'runtime-probe',
+    { id: 'runtime-probe', type: 'hook', entry: './src/index.js' },
+    `export default {
+      __yuncms_extension__: true,
+      type: 'hook',
+      register({ init }, context) {
+        init('app.start', async () => {
+          const service = new context.services.ProbeService({ database: context.database });
+          globalThis.__yuncmsRuntimeProbe = await service.read();
+        });
+      }
+    };\n`,
+  );
+
+  class ProbeService {
+    constructor(options) {
+      this.options = options;
+    }
+
+    async read() {
+      return this.options.database === database ? 'direct-service-context' : 'wrong-context';
+    }
+  }
+
+  const database = { query: async () => [[], []] };
+  const runtime = await loadExtensionRuntime({
+    rootDir: root,
+    includeDependencies: false,
+    services: { ProbeService },
+    database,
+    schemaCache: { get: async () => ({ version: 1 }) },
+    emitter: new HookEmitter(),
+    logger: { info() {} },
+    env: {},
+  });
+
+  await runtime.init('app.start');
+  assert.equal(globalThis.__yuncmsRuntimeProbe, 'direct-service-context');
 });
