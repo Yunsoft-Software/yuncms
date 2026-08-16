@@ -3,6 +3,7 @@ import { AuthService } from './auth-service.js';
 import { AuthTokensService } from './auth-tokens-service.js';
 import { CollectionsService } from './collections-service.js';
 import { FieldsService } from './fields-service.js';
+import { FilesService } from './files-service.js';
 import { ItemsService } from './items-service.js';
 import { PermissionsService } from './permissions-service.js';
 import { RelationsService } from './relations-service.js';
@@ -22,5 +23,6 @@ export function createCoreServiceRegistry() {
     UsersService,
     RolesService,
     PermissionsService,
+    FilesService,
   });
 }
