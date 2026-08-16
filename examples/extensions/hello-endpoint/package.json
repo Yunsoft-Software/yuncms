@@ -1,0 +1,11 @@
+{
+  "name": "yuncms-extension-hello",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "yuncms": {
+    "id": "hello",
+    "type": "endpoint",
+    "entry": "./src/index.js"
+  }
+}
