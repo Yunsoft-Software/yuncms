@@ -4,6 +4,7 @@ import {
   createCoreServiceRegistry,
   createDatabasePool,
   createStorageRegistry,
+  createSystemAccountability,
   HookEmitter,
   loadConfig,
   loadEnvFileIfPresent,
@@ -22,6 +23,39 @@ const storage = createStorageRegistry({
 let server = null;
 let shuttingDown = false;
 
+function registerInternalAudit({ emitter, services }) {
+  const AuditService = services.AuditService;
+  const systemAccountability = createSystemAccountability();
+
+  for (const event of ['items.create', 'items.update', 'items.delete']) {
+    emitter.registerAction(event, async (payload, context) => {
+      try {
+        const audit = new AuditService({
+          accountability: systemAccountability,
+          database: pool,
+          logger: console,
+          requestId: context.requestId ?? null,
+        });
+        await audit.record({
+          user: context.accountability?.user ?? null,
+          action: event,
+          collection: context.collection ?? null,
+          itemKey: payload?.key ?? null,
+          requestId: context.requestId ?? null,
+          payload,
+        });
+      } catch (error) {
+        console.error('YunCMS audit write failed after committed mutation', {
+          event,
+          requestId: context.requestId ?? null,
+          code: error?.code,
+          message: error?.message,
+        });
+      }
+    });
+  }
+}
+
 async function start() {
   await assertDatabaseCompatible(pool);
 
@@ -29,6 +63,8 @@ async function start() {
   const services = serviceRegistry.toObject();
   const schemaCache = new SchemaCache();
   const emitter = new HookEmitter();
+  registerInternalAudit({ emitter, services });
+
   const extensionRuntime = await loadExtensionRuntime({
     services,
     database: pool,
