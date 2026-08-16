@@ -1,15 +1,24 @@
-import { closeDatabasePool, createDatabasePool, loadConfig } from '@yuncms/core';
+import {
+  assertDatabaseCompatible,
+  closeDatabasePool,
+  createDatabasePool,
+  loadConfig,
+} from '@yuncms/core';
 import { createApp } from './app.js';
 
 const config = loadConfig();
 const pool = createDatabasePool(config.database);
-const app = createApp({ pool, config });
-
-const server = app.listen(config.server.port, config.server.host, () => {
-  console.log(`YunCMS API listening on http://${config.server.host}:${config.server.port}`);
-});
-
+let server = null;
 let shuttingDown = false;
+
+async function start() {
+  await assertDatabaseCompatible(pool);
+
+  const app = createApp({ pool, config });
+  server = app.listen(config.server.port, config.server.host, () => {
+    console.log(`YunCMS API listening on http://${config.server.host}:${config.server.port}`);
+  });
+}
 
 async function shutdown(signal) {
   if (shuttingDown) return;
@@ -22,7 +31,9 @@ async function shutdown(signal) {
   }, 10_000);
   forceExit.unref();
 
-  await new Promise((resolve) => server.close(resolve));
+  if (server) {
+    await new Promise((resolve) => server.close(resolve));
+  }
   await closeDatabasePool(pool);
   clearTimeout(forceExit);
 }
@@ -37,3 +48,12 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
       });
   });
 }
+
+start().catch(async (error) => {
+  console.error('YunCMS API failed to start', {
+    code: error?.code,
+    message: error?.message,
+  });
+  await closeDatabasePool(pool).catch(() => {});
+  process.exit(1);
+});
