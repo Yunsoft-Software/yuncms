@@ -36,8 +36,13 @@ export async function promptSecret(message, {
     let value = '';
     let finished = false;
 
+    function onError(error) {
+      finish(error);
+    }
+
     function cleanup() {
       input.off('data', onData);
+      input.off('error', onError);
       input.setRawMode(previousRaw);
       if (previousEncoding) input.setEncoding(previousEncoding);
       if (wasPaused) input.pause();
@@ -82,7 +87,7 @@ export async function promptSecret(message, {
     input.setRawMode(true);
     input.resume();
     input.on('data', onData);
-    input.once('error', finish);
+    input.once('error', onError);
   });
 }
 
