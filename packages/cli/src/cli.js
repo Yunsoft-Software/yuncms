@@ -1,4 +1,5 @@
 import { runBootstrapCommand } from './bootstrap-command.js';
+import { runInitCommand } from './init-command.js';
 
 function assertSupportedNode(version = process.versions.node) {
   const major = Number(String(version).split('.')[0]);
@@ -10,10 +11,15 @@ function assertSupportedNode(version = process.versions.node) {
 }
 
 function printHelp(output) {
-  output.log?.(`YunCMS CLI\n\nCommands:\n  yuncms bootstrap   Apply required core database migrations\n  yuncms help        Show this help\n\nThe interactive init wizard and start wrapper are planned but not shipped yet.`);
+  output.log?.(`YunCMS CLI\n\nCommands:\n  yuncms init        Configure MySQL, bootstrap schema and create the first administrator\n  yuncms bootstrap   Apply required core database migrations\n  yuncms help        Show this help\n\nThe CLI start wrapper is planned but not shipped yet.`);
 }
 
-export async function runCli(argv = process.argv.slice(2), { output = console, env = process.env } = {}) {
+export async function runCli(argv = process.argv.slice(2), {
+  output = console,
+  env = process.env,
+  cwd = process.cwd(),
+  prompts,
+} = {}) {
   assertSupportedNode();
   const [command = 'help', ...rest] = argv;
 
@@ -24,6 +30,8 @@ export async function runCli(argv = process.argv.slice(2), { output = console, e
   }
 
   switch (command) {
+    case 'init':
+      return runInitCommand({ env, cwd, output, ...(prompts ? { prompts } : {}) });
     case 'bootstrap':
       return runBootstrapCommand({ env, output });
     case 'help':
