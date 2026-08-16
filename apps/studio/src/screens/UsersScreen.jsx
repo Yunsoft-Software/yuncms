@@ -68,6 +68,20 @@ export function UsersScreen({ currentUserId }) {
     }
   }
 
+  async function sendVerification(user) {
+    setError('');
+    setNotice('');
+    try {
+      await apiRequest('/auth/email-verification/request', {
+        method: 'POST',
+        body: { user: user.id },
+      });
+      setNotice(`Verification email queued for ${user.email}`);
+    } catch (requestError) {
+      setError(requestError.message || 'Verification email could not be sent');
+    }
+  }
+
   async function deleteUser(user) {
     if (!window.confirm(`Delete user ${user.email}?`)) return;
     setError('');
@@ -140,7 +154,7 @@ export function UsersScreen({ currentUserId }) {
         <div className="table-scroll">
           <table>
             <thead>
-              <tr><th>Email</th><th>Role</th><th>Status</th><th>Last access</th><th /></tr>
+              <tr><th>Email</th><th>Role</th><th>Status</th><th>Verified</th><th>Last access</th><th /></tr>
             </thead>
             <tbody>
               {users.map((user) => (
@@ -171,8 +185,12 @@ export function UsersScreen({ currentUserId }) {
                       <option value="disabled">disabled</option>
                     </select>
                   </td>
+                  <td>{user.email_verified_at ? 'Yes' : 'No'}</td>
                   <td>{user.last_access ? new Date(user.last_access).toLocaleString() : '—'}</td>
                   <td className="row-actions">
+                    {!user.email_verified_at && (
+                      <button className="text-button" type="button" onClick={() => sendVerification(user)}>Send verification</button>
+                    )}
                     <button
                       className="danger-button"
                       type="button"
