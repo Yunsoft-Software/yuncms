@@ -1,4 +1,5 @@
 import { ApiTokensService } from './api-tokens-service.js';
+import { AuditService } from './audit-service.js';
 import { AuthService } from './auth-service.js';
 import { AuthTokensService } from './auth-tokens-service.js';
 import { CollectionsService } from './collections-service.js';
@@ -16,6 +17,7 @@ export function createCoreServiceRegistry() {
     AuthService,
     AuthTokensService,
     ApiTokensService,
+    AuditService,
     ItemsService,
     CollectionsService,
     FieldsService,
