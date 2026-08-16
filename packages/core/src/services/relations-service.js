@@ -27,6 +27,16 @@ function assertOnDelete(value) {
   return action;
 }
 
+function parseRelationMetadata(value) {
+  if (value == null) return {};
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
 export class RelationsService extends BaseService {
   async readMany() {
     return new SchemaMetadataRepository(this.database).listRelations();
@@ -36,6 +46,11 @@ export class RelationsService extends BaseService {
     assertIdentifier(manyCollection, 'collection name');
     assertIdentifier(manyField, 'field name');
     return new SchemaMetadataRepository(this.database).readRelation(manyCollection, manyField);
+  }
+
+  async readO2M(oneCollection) {
+    assertIdentifier(oneCollection, 'one collection');
+    return new SchemaMetadataRepository(this.database).listRelationsForOne(oneCollection);
   }
 
   async createM2O(input = {}) {
@@ -150,6 +165,59 @@ export class RelationsService extends BaseService {
 
         if (cleanupErrors.length > 0) {
           error.cleanupErrors = cleanupErrors;
+          error.code ||= 'SCHEMA_PARTIAL_FAILURE';
+        }
+        throw error;
+      }
+    });
+  }
+
+  async deleteM2O(manyCollection, manyField) {
+    assertIdentifier(manyCollection, 'many collection');
+    assertIdentifier(manyField, 'many field');
+
+    return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      const metadata = new SchemaMetadataRepository(connection);
+      const relation = await metadata.readRelation(manyCollection, manyField);
+      if (!relation) {
+        const error = new Error(`Unknown relation: ${manyCollection}.${manyField}`);
+        error.code = 'RELATION_NOT_FOUND';
+        throw error;
+      }
+
+      const relationMetadata = parseRelationMetadata(relation.metadata);
+      const fkName = relationMetadata.constraintName
+        ?? constraintName(relation.many_collection, relation.many_field, relation.one_collection);
+      const manyTableSql = quoteIdentifier(relation.many_collection, 'many collection');
+      const manyFieldSql = quoteIdentifier(relation.many_field, 'many field');
+      const oneTableSql = quoteIdentifier(relation.one_collection, 'one collection');
+      const oneFieldSql = quoteIdentifier(relation.one_field, 'one field');
+      const constraintSql = quoteIdentifier(fkName, 'constraint name');
+      const onDelete = assertOnDelete(relation.on_delete);
+
+      await connection.query(`ALTER TABLE ${manyTableSql} DROP FOREIGN KEY ${constraintSql}`);
+
+      try {
+        return await withConnectionTransaction(connection, async () => {
+          const deleted = await metadata.deleteRelation(manyCollection, manyField);
+          if (deleted !== 1) {
+            const error = new Error(`Relation metadata disappeared during delete: ${manyCollection}.${manyField}`);
+            error.code = 'SCHEMA_METADATA_DRIFT';
+            throw error;
+          }
+          const schemaVersion = await incrementSchemaVersion(connection);
+          return { deleted: true, schemaVersion };
+        });
+      } catch (error) {
+        try {
+          await connection.query(
+            `ALTER TABLE ${manyTableSql}
+             ADD CONSTRAINT ${constraintSql}
+             FOREIGN KEY (${manyFieldSql}) REFERENCES ${oneTableSql} (${oneFieldSql})
+             ON DELETE ${onDelete}`,
+          );
+        } catch (restoreError) {
+          error.restoreError = restoreError;
           error.code ||= 'SCHEMA_PARTIAL_FAILURE';
         }
         throw error;
