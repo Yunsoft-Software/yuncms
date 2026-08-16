@@ -8,6 +8,7 @@ export class BaseService {
     emitter = null,
     logger = console,
     storage = null,
+    permissionCache = null,
     requestId = null,
   } = {}) {
     requireAccountability(accountability);
@@ -19,6 +20,7 @@ export class BaseService {
     this.emitter = emitter;
     this.logger = logger;
     this.storage = storage;
+    this.permissionCache = permissionCache;
     this.requestId = requestId;
   }
 }
