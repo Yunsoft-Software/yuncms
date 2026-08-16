@@ -33,11 +33,13 @@ export function loadEnvFileIfPresent(path = '.env') {
 }
 
 export function loadConfig(env = process.env) {
+  const studioOrigin = readString(env.STUDIO_ORIGIN, 'http://localhost:5173');
+
   return {
     server: {
       host: readString(env.HOST, '127.0.0.1'),
       port: readInteger(env.PORT, 8055, 'PORT', { min: 1, max: 65535 }),
-      studioOrigin: readString(env.STUDIO_ORIGIN, 'http://localhost:5173'),
+      studioOrigin,
     },
     logging: {
       level: readString(env.LOG_LEVEL, 'info'),
@@ -65,6 +67,17 @@ export function loadConfig(env = process.env) {
         secretAccessKey: readString(env.S3_SECRET_ACCESS_KEY, '') || null,
         forcePathStyle: readBoolean(env.S3_FORCE_PATH_STYLE, false),
       },
+    },
+    mail: {
+      host: readString(env.SMTP_HOST, ''),
+      port: readInteger(env.SMTP_PORT, 587, 'SMTP_PORT', { min: 1, max: 65535 }),
+      secure: readBoolean(env.SMTP_SECURE, false),
+      user: readString(env.SMTP_USER, '') || null,
+      password: readString(env.SMTP_PASSWORD, '') || null,
+      from: readString(env.SMTP_FROM, '') || null,
+    },
+    auth: {
+      publicUrl: readString(env.AUTH_PUBLIC_URL, studioOrigin).replace(/\/$/, ''),
     },
   };
 }
