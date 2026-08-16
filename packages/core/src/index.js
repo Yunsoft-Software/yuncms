@@ -13,6 +13,7 @@ export {
 export { createRequestContext } from './context.js';
 export { createInitialAdmin, findExistingAdmin } from './setup.js';
 export { HookEmitter } from './hooks.js';
+export { SmtpMailer } from './mail/smtp-mailer.js';
 export { LocalStorageDriver, assertStorageKey } from './storage/local-storage-driver.js';
 export { S3StorageDriver } from './storage/s3-storage-driver.js';
 export { createStorageRegistry } from './storage/storage-registry.js';
