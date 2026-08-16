@@ -15,6 +15,10 @@ function bearerToken(header) {
   return match[1];
 }
 
+function isPublicAuthRoute(req) {
+  return req.method === 'POST' && (req.path === '/auth/login' || req.path === '/auth/refresh');
+}
+
 export function createAuthenticationMiddleware({ pool, config, logger, services }) {
   return async (req, _res, next) => {
     try {
@@ -38,6 +42,10 @@ export function createAuthenticationMiddleware({ pool, config, logger, services 
         });
         req.authToken = token;
         req.sessionId = identity.session;
+      } else if (isPublicAuthRoute(req)) {
+        accountability = bootstrapAccountability;
+        req.authToken = null;
+        req.sessionId = null;
       } else {
         accountability = await auth.resolvePublicAccountability();
         req.authToken = null;
@@ -60,4 +68,4 @@ export function createAuthenticationMiddleware({ pool, config, logger, services 
   };
 }
 
-export { bearerToken };
+export { bearerToken, isPublicAuthRoute };
