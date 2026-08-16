@@ -97,7 +97,7 @@ test('runtime accepts SDK marker and exposes services directly to hooks', async 
       __yuncms_extension__: true,
       type: 'hook',
       register({ init }, context) {
-        init('app.start', async () => {
+        init('app.beforeStart', async () => {
           const service = new context.services.ProbeService({ database: context.database });
           globalThis.__yuncmsRuntimeProbe = await service.read();
         });
@@ -127,6 +127,6 @@ test('runtime accepts SDK marker and exposes services directly to hooks', async 
     env: {},
   });
 
-  await runtime.init('app.start');
+  await runtime.init('app.beforeStart');
   assert.equal(globalThis.__yuncmsRuntimeProbe, 'direct-service-context');
 });
