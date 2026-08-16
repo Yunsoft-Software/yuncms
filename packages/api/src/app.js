@@ -7,6 +7,9 @@ import {
   pingDatabase,
 } from '@yuncms/core';
 
+import { apiErrorHandler } from './error-response.js';
+import { createItemsRouter } from './routes/items.js';
+
 function studioCors(config) {
   return (req, res, next) => {
     const origin = req.get('origin');
@@ -67,11 +70,14 @@ export function createApp({ pool, config, logger = console, serviceRegistry = cr
     }
   });
 
+  app.use('/items', createItemsRouter());
+
   app.use((req, res) => {
     res.status(404).json({
       errors: [{ code: 'NOT_FOUND', message: 'Route not found', request_id: req.id }],
     });
   });
 
+  app.use(apiErrorHandler(logger));
   return app;
 }
