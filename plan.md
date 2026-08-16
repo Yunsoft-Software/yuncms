@@ -90,9 +90,9 @@ Rules:
 - authorization is enforced in services so HTTP and extensions share behavior.
 
 Tasks:
-- [ ] Implement request context factory.
-- [ ] Implement explicit public/system accountability helpers.
-- [ ] Add context propagation tests.
+- [x] Implement request context factory.
+- [x] Implement explicit public/system accountability helpers.
+- [x] Add context propagation/accountability tests.
 
 ### 2.2 Service layer
 Target service names:
@@ -105,8 +105,9 @@ Target service names:
 - `PermissionsService`
 - `FilesService`
 
-- [ ] Define base service contracts.
-- [ ] Implement service registry exposed to API routes/extensions.
+- [x] Define base service contract.
+- [x] Implement service registry and expose current core services to API request context.
+- [ ] Expose the same registry through the extension runtime once discovery/loading exists.
 - [ ] Ensure dedicated system services own special behavior such as password hashing/session invalidation.
 
 ### 2.3 MySQL foundation
@@ -117,7 +118,7 @@ Target service names:
 - [x] Disable multi-statements in pool configuration.
 - [x] Add MySQL error normalization for duplicate/FK/deadlock/lock/connection classes.
 - [x] Add bounded deadlock/lock-timeout retry helper.
-- [ ] Enforce placeholder-only values throughout future query/schema services.
+- [x] Use placeholders for data values in current metadata/schema services; keep this invariant for future services.
 - [ ] Add real-MySQL transaction/error integration tests.
 
 ## 3. System metadata and bootstrap
@@ -133,6 +134,7 @@ Initial reserved tables:
 - `yuncms_api_tokens`
 - `yuncms_files`
 - `yuncms_schema_migrations`
+- `yuncms_schema_state`
 - `yuncms_audit_log`
 
 Invariants:
@@ -143,12 +145,13 @@ Invariants:
 - destructive schema operations require explicit intent.
 
 Tasks:
-- [ ] Define bootstrap SQL/migration format.
-- [ ] Implement migration journal.
-- [ ] Implement bootstrap runner.
-- [ ] Implement schema advisory lock helper.
-- [ ] Implement schema version reader/writer.
-- [ ] Implement startup compatibility checks.
+- [x] Define bootstrap migration object/statement format.
+- [x] Implement migration journal.
+- [x] Implement bootstrap runner.
+- [x] Implement schema advisory lock helper.
+- [x] Implement schema version reader/increment helper.
+- [x] Implement read-only startup compatibility checks before API listen.
+- [x] Add unit tests for migration runner and advisory lock contracts.
 - [ ] Add bootstrap idempotency tests against real MySQL.
 
 ## 4. Dynamic schema engine
@@ -184,16 +187,19 @@ Operations:
 - support `RESTRICT`, `CASCADE`, `SET NULL` only when structurally valid.
 
 Tasks:
-- [ ] Build schema metadata repository.
-- [ ] Build collections create/read/delete path.
-- [ ] Build fields create/read/update/delete path.
-- [ ] Build M2O create/delete.
-- [ ] Build O2M inverse representation.
+- [x] Build schema metadata repository for collections/fields/relations.
+- [x] Build collections create/read/list path with physical table + metadata compensation on failure.
+- [ ] Build collection safe-metadata update + explicit destructive delete path.
+- [x] Build primitive field type compiler and fields create/read path.
+- [ ] Build field safe update + explicit destructive delete path.
+- [x] Build M2O creation with FK/type/on-delete validation and cleanup compensation.
+- [ ] Build M2O delete path.
+- [ ] Build O2M inverse representation/read API.
 - [ ] Build M2M junction helper.
 - [ ] Add schema cache keyed by schema version.
 - [ ] Invalidate cache only after committed mutation.
 - [ ] Add concurrent DDL tests.
-- [ ] Add partial-failure recovery tests.
+- [ ] Add partial-failure recovery tests against real MySQL.
 
 ## 5. Generic ItemsService + REST query language
 
@@ -457,6 +463,8 @@ Tasks:
 - [x] Add `/ready` MySQL readiness probe with HTTP 503 on DB failure.
 - [x] Add graceful HTTP + MySQL shutdown path.
 - [x] Add narrow Studio-origin CORS boundary for current shell.
+- [x] Attach explicit public request context and current core service registry to API requests.
+- [x] Refuse API startup when required core migrations/schema state are missing.
 - [ ] Define reusable API error classes/codes.
 - [ ] Add structured logging with secret redaction.
 - [ ] Normalize all Express errors into one response contract.
@@ -486,6 +494,7 @@ Critical regressions:
 Tasks:
 - [x] Add Node built-in test-runner baseline.
 - [x] Add unit tests for identifier safety, DB error normalization/retry and extension SDK definitions.
+- [x] Add unit test sources for accountability/context, migration runner and advisory lock behavior.
 - [ ] Run current tests after local `npm install`.
 - [ ] Real-MySQL integration harness.
 - [ ] API smoke tests.
@@ -564,11 +573,14 @@ Definition of done:
 - [x] Add `todo.md` for environment/manual blockers.
 - [x] Create npm workspace skeleton and runtime/toolchain policy.
 - [x] Create core config + MySQL pool + transaction/error/retry helpers.
-- [x] Create Express API factory/runtime + health/readiness.
+- [x] Create explicit accountability/request context + service registry foundation.
+- [x] Create Express API factory/runtime + health/readiness + bootstrap compatibility guard.
 - [x] Create extension SDK skeleton (`defineEndpoint`, `defineHook`).
 - [x] Create React Studio shell + API health indicator.
-- [x] Add architecture/development documentation for shipped behavior.
-- [x] Add non-MySQL unit test sources.
+- [x] Add bootstrap migration journal, system schema, advisory lock and schema version state.
+- [x] Add schema metadata repository and first `CollectionsService`/`FieldsService`/`RelationsService` create/read operations.
+- [x] Add architecture/development documentation for shipped baseline behavior.
+- [x] Add non-MySQL unit test sources including bootstrap/context contracts.
 - [x] Record npm install/build/test and real-MySQL checks in `todo.md`.
-- [ ] Local/Codex: run dependency install, tests, Studio build and API smoke checks; then check Milestone A if all pass.
-- [ ] Next code slice after Milestone A verification: bootstrap migration journal + system metadata schema.
+- [ ] Local/Codex: run dependency install, tests, Studio build, API/bootstrap smoke and real-MySQL checks; then check Milestone A if all pass.
+- [ ] Next code slice: schema snapshot/cache, remaining safe schema operations, then generic query compiler/ItemsService.
