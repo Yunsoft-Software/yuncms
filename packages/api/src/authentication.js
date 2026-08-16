@@ -26,6 +26,7 @@ export function createAuthenticationMiddleware({
   services,
   schemaCache = null,
   emitter = null,
+  storage = null,
 }) {
   return async (req, _res, next) => {
     try {
@@ -36,6 +37,7 @@ export function createAuthenticationMiddleware({
         database: pool,
         logger,
         emitter,
+        storage,
       });
 
       const token = bearerToken(req.get('authorization'));
@@ -76,6 +78,7 @@ export function createAuthenticationMiddleware({
         logger,
         env: config,
         emitter,
+        storage,
         requestId: req.id,
       });
       next();
