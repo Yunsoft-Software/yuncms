@@ -1,5 +1,5 @@
 import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { isAbsolute, relative, resolve } from 'node:path';
 
 const STORAGE_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,190}$/;
 
@@ -25,7 +25,8 @@ export class LocalStorageDriver {
   pathFor(key) {
     const safeKey = assertStorageKey(key);
     const path = resolve(this.root, safeKey);
-    if (!path.startsWith(`${this.root}/`) && path !== this.root) {
+    const fromRoot = relative(this.root, path);
+    if (!fromRoot || fromRoot.startsWith('..') || isAbsolute(fromRoot)) {
       throw storageError('INVALID_STORAGE_KEY', 'Storage key escaped the configured root');
     }
     return path;
