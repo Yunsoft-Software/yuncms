@@ -1,13 +1,20 @@
 import { createPublicAccountability } from '../accountability.js';
 import { verifyPassword } from '../auth/password.js';
+import { hashToken, tokenType } from '../auth/tokens.js';
 import { readAuthenticationUserByEmail } from '../auth/users-repository.js';
 import { BaseService } from './base-service.js';
 import { SessionsService } from './sessions-service.js';
 
 const DUMMY_PASSWORD_HASH = 'scrypt$N=65536,r=8,p=1,keyLength=64$AAAAAAAAAAAAAAAAAAAAAA$wPIB-ojIevW9SJ6ou99EIix5AukscH1McxhCNVsi1eVkhsxb5QzXquW0YeAFglU5Vh-NthiqKH90soC0JgEJPQ';
 
-function invalidCredentials() {
+function invalidLogin() {
   const error = new Error('Invalid email or password');
+  error.code = 'INVALID_CREDENTIALS';
+  return error;
+}
+
+function invalidToken() {
+  const error = new Error('Invalid or expired authentication token');
   error.code = 'INVALID_CREDENTIALS';
   return error;
 }
@@ -70,7 +77,7 @@ export class AuthService extends BaseService {
     );
 
     if (!user || !passwordMatches || user.status !== 'active') {
-      throw invalidCredentials();
+      throw invalidLogin();
     }
 
     const tokens = await this.createSessionsService().createForUser(user, { ip, userAgent });
@@ -82,6 +89,49 @@ export class AuthService extends BaseService {
 
   async authenticateAccessToken(token) {
     return this.createSessionsService().authenticateAccessToken(token);
+  }
+
+  async authenticateApiToken(token) {
+    if (tokenType(token) !== 'api') throw invalidToken();
+    const [rows] = await this.database.query(
+      `SELECT t.id AS api_token_id, t.user, u.email, u.role, u.status,
+              r.admin AS role_admin
+       FROM yuncms_api_tokens t
+       INNER JOIN yuncms_users u ON u.id = t.user
+       LEFT JOIN yuncms_roles r ON r.id = u.role
+       WHERE t.token_hash = ?
+         AND (t.expires_at IS NULL OR t.expires_at > CURRENT_TIMESTAMP(3))
+         AND u.status = 'active'
+       LIMIT 1`,
+      [hashToken(token)],
+    );
+    const row = rows[0];
+    if (!row) throw invalidToken();
+
+    await this.database.query(
+      `UPDATE yuncms_api_tokens t
+       INNER JOIN yuncms_users u ON u.id = t.user
+       SET t.last_used_at = CURRENT_TIMESTAMP(3), u.last_access = CURRENT_TIMESTAMP(3)
+       WHERE t.id = ?`,
+      [row.api_token_id],
+    );
+
+    return {
+      user: row.user,
+      role: row.role ?? null,
+      admin: Boolean(row.role_admin),
+      email: row.email,
+      session: null,
+      apiToken: row.api_token_id,
+      authMethod: 'api_token',
+    };
+  }
+
+  async authenticateBearerToken(token) {
+    const type = tokenType(token);
+    if (type === 'access') return this.authenticateAccessToken(token);
+    if (type === 'api') return this.authenticateApiToken(token);
+    throw invalidToken();
   }
 
   async refresh(refreshToken) {
