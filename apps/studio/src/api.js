@@ -1,6 +1,7 @@
 export const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8055';
 
 const SESSION_KEY = 'yuncms.studio.session';
+const SESSION_EVENT = 'yuncms:session-changed';
 let refreshInFlight = null;
 
 export class ApiError extends Error {
@@ -11,6 +12,10 @@ export class ApiError extends Error {
     this.code = code;
     this.body = body;
   }
+}
+
+function emitSessionChange() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
 export function readSession() {
@@ -28,14 +33,22 @@ export function readSession() {
 export function writeSession(session) {
   if (!session) {
     sessionStorage.removeItem(SESSION_KEY);
+    emitSessionChange();
     return null;
   }
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  emitSessionChange();
   return session;
 }
 
 export function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
+  emitSessionChange();
+}
+
+export function subscribeSession(listener) {
+  window.addEventListener(SESSION_EVENT, listener);
+  return () => window.removeEventListener(SESSION_EVENT, listener);
 }
 
 async function parseResponse(response) {
