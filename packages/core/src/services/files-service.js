@@ -51,6 +51,15 @@ export class FilesService extends BaseService {
     this.storage = options.storage;
   }
 
+  async action(event, payload) {
+    if (!this.emitter) return;
+    await this.emitter.action(event, payload, {
+      accountability: this.accountability,
+      requestId: this.requestId,
+      collection: 'yuncms_files',
+    });
+  }
+
   async readMany() {
     assertFileManager(this.accountability);
     const [rows] = await this.database.query(
@@ -115,7 +124,12 @@ export class FilesService extends BaseService {
           metadata == null ? null : JSON.stringify(metadata),
         ],
       );
-      return this.readOne(id);
+      const file = await this.readOne(id);
+      await this.action('files.create', {
+        key: id,
+        item: file,
+      });
+      return file;
     } catch (error) {
       if (stored) {
         try {
@@ -147,6 +161,9 @@ export class FilesService extends BaseService {
       throw fileError('INVALID_PAYLOAD', 'File update supports filenameDownload, title and metadata only');
     }
 
+    const before = await this.readOne(id);
+    if (!before) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+
     const assignments = [];
     const params = [];
     if (Object.hasOwn(patch, 'filenameDownload')) {
@@ -168,7 +185,14 @@ export class FilesService extends BaseService {
       params,
     );
     if (result.affectedRows !== 1) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
-    return this.readOne(id);
+    const file = await this.readOne(id);
+    await this.action('files.update', {
+      key: id,
+      before,
+      item: file,
+      changes: patch,
+    });
+    return file;
   }
 
   async deleteOne(id) {
@@ -191,6 +215,11 @@ export class FilesService extends BaseService {
       error.file = file;
       throw error;
     }
+
+    await this.action('files.delete', {
+      key: id,
+      before: file,
+    });
     return true;
   }
 }
