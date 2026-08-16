@@ -1,10 +1,12 @@
 import { withAdvisoryLock } from './advisory-lock.js';
 import { applyMigrations, assertMigrationsApplied } from './migrations.js';
 import { systemSchemaMigration } from './migrations/0001-system-schema.js';
+import { sessionAccessTokensMigration } from './migrations/0002-session-access-tokens.js';
 import { readSchemaVersion } from './schema-version.js';
 
 export const CORE_MIGRATIONS = Object.freeze([
   systemSchemaMigration,
+  sessionAccessTokensMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(
