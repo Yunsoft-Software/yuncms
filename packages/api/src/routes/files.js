@@ -13,11 +13,22 @@ function notFound(id) {
   return error;
 }
 
+function decodeFilenameHeader(value) {
+  if (!value) return value;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    const error = new Error('Encoded upload filename is invalid');
+    error.code = 'INVALID_PAYLOAD';
+    throw error;
+  }
+}
+
 function attachmentHeader(filename) {
   const safe = String(filename || 'download')
     .replace(/[\r\n]/g, '')
     .replace(/["\\]/g, '_');
-  return `attachment; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(safe)}`;
+  return `attachment; filename="${safe.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(safe)}`;
 }
 
 export function createFilesRouter({ maxUploadBytes = 25 * 1024 * 1024 } = {}) {
@@ -29,7 +40,7 @@ export function createFilesRouter({ maxUploadBytes = 25 * 1024 * 1024 } = {}) {
   });
 
   router.post('/', rawUpload, async (req, res) => {
-    const filenameDownload = req.get('x-filename');
+    const filenameDownload = decodeFilenameHeader(req.get('x-filename'));
     const title = req.get('x-title') || null;
     const mimetype = req.get('x-mimetype') || 'application/octet-stream';
     const storage = req.query.storage || 'local';
@@ -70,4 +81,4 @@ export function createFilesRouter({ maxUploadBytes = 25 * 1024 * 1024 } = {}) {
   return router;
 }
 
-export { attachmentHeader };
+export { attachmentHeader, decodeFilenameHeader };
