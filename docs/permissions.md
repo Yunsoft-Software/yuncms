@@ -1,45 +1,40 @@
 # Roles and Permissions
 
-This document describes RBAC behavior currently implemented on branch `16-08-2026`.
+This document describes RBAC behavior implemented on branch `16-08-2026`.
 
 ## Accountability
 
-Authorization starts from explicit accountability passed to services. The current shape carries user/role identity plus explicit `admin`, `public` and `system` flags.
+Authorization starts from explicit accountability passed to services.
 
-Important defaults:
+Important invariants:
 
 - `null` user/role never means administrator;
 - role-less public accountability is not granted item access;
-- system accountability is explicitly administrative;
-- session/API-token authentication resolves user/role/admin before service execution;
-- future extensions are expected to use the same service-layer authorization path.
+- system/admin bypass is explicit;
+- session/API-token authentication resolves the user's current role before service execution;
+- trusted extensions that instantiate services with request service options inherit the same accountability and request-local permission cache.
 
 ## RolesService
 
-`RolesService` currently supports administrator/system-only:
+Role management is administrator/system-only and supports list/read/create/update/delete.
 
-- list roles;
-- read one role;
-- create a role.
+Protected invariants:
 
-Security invariants:
-
-- a role cannot be both `admin` and `public`;
+- one role cannot be both admin and public;
 - only one public role may exist;
-- `RolesService` rejects a second public role before insert;
-- MySQL also enforces the single-public-role invariant using a generated-column unique key, closing the concurrent-create race.
-
-Unauthenticated normal application requests resolve the configured public role. Login/refresh intentionally do not depend on public-role lookup.
+- MySQL also enforces the one-public-role rule;
+- protected admin/public semantics cannot be silently mutated;
+- roles still referenced by users/permissions cannot be deleted through an unsafe shortcut.
 
 ## Permission records
 
-`PermissionsService` uses one permission row per:
+A permission is scoped to:
 
 ```text
 role + collection + action
 ```
 
-Current actions:
+Actions:
 
 - `create`
 - `read`
@@ -48,63 +43,92 @@ Current actions:
 
 A permission may contain:
 
-- a field allowlist;
-- a row filter expressed with the same safe filter language used by `ItemsService`.
+- field allowlist;
+- server-side row filter;
+- create/update prospective-record validation JSON.
 
-Create/update validation metadata is intentionally rejected with `PERMISSION_VALIDATION_NOT_READY` until validation enforcement exists. YunCMS does not store a security policy it cannot yet enforce.
+Filters and validations use the same allowlisted field/operator language as the generic query layer.
 
-## Resolution behavior
+## Resolution and request-local cache
 
-`PermissionsService.resolve(action, collection)` behaves as follows:
+`PermissionsService.resolve(action, collection)`:
 
-1. explicit admin/system accountability receives full access;
-2. non-admin accountability without a role is denied;
-3. the exact `role + collection + action` permission row is loaded;
-4. a missing row is denied;
-5. malformed field metadata is rejected.
+1. gives explicit admin/system accountability full access;
+2. denies non-admin accountability without a role;
+3. resolves the exact role/collection/action row;
+4. denies missing permission rows;
+5. rejects malformed metadata;
+6. caches the resolved result only inside the current request context.
 
-There is no implicit fallback permission.
+The cache is intentionally request-local, so there is no cross-process stale-permission cache to invalidate. Permission mutations clear the current request cache.
 
-## ItemsService enforcement
+## Field and row enforcement
 
-Authorization lives inside `ItemsService`, not only in Express middleware.
+`ItemsService` enforces permissions inside the service layer.
 
-### Reads
+Reads:
 
-For role-restricted reads:
+- selected fields must be readable;
+- sort/filter fields must be readable;
+- permission row filter is compiled against the full collection schema;
+- caller filter is compiled against the caller-visible schema;
+- both filters are combined with `AND`.
 
-- selected fields must be in the permission field allowlist;
-- user sort fields must be in the permission field allowlist;
-- user filter fields must be in the permission field allowlist;
-- the permission's server-side row filter is compiled against the full schema;
-- permission and caller row filters are combined with `AND`.
+Writes:
 
-This distinction is deliberate. A role may be restricted by `status = active` without being allowed to read/filter/sort by the `status` field itself.
+- payload fields must exist, be writable and belong to the action field allowlist;
+- update/delete also apply the permission row filter;
+- bulk update/delete additionally require an explicit non-empty caller filter.
 
-### Writes
+## Create/update validation
 
-Create/update payload fields must exist, must not be read-only and must be inside the action permission's field allowlist when one is present.
+Validation is evaluated against the **prospective final record**, not merely the incoming patch.
 
-Update/delete actions also apply the permission row filter. Bulk update/delete additionally require an explicit non-empty caller filter so a generic bulk call cannot accidentally target every row merely because the permission filter exists.
+Create:
 
-## HTTP authentication and roles
+- generated primary key + provided values + known schema defaults form the candidate record;
+- the candidate must satisfy the permission validation rule before insert.
 
-The API now authenticates either:
+Update:
 
-- a short-lived session access token;
-- a static API token;
-- or no credential, in which case the explicit public role is resolved.
+- current persisted row is loaded within the allowed update scope;
+- patch is applied in memory to form the candidate final row;
+- validation runs against that final row before update.
 
-Session/API-token identities inherit the user's current role. Role changes therefore take effect on later credential validation rather than being embedded permanently in a self-contained token.
+Bulk update:
 
-No configured public role means `public=true, role=null`, so `ItemsService` fails closed unless the request hits a route such as login/refresh that does not require ordinary item permission resolution.
+- candidate rows are inspected before mutation;
+- V1 refuses to validate more than 5,000 matching rows in one call rather than silently skipping validation.
 
-## Not implemented yet
+A validation failure returns `VALIDATION_FAILED`; the bulk guard returns `VALIDATION_BULK_LIMIT`.
 
-- permission create/update validation rules;
-- effective-permission caching;
-- permission update/delete management methods;
-- hardened privilege-escalation regression suite against real MySQL;
-- extension runtime propagation tests.
+## Relation expansion
 
-See `todo.md` for real-MySQL verification that must be completed before the RBAC milestone is considered production-ready.
+Direct M2O expansion also honors RBAC:
+
+- source relation field must be visible under source read permission;
+- target records are loaded through `ItemsService` with the same accountability;
+- target field allowlists/row filters remain effective;
+- inaccessible targets resolve to `null` rather than bypassing target restrictions.
+
+## Management REST
+
+```text
+GET    /roles
+POST   /roles
+GET    /roles/:id
+PATCH  /roles/:id
+DELETE /roles/:id
+
+GET    /permissions
+POST   /permissions
+GET    /permissions/:id
+PATCH  /permissions/:id
+DELETE /permissions/:id
+```
+
+The Studio exposes role CRUD plus field/filter/validation editing.
+
+## Remaining verification
+
+Source-level enforcement exists. Real MySQL/API privilege-escalation, validation, cache and relation-expansion tests remain in `todo.md` and must pass before production release.
