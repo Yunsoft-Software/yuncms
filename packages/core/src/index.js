@@ -13,3 +13,18 @@ export {
 export { createRequestContext } from './context.js';
 export { BaseService } from './services/base-service.js';
 export { createServiceRegistry } from './services/service-registry.js';
+export { withAdvisoryLock } from './advisory-lock.js';
+export {
+  ensureMigrationJournal,
+  readAppliedMigrations,
+  validateMigration,
+  applyMigrations,
+  assertMigrationsApplied,
+} from './migrations.js';
+export { readSchemaVersion, incrementSchemaVersion } from './schema-version.js';
+export {
+  CORE_MIGRATIONS,
+  REQUIRED_CORE_MIGRATION_IDS,
+  bootstrapDatabase,
+  assertDatabaseCompatible,
+} from './bootstrap.js';
