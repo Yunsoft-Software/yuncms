@@ -11,7 +11,8 @@ Important defaults:
 - `null` user/role never means administrator;
 - role-less public accountability is not granted item access;
 - system accountability is explicitly administrative;
-- HTTP and future extensions use the same service-layer authorization path.
+- session/API-token authentication resolves user/role/admin before service execution;
+- future extensions are expected to use the same service-layer authorization path.
 
 ## RolesService
 
@@ -21,7 +22,14 @@ Important defaults:
 - read one role;
 - create a role.
 
-Role rows contain `admin` and `public` flags, but automatic public-role assignment and authenticated request role resolution are not implemented yet.
+Security invariants:
+
+- a role cannot be both `admin` and `public`;
+- only one public role may exist;
+- `RolesService` rejects a second public role before insert;
+- MySQL also enforces the single-public-role invariant using a generated-column unique key, closing the concurrent-create race.
+
+Unauthenticated normal application requests resolve the configured public role. Login/refresh intentionally do not depend on public-role lookup.
 
 ## Permission records
 
@@ -79,16 +87,20 @@ Create/update payload fields must exist, must not be read-only and must be insid
 
 Update/delete actions also apply the permission row filter. Bulk update/delete additionally require an explicit non-empty caller filter so a generic bulk call cannot accidentally target every row merely because the permission filter exists.
 
-## Current HTTP state
+## HTTP authentication and roles
 
-The API mounts generic item routes, but authentication middleware is still pending. Requests currently receive role-less public accountability, so item routes fail with `FORBIDDEN` by design.
+The API now authenticates either:
 
-Authenticated user resolution and explicit public-role assignment will be added with the authentication milestone rather than temporarily bypassing RBAC.
+- a short-lived session access token;
+- a static API token;
+- or no credential, in which case the explicit public role is resolved.
+
+Session/API-token identities inherit the user's current role. Role changes therefore take effect on later credential validation rather than being embedded permanently in a self-contained token.
+
+No configured public role means `public=true, role=null`, so `ItemsService` fails closed unless the request hits a route such as login/refresh that does not require ordinary item permission resolution.
 
 ## Not implemented yet
 
-- login/session-derived accountability;
-- public-role discovery/assignment;
 - permission create/update validation rules;
 - effective-permission caching;
 - permission update/delete management methods;
