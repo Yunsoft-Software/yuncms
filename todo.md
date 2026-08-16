@@ -11,12 +11,12 @@ This file contains only work that cannot be completed or truthfully verified fro
 - [ ] Run `node packages/cli/bin/yuncms.js help` and verify only actually implemented CLI commands are advertised as available.
 - [ ] Confirm the API refuses to listen on an unbootstrapped database with `DATABASE_MIGRATION_REQUIRED` rather than silently creating application schema at startup.
 - [ ] Run `npm run bootstrap` on a disposable MySQL database and then start the API; verify `/health` returns process health and `/ready` reports MySQL readiness accurately.
-- [ ] Before auth is implemented, call a generic `/items/<existing-collection>` route and confirm the role-less public request fails closed with HTTP 403/canonical `FORBIDDEN` error rather than exposing data.
+- [ ] Call a generic `/items/<existing-collection>` route without credentials and confirm role-less/no-permission public access fails closed with canonical HTTP 403 rather than exposing data.
 - [ ] Verify unknown routed errors do not expose stack traces, DB messages or secrets in HTTP responses; confirm request ids correlate with server logs.
 
 ## Real MySQL required
 
-Use a disposable local MySQL 8 database; do not point early bootstrap/schema/CRUD/RBAC tests at production data.
+Use a disposable local MySQL 8 database; do not point early bootstrap/schema/CRUD/RBAC/auth tests at production data.
 
 ### Bootstrap and schema
 
@@ -24,6 +24,7 @@ Use a disposable local MySQL 8 database; do not point early bootstrap/schema/CRU
 - [ ] Copy `.env.example` to `.env` and fill the MySQL connection values.
 - [ ] Verify `mysql2/promise` can connect and `SELECT 1` succeeds.
 - [ ] Run `bootstrapDatabase()`/`npm run bootstrap` against the empty database, then run it a second time and verify the second run reports no newly applied migration and changes nothing destructive.
+- [ ] Confirm migrations `0001` through `0004` are journaled exactly once; `0004-auth-action-tokens` must create `yuncms_auth_tokens` with its unique token hash, user/type and expiry indexes/FK.
 - [ ] Inspect `yuncms_schema_migrations`, `yuncms_schema_state`, `yuncms_collections`, `yuncms_fields`, `yuncms_relations`, auth/file/audit system tables and their indexes/FKs after bootstrap.
 - [ ] Verify the schema advisory lock with two independent Node processes; only one schema mutation should own `yuncms:schema` at a time and lock timeout must fail cleanly.
 - [ ] Create two disposable collections through `CollectionsService`; confirm physical MySQL tables, `id CHAR(36)` primary keys and metadata rows agree.
@@ -45,7 +46,22 @@ Use a disposable local MySQL 8 database; do not point early bootstrap/schema/CRU
 - [ ] Attempt SQL-injection payloads through collection names, field selection, sort, filter operators and values; identifiers/operators must fail closed and values must remain data parameters.
 - [ ] Verify `createMany()` rolls back the whole transaction when a later row fails.
 - [ ] Verify `updateMany()` and `deleteMany()` reject missing/empty caller filters even for admin/system accountability.
-- [ ] Verify `/items/:collection` REST responses/error shapes after auth test wiring exists; until then only verify the expected fail-closed 403 behavior.
+- [ ] Verify `/items/:collection` REST responses/error shapes with authenticated admin, normal-role, public-role and role-less requests.
+
+### Authentication and sessions
+
+- [ ] Create the first admin through `createInitialAdmin()` on a bootstrapped DB; rerun and confirm it refuses to silently create a second initial admin.
+- [ ] Login with valid/invalid credentials and verify unknown user, bad password and inactive user all fail with the same public credential error shape.
+- [ ] Verify access tokens authenticate only while both access/session TTLs are valid and while the owning user is active.
+- [ ] Refresh a session and verify both access and refresh tokens rotate; replay the old refresh token and confirm it fails.
+- [ ] Run two concurrent refreshes with the same refresh token and confirm only one succeeds.
+- [ ] Verify `logout` revokes only the current session and `logout-all` revokes every session for the authenticated user.
+- [ ] Change a password and confirm all existing sessions are revoked in the same transaction.
+- [ ] Create/list/revoke API tokens; confirm token secrets/hashes never appear in list responses, expiry is enforced, and disabling the owning user disables authentication.
+- [ ] Request a password-reset token for an active user and confirm previous unused reset tokens are replaced; malformed/unknown/inactive accounts must not expose account existence.
+- [ ] Consume a reset token once; confirm password changes, all sessions are revoked, outstanding sibling reset tokens are removed and replay fails.
+- [ ] Issue email-verification only for self/admin/system accountability; consume once, set `email_verified_at`, and verify replay/expired/wrong-prefix tokens fail.
+- [ ] Confirm raw reset/verification tokens are not exposed by a generic public HTTP endpoint before mail transport is implemented.
 
 ### Roles and permissions
 
@@ -69,7 +85,8 @@ Do not publish from this environment.
 
 ## Manual security/production checks for later milestones
 
-- [ ] Run full auth/RBAC integration tests with separate admin, normal-role, explicit public-role and role-less identities against real MySQL after authentication is implemented.
+- [ ] Run full auth/RBAC integration tests with separate admin, normal-role, explicit public-role and role-less identities against real MySQL.
+- [ ] Add/verify authentication rate limiting before public production deployment.
 - [ ] Test schema mutations concurrently from two processes, not only two promises in one process.
 - [ ] Test graceful shutdown while requests and a DB transaction are active.
 - [ ] Test local file storage permissions/path traversal once FilesService lands.
