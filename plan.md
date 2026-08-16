@@ -202,13 +202,14 @@ Tasks:
 - [x] Build M2O creation with FK/type/on-delete validation and cleanup compensation.
 - [x] Build M2O delete path with FK restore compensation on metadata failure.
 - [x] Build O2M inverse representation/read API.
-- [ ] Build M2M junction helper.
+- [x] Build M2M junction helper with two FKs, unique pair and single logical schema-version increment.
 - [x] Add schema cache keyed by schema version.
 - [x] Make metadata + schema-version changes atomic and let version changes invalidate cached snapshots only after commit.
-- [x] Add source-level guards for non-admin schema access and explicit destructive intent.
+- [x] Add source-level guards for non-admin schema access, explicit destructive intent and invalid M2M combinations.
+- [ ] Add high-level M2M delete lifecycle helper.
 - [ ] Add concurrent DDL tests against real MySQL.
 - [ ] Add partial-failure recovery tests against real MySQL.
-- [ ] Verify tombstone cleanup and physical field ALTER/index compensation against real MySQL.
+- [ ] Verify tombstone cleanup, physical field ALTER/index compensation and M2M physical/metadata consistency against real MySQL.
 
 ## 5. Generic ItemsService + REST query language
 
@@ -512,6 +513,7 @@ Critical regressions:
 - schema metadata/physical drift;
 - non-admin schema mutation;
 - destructive schema intent/compensation;
+- M2M partial creation/duplicate links;
 - concurrent DDL;
 - deadlock retry correctness;
 - session rotation/revocation;
@@ -527,7 +529,7 @@ Tasks:
 - [x] Add unit test sources for RBAC permission resolution, row filters, field restrictions and fail-closed access.
 - [x] Add unit test sources for login/session/API-token/auth-action-token boundaries.
 - [x] Add extension manifest/discovery/duplicate-id/runtime-context test sources.
-- [x] Add schema-service authorization and destructive-intent test sources.
+- [x] Add schema-service authorization, destructive-intent and M2M preflight test sources.
 - [x] Add API canonical-error unit test sources.
 - [ ] Run current tests after local `npm install`.
 - [ ] Real-MySQL integration harness.
@@ -542,7 +544,7 @@ Write docs as behavior stabilizes; never document planned behavior as shipped.
 - [x] `README.md` current-state overview.
 - [x] `docs/architecture.md`.
 - [x] `docs/development.md`.
-- [x] `docs/database.md`.
+- [x] `docs/database.md` including current destructive schema/physical field/M2M behavior.
 - [x] `docs/rest-api.md`.
 - [x] `docs/auth.md` for current auth/session/token surface and known transport limitation.
 - [x] `docs/permissions.md` for current RBAC surface.
@@ -574,7 +576,7 @@ Definition of done:
 - filters/sort/pagination;
 - real-MySQL integration tests.
 
-- [ ] Milestone B complete. **Code paths now include explicit destructive delete and safe physical field mutation; completion remains blocked on real-MySQL/API verification in `todo.md`.**
+- [ ] Milestone B complete. **Core schema code now includes destructive delete, physical field mutation and M2M creation; completion remains blocked on real-MySQL/API verification in `todo.md`.**
 
 ### Milestone C — auth + RBAC
 - users/sessions/login/refresh/logout;
@@ -615,6 +617,7 @@ Definition of done:
 - [x] Add versioned schema snapshot/cache with metadata+version commit discipline.
 - [x] Add schema metadata repository and collection/field safe create/read/update foundations.
 - [x] Add M2O create/delete plus O2M inverse read behavior.
+- [x] Add M2M junction creation with paired metadata relations and unique pair constraint.
 - [x] Add allowlisted query compiler and generic `ItemsService` CRUD.
 - [x] Add `RolesService`/`PermissionsService` and enforce field/row restrictions inside `ItemsService`.
 - [x] Add generic item REST adapters and canonical API error middleware.
@@ -633,4 +636,4 @@ Definition of done:
 - [x] Add non-MySQL unit test sources for bootstrap/context/query/CRUD/RBAC/auth/extensions/schema-access/API contracts.
 - [x] Record npm install/build/test and real-MySQL/schema/CRUD/RBAC/auth/API/extension verification in `todo.md`.
 - [ ] Local/Codex: run dependency install, tests, Studio build, bootstrap/API/extension smoke and real-MySQL verification; check Milestone A/B/C only after they pass.
-- [ ] Next code slice: build M2M junction helper, then expose authenticated schema/admin APIs required by Studio and move into real Studio workflows.
+- [ ] Next code slice: expose authenticated admin schema APIs required by Studio, then add Studio API client/login and Data Model workflows; high-level M2M delete can follow after creation is real-MySQL verified.
