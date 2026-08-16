@@ -108,7 +108,7 @@ Target service names:
 - [x] Define base service contract.
 - [x] Implement service registry and expose current core services to API request context.
 - [ ] Expose the same registry through the extension runtime once discovery/loading exists.
-- [ ] Ensure dedicated system services own special behavior such as password hashing/session invalidation.
+- [x] Ensure dedicated system services own special behavior such as password hashing/session invalidation.
 
 ### 2.3 MySQL foundation
 - [x] Create one `mysql2/promise` pool factory.
@@ -119,7 +119,7 @@ Target service names:
 - [x] Disable multi-statements in pool configuration.
 - [x] Add MySQL error normalization for duplicate/FK/deadlock/lock/connection classes.
 - [x] Add bounded deadlock/lock-timeout retry helper.
-- [x] Use placeholders for data values in current metadata/schema/query/item/RBAC services; keep this invariant for future services.
+- [x] Use placeholders for data values in current metadata/schema/query/item/RBAC/auth services; keep this invariant for future services.
 - [ ] Add real-MySQL transaction/error integration tests.
 
 ## 3. System metadata and bootstrap
@@ -133,6 +133,7 @@ Initial reserved tables:
 - `yuncms_roles`
 - `yuncms_permissions`
 - `yuncms_api_tokens`
+- `yuncms_auth_tokens`
 - `yuncms_files`
 - `yuncms_schema_migrations`
 - `yuncms_schema_state`
@@ -152,6 +153,7 @@ Tasks:
 - [x] Implement schema advisory lock helper.
 - [x] Implement schema version reader/increment helper.
 - [x] Implement read-only startup compatibility checks before API listen.
+- [x] Add versioned auth action-token migration for reset/verification lifecycle.
 - [x] Add unit test sources for migration runner and advisory lock contracts.
 - [ ] Add bootstrap idempotency tests against real MySQL.
 
@@ -272,16 +274,19 @@ Security:
 - auth rate limiting before production release.
 
 Tasks:
-- [ ] Users repository/service.
-- [ ] Password hashing/verification.
-- [ ] Session creation/rotation/revocation.
-- [ ] Authentication middleware that replaces role-less public accountability only after verified credentials.
-- [ ] Explicit public-role resolution for unauthenticated requests.
-- [ ] Refresh/logout endpoints.
-- [ ] Password reset lifecycle.
-- [ ] Email verification lifecycle.
-- [ ] API token lifecycle.
-- [ ] Auth security tests.
+- [x] Users repository/service.
+- [x] Password hashing/verification.
+- [x] Session creation/rotation/revocation.
+- [x] Authentication middleware that replaces public accountability only after verified credentials.
+- [x] Explicit public-role resolution for unauthenticated requests.
+- [x] Refresh/logout endpoints.
+- [x] Password reset one-time token lifecycle in core.
+- [x] Email verification one-time token lifecycle in core.
+- [x] API token lifecycle.
+- [x] Add auth/token unit test sources and fail-closed guards.
+- [ ] Add mail transport + public reset/verification delivery endpoints without account enumeration/token leakage.
+- [ ] Add authentication rate limiting before production release.
+- [ ] Run auth security/replay/revocation integration tests against real MySQL/API.
 
 ## 7. Roles and permissions
 
@@ -408,7 +413,8 @@ Tasks:
 - [ ] Implement `init` prompts.
 - [x] Verify DB connectivity in the bootstrap command before migrations.
 - [x] Implement bootstrap command with pool cleanup on success/failure.
-- [ ] Initial admin creation.
+- [x] Implement reusable first-administrator creation helper with duplicate-admin refusal.
+- [ ] Wire initial administrator creation into interactive `init` flow.
 - [ ] `start` command wrapper.
 - [ ] Non-interactive env bootstrap for servers/containers beyond current environment-driven bootstrap command.
 - [ ] Document final npm installation/publishing flow after package naming/auth is verified.
@@ -501,6 +507,7 @@ Critical regressions:
 - concurrent DDL;
 - deadlock retry correctness;
 - session rotation/revocation;
+- one-time reset/verification token replay;
 - extension accountability;
 - file path traversal.
 
@@ -510,6 +517,7 @@ Tasks:
 - [x] Add unit test sources for accountability/context, migration runner and advisory lock behavior.
 - [x] Add unit test sources for field/query compiler and generic `ItemsService` SQL boundaries.
 - [x] Add unit test sources for RBAC permission resolution, row filters, field restrictions and fail-closed access.
+- [x] Add unit test sources for login/session/API-token/auth-action-token boundaries.
 - [x] Add API canonical-error unit test sources.
 - [ ] Run current tests after local `npm install`.
 - [ ] Real-MySQL integration harness.
@@ -526,7 +534,7 @@ Write docs as behavior stabilizes; never document planned behavior as shipped.
 - [x] `docs/development.md`.
 - [x] `docs/database.md`.
 - [x] `docs/rest-api.md`.
-- [ ] `docs/auth.md` after auth exists.
+- [x] `docs/auth.md` for current auth/session/token surface and known transport limitation.
 - [x] `docs/permissions.md` for current RBAC surface.
 - [ ] `docs/extensions.md` after runtime loading exists.
 - [ ] `docs/studio.md` when real Studio workflows exist.
@@ -562,9 +570,9 @@ Definition of done:
 - users/sessions/login/refresh/logout;
 - roles/permissions inside services;
 - field + row restrictions;
-- privilege regression tests.
+- privilege/auth regression tests.
 
-- [ ] Milestone C complete. **RBAC service foundation exists; authentication/session work and real privilege tests remain.**
+- [ ] Milestone C complete. **Core auth/RBAC code paths now exist; completion remains blocked on real-MySQL/API auth, replay, revocation and privilege verification in `todo.md`. Mail transport/rate limiting remain production-V1 work.**
 
 ### Milestone D — extensions + useful Studio
 - endpoint/hook extensions load locally/npm;
@@ -601,8 +609,12 @@ Definition of done:
 - [x] Add `RolesService`/`PermissionsService` and enforce field/row restrictions inside `ItemsService`.
 - [x] Add generic item REST adapters and canonical API error middleware.
 - [x] Add `yuncms` CLI package with Node guard and `bootstrap` command.
-- [x] Add/update database, REST, permission and CLI documentation for shipped behavior.
-- [x] Add non-MySQL unit test sources for bootstrap/context/query/CRUD/RBAC/API contracts.
-- [x] Record npm install/build/test, real-MySQL schema/CRUD/RBAC and API checks in `todo.md`.
-- [ ] Local/Codex: run dependency install, tests, Studio build, bootstrap/API smoke and real-MySQL verification; check Milestone A/B items only after they pass.
-- [ ] Next code slice: authentication/users/sessions, then wire authenticated/public role accountability into the existing REST/RBAC path.
+- [x] Add users/password/session login-refresh-logout and API-token authentication foundation.
+- [x] Wire authenticated and explicit public-role accountability into the REST/RBAC path.
+- [x] Add password-reset and email-verification one-time token lifecycle with migration `0004`.
+- [x] Add reusable first-administrator creation helper.
+- [x] Add/update database, REST, auth, permission and CLI documentation for shipped behavior.
+- [x] Add non-MySQL unit test sources for bootstrap/context/query/CRUD/RBAC/auth/API contracts.
+- [x] Record npm install/build/test and real-MySQL schema/CRUD/RBAC/auth/API checks in `todo.md`.
+- [ ] Local/Codex: run dependency install, tests, Studio build, bootstrap/API smoke and real-MySQL verification; check Milestone A/B/C only after they pass.
+- [ ] Next code slice: finish destructive schema operations + M2M helper, then extension discovery/runtime before expanding Studio.
