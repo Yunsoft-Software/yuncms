@@ -38,7 +38,7 @@ export function loadConfig(env = process.env) {
   return {
     server: {
       host: readString(env.HOST, '127.0.0.1'),
-      port: readInteger(env.PORT, 8055, 'PORT', { min: 1, max: 65535 }),
+      port: readInteger(env.PORT, 3008, 'PORT', { min: 1, max: 65535 }),
       studioOrigin,
     },
     logging: {
