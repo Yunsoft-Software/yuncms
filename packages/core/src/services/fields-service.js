@@ -6,10 +6,32 @@ import { incrementSchemaVersion } from '../schema-version.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 
+const FIELD_METADATA_KEYS = new Set(['readonly', 'hidden', 'sort', 'interface', 'options']);
+
 function assertFieldName(field) {
   assertIdentifier(field, 'field name');
   if (field.length > 64) throw new Error('Field name cannot exceed 64 characters');
   return field;
+}
+
+function assertFieldMetadataPatch(patch) {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    const error = new Error('Field metadata patch must be an object');
+    error.code = 'INVALID_SCHEMA_PAYLOAD';
+    throw error;
+  }
+  for (const key of Object.keys(patch)) {
+    if (!FIELD_METADATA_KEYS.has(key)) {
+      const error = new Error(`Field property cannot be updated through metadata-only V1 update: ${key}`);
+      error.code = 'UNSUPPORTED_SCHEMA_UPDATE';
+      throw error;
+    }
+  }
+  if (Object.keys(patch).length === 0) {
+    const error = new Error('Field metadata patch cannot be empty');
+    error.code = 'INVALID_SCHEMA_PAYLOAD';
+    throw error;
+  }
 }
 
 export class FieldsService extends BaseService {
@@ -108,6 +130,48 @@ export class FieldsService extends BaseService {
         }
         throw error;
       }
+    });
+  }
+
+  async updateOne(collection, field, patch) {
+    assertIdentifier(collection, 'collection name');
+    assertFieldName(field);
+    assertFieldMetadataPatch(patch);
+
+    if (field === 'id') {
+      const error = new Error('Primary key field metadata is read-only in V1');
+      error.code = 'SYSTEM_SCHEMA_READ_ONLY';
+      throw error;
+    }
+
+    return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      const metadata = new SchemaMetadataRepository(connection);
+      const [collectionMetadata, existing] = await Promise.all([
+        metadata.readCollection(collection),
+        metadata.readField(collection, field),
+      ]);
+
+      if (!collectionMetadata) {
+        const error = new Error(`Unknown collection: ${collection}`);
+        error.code = 'COLLECTION_NOT_FOUND';
+        throw error;
+      }
+      if (collectionMetadata.system) {
+        const error = new Error('System collection fields cannot be changed through the dynamic schema API');
+        error.code = 'SYSTEM_SCHEMA_READ_ONLY';
+        throw error;
+      }
+      if (!existing) {
+        const error = new Error(`Unknown field: ${collection}.${field}`);
+        error.code = 'FIELD_NOT_FOUND';
+        throw error;
+      }
+
+      return withConnectionTransaction(connection, async () => {
+        const updated = await metadata.updateFieldMetadata(collection, field, patch);
+        const schemaVersion = await incrementSchemaVersion(connection);
+        return { ...updated, schemaVersion };
+      });
     });
   }
 }
