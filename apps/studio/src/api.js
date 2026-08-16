@@ -128,19 +128,27 @@ async function refreshSession() {
   }
 }
 
-export async function apiRequest(path, options = {}, { retryAuth = true } = {}) {
+async function requestWithAuth(path, options = {}, retryAuth = true) {
   const session = readSession();
-  const { response, body } = await rawRequest(path, options, session?.access_token ?? null);
+  const result = await rawRequest(path, options, session?.access_token ?? null);
 
-  if (response.status === 401 && retryAuth && session?.refresh_token) {
+  if (result.response.status === 401 && retryAuth && session?.refresh_token) {
     const next = await refreshSession();
-    const retried = await rawRequest(path, options, next.access_token);
-    if (!retried.response.ok) throw errorFromResponse(retried.response, retried.body);
-    return retried.body;
+    return rawRequest(path, options, next.access_token);
   }
+  return result;
+}
 
-  if (!response.ok) throw errorFromResponse(response, body);
-  return body;
+export async function apiRequest(path, options = {}, { retryAuth = true } = {}) {
+  const result = await requestWithAuth(path, options, retryAuth);
+  if (!result.response.ok) throw errorFromResponse(result.response, result.body);
+  return result.body;
+}
+
+export async function apiBlob(path, options = {}, { retryAuth = true } = {}) {
+  const result = await requestWithAuth(path, options, retryAuth);
+  if (!result.response.ok) throw errorFromResponse(result.response, result.body);
+  return result.response.blob();
 }
 
 export async function login(email, password) {
