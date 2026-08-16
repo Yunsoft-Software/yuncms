@@ -10,7 +10,7 @@ function extensionError(code, message) {
 }
 
 function assertDefinition(definition, manifest) {
-  if (!definition || definition.__yuncmsExtension !== true || typeof definition.register !== 'function') {
+  if (!definition || definition.__yuncms_extension__ !== true || typeof definition.register !== 'function') {
     throw extensionError(
       'INVALID_EXTENSION_DEFINITION',
       `Extension ${manifest.id} must default-export a YunCMS extension definition`,
