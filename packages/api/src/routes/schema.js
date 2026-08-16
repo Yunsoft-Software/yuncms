@@ -12,6 +12,27 @@ function destructiveRequested(req) {
   return String(req.query?.destructive ?? '').toLowerCase() === 'true';
 }
 
+async function auditSchema(req, { action, collection = null, itemKey = null, payload = null }) {
+  try {
+    await service(req, 'AuditService').record({
+      action,
+      collection,
+      itemKey,
+      requestId: req.id,
+      payload,
+    });
+  } catch (error) {
+    req.context.logger?.error?.('YunCMS schema audit write failed after committed mutation', {
+      requestId: req.id,
+      action,
+      collection,
+      itemKey,
+      code: error?.code,
+      message: error?.message,
+    });
+  }
+}
+
 export function createSchemaRouter() {
   const router = express.Router();
 
@@ -21,6 +42,12 @@ export function createSchemaRouter() {
 
   router.post('/collections', async (req, res) => {
     const data = await service(req, 'CollectionsService').createOne(req.body ?? {});
+    await auditSchema(req, {
+      action: 'schema.collection.create',
+      collection: data.collection,
+      itemKey: data.collection,
+      payload: { after: data },
+    });
     res.status(201).json({ data });
   });
 
@@ -35,16 +62,29 @@ export function createSchemaRouter() {
   });
 
   router.patch('/collections/:collection', async (req, res) => {
-    const data = await service(req, 'CollectionsService').updateOne(
-      req.params.collection,
-      req.body ?? {},
-    );
+    const collections = service(req, 'CollectionsService');
+    const before = await collections.readOne(req.params.collection);
+    const data = await collections.updateOne(req.params.collection, req.body ?? {});
+    await auditSchema(req, {
+      action: 'schema.collection.update',
+      collection: req.params.collection,
+      itemKey: req.params.collection,
+      payload: { before, after: data, changes: req.body ?? {} },
+    });
     res.json({ data });
   });
 
   router.delete('/collections/:collection', async (req, res) => {
-    await service(req, 'CollectionsService').deleteOne(req.params.collection, {
+    const collections = service(req, 'CollectionsService');
+    const before = await collections.readOne(req.params.collection);
+    await collections.deleteOne(req.params.collection, {
       destructive: destructiveRequested(req),
+    });
+    await auditSchema(req, {
+      action: 'schema.collection.delete',
+      collection: req.params.collection,
+      itemKey: req.params.collection,
+      payload: { before },
     });
     res.status(204).end();
   });
@@ -58,6 +98,12 @@ export function createSchemaRouter() {
       req.params.collection,
       req.body ?? {},
     );
+    await auditSchema(req, {
+      action: 'schema.field.create',
+      collection: req.params.collection,
+      itemKey: data.field,
+      payload: { after: data },
+    });
     res.status(201).json({ data });
   });
 
@@ -75,29 +121,53 @@ export function createSchemaRouter() {
   });
 
   router.patch('/collections/:collection/fields/:field', async (req, res) => {
-    const data = await service(req, 'FieldsService').updateOne(
+    const fields = service(req, 'FieldsService');
+    const before = await fields.readOne(req.params.collection, req.params.field);
+    const data = await fields.updateOne(
       req.params.collection,
       req.params.field,
       req.body ?? {},
     );
+    await auditSchema(req, {
+      action: 'schema.field.update',
+      collection: req.params.collection,
+      itemKey: req.params.field,
+      payload: { before, after: data, changes: req.body ?? {} },
+    });
     res.json({ data });
   });
 
   router.patch('/collections/:collection/fields/:field/schema', async (req, res) => {
-    const data = await service(req, 'FieldsService').updateSchema(
+    const fields = service(req, 'FieldsService');
+    const before = await fields.readOne(req.params.collection, req.params.field);
+    const data = await fields.updateSchema(
       req.params.collection,
       req.params.field,
       req.body ?? {},
     );
+    await auditSchema(req, {
+      action: 'schema.field.alter',
+      collection: req.params.collection,
+      itemKey: req.params.field,
+      payload: { before, after: data, changes: req.body ?? {} },
+    });
     res.json({ data });
   });
 
   router.delete('/collections/:collection/fields/:field', async (req, res) => {
-    await service(req, 'FieldsService').deleteOne(
+    const fields = service(req, 'FieldsService');
+    const before = await fields.readOne(req.params.collection, req.params.field);
+    await fields.deleteOne(
       req.params.collection,
       req.params.field,
       { destructive: destructiveRequested(req) },
     );
+    await auditSchema(req, {
+      action: 'schema.field.delete',
+      collection: req.params.collection,
+      itemKey: req.params.field,
+      payload: { before },
+    });
     res.status(204).end();
   });
 
@@ -126,23 +196,43 @@ export function createSchemaRouter() {
 
   router.post('/relations/m2o', async (req, res) => {
     const data = await service(req, 'RelationsService').createM2O(req.body ?? {});
+    await auditSchema(req, {
+      action: 'schema.relation.create',
+      collection: data.many_collection,
+      itemKey: data.many_field,
+      payload: { after: data },
+    });
     res.status(201).json({ data });
   });
 
   router.delete('/relations/m2o/:manyCollection/:manyField', async (req, res) => {
-    await service(req, 'RelationsService').deleteM2O(
+    const relations = service(req, 'RelationsService');
+    const before = await relations.readOne(req.params.manyCollection, req.params.manyField);
+    await relations.deleteM2O(
       req.params.manyCollection,
       req.params.manyField,
     );
+    await auditSchema(req, {
+      action: 'schema.relation.delete',
+      collection: req.params.manyCollection,
+      itemKey: req.params.manyField,
+      payload: { before },
+    });
     res.status(204).end();
   });
 
   router.post('/relations/m2m', async (req, res) => {
     const data = await service(req, 'RelationsService').createM2M(req.body ?? {});
+    await auditSchema(req, {
+      action: 'schema.relation.m2m.create',
+      collection: data.junctionCollection,
+      itemKey: data.junctionCollection,
+      payload: { after: data },
+    });
     res.status(201).json({ data });
   });
 
   return router;
 }
 
-export { destructiveRequested };
+export { auditSchema, destructiveRequested };
