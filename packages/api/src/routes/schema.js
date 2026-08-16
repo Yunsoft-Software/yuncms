@@ -1,4 +1,5 @@
 import express from 'express';
+import { deleteM2MJunction } from '@yuncms/core';
 
 import { serviceOptionsFromRequest } from '../service-options.js';
 
@@ -230,6 +231,26 @@ export function createSchemaRouter() {
       payload: { after: data },
     });
     res.status(201).json({ data });
+  });
+
+  router.delete('/relations/m2m/:junctionCollection', async (req, res) => {
+    const relationRows = await service(req, 'RelationsService').readMany();
+    const before = relationRows.filter(
+      (relation) => relation.junction_collection === req.params.junctionCollection,
+    );
+    const data = await deleteM2MJunction({
+      database: req.context.database,
+      accountability: req.accountability,
+      junctionCollection: req.params.junctionCollection,
+      destructive: destructiveRequested(req),
+    });
+    await auditSchema(req, {
+      action: 'schema.relation.m2m.delete',
+      collection: req.params.junctionCollection,
+      itemKey: req.params.junctionCollection,
+      payload: { before, result: data },
+    });
+    res.status(204).end();
   });
 
   return router;
