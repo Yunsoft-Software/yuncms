@@ -1,0 +1,21 @@
+{
+  "name": "yuncms-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "dev:api": "npm run dev --workspace=@yuncms/api",
+    "dev:studio": "npm run dev --workspace=@yuncms/studio",
+    "start": "npm run start --workspace=@yuncms/api",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  }
+}
