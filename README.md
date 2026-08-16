@@ -1,10 +1,10 @@
 # YunCMS
 
-YunCMS is a small, reusable Node.js backend platform for projects that need the parts of Directus we use most without carrying the whole Directus product surface.
+YunCMS is a small reusable Node.js backend platform for projects that need the Directus-style capabilities we use most without carrying the whole Directus product surface.
 
-It is an independent implementation. Directus is used as an architectural and developer-ergonomics reference; YunCMS is not a fork and does not aim for full API compatibility.
+It is an independent implementation, not a fork and not a Directus API-compatibility project.
 
-## Current direction
+## Baseline
 
 - Node.js 24 LTS
 - JavaScript / ESM
@@ -16,51 +16,84 @@ It is an independent implementation. Directus is used as an architectural and de
 - no ORM/query builder
 - no GitHub Actions
 
-See [`plan.md`](./plan.md) for the roadmap/status, [`AGENTS.md`](./AGENTS.md) for implementation rules, and [`todo.md`](./todo.md) for local/environment work that still requires Codex or a developer machine.
+See [`plan.md`](./plan.md) for source status, [`AGENTS.md`](./AGENTS.md) for implementation rules and [`todo.md`](./todo.md) for checks that still require a real install/MySQL/provider/runtime environment.
 
-## Repository layout
+## Repository
 
 ```text
-apps/studio                React Studio shell
-packages/api               Express HTTP/auth runtime and thin REST adapters
-packages/core              MySQL, bootstrap, schema/query/auth/RBAC services
-packages/extensions-sdk    extension authoring helpers
-packages/cli               YunCMS init/bootstrap CLI
+apps/studio                React administration UI
+packages/api               Express API/runtime and REST adapters
+packages/core              MySQL/schema/items/auth/RBAC/files/audit runtime
+packages/extensions-sdk    defineEndpoint/defineHook authoring helpers
+packages/cli               init/bootstrap/start CLI
+examples/extensions        endpoint + hook examples
+docs                       architecture/operations/security/API docs
 ```
 
-## Implemented backend slice
+## Current V1 source surface
 
-Current code includes:
+### Schema and data
 
-- MySQL pool, pinned transactions, normalized DB errors and bounded retry helpers;
-- explicit public/system/user accountability and request context;
-- versioned system bootstrap with a migration journal and MySQL advisory lock;
-- `yuncms_*` metadata/auth/file/audit foundation tables;
-- schema version state and a version-aware schema snapshot cache;
-- `CollectionsService` create/read/list plus safe metadata-only updates;
-- `FieldsService` primitive field create/read plus safe metadata-only updates;
-- `RelationsService` validated M2O create/delete and O2M inverse reads;
-- allowlisted item filter/sort/field query compiler;
-- generic `ItemsService` CRUD with service-layer role permission enforcement;
-- `RolesService` and `PermissionsService` with field allowlists and row filters;
-- opaque session access/refresh tokens with refresh rotation and server-side revocation;
-- scrypt password hashing and session invalidation on password change;
-- static hashed API tokens with one-time secret return;
-- authenticated/public-role request accountability;
-- login/refresh/logout/logout-all/API-token REST routes;
-- generic `/items/:collection` REST CRUD adapters and canonical API error handling;
-- one-public-role constraints at service and MySQL levels;
-- `defineEndpoint` / `defineHook` extension SDK helpers;
-- interactive `yuncms init` and idempotent `yuncms bootstrap` commands;
-- minimal React Studio shell and API health indicator.
+- versioned MySQL bootstrap/migration journal;
+- schema version/cache and advisory-lock serialized DDL;
+- collection/field create/read/update/destructive-delete lifecycles;
+- field required/default/index mutations;
+- M2O create/delete + O2M inverse metadata;
+- M2M junction create + high-level destructive junction delete;
+- generic ItemsService CRUD;
+- allowlisted fields/filter/sort/limit/offset query language;
+- one-level direct M2O `expand` reads with source/target RBAC preserved.
 
-M2M, destructive schema deletes, password-reset/email-verification lifecycles, auth rate limiting, permission validation rules, extension loading, files and most Studio screens are still roadmap work.
+### Authentication and RBAC
 
-## Setup / local development
+- scrypt password hashing;
+- opaque access/refresh sessions with rotation/revocation;
+- API tokens;
+- password reset + email verification one-time tokens;
+- Nodemailer SMTP delivery;
+- process-local configurable auth rate limits;
+- public/admin/system accountability;
+- role CRUD, permission field allowlists, row filters and create/update validation;
+- request-local permission cache;
+- auth responses marked `no-store`.
 
-The repository is intentionally committed before dependency installation so the first local/Codex session can verify the dependency graph and create the lockfile explicitly.
+### Extensions
 
-Interactive first setup:
+- `defineEndpoint` / `defineHook` SDK;
+- local and npm dependency discovery;
+- authenticated endpoint mount under `/extensions/<id>`;
+- filter/action/init hooks with recursion protection;
+- trusted context with services/database/schema/accountability/logger/storage;
+- direct service use; no YunCMS self-HTTP requirement.
+
+### Files, audit and operations
+
+- local storage + S3-compatible AWS SDK v3 driver;
+- file metadata/upload/download/update/delete;
+- storage inventory and guarded orphan reconciliation;
+- audit records for item/file/schema mutations;
+- recursive secret redaction;
+- explicit batched audit retention cleanup;
+- structured JSON runtime logs;
+- request ids, health/readiness, baseline security headers and graceful shutdown.
+
+### Studio
+
+- login/logout/refresh;
+- password-reset and verification link flows;
+- generic content table + create/edit form;
+- direct M2O relation pickers/display labels;
+- collection/field/M2O/M2M Data Model workflows;
+- M2M junction delete control;
+- users management + verification action;
+- roles/permissions + validation editor;
+- file management.
+
+Source presence is not a production-readiness claim. `todo.md` deliberately keeps real MySQL, build, SMTP, S3, browser, concurrency and package-install verification open until executed.
+
+## Setup / development
+
+First local validation should use Node 24 and a disposable MySQL database:
 
 ```bash
 npm install
@@ -69,9 +102,7 @@ npm run dev:api
 npm run dev:studio
 ```
 
-`npm run init` creates `.env` when missing, verifies MySQL, applies migrations and creates the first administrator exactly once. Existing `.env` and existing administrator state are reused on rerun rather than silently overwritten/recreated.
-
-For an already configured environment:
+For an already configured database:
 
 ```bash
 npm run bootstrap
@@ -79,21 +110,45 @@ npm run dev:api
 npm run dev:studio
 ```
 
-The API performs a read-only migration compatibility check before listening; it does not silently bootstrap application state on startup.
-
-API defaults to `http://127.0.0.1:8055` and Studio to `http://localhost:5173`.
-
-Current probes:
+The package-level target is:
 
 ```text
-GET /health   process/API health without authentication/public-role lookup
-GET /ready    live MySQL readiness; returns 503 when DB access fails
+npx yuncms init
+npx yuncms bootstrap
+npx yuncms start
 ```
 
-See [`docs/database.md`](./docs/database.md), [`docs/rest-api.md`](./docs/rest-api.md), [`docs/auth.md`](./docs/auth.md), [`docs/permissions.md`](./docs/permissions.md) and [`docs/setup-cli.md`](./docs/setup-cli.md) for current shipped behavior.
+The implementation exists; public npm ownership/tarball/fresh-install verification is still a release gate. Naming policy is documented in [`docs/publishing.md`](./docs/publishing.md).
 
-## Design rule that matters most
+## Runtime probes
 
-HTTP is an adapter, not the internal API. YunCMS services and future extensions call service/database APIs directly with explicit accountability instead of making self-HTTP requests back into the same server.
+```text
+GET /health
+GET /ready
+```
 
-This keeps authorization, transactions and error handling in one process boundary and avoids the class of self-request problems that appear in larger plugin-heavy backends.
+API default: `http://127.0.0.1:8055`
+Studio default: `http://localhost:5173`
+
+## Core design rule
+
+HTTP is an adapter, not YunCMS's internal API.
+
+Services and trusted extensions call service/database APIs directly with explicit accountability. They do not send requests back into the same YunCMS HTTP server. This keeps authorization, transactions, hooks and error handling on one internal service path.
+
+## Documentation
+
+Start with:
+
+- [`docs/architecture.md`](./docs/architecture.md)
+- [`docs/database.md`](./docs/database.md)
+- [`docs/rest-api.md`](./docs/rest-api.md)
+- [`docs/auth.md`](./docs/auth.md)
+- [`docs/permissions.md`](./docs/permissions.md)
+- [`docs/extensions.md`](./docs/extensions.md)
+- [`docs/files.md`](./docs/files.md)
+- [`docs/studio.md`](./docs/studio.md)
+- [`docs/security.md`](./docs/security.md)
+- [`docs/deployment.md`](./docs/deployment.md)
+- [`docs/setup-cli.md`](./docs/setup-cli.md)
+- [`docs/publishing.md`](./docs/publishing.md)
