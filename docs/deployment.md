@@ -30,7 +30,7 @@ Minimal DB/API example:
 
 ```text
 HOST=127.0.0.1
-PORT=8055
+PORT=3008
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=yuncms
