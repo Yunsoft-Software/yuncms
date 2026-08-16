@@ -74,6 +74,18 @@ Use a disposable local MySQL 8 database; do not point early bootstrap/schema/CRU
 - [ ] Verify malformed/stale permission metadata fails safely rather than broadening access.
 - [ ] Keep permission `validation` null for now; confirm attempts to store validation metadata fail with `PERMISSION_VALIDATION_NOT_READY` until enforcement is implemented.
 
+### Extensions
+
+- [ ] Copy/install the endpoint and hook examples into a disposable project's active `extensions/` directory and confirm both are discovered during startup.
+- [ ] Confirm an endpoint extension id such as `hello` is reachable only under `/extensions/hello` and runs after normal authentication/accountability middleware.
+- [ ] From an endpoint extension, instantiate `ItemsService` using `context.serviceOptions(req)` and verify normal-role/public row+field restrictions are identical to `/items` REST behavior; do not forward an auth token to a self-HTTP request.
+- [ ] Verify `filter` hooks can transform a payload before mutation, transformed payload still passes normal validation/RBAC, and thrown filter errors prevent the DB mutation.
+- [ ] Verify `action` hooks run only after successful mutations/commits and do not run after rejected/rolled-back mutations.
+- [ ] Verify `app.beforeStart` executes before listen and `app.afterStart` executes only after the HTTP server is listening.
+- [ ] Trigger a deliberate recursive hook/service chain and confirm `HOOK_RECURSION_LIMIT` terminates it at the configured depth without affecting unrelated concurrent requests.
+- [ ] Verify invalid manifest entry path, unknown extension type, duplicate id, invalid default export and manifest/definition type mismatch fail startup cleanly.
+- [ ] Pack a sample extension as an npm tarball, install it as a project dependency and verify dependency discovery loads the same manifest/runtime contract as a local extension.
+
 ## npm/package publishing decisions
 
 Do not publish from this environment.
