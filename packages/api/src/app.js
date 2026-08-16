@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto';
 import express from 'express';
 import {
   createCoreServiceRegistry,
-  createPublicAccountability,
-  createRequestContext,
   pingDatabase,
 } from '@yuncms/core';
 
+import { createAuthenticationMiddleware } from './authentication.js';
 import { apiErrorHandler } from './error-response.js';
+import { createAuthRouter } from './routes/auth.js';
 import { createItemsRouter } from './routes/items.js';
 
 function studioCors(config) {
@@ -39,15 +39,6 @@ export function createApp({ pool, config, logger = console, serviceRegistry = cr
   app.use((req, res, next) => {
     req.id = req.get('x-request-id') || randomUUID();
     res.set('x-request-id', req.id);
-    req.accountability = createPublicAccountability();
-    req.context = createRequestContext({
-      accountability: req.accountability,
-      services,
-      database: pool,
-      logger,
-      env: config,
-      requestId: req.id,
-    });
     next();
   });
 
@@ -70,6 +61,8 @@ export function createApp({ pool, config, logger = console, serviceRegistry = cr
     }
   });
 
+  app.use(createAuthenticationMiddleware({ pool, config, logger, services }));
+  app.use('/auth', createAuthRouter());
   app.use('/items', createItemsRouter());
 
   app.use((req, res) => {
