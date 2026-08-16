@@ -1,4 +1,5 @@
 import express from 'express';
+import { readManyWithRelations, readOneWithRelations } from '@yuncms/core';
 
 import { serviceOptionsFromRequest } from '../service-options.js';
 
@@ -7,15 +8,24 @@ export function createItemsRouter() {
 
   router.get('/:collection', async (req, res) => {
     const Service = req.context.services.ItemsService;
-    const service = new Service(req.params.collection, serviceOptionsFromRequest(req));
-    const result = await service.readManyWithMeta(req.query);
+    const result = await readManyWithRelations({
+      collection: req.params.collection,
+      query: req.query,
+      options: serviceOptionsFromRequest(req),
+      ItemsServiceClass: Service,
+    });
     res.json(result);
   });
 
   router.get('/:collection/:id', async (req, res) => {
     const Service = req.context.services.ItemsService;
-    const service = new Service(req.params.collection, serviceOptionsFromRequest(req));
-    const data = await service.readOne(req.params.id, { fields: req.query.fields ?? null });
+    const data = await readOneWithRelations({
+      collection: req.params.collection,
+      id: req.params.id,
+      query: req.query,
+      options: serviceOptionsFromRequest(req),
+      ItemsServiceClass: Service,
+    });
 
     if (!data) {
       const error = new Error('Item not found');
