@@ -1,3 +1,5 @@
+import { loadEnvFile } from 'node:process';
+
 function readInteger(value, fallback, name, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   if (value === undefined || value === '') return fallback;
 
@@ -18,6 +20,16 @@ function readBoolean(value, fallback = false) {
 
 function readString(value, fallback = '') {
   return value === undefined ? fallback : String(value);
+}
+
+export function loadEnvFileIfPresent(path = '.env') {
+  try {
+    loadEnvFile(path);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
 }
 
 export function loadConfig(env = process.env) {
