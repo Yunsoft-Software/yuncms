@@ -6,6 +6,9 @@
   "engines": {
     "node": ">=24 <25"
   },
+  "exports": {
+    "./server": "./src/server.js"
+  },
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
