@@ -43,6 +43,12 @@ function actionUrl(config, action, token) {
   return `${config.auth.publicUrl}/?auth_action=${encodeURIComponent(action)}&token=${encodeURIComponent(token)}`;
 }
 
+function noStore(req, res, next) {
+  res.set('cache-control', 'no-store');
+  res.set('pragma', 'no-cache');
+  next();
+}
+
 export function createAuthRouter({ mailer = null, config = null, logger = console } = {}) {
   const router = express.Router();
   const limits = config?.auth?.rateLimit ?? {};
@@ -58,6 +64,8 @@ export function createAuthRouter({ mailer = null, config = null, logger = consol
     windowMs: limits.actionWindowMs ?? 15 * 60_000,
     max: limits.actionMax ?? 5,
   });
+
+  router.use(noStore);
 
   router.post('/login', loginLimit, async (req, res) => {
     const result = await authService(req).login({
@@ -168,4 +176,4 @@ export function createAuthRouter({ mailer = null, config = null, logger = consol
   return router;
 }
 
-export { actionUrl, requireMailer, requireSessionAuthentication };
+export { actionUrl, noStore, requireMailer, requireSessionAuthentication };
