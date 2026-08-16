@@ -1,3 +1,4 @@
+import { ApiTokensService } from './api-tokens-service.js';
 import { AuthService } from './auth-service.js';
 import { CollectionsService } from './collections-service.js';
 import { FieldsService } from './fields-service.js';
@@ -11,6 +12,7 @@ import { createServiceRegistry } from './service-registry.js';
 export function createCoreServiceRegistry() {
   return createServiceRegistry({
     AuthService,
+    ApiTokensService,
     ItemsService,
     CollectionsService,
     FieldsService,
