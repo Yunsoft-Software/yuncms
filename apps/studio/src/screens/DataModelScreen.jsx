@@ -16,6 +16,10 @@ function parseJson(value) {
   }
 }
 
+function relationKind(relation) {
+  return parseJson(relation?.metadata)?.kind || 'm2o';
+}
+
 export function DataModelScreen() {
   const [collections, setCollections] = useState([]);
   const [selected, setSelected] = useState('');
@@ -66,8 +70,7 @@ export function DataModelScreen() {
         apiRequest('/schema/relations'),
       ]);
       setFields(fieldResponse?.data ?? []);
-      setRelations((relationResponse?.data ?? []).filter((relation) =>
-        relation.many_collection === collection || relation.one_collection === collection));
+      setRelations(relationResponse?.data ?? []);
     } catch (requestError) {
       setError(requestError.message || 'Collection schema could not be loaded');
     } finally {
@@ -86,23 +89,34 @@ export function DataModelScreen() {
 
   const selectedCollection = collections.find((entry) => entry.collection === selected) ?? null;
   const userCollections = useMemo(() => collections.filter((entry) => !entry.system), [collections]);
+  const m2oRelations = useMemo(() => relations.filter((relation) =>
+    relationKind(relation) !== 'm2m' &&
+    (relation.many_collection === selected || relation.one_collection === selected)), [relations, selected]);
+  const m2mJunctions = useMemo(() => {
+    const names = [...new Set(relations
+      .filter((relation) => relationKind(relation) === 'm2m' && relation.one_collection === selected)
+      .map((relation) => relation.junction_collection)
+      .filter(Boolean))];
+    return names.map((junctionCollection) => ({
+      junctionCollection,
+      relations: relations.filter((relation) =>
+        relation.junction_collection === junctionCollection && relationKind(relation) === 'm2m'),
+    }));
+  }, [relations, selected]);
 
   async function createCollection(event) {
     event.preventDefault();
     setError('');
     setNotice('');
     try {
+      const name = collectionForm.collection.trim();
       await apiRequest('/schema/collections', {
         method: 'POST',
-        body: {
-          collection: collectionForm.collection.trim(),
-          note: collectionForm.note.trim() || null,
-        },
+        body: { collection: name, note: collectionForm.note.trim() || null },
       });
-      const created = collectionForm.collection.trim();
       setCollectionForm({ collection: '', note: '' });
-      setNotice(`Created collection ${created}`);
-      await loadCollections(created);
+      setNotice(`Created collection ${name}`);
+      await loadCollections(name);
     } catch (requestError) {
       setError(requestError.message || 'Collection could not be created');
     }
@@ -137,8 +151,7 @@ export function DataModelScreen() {
       };
       if (fieldForm.type === 'string') body.length = Number(fieldForm.length || 255);
       await apiRequest(`/schema/collections/${encodeURIComponent(selected)}/fields`, {
-        method: 'POST',
-        body,
+        method: 'POST', body,
       });
       setNotice(`Added field ${fieldForm.field.trim()}`);
       setFieldForm({ field: '', type: 'string', required: false, length: 255 });
@@ -204,7 +217,6 @@ export function DataModelScreen() {
   }
 
   async function deleteM2O(relation) {
-    if (parseJson(relation.metadata)?.kind === 'm2m') return;
     if (!window.confirm(`Delete relation ${relation.many_collection}.${relation.many_field}?`)) return;
     setError('');
     setNotice('');
@@ -225,20 +237,38 @@ export function DataModelScreen() {
     setError('');
     setNotice('');
     try {
+      const junction = m2mForm.junctionCollection.trim();
       await apiRequest('/schema/relations/m2m', {
         method: 'POST',
         body: {
-          junctionCollection: m2mForm.junctionCollection.trim(),
+          junctionCollection: junction,
           leftCollection: m2mForm.leftCollection,
           rightCollection: m2mForm.rightCollection,
         },
       });
-      setNotice(`Created M2M junction ${m2mForm.junctionCollection.trim()}`);
+      setNotice(`Created M2M junction ${junction}`);
       setM2mForm({ junctionCollection: '', leftCollection: '', rightCollection: '' });
       await loadCollections(selected);
       await loadSelected(selected);
     } catch (requestError) {
       setError(requestError.message || 'M2M relation could not be created');
+    }
+  }
+
+  async function deleteM2M(junctionCollection) {
+    if (!window.confirm(`Permanently delete M2M junction ${junctionCollection} and all of its link records?`)) return;
+    setError('');
+    setNotice('');
+    try {
+      await apiRequest(
+        `/schema/relations/m2m/${encodeURIComponent(junctionCollection)}?destructive=true`,
+        { method: 'DELETE' },
+      );
+      setNotice(`Deleted M2M junction ${junctionCollection}`);
+      await loadCollections(selected);
+      await loadSelected(selected);
+    } catch (requestError) {
+      setError(requestError.message || 'M2M relation could not be deleted');
     }
   }
 
@@ -340,10 +370,7 @@ export function DataModelScreen() {
                   </label>
                   <label className="field-label">
                     <span>Type</span>
-                    <select
-                      value={fieldForm.type}
-                      onChange={(event) => setFieldForm((current) => ({ ...current, type: event.target.value }))}
-                    >
+                    <select value={fieldForm.type} onChange={(event) => setFieldForm((current) => ({ ...current, type: event.target.value }))}>
                       {FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>
                   </label>
@@ -389,21 +416,16 @@ export function DataModelScreen() {
             </div>
 
             <div className="list-stack">
-              {relations.length === 0 && <p className="muted-line">No relations for this collection.</p>}
-              {relations.map((relation) => {
-                const metadata = parseJson(relation.metadata);
-                return (
-                  <div className="relation-row" key={`${relation.many_collection}.${relation.many_field}`}>
-                    <div>
-                      <strong>{relation.many_collection}.{relation.many_field}</strong>
-                      <small> → {relation.one_collection}.{relation.one_field} · {metadata?.kind || 'm2o'}</small>
-                    </div>
-                    {metadata?.kind !== 'm2m' && (
-                      <button className="danger-button" type="button" onClick={() => deleteM2O(relation)}>Delete</button>
-                    )}
+              {m2oRelations.length === 0 && <p className="muted-line">No direct relations for this collection.</p>}
+              {m2oRelations.map((relation) => (
+                <div className="relation-row" key={`${relation.many_collection}.${relation.many_field}`}>
+                  <div>
+                    <strong>{relation.many_collection}.{relation.many_field}</strong>
+                    <small> → {relation.one_collection}.{relation.one_field} · M2O</small>
                   </div>
-                );
-              })}
+                  <button className="danger-button" type="button" onClick={() => deleteM2O(relation)}>Delete</button>
+                </div>
+              ))}
             </div>
 
             <form className="form-stack compact" onSubmit={createM2O}>
@@ -428,17 +450,12 @@ export function DataModelScreen() {
                   required
                 >
                   <option value="">Select collection</option>
-                  {userCollections.map((entry) => (
-                    <option key={entry.collection} value={entry.collection}>{entry.collection}</option>
-                  ))}
+                  {userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}
                 </select>
               </label>
               <label className="field-label">
                 <span>On delete</span>
-                <select
-                  value={m2oForm.onDelete}
-                  onChange={(event) => setM2oForm((current) => ({ ...current, onDelete: event.target.value }))}
-                >
+                <select value={m2oForm.onDelete} onChange={(event) => setM2oForm((current) => ({ ...current, onDelete: event.target.value }))}>
                   <option value="RESTRICT">RESTRICT</option>
                   <option value="CASCADE">CASCADE</option>
                   <option value="SET NULL">SET NULL</option>
@@ -452,7 +469,20 @@ export function DataModelScreen() {
             <div>
               <p className="eyebrow">Relations</p>
               <h2>M2M junction</h2>
-              <p>Create a hidden junction collection with two required foreign keys and a unique pair.</p>
+              <p>Create or remove a hidden junction collection with two required foreign keys and a unique pair.</p>
+            </div>
+
+            <div className="list-stack">
+              {m2mJunctions.length === 0 && <p className="muted-line">No M2M junctions for this collection.</p>}
+              {m2mJunctions.map((junction) => (
+                <div className="relation-row" key={junction.junctionCollection}>
+                  <div>
+                    <strong>{junction.junctionCollection}</strong>
+                    <small>{junction.relations.map((relation) => relation.one_collection).join(' ↔ ')}</small>
+                  </div>
+                  <button className="danger-button" type="button" onClick={() => deleteM2M(junction.junctionCollection)}>Delete</button>
+                </div>
+              ))}
             </div>
 
             <form className="form-stack compact" onSubmit={createM2M}>
@@ -467,22 +497,14 @@ export function DataModelScreen() {
               </label>
               <label className="field-label">
                 <span>Left collection</span>
-                <select
-                  value={m2mForm.leftCollection}
-                  onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))}
-                  required
-                >
+                <select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required>
                   <option value="">Select collection</option>
                   {userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}
                 </select>
               </label>
               <label className="field-label">
                 <span>Right collection</span>
-                <select
-                  value={m2mForm.rightCollection}
-                  onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))}
-                  required
-                >
+                <select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required>
                   <option value="">Select collection</option>
                   {userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}
                 </select>
