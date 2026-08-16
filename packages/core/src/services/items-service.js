@@ -237,7 +237,6 @@ export class ItemsService extends BaseService {
     const entries = this.validatePayload(payload, schema, permission);
     if (entries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
 
-    const accessSchema = schemaForFields(schema, permission.fields);
     const table = quoteIdentifier(this.collection, 'collection name');
     const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
     const filter = combineCompiledFilters(
@@ -250,7 +249,6 @@ export class ItemsService extends BaseService {
     );
 
     if (result.affectedRows === 0) return null;
-    void accessSchema;
     return this.returnCreatedOrUpdated(id, schema);
   }
 
