@@ -15,8 +15,10 @@ import { BaseService } from '../src/services/base-service.js';
 import { createServiceRegistry } from '../src/services/service-registry.js';
 
 test('loadConfig uses stable defaults and parses numeric values', () => {
+  const defaults = loadConfig({});
   const config = loadConfig({ PORT: '9000', DB_CONNECTION_LIMIT: '20', DB_SSL: 'true' });
 
+  assert.equal(defaults.server.port, 3008);
   assert.equal(config.server.port, 9000);
   assert.equal(config.database.connectionLimit, 20);
   assert.equal(config.database.ssl, true);
