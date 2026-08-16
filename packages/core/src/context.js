@@ -8,6 +8,7 @@ export function createRequestContext({
   logger = console,
   env = {},
   emitter = null,
+  storage = null,
   requestId = null,
 } = {}) {
   requireAccountability(accountability);
@@ -23,6 +24,7 @@ export function createRequestContext({
     logger,
     env,
     emitter,
+    storage,
     requestId,
   });
 }
