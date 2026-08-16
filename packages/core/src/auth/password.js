@@ -24,9 +24,20 @@ export function assertPasswordInput(password) {
   return password;
 }
 
+function assertScryptParameters({ N, r, p, keyLength }) {
+  const powerOfTwo = Number.isInteger(N) && N > 1 && (N & (N - 1)) === 0;
+  if (!powerOfTwo || N > 131_072) throw passwordError('Invalid scrypt cost parameter');
+  if (!Number.isInteger(r) || r < 1 || r > 16) throw passwordError('Invalid scrypt block size');
+  if (!Number.isInteger(p) || p < 1 || p > 4) throw passwordError('Invalid scrypt parallelization');
+  if (!Number.isInteger(keyLength) || keyLength < 32 || keyLength > 128) {
+    throw passwordError('Invalid scrypt key length');
+  }
+}
+
 export async function hashPassword(password, options = {}) {
   assertPasswordInput(password);
   const params = { ...DEFAULTS, ...options };
+  assertScryptParameters(params);
   const salt = randomBytes(params.saltLength);
   const derived = await scrypt(password, salt, params.keyLength, {
     N: params.N,
@@ -56,13 +67,16 @@ function parseHash(encoded) {
   );
 
   const { N, r, p, keyLength } = parameters;
-  if (![N, r, p, keyLength].every(Number.isInteger)) return null;
-  if (N < 2 || r < 1 || p < 1 || keyLength < 16 || keyLength > 128) return null;
+  try {
+    assertScryptParameters({ N, r, p, keyLength });
+  } catch {
+    return null;
+  }
 
   try {
     const salt = Buffer.from(saltValue, 'base64url');
     const expected = Buffer.from(hashValue, 'base64url');
-    if (salt.length < 8 || expected.length !== keyLength) return null;
+    if (salt.length < 8 || salt.length > 64 || expected.length !== keyLength) return null;
     return { N, r, p, keyLength, salt, expected };
   } catch {
     return null;
