@@ -13,6 +13,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@yuncms/api": "0.0.0",
     "@yuncms/core": "0.0.0"
   }
 }
