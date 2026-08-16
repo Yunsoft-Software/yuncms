@@ -1,9 +1,8 @@
-import { randomUUID } from 'node:crypto';
-
 import { withAdvisoryLock } from '../advisory-lock.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { incrementSchemaVersion } from '../schema-version.js';
+import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 
 function assertUserCollectionName(collection) {
@@ -48,7 +47,6 @@ export class CollectionsService extends BaseService {
 
       const table = quoteIdentifier(collection, 'collection name');
       let tableCreated = false;
-      let metadataCreated = false;
 
       try {
         await connection.query(
@@ -58,37 +56,36 @@ export class CollectionsService extends BaseService {
         );
         tableCreated = true;
 
-        const created = await metadata.createCollection({
-          collection,
-          primaryKey,
-          note: input.note ?? null,
-          singleton: input.singleton === true,
-          hidden: input.hidden === true,
-          metadata: input.metadata ?? null,
-        });
-        metadataCreated = true;
+        return await withConnectionTransaction(connection, async () => {
+          const created = await metadata.createCollection({
+            collection,
+            primaryKey,
+            note: input.note ?? null,
+            singleton: input.singleton === true,
+            hidden: input.hidden === true,
+            metadata: input.metadata ?? null,
+          });
 
-        await metadata.createField({
-          collection,
-          field: 'id',
-          type: 'uuid',
-          required: true,
-          readonly: true,
-          interface: 'input',
-          schemaMetadata: { primaryKey: true, length: 36 },
-        });
+          await metadata.createField({
+            collection,
+            field: 'id',
+            type: 'uuid',
+            required: true,
+            readonly: true,
+            interface: 'input',
+            schemaMetadata: { primaryKey: true, length: 36 },
+          });
 
-        const schemaVersion = await incrementSchemaVersion(connection);
-        return { ...created, schemaVersion };
+          const schemaVersion = await incrementSchemaVersion(connection);
+          return { ...created, schemaVersion };
+        });
       } catch (error) {
         const cleanupErrors = [];
 
-        if (metadataCreated) {
-          try {
-            await metadata.deleteCollection(collection);
-          } catch (cleanupError) {
-            cleanupErrors.push(cleanupError);
-          }
+        try {
+          await metadata.deleteCollection(collection);
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError);
         }
 
         if (tableCreated) {
