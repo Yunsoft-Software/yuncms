@@ -35,7 +35,10 @@ test('custom system extension fields are optional-only so existing system rows r
   );
 });
 
-test('system extension creation is schema-locked, physically added and tagged in metadata', () => {
+test('system extension creation is schema-locked, normalized and tagged in metadata', () => {
+  assert.match(serviceSource, /resolveSchemaName/);
+  assert.match(serviceSource, /displayName:\s*input\.name \?\? input\.field/);
+  assert.match(serviceSource, /name,\n\s*type:/);
   assert.match(serviceSource, /withAdvisoryLock\(this\.database, 'yuncms:schema'/);
   assert.match(serviceSource, /ALTER TABLE \$\{table\} ADD COLUMN \$\{column\}/);
   assert.match(serviceSource, /systemExtension:\s*true/);
