@@ -21,19 +21,12 @@ Automated/source checks and the local browser smoke already cover login, fresh i
 - [ ] Upload representative PDF, video, audio and unsupported files and manually confirm embedded/playable/placeholder behavior. Their classifier/component contracts are covered by automated tests.
 - [ ] Finish a keyboard/screen-reader pass for visible focus, Escape/modal behavior, accordion controls, type cards, checkboxes and labels; visually sample the remaining Login, Users, Relations and Content Visibility surfaces in both Light and Dark themes.
 
-## 3. npm 0.1.2 publication
-
-The `0.1.2` release candidate is committed and all Node 24/source/build/package/real-database gates pass. The authenticated `raichubuilds` npm account owns all four packages, but the current CLI credential is not a bypass-2FA publish token and npm rejected the first package before creating any `0.1.2` version.
-
-- [ ] Supply a current npm OTP and publish with `npm publish --workspace=@yunsoft/yuncms-core --access public --otp=...`, then publish `@yunsoft/yuncms-api`, `@yunsoft/yuncms-extensions-sdk` and `@yunsoft/yuncms` in that order with the same/current OTP as required. Alternatively authenticate npm with an active granular write token whose `bypass_2fa` flag is enabled.
-- [ ] Verify every exact `0.1.2` version and internal dependency pin with unauthenticated `npm view`, then install `@yunsoft/yuncms@0.1.2` in a fresh directory and smoke `yuncms help`, `init`, `bootstrap` and `start`.
-
-## 4. Deployment-only hardening
+## 3. Deployment-only hardening
 
 - [ ] Behind the actual reverse proxy, configure exact `TRUST_PROXY_HOPS`; verify session IP and auth rate-limit buckets use the intended client IP. Confirm `TRUST_PROXY_HOPS=0` ignores forwarded addresses for direct deployments.
 - [ ] Configure HSTS at the actual TLS/reverse-proxy layer and verify it there.
 - [ ] If production uses S3-compatible storage, test the real provider: upload/list/download/delete, credential-chain behavior, reconciliation dry-run/age guard, multi-page inventory and redacted provider errors.
 
-## 5. Final production-readiness decision
+## 4. Final production-readiness decision
 
 - [ ] Only after the applicable checks above pass, update the production-readiness decision for the actual deployment environment.
