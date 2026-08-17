@@ -13,6 +13,7 @@ const TYPE_NAMES = new Set([
 ]);
 
 const FILE_INTERFACES = new Set(['file', 'image']);
+const CURRENT_TIME_TYPES = new Set(['datetime', 'timestamp']);
 
 function integerOption(value, fallback, { min, max, label }) {
   const resolved = value ?? fallback;
@@ -40,9 +41,38 @@ function assertInterfaceStorage(type, fieldInterface) {
   }
 }
 
+function assertTimePresets(type, input) {
+  if (Object.hasOwn(input, 'defaultValue') && input.defaultPreset != null) {
+    const error = new Error('defaultValue and defaultPreset cannot be used together');
+    error.code = 'INVALID_FIELD_DEFAULT';
+    throw error;
+  }
+  if (input.defaultPreset != null && input.defaultPreset !== 'now') {
+    const error = new Error(`Unsupported default preset: ${String(input.defaultPreset)}`);
+    error.code = 'UNSUPPORTED_FIELD_DEFAULT';
+    throw error;
+  }
+  if (input.defaultPreset === 'now' && !CURRENT_TIME_TYPES.has(type)) {
+    const error = new Error('Current-time defaults require datetime or timestamp storage');
+    error.code = 'UNSUPPORTED_FIELD_DEFAULT';
+    throw error;
+  }
+  if (input.autoUpdate != null && typeof input.autoUpdate !== 'boolean') {
+    const error = new Error('autoUpdate must be boolean');
+    error.code = 'INVALID_SCHEMA_PAYLOAD';
+    throw error;
+  }
+  if (input.autoUpdate === true && !CURRENT_TIME_TYPES.has(type)) {
+    const error = new Error('Automatic update timestamps require datetime or timestamp storage');
+    error.code = 'UNSUPPORTED_FIELD_DEFAULT';
+    throw error;
+  }
+}
+
 export function compileFieldColumn(input = {}) {
   const type = assertFieldType(input.type);
   assertInterfaceStorage(type, input.interface);
+  assertTimePresets(type, input);
   const params = [];
   let sqlType;
 
@@ -93,7 +123,9 @@ export function compileFieldColumn(input = {}) {
   let sql = sqlType;
   sql += input.required === true ? ' NOT NULL' : ' NULL';
 
-  if (Object.hasOwn(input, 'defaultValue')) {
+  if (input.defaultPreset === 'now') {
+    sql += ' DEFAULT CURRENT_TIMESTAMP(3)';
+  } else if (Object.hasOwn(input, 'defaultValue')) {
     if (type === 'text' || type === 'json') {
       const error = new Error(`Defaults for ${type} fields are postponed in V1`);
       error.code = 'UNSUPPORTED_FIELD_DEFAULT';
@@ -109,6 +141,8 @@ export function compileFieldColumn(input = {}) {
     }
   }
 
+  if (input.autoUpdate === true) sql += ' ON UPDATE CURRENT_TIMESTAMP(3)';
+
   return {
     sql,
     params,
@@ -117,6 +151,8 @@ export function compileFieldColumn(input = {}) {
       precision: type === 'decimal' ? (input.precision ?? 18) : undefined,
       scale: type === 'decimal' ? (input.scale ?? 2) : undefined,
       defaultValue: Object.hasOwn(input, 'defaultValue') ? input.defaultValue : undefined,
+      defaultPreset: input.defaultPreset ?? undefined,
+      autoUpdate: input.autoUpdate === true ? true : undefined,
     },
   };
 }
