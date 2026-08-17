@@ -60,7 +60,10 @@ export function resolveStudioLogo(settings, resolvedTheme = 'light') {
   const isYunsoftDefault = normalized.logo_url === YUNSOFT_LIGHT_LOGO_URL
     || normalized.logo_url === YUNSOFT_DARK_LOGO_URL;
   if (!isYunsoftDefault) return normalized.logo_url;
-  return resolvedTheme === 'dark' ? YUNSOFT_DARK_LOGO_URL : YUNSOFT_LIGHT_LOGO_URL;
+
+  // Asset names describe the logo artwork, not the surface it belongs on.
+  // The light artwork is for dark surfaces; the dark artwork is for light surfaces.
+  return resolvedTheme === 'dark' ? YUNSOFT_LIGHT_LOGO_URL : YUNSOFT_DARK_LOGO_URL;
 }
 
 export function applyStudioAppearance(settings, prefersDark = false) {
