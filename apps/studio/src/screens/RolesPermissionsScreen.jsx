@@ -4,6 +4,11 @@ import { apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
 
 const ACTIONS = ['read', 'create', 'update', 'delete'];
+const ROLE_SORT_OPTIONS = [
+  ['name-asc', 'Name A–Z'],
+  ['name-desc', 'Name Z–A'],
+  ['rules-desc', 'Most rules'],
+];
 
 function parseJsonInput(value) {
   if (!value.trim()) return null;
@@ -29,6 +34,10 @@ export function RolesPermissionsScreen() {
   const [collections, setCollections] = useState([]);
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [showCreateRole, setShowCreateRole] = useState(false);
+  const [roleSearch, setRoleSearch] = useState('');
+  const [roleSort, setRoleSort] = useState('name-asc');
+  const [collectionSearch, setCollectionSearch] = useState('');
+  const [configuredOnly, setConfiguredOnly] = useState(false);
   const [roleForm, setRoleForm] = useState({ name: '', description: '', public: false });
   const [roleName, setRoleName] = useState('');
   const [advancedPermission, setAdvancedPermission] = useState(null);
@@ -77,6 +86,41 @@ export function RolesPermissionsScreen() {
   ])), [permissions]);
   const selectedRolePermissions = useMemo(() => permissions.filter((permission) =>
     permission.role === selectedRoleId), [permissions, selectedRoleId]);
+  const roleRuleCounts = useMemo(() => {
+    const counts = new Map();
+    permissions.forEach((permission) => counts.set(permission.role, (counts.get(permission.role) || 0) + 1));
+    return counts;
+  }, [permissions]);
+  const visibleRoles = useMemo(() => {
+    const query = roleSearch.trim().toLowerCase();
+    return roles
+      .filter((role) => !query || [
+        role.name,
+        role.description,
+        role.admin ? 'administrator' : null,
+        role.public ? 'public' : 'custom',
+      ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query)))
+      .slice()
+      .sort((left, right) => {
+        if (roleSort === 'rules-desc') {
+          const countResult = (roleRuleCounts.get(right.id) || 0) - (roleRuleCounts.get(left.id) || 0);
+          if (countResult) return countResult;
+        }
+        const nameResult = String(left.name || '').localeCompare(String(right.name || ''));
+        return roleSort === 'name-desc' ? -nameResult : nameResult;
+      });
+  }, [roleRuleCounts, roleSearch, roleSort, roles]);
+  const visibleCollections = useMemo(() => {
+    const query = collectionSearch.trim().toLowerCase();
+    return collections
+      .filter((collection) => !query || [collection.collection, collection.note]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)))
+      .filter((collection) => !configuredOnly || ACTIONS.some((action) =>
+        permissionIndex.has(permissionKey(selectedRoleId, collection.collection, action))))
+      .slice()
+      .sort((left, right) => String(left.collection || '').localeCompare(String(right.collection || '')));
+  }, [collectionSearch, collections, configuredOnly, permissionIndex, selectedRoleId]);
 
   useEffect(() => {
     setRoleName(selectedRole?.name || '');
@@ -289,8 +333,27 @@ export function RolesPermissionsScreen() {
             </form>
           )}
 
+          <div className="sidebar-filter-row">
+            <label className="field-label">
+              <span>Find role</span>
+              <input
+                type="search"
+                value={roleSearch}
+                onChange={(event) => setRoleSearch(event.target.value)}
+                placeholder="Name or description…"
+              />
+            </label>
+            <label className="field-label">
+              <span>Sort</span>
+              <select value={roleSort} onChange={(event) => setRoleSort(event.target.value)}>
+                {ROLE_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+          </div>
+          <small className="collection-group-label">Showing {visibleRoles.length}/{roles.length} roles</small>
+
           <div className="list-stack role-list">
-            {roles.map((role) => (
+            {visibleRoles.map((role) => (
               <button
                 className={`list-button role-list-button ${role.id === selectedRoleId ? 'active' : ''}`}
                 key={role.id}
@@ -299,13 +362,14 @@ export function RolesPermissionsScreen() {
               >
                 <span>
                   <strong>{role.name}</strong>
-                  <small>{role.admin ? 'Administrator · full access' : role.public ? 'Public role' : 'Custom role'}</small>
+                  <small>{role.admin ? 'Administrator · full access' : role.public ? 'Public role' : role.description || 'Custom role'}</small>
                 </span>
                 {!role.admin && (
-                  <span className="permission-count">{permissions.filter((permission) => permission.role === role.id).length}</span>
+                  <span className="permission-count">{roleRuleCounts.get(role.id) || 0}</span>
                 )}
               </button>
             ))}
+            {roles.length > 0 && visibleRoles.length === 0 && <p className="muted-line">No matching roles.</p>}
           </div>
         </aside>
 
@@ -349,6 +413,35 @@ export function RolesPermissionsScreen() {
                     </div>
                     <span className="schema-count">{selectedRolePermissions.length} rules</span>
                   </div>
+                  <div className="permission-list-controls">
+                    <label className="field-label">
+                      <span>Find collection</span>
+                      <input
+                        type="search"
+                        value={collectionSearch}
+                        onChange={(event) => setCollectionSearch(event.target.value)}
+                        placeholder="Name or description…"
+                      />
+                    </label>
+                    <label className="checkbox-label permission-filter-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={configuredOnly}
+                        onChange={(event) => setConfiguredOnly(event.target.checked)}
+                      />
+                      Configured only
+                    </label>
+                    <span className="result-count">{visibleCollections.length}/{collections.length} collections</span>
+                    {(collectionSearch || configuredOnly) && (
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() => { setCollectionSearch(''); setConfiguredOnly(false); }}
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
                   <div className="table-scroll">
                     <table className="permission-matrix">
                       <thead>
@@ -358,7 +451,7 @@ export function RolesPermissionsScreen() {
                         </tr>
                       </thead>
                       <tbody>
-                        {collections.map((collection) => (
+                        {visibleCollections.map((collection) => (
                           <tr key={collection.collection}>
                             <td>
                               <strong>{collection.collection}</strong>
@@ -400,6 +493,9 @@ export function RolesPermissionsScreen() {
                     </table>
                   </div>
                   {!loading && collections.length === 0 && <div className="table-footer">Create a collection before configuring permissions.</div>}
+                  {!loading && collections.length > 0 && visibleCollections.length === 0 && (
+                    <div className="table-footer">No collections match the current permission filters.</div>
+                  )}
                 </section>
               )}
             </>
