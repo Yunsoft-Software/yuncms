@@ -20,7 +20,11 @@ test('loadConfig uses stable defaults and parses numeric values', () => {
   const config = loadConfig({ PORT: '9000', DB_CONNECTION_LIMIT: '20', DB_SSL: 'true' });
 
   assert.equal(defaults.server.port, 3008);
+  assert.equal(defaults.server.studioOrigin, 'http://localhost:3008');
+  assert.equal(defaults.auth.publicUrl, 'http://localhost:3008');
   assert.equal(config.server.port, 9000);
+  assert.equal(config.server.studioOrigin, 'http://localhost:9000');
+  assert.equal(config.auth.publicUrl, 'http://localhost:9000');
   assert.equal(config.database.connectionLimit, 20);
   assert.equal(config.database.ssl, true);
   assert.equal(config.database.host, '127.0.0.1');
