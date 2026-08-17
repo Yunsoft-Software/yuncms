@@ -1,4 +1,4 @@
-export { loadConfig, loadEnvFileIfPresent } from './config.js';
+export { DEFAULT_SERVER_PORT, loadConfig, loadEnvFileIfPresent } from './config.js';
 export { createDatabasePool, pingDatabase, closeDatabasePool } from './database.js';
 export { withTransaction, withConnectionTransaction } from './transaction.js';
 export { assertIdentifier, quoteIdentifier } from './identifier.js';
@@ -51,6 +51,20 @@ export { StudioSettingsService, STUDIO_SETTING_DEFAULTS } from './services/studi
 export { SchemaMetadataRepository } from './schema-metadata-repository.js';
 export { loadSchemaSnapshot, SchemaCache } from './schema.js';
 export { assertFieldType, compileFieldColumn } from './field-types.js';
+export {
+  COLLECTION_SYSTEM_FIELDS,
+  compileCollectionSystemFields,
+  fieldSpecial,
+  isSystemManagedField,
+  normalizeCollectionSystemFields,
+  systemMutationEntries,
+} from './system-fields.js';
+export {
+  assertActionOnlyPermissionPayload,
+  assertSystemResourceAction,
+  isPermissionManagedSystemResource,
+  systemPermissionConfig,
+} from './system-permissions.js';
 export {
   parseItemsQuery,
   compileSelectFields,
