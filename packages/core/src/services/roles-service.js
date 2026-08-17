@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { BaseService } from './base-service.js';
+import { resolveSystemResourceAccess } from './system-resource-access.js';
 
 function assertRoleManager(accountability) {
   if (accountability.admin === true || accountability.system === true) return;
@@ -26,7 +27,7 @@ function normalizeRoleName(name) {
 
 export class RolesService extends BaseService {
   async readMany() {
-    assertRoleManager(this.accountability);
+    await resolveSystemResourceAccess(this, 'read', 'yuncms_roles');
     const [rows] = await this.database.query(
       `SELECT id, name, description, admin, public, created_at, updated_at
        FROM yuncms_roles
@@ -36,7 +37,7 @@ export class RolesService extends BaseService {
   }
 
   async readOne(id) {
-    assertRoleManager(this.accountability);
+    await resolveSystemResourceAccess(this, 'read', 'yuncms_roles');
     const [rows] = await this.database.query(
       `SELECT id, name, description, admin, public, created_at, updated_at
        FROM yuncms_roles
