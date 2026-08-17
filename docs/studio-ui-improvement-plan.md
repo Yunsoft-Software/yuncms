@@ -10,6 +10,8 @@ This plan focuses on usability polish for the existing `16-08-2026` Studio imple
 - Replace prompt-driven and raw-JSON-first workflows with guided controls while keeping advanced rules available.
 - Keep the UI lightweight: React/Vite only, no new UI framework or icon package unless a later requirement proves necessary.
 - Preserve the current REST API contracts and Directus-inspired concepts without copying Directus UI/source.
+- Make large lists easier to scan by giving every data-heavy workspace an obvious search/filter/sort path.
+- Prefer server-side data controls when the API already supports them; do not pretend a current-page-only sort is a full dataset sort.
 
 ## Phase 1 — information architecture and navigation
 
@@ -80,6 +82,44 @@ This plan focuses on usability polish for the existing `16-08-2026` Studio imple
 - [x] Add source-level path traversal coverage for the Studio asset resolver.
 - [ ] Run a real build/start smoke and verify Studio HTML/assets/API/auth links all work on one port — `todo.md`.
 
+## Phase 8 — shared list controls and scanability
+
+- [ ] Add a compact control-strip pattern for search, filter, sort, result count and clear/reset actions.
+- [ ] Add reusable visual treatment for active filter chips and compact select controls without adding a dependency.
+- [ ] Keep data controls responsive so they stack cleanly on narrow screens.
+- [ ] Make filtered/visible counts explicit so users understand whether they are looking at all records or a subset.
+
+## Phase 9 — Content data explorer
+
+- [ ] Replace current-page-only search with server-backed search across readable text fields.
+- [ ] Add field-aware filters using the existing REST filter operators and combine multiple active filters with AND semantics.
+- [ ] Add server-backed sorting with ascending/descending direction.
+- [ ] Add page-size selection plus previous/next pagination using API `limit`, `offset` and filtered `total_count` metadata.
+- [ ] Reset pagination when search/filter/sort/page-size changes so users never land on an empty stale page.
+- [ ] Show active filters as removable chips and provide one-click reset.
+
+## Phase 10 — Files library controls
+
+- [ ] Add file-type filtering for images, video, audio, PDF and other files.
+- [ ] Add useful sort presets for newest/oldest, name and file size.
+- [ ] Show visible-result counts and a clear-filters affordance in both Gallery and List views.
+- [ ] Keep the same search/filter/sort state when switching Gallery/List.
+
+## Phase 11 — Users, Data Model and permission-heavy settings
+
+- [ ] Users: collapse creation behind a clear `New user` action so the user list remains the primary workspace.
+- [ ] Users: add search, role/status filters and useful sort options with visible result counts.
+- [ ] Data Model: add collection search/sort in the master sidebar and field search/sort in the Fields tab.
+- [ ] Roles & Permissions: add role search and collection filtering so large permission matrices remain manageable.
+- [ ] Roles & Permissions: add a quick `configured only` view for auditing granted access.
+
+## Phase 12 — interaction refinements
+
+- [ ] Make sortable/filterable toolbars visually consistent across Content, Files, Users, Data Model and Roles & Permissions.
+- [ ] Keep primary actions visually separate from list controls so `New record`, `Upload`, `New user`, `New collection` and `New role` stay obvious.
+- [ ] Keep destructive actions out of dense filter toolbars and preserve explicit confirmation dialogs.
+- [ ] Re-run source/build/runtime/browser verification after the data-control pass; environment-only checks remain in `todo.md`.
+
 ## Delivery order
 
 1. Sidebar/navigation grouping and collection sub-navigation. — done
@@ -89,7 +129,12 @@ This plan focuses on usability polish for the existing `16-08-2026` Studio imple
 5. Role-first permission matrix and advanced editor. — done
 6. Shared responsive/accessibility polish and runtime smoke. — source polish done; formal accessibility/runtime checks remain
 7. Single-port Studio/API runtime. — source implementation done; runtime smoke remains
+8. Shared list-control styling + server-backed Content sort/filter/pagination.
+9. Files type filtering/sort presets.
+10. Users list-first workflow + search/filter/sort.
+11. Data Model and Roles/Permissions search/filter polish.
+12. Final consistency pass and runtime verification.
 
 ## Verification
 
-Source changes can be reviewed through the repository connector in this environment, but the final Studio build/runtime/browser verification remains part of `todo.md` when a local Node/browser environment is unavailable. Do not mark runtime-only checks complete from source inspection alone.
+Source changes can be reviewed through the repository connector in this environment. GitHub Actions must not be used. The final Studio build/runtime/browser verification remains part of `todo.md` when a local Node/browser environment is unavailable; do not mark runtime-only checks complete from source inspection alone.
