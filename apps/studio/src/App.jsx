@@ -148,10 +148,11 @@ export function App() {
     return (
       <ContentScreen
         collection={contentCollection}
+        collectionLabel={contentTitle}
         onOpenDataModel={() => setSection('data-model')}
       />
     );
-  }, [contentCollection, section, session?.user?.id]);
+  }, [contentCollection, contentTitle, section, session?.user?.id]);
 
   async function handleLogout() {
     setLoggingOut(true);
