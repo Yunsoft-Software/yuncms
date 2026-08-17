@@ -75,6 +75,8 @@ export const UI_EN = Object.freeze({
   'fileField.uploadNew': 'Upload new',
   'fileField.clear': 'Clear file',
 
+  'users.managedVerifiedHint': 'Users created here are trusted management-created accounts and are marked email-verified immediately. They can sign in without a verification email.',
+
   'dataModel.fieldBuilderHint': 'Choose the data kind first. File and image fields store a file reference and get a dedicated picker in Content.',
   'dataModel.fieldType': 'Field type',
   'dataModel.imageFieldInfo': 'Image fields accept image files and show an authenticated thumbnail preview in record forms and tables.',
