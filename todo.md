@@ -7,7 +7,7 @@ This file contains only work that cannot be truthfully verified from the GitHub-
 - [x] Switch to branch `16-08-2026` and confirm a clean working tree.
 - [x] Confirm Node.js 24 LTS with `node --version`.
 - [x] Run `npm install`; review `mysql2`, Express, React/Vite, AWS SDK and Nodemailer resolution.
-- [ ] Review and commit the generated `package-lock.json` only after install succeeds without unintended dependency drift.
+- [x] Review and commit the generated `package-lock.json` only after install succeeds without unintended dependency drift.
 - [x] Run `npm test`; fix real failures before checking any milestone.
 - [x] Run `npm run build --workspace=@yuncms/studio`.
 - [x] Run CLI help and confirm `init`, `bootstrap`, `start`, `help` only.

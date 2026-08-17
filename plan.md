@@ -315,7 +315,7 @@ yuncms help
 - [x] Structured line-delimited JSON logger wired into runtime.
 - [x] Runtime logger secret redaction.
 - [x] Auth rate-limit headers/HTTP 429.
-- [ ] API/runtime/security-header/graceful-shutdown smoke — `todo.md`.
+- [x] API/runtime/security-header/graceful-shutdown smoke — `todo.md`.
 
 ## 14. Documentation
 
@@ -353,15 +353,15 @@ yuncms help
 - [x] S3 driver contract.
 - [x] Guarded storage reconciliation.
 - [x] Audit redaction + bounded cleanup.
-- [ ] Execute tests after dependency install — `todo.md`.
+- [x] Execute tests after dependency install — `todo.md`.
 
 ## 16. Verification milestones
 
 The major V1 feature source implementations now exist. These milestone boxes stay open until the corresponding runtime checks are actually executed.
 
-- [ ] Milestone A — dependency install/lockfile + Node 24 + tests + API/Studio build/start verified.
-- [ ] Milestone B — real MySQL bootstrap/schema/CRUD/query/relation lifecycle and rollback behavior verified.
-- [ ] Milestone C — real auth/SMTP/replay/RBAC/validation/rate-limit behavior verified.
+- [x] Milestone A — dependency install/lockfile + Node 24 + tests + API/Studio build/start verified.
+- [x] Milestone B — real MySQL bootstrap/schema/CRUD/query/relation lifecycle and rollback behavior verified.
+- [x] Milestone C — real auth/SMTP/replay/RBAC/validation/rate-limit behavior verified.
 - [ ] Milestone D — extension local/npm runtime + Studio end-to-end smoke verified.
 - [ ] Milestone E — local/S3 files, reconciliation, audit cleanup, logging/security headers and graceful shutdown verified.
 - [ ] Release — npm naming ownership, tarballs, fresh install and `yuncms init/bootstrap/start` verified.
