@@ -1,16 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
 import { BaseService } from './base-service.js';
+import { resolveSystemResourceAccess } from './system-resource-access.js';
 
 function fileError(code, message) {
   const error = new Error(message);
   error.code = code;
   return error;
-}
-
-function assertFileManager(accountability) {
-  if (accountability.admin === true || accountability.system === true) return;
-  throw fileError('FORBIDDEN', 'File management requires administrator accountability in V1');
 }
 
 function normalizeFilename(value) {
@@ -60,19 +56,7 @@ export class FilesService extends BaseService {
     });
   }
 
-  async readMany() {
-    assertFileManager(this.accountability);
-    const [rows] = await this.database.query(
-      `SELECT id, storage, filename_disk, filename_download, title, mimetype, filesize,
-              uploaded_by, uploaded_at, metadata
-       FROM yuncms_files
-       ORDER BY uploaded_at DESC, id DESC`,
-    );
-    return rows.map(normalizeRow);
-  }
-
-  async readOne(id) {
-    assertFileManager(this.accountability);
+  async #readOneUnsafe(id) {
     const [rows] = await this.database.query(
       `SELECT id, storage, filename_disk, filename_download, title, mimetype, filesize,
               uploaded_by, uploaded_at, metadata
@@ -84,6 +68,22 @@ export class FilesService extends BaseService {
     return normalizeRow(rows[0]);
   }
 
+  async readMany() {
+    await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
+    const [rows] = await this.database.query(
+      `SELECT id, storage, filename_disk, filename_download, title, mimetype, filesize,
+              uploaded_by, uploaded_at, metadata
+       FROM yuncms_files
+       ORDER BY uploaded_at DESC, id DESC`,
+    );
+    return rows.map(normalizeRow);
+  }
+
+  async readOne(id) {
+    await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
+    return this.#readOneUnsafe(id);
+  }
+
   async createOne({
     contents,
     filenameDownload,
@@ -92,7 +92,7 @@ export class FilesService extends BaseService {
     storage = 'local',
     metadata = null,
   } = {}) {
-    assertFileManager(this.accountability);
+    await resolveSystemResourceAccess(this, 'create', 'yuncms_files');
     if (!Buffer.isBuffer(contents) && !(contents instanceof Uint8Array)) {
       throw fileError('INVALID_FILE_CONTENT', 'File contents must be Buffer or Uint8Array');
     }
@@ -124,7 +124,7 @@ export class FilesService extends BaseService {
           metadata == null ? null : JSON.stringify(metadata),
         ],
       );
-      const file = await this.readOne(id);
+      const file = await this.#readOneUnsafe(id);
       await this.action('files.create', {
         key: id,
         item: file,
@@ -144,7 +144,8 @@ export class FilesService extends BaseService {
   }
 
   async readContent(id) {
-    const file = await this.readOne(id);
+    await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
+    const file = await this.#readOneUnsafe(id);
     if (!file) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
     const driver = this.storage.get(file.storage);
     const contents = await driver.get(file.filename_disk);
@@ -152,7 +153,7 @@ export class FilesService extends BaseService {
   }
 
   async updateOne(id, patch = {}) {
-    assertFileManager(this.accountability);
+    await resolveSystemResourceAccess(this, 'update', 'yuncms_files');
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
       throw fileError('INVALID_PAYLOAD', 'File metadata patch must be an object');
     }
@@ -161,7 +162,7 @@ export class FilesService extends BaseService {
       throw fileError('INVALID_PAYLOAD', 'File update supports filenameDownload, title and metadata only');
     }
 
-    const before = await this.readOne(id);
+    const before = await this.#readOneUnsafe(id);
     if (!before) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
 
     const assignments = [];
@@ -185,7 +186,7 @@ export class FilesService extends BaseService {
       params,
     );
     if (result.affectedRows !== 1) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
-    const file = await this.readOne(id);
+    const file = await this.#readOneUnsafe(id);
     await this.action('files.update', {
       key: id,
       before,
@@ -196,8 +197,8 @@ export class FilesService extends BaseService {
   }
 
   async deleteOne(id) {
-    assertFileManager(this.accountability);
-    const file = await this.readOne(id);
+    await resolveSystemResourceAccess(this, 'delete', 'yuncms_files');
+    const file = await this.#readOneUnsafe(id);
     if (!file) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
 
     const [result] = await this.database.query('DELETE FROM yuncms_files WHERE id = ?', [id]);
