@@ -12,7 +12,11 @@ export function createStudioSettingsRouter() {
 
   router.get('/logo', async (req, res) => {
     const { file, contents } = await settingsService(req).readLogoContent();
-    res.set('cache-control', 'public, max-age=300, must-revalidate');
+    // Revalidate immediately after branding changes. Sandbox also prevents an uploaded SVG
+    // from becoming a same-origin active document if somebody opens this asset directly.
+    res.set('cache-control', 'no-cache, must-revalidate');
+    res.set('content-security-policy', 'sandbox');
+    res.set('content-disposition', 'inline');
     res.type(file.mimetype || 'application/octet-stream').send(contents);
   });
 
