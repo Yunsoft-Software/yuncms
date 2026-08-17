@@ -52,3 +52,14 @@ test('raw MySQL duplicate errors become safe conflict errors', () => {
   assert.equal(normalized.message, 'A record with the same unique value already exists');
   assert.doesNotMatch(normalized.message, /secret@example\.com/);
 });
+
+test('malformed JSON is a safe 400 client error', () => {
+  const parseError = new SyntaxError('Unexpected token with raw request content');
+  parseError.type = 'entity.parse.failed';
+
+  const normalized = normalizeApiError(parseError);
+  assert.equal(normalized.code, 'INVALID_PAYLOAD');
+  assert.equal(statusForError(normalized), 400);
+  assert.equal(normalized.message, 'Request body contains invalid JSON');
+  assert.doesNotMatch(normalized.message, /raw request content/);
+});
