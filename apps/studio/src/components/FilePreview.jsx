@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { apiBlob } from '../api.js';
+import { useI18n } from '../i18n.js';
 
 const IMAGE_EXTENSIONS = new Set([
   'avif', 'bmp', 'gif', 'heic', 'heif', 'ico', 'jpeg', 'jpg', 'png', 'svg', 'webp',
@@ -17,7 +18,8 @@ export function isPreviewableImage(file) {
   return IMAGE_EXTENSIONS.has(fileExtension(file));
 }
 
-export function FilePreview({ file, label = 'File', alt = '' }) {
+export function FilePreview({ file, label, alt = '' }) {
+  const { t } = useI18n();
   const previewable = isPreviewableImage(file);
   const [state, setState] = useState({ status: previewable ? 'loading' : 'placeholder', url: '' });
 
@@ -63,17 +65,17 @@ export function FilePreview({ file, label = 'File', alt = '' }) {
 
   if (state.status === 'loading') {
     return (
-      <div className="file-preview-state" aria-label={`Loading preview for ${file.filename_download || 'file'}`}>
+      <div className="file-preview-state" aria-label={t('files.loadingPreviewFor', { file: file.filename_download || t('files.file') })}>
         <span className="file-preview-spinner" aria-hidden="true" />
-        <small>Loading preview</small>
+        <small>{t('files.loadingPreview')}</small>
       </div>
     );
   }
 
   return (
     <div className={`file-type-placeholder ${state.status === 'error' ? 'preview-error' : ''}`} aria-hidden="true">
-      <strong>{label}</strong>
-      {state.status === 'error' && <small>Preview unavailable</small>}
+      <strong>{label || t('files.file')}</strong>
+      {state.status === 'error' && <small>{t('files.previewUnavailable')}</small>}
     </div>
   );
 }
