@@ -25,6 +25,7 @@ function settingsDatabase() {
         return [[{
           brand_name: 'YunCMS',
           logo_url: 'https://yunsoft.com/light-logo.png',
+          logo_file: null,
           accent_color: '#2563eb',
           theme: 'system',
           default_locale: 'en',
@@ -71,6 +72,7 @@ test('anonymous Studio can read safe display settings before login', async () =>
     assert.deepEqual((await response.json()).data, {
       brand_name: 'YunCMS',
       logo_url: 'https://yunsoft.com/light-logo.png',
+      logo_file: null,
       accent_color: '#2563eb',
       theme: 'system',
       default_locale: 'en',
