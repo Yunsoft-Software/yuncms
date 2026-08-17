@@ -3,9 +3,12 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import test from 'node:test';
 
-import { EN } from '../src/locales/en.js';
-import { TR } from '../src/locales/tr.js';
-import { hasTranslation, translate } from '../src/i18n.js';
+import {
+  EN,
+  TR,
+  hasTranslation,
+  translate,
+} from '../src/localization.js';
 
 const SRC_ROOT = resolve(import.meta.dirname, '../src');
 
