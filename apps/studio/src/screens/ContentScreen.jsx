@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
+import { FileFieldControl, FileValuePreview } from '../components/FileFieldControl.jsx';
 import { Pagination } from '../components/Pagination.jsx';
+import { isFileField, isImageField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 
 const PAGE_SIZES = [25, 50, 100];
@@ -103,7 +105,7 @@ function renderValue(field, record, relationLookups) {
 }
 
 function operatorsForField(field, relationLookup) {
-  if (relationLookup) return UUID_OPERATORS;
+  if (relationLookup || isFileField(field)) return UUID_OPERATORS;
   if (['string', 'text'].includes(field?.type)) return TEXT_OPERATORS;
   if (field?.type === 'boolean') return BOOLEAN_OPERATORS;
   if (['integer', 'bigint', 'decimal', 'date', 'datetime', 'timestamp'].includes(field?.type)) return ORDER_OPERATORS;
@@ -145,7 +147,7 @@ function buildItemsPath({ collection, fields, search, filters, sortField, sortDi
   return `/items/${encodeURIComponent(collection)}?${params.toString()}`;
 }
 
-function RecordForm({ collection, fields, relationLookups, record, onSaved, onCancel }) {
+function RecordForm({ collection, fields, relationLookups, files, record, onFileUploaded, onSaved, onCancel }) {
   const { t } = useI18n();
   const editable = useMemo(() => fields.filter((field) => !field.readonly), [fields]);
   const [values, setValues] = useState({});
@@ -195,7 +197,7 @@ function RecordForm({ collection, fields, relationLookups, record, onSaved, onCa
         <button className="text-button" type="button" onClick={onCancel}>{t('common.cancel')}</button>
       </div>
 
-      <div className="form-grid">
+      <div className="form-grid record-form-grid">
         {editable.map((field) => {
           const relationLookup = relationLookups[field.field];
           const currentValue = values[field.field] ?? '';
@@ -204,9 +206,18 @@ function RecordForm({ collection, fields, relationLookups, record, onSaved, onCa
           );
 
           return (
-            <label className="field-label" key={field.field}>
+            <label className={`field-label ${isFileField(field) ? 'file-field-label' : ''}`} key={field.field}>
               <span>{field.field}{field.required ? ' *' : ''}</span>
-              {relationLookup ? (
+              {isFileField(field) ? (
+                <FileFieldControl
+                  field={field}
+                  value={currentValue}
+                  files={files}
+                  t={t}
+                  onFileUploaded={onFileUploaded}
+                  onChange={(value) => setValues((current) => ({ ...current, [field.field]: value }))}
+                />
+              ) : relationLookup ? (
                 <select
                   value={currentValue}
                   onChange={(event) => setValues((current) => ({ ...current, [field.field]: event.target.value }))}
@@ -270,6 +281,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
   const requestVersion = useRef(0);
   const [fields, setFields] = useState([]);
   const [relationLookups, setRelationLookups] = useState({});
+  const [files, setFiles] = useState([]);
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -315,6 +327,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
     const version = ++requestVersion.current;
     setFields([]);
     setRelationLookups({});
+    setFiles([]);
     setItems([]);
     setMeta(null);
     setItemsLoading(false);
@@ -331,10 +344,14 @@ export function ContentScreen({ collection, onOpenDataModel }) {
       ]);
       const loadedFields = fieldResponse?.data ?? [];
       const loadedRelations = relationResponse?.data ?? [];
-      const lookups = await buildRelationLookups(target, loadedRelations);
+      const [lookups, fileResponse] = await Promise.all([
+        buildRelationLookups(target, loadedRelations),
+        loadedFields.some(isFileField) ? apiRequest('/files') : Promise.resolve({ data: [] }),
+      ]);
       if (version !== requestVersion.current) return;
       setFields(loadedFields);
       setRelationLookups(lookups);
+      setFiles(fileResponse?.data ?? []);
     } catch (requestError) {
       if (version !== requestVersion.current) return;
       setError(requestError.message || t('content.schemaLoadError'));
@@ -488,8 +505,17 @@ export function ContentScreen({ collection, onOpenDataModel }) {
   function filterValueLabel(filter) {
     if (filter.operator === '_null') return t('content.empty');
     if (filter.operator === '_nnull') return t('content.notEmpty');
+    const field = filterableFields.find((entry) => entry.field === filter.field);
+    if (isFileField(field)) {
+      const file = files.find((entry) => String(entry.id) === String(filter.value));
+      return file?.title || file?.filename_download || String(filter.value);
+    }
     const lookup = relationLookups[filter.field];
     return lookup ? lookupLabel(lookup, filter.value) : String(filter.value);
+  }
+
+  function registerUploadedFile(file) {
+    setFiles((current) => [file, ...current.filter((entry) => entry.id !== file.id)]);
   }
 
   if (creating || editing) {
@@ -498,7 +524,9 @@ export function ContentScreen({ collection, onOpenDataModel }) {
         collection={collection}
         fields={fields}
         relationLookups={relationLookups}
+        files={files}
         record={editing}
+        onFileUploaded={registerUploadedFile}
         onCancel={() => { setCreating(false); setEditing(null); }}
         onSaved={async () => {
           setCreating(false);
@@ -594,6 +622,17 @@ export function ContentScreen({ collection, onOpenDataModel }) {
               <span>{t('content.value')}</span>
               {['_null', '_nnull'].includes(filterDraft.operator) ? (
                 <div className="control-placeholder">{t('content.noValueNeeded')}</div>
+              ) : isFileField(selectedFilterField) ? (
+                <select
+                  value={filterDraft.value}
+                  disabled={!selectedFilterField}
+                  onChange={(event) => setFilterDraft((current) => ({ ...current, value: event.target.value }))}
+                >
+                  <option value="">{t('fileField.chooseFile')}</option>
+                  {files
+                    .filter((file) => !isImageField(selectedFilterField) || String(file.mimetype || '').startsWith('image/'))
+                    .map((file) => <option key={file.id} value={file.id}>{file.title || file.filename_download}</option>)}
+                </select>
               ) : relationLookups[filterDraft.field] ? (
                 <select
                   value={filterDraft.value}
@@ -692,7 +731,13 @@ export function ContentScreen({ collection, onOpenDataModel }) {
               <tbody>
                 {items.map((record) => (
                   <tr key={record.id}>
-                    {tableFields.map((field) => <td key={field.field}>{renderValue(field, record, relationLookups)}</td>)}
+                    {tableFields.map((field) => (
+                      <td key={field.field}>
+                        {isFileField(field) ? (
+                          <FileValuePreview field={field} value={record[field.field]} files={files} t={t} />
+                        ) : renderValue(field, record, relationLookups)}
+                      </td>
+                    ))}
                     <td className="row-actions">
                       <button className="text-button" type="button" onClick={() => setEditing(record)}>{t('common.edit')}</button>
                       <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>
