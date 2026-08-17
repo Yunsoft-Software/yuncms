@@ -119,11 +119,13 @@
   grid-template-columns: minmax(240px, 1.4fr) minmax(160px, 0.7fr) minmax(140px, 0.6fr);
 }
 
-.library-header-panel {
+.library-header-panel,
+.users-header-panel {
   padding-block: 22px;
 }
 
-.file-upload-compact {
+.file-upload-compact,
+.create-user-panel {
   padding-block: 22px;
 }
 
@@ -245,6 +247,189 @@
   height: 16px;
 }
 
+.user-identity-cell {
+  min-width: 210px;
+  display: grid;
+  gap: 6px;
+}
+
+.user-cell-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.user-status-pill {
+  text-transform: capitalize;
+}
+
+.user-status-pill.active,
+.verification-pill.verified {
+  background: #eef8f1;
+  color: #34714a;
+}
+
+.user-status-pill.suspended {
+  background: #fff7e8;
+  color: #876324;
+}
+
+.user-status-pill.disabled {
+  background: #f5f1f1;
+  color: #8b6565;
+}
+
+.verification-pill {
+  white-space: nowrap;
+}
+
+.data-model-sidebar,
+.access-role-sidebar {
+  gap: 16px;
+  padding: 20px;
+}
+
+.model-sidebar-heading,
+.role-sidebar-heading {
+  align-items: flex-start;
+}
+
+.collection-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.collection-group-heading > span {
+  color: #8a95a7;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.collection-list-page,
+.role-list-page {
+  min-height: 44px;
+}
+
+.model-detail-heading {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.model-heading-actions,
+.role-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.field-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef2f8;
+  color: #5d6c84;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.field-name-stack {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.field-name-stack strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-name-stack small {
+  color: #8a95a7;
+  font-size: 10px;
+}
+
+.role-summary-panel {
+  align-items: flex-end;
+}
+
+.role-summary-stat {
+  display: grid;
+  gap: 1px;
+  min-width: 92px;
+  padding: 8px 10px;
+  border: 1px solid #e5e9f0;
+  border-radius: 10px;
+  background: #fafbfd;
+}
+
+.role-summary-stat strong {
+  font-size: 15px;
+}
+
+.role-summary-stat small {
+  color: #8791a2;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.permission-list-controls {
+  padding: 14px 18px;
+  border-bottom: 1px solid #edf0f5;
+  background: #fbfcfe;
+}
+
+.permission-matrix-scroll {
+  max-height: min(62vh, 720px);
+}
+
+.permission-matrix thead th {
+  top: 0;
+  z-index: 3;
+}
+
+.permission-matrix th:first-child,
+.permission-matrix td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 1px 0 0 #edf0f5;
+}
+
+.permission-matrix thead th:first-child {
+  z-index: 4;
+  background: #fafbfd;
+}
+
+.permission-toggle.enabled {
+  color: #2f6f49;
+}
+
+.permission-toggle.enabled span {
+  font-weight: 750;
+}
+
+.permission-editor-modal {
+  width: min(960px, 100%);
+}
+
+.permission-editor-modal .modal-body {
+  margin-top: 18px;
+}
+
+.permission-editor-modal .advanced-permission-grid {
+  align-items: start;
+}
+
 @keyframes file-preview-spin {
   to { transform: rotate(360deg); }
 }
@@ -252,6 +437,12 @@
 @media (prefers-reduced-motion: reduce) {
   .file-preview-spinner {
     animation: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .permission-editor-modal .advanced-permission-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -287,5 +478,19 @@
 
   .file-library-results .file-grid {
     padding: 10px;
+  }
+
+  .model-heading-actions,
+  .role-summary-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .role-summary-stat {
+    width: 100%;
+  }
+
+  .permission-matrix-scroll {
+    max-height: none;
   }
 }
