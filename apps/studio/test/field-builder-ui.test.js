@@ -22,17 +22,19 @@ test('field type browser separates common, media and advanced choices', () => {
   }
 });
 
-test('field creation payload supports timestamp current-time and auto-update presets', () => {
+test('field creation payload keeps the label and supports timestamp current-time automation', () => {
   const form = {
     ...createEmptyFieldForm(),
-    field: 'last_seen_at',
+    name: 'Son Görülme Zamanı',
+    field: 'son_gorulme_zamani',
     type: 'timestamp',
     required: true,
     defaultMode: 'now',
     autoUpdate: true,
   };
   assert.deepEqual(fieldCreationPayload(form), {
-    field: 'last_seen_at',
+    name: 'Son Görülme Zamanı',
+    field: 'son_gorulme_zamani',
     type: 'timestamp',
     required: true,
     defaultPreset: 'now',
@@ -43,6 +45,7 @@ test('field creation payload supports timestamp current-time and auto-update pre
 test('fixed date-time defaults are normalized from browser input to MySQL format', () => {
   const payload = fieldCreationPayload({
     ...createEmptyFieldForm(),
+    name: 'Published at',
     field: 'published_at',
     type: 'datetime',
     defaultMode: 'value',
@@ -54,13 +57,23 @@ test('fixed date-time defaults are normalized from browser input to MySQL format
 test('decimal field builder sends explicit precision and scale', () => {
   const payload = fieldCreationPayload({
     ...createEmptyFieldForm(),
-    field: 'price',
+    name: 'Ürün Fiyatı',
+    field: 'urun_fiyati',
     type: 'decimal',
     precision: 12,
     scale: 4,
   });
+  assert.equal(payload.name, 'Ürün Fiyatı');
+  assert.equal(payload.field, 'urun_fiyati');
   assert.equal(payload.precision, 12);
   assert.equal(payload.scale, 4);
+});
+
+test('field builder accepts a natural display name and maintains a separate generated API key', () => {
+  assert.match(builderSource, /fieldBuilder\.displayName/);
+  assert.match(builderSource, /fieldBuilder\.apiKey/);
+  assert.match(builderSource, /schemaKeyFromName\(value, 'field'\)/);
+  assert.match(builderSource, /keyTouched/);
 });
 
 test('Data Model V2 uses the dedicated visual builder and defaults accountability fields on new collections', () => {
