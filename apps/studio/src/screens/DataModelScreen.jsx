@@ -8,6 +8,18 @@ const FIELD_TYPES = [
   'date', 'datetime', 'timestamp', 'json', 'uuid',
 ];
 
+const COLLECTION_SORT_OPTIONS = [
+  ['name-asc', 'Name A–Z'],
+  ['name-desc', 'Name Z–A'],
+];
+
+const FIELD_SORT_OPTIONS = [
+  ['name-asc', 'Name A–Z'],
+  ['name-desc', 'Name Z–A'],
+  ['type', 'Type'],
+  ['required', 'Required first'],
+];
+
 function parseJson(value) {
   if (!value) return null;
   try {
@@ -21,6 +33,24 @@ function relationKind(relation) {
   return parseJson(relation?.metadata)?.kind || 'm2o';
 }
 
+function compareCollections(left, right, sort) {
+  const result = String(left.collection || '').localeCompare(String(right.collection || ''));
+  return sort === 'name-desc' ? -result : result;
+}
+
+function compareFields(left, right, sort) {
+  if (sort === 'type') {
+    const typeResult = String(left.type || '').localeCompare(String(right.type || ''));
+    return typeResult || String(left.field || '').localeCompare(String(right.field || ''));
+  }
+  if (sort === 'required') {
+    const requiredResult = Number(Boolean(right.required)) - Number(Boolean(left.required));
+    return requiredResult || String(left.field || '').localeCompare(String(right.field || ''));
+  }
+  const result = String(left.field || '').localeCompare(String(right.field || ''));
+  return sort === 'name-desc' ? -result : result;
+}
+
 export function DataModelScreen() {
   const requestConfirmation = useConfirmDialog();
   const [collections, setCollections] = useState([]);
@@ -29,6 +59,10 @@ export function DataModelScreen() {
   const [relations, setRelations] = useState([]);
   const [schemaTab, setSchemaTab] = useState('fields');
   const [showCreateCollection, setShowCreateCollection] = useState(false);
+  const [collectionSearch, setCollectionSearch] = useState('');
+  const [collectionSort, setCollectionSort] = useState('name-asc');
+  const [fieldSearch, setFieldSearch] = useState('');
+  const [fieldSort, setFieldSort] = useState('name-asc');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
@@ -89,12 +123,40 @@ export function DataModelScreen() {
   useEffect(() => {
     setM2oForm((current) => ({ ...current, manyField: '', oneCollection: '' }));
     setSchemaTab('fields');
+    setFieldSearch('');
+    setFieldSort('name-asc');
     loadSelected(selected);
   }, [selected]);
 
   const selectedCollection = collections.find((entry) => entry.collection === selected) ?? null;
   const userCollections = useMemo(() => collections.filter((entry) => !entry.system), [collections]);
   const systemCollections = useMemo(() => collections.filter((entry) => entry.system), [collections]);
+  const visibleUserCollections = useMemo(() => {
+    const query = collectionSearch.trim().toLowerCase();
+    return userCollections
+      .filter((entry) => !query || [entry.collection, entry.note]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)))
+      .slice()
+      .sort((left, right) => compareCollections(left, right, collectionSort));
+  }, [collectionSearch, collectionSort, userCollections]);
+  const visibleSystemCollections = useMemo(() => {
+    const query = collectionSearch.trim().toLowerCase();
+    return systemCollections
+      .filter((entry) => !query || [entry.collection, entry.note]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)))
+      .slice()
+      .sort((left, right) => compareCollections(left, right, collectionSort));
+  }, [collectionSearch, collectionSort, systemCollections]);
+  const visibleFields = useMemo(() => {
+    const query = fieldSearch.trim().toLowerCase();
+    return fields
+      .filter((field) => !query || [field.field, field.type, field.required ? 'required' : 'optional']
+        .some((value) => String(value).toLowerCase().includes(query)))
+      .slice()
+      .sort((left, right) => compareFields(left, right, fieldSort));
+  }, [fieldSearch, fieldSort, fields]);
   const m2oRelations = useMemo(() => relations.filter((relation) =>
     relationKind(relation) !== 'm2m' &&
     (relation.many_collection === selected || relation.one_collection === selected)), [relations, selected]);
@@ -349,10 +411,31 @@ export function DataModelScreen() {
             </form>
           )}
 
+          <div className="sidebar-filter-row">
+            <label className="field-label">
+              <span>Find collection</span>
+              <input
+                className="sidebar-filter-input"
+                type="search"
+                value={collectionSearch}
+                onChange={(event) => setCollectionSearch(event.target.value)}
+                placeholder="Name or description…"
+              />
+            </label>
+            <label className="field-label">
+              <span>Sort</span>
+              <select value={collectionSort} onChange={(event) => setCollectionSort(event.target.value)}>
+                {COLLECTION_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+          </div>
+
           <div className="collection-group">
-            <small className="collection-group-label">Project collections</small>
+            <small className="collection-group-label">
+              Project collections · {visibleUserCollections.length}/{userCollections.length}
+            </small>
             <div className="list-stack">
-              {userCollections.map((entry) => (
+              {visibleUserCollections.map((entry) => (
                 <button
                   className={`list-button collection-list-button ${entry.collection === selected ? 'active' : ''}`}
                   key={entry.collection}
@@ -366,14 +449,15 @@ export function DataModelScreen() {
                 </button>
               ))}
               {userCollections.length === 0 && <p className="muted-line">No project collections yet.</p>}
+              {userCollections.length > 0 && visibleUserCollections.length === 0 && <p className="muted-line">No matching project collections.</p>}
             </div>
           </div>
 
           {systemCollections.length > 0 && (
             <details className="system-collections">
-              <summary>System collections ({systemCollections.length})</summary>
+              <summary>System collections ({visibleSystemCollections.length}/{systemCollections.length})</summary>
               <div className="list-stack">
-                {systemCollections.map((entry) => (
+                {visibleSystemCollections.map((entry) => (
                   <button
                     className={`list-button collection-list-button ${entry.collection === selected ? 'active' : ''}`}
                     key={entry.collection}
@@ -383,6 +467,7 @@ export function DataModelScreen() {
                     <span><strong>{entry.collection}</strong><small>system managed</small></span>
                   </button>
                 ))}
+                {visibleSystemCollections.length === 0 && <p className="muted-line">No matching system collections.</p>}
               </div>
             </details>
           )}
@@ -418,11 +503,38 @@ export function DataModelScreen() {
                       <h3>Fields</h3>
                       <p>Fields define what data each record can store.</p>
                     </div>
-                    <span className="schema-count">{fields.length}</span>
+                    <span className="schema-count">{visibleFields.length}/{fields.length}</span>
+                  </div>
+
+                  <div className="field-list-controls">
+                    <label className="field-label">
+                      <span>Find field</span>
+                      <input
+                        type="search"
+                        value={fieldSearch}
+                        onChange={(event) => setFieldSearch(event.target.value)}
+                        placeholder="Name, type, required…"
+                      />
+                    </label>
+                    <label className="field-label">
+                      <span>Sort fields</span>
+                      <select value={fieldSort} onChange={(event) => setFieldSort(event.target.value)}>
+                        {FIELD_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </label>
+                    {(fieldSearch || fieldSort !== 'name-asc') && (
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() => { setFieldSearch(''); setFieldSort('name-asc'); }}
+                      >
+                        Reset
+                      </button>
+                    )}
                   </div>
 
                   <div className="field-list">
-                    {fields.map((field) => (
+                    {visibleFields.map((field) => (
                       <div className="field-row" key={field.field}>
                         <div className="field-row-main">
                           <strong>{field.field}</strong>
@@ -441,6 +553,9 @@ export function DataModelScreen() {
                         </div>
                       </div>
                     ))}
+                    {fields.length > 0 && visibleFields.length === 0 && (
+                      <div className="inline-info">No fields match this search.</div>
+                    )}
                   </div>
 
                   {!selectedCollection.system && (
