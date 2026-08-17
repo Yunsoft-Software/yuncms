@@ -139,6 +139,7 @@
 - [x] Files-backed branding service/client/API source contracts.
 - [x] Collection icon/search/order/metadata contracts.
 - [x] Data Model V2 source/workspace, drag-order, relation-cleanup and bounded system-field contracts.
+- [x] Shared Studio confirmation dialogs remain distinct from forbidden native browser dialogs.
 - [x] Sidebar hierarchy/direct-Files contracts.
 - [x] EN/TR parity/static key scan plus dynamic field/action/Data Model tab coverage.
 - [ ] Execute the changed test suites and browser/MySQL verification in `todo.md` before calling this exact source state deployment-verified.

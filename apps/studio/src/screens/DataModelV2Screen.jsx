@@ -66,7 +66,7 @@ function reorderCollections(rows, sourceName, targetName) {
 
 export function DataModelV2Screen({ onCollectionsChanged }) {
   const { t } = useI18n();
-  const confirm = useConfirmDialog();
+  const confirmDialog = useConfirmDialog();
   const [collections, setCollections] = useState([]);
   const [selected, setSelected] = useState('');
   const [fields, setFields] = useState([]);
@@ -288,7 +288,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
 
   async function deleteCollection() {
     if (!selectedCollection || selectedCollection.system) return;
-    const accepted = await confirm({
+    const accepted = await confirmDialog({
       title: t('dataModel.deleteCollection'),
       description: t('dataModel.deleteCollectionDescription', { name: selected }),
       confirmLabel: t('dataModel.deleteCollectionAction'),
@@ -338,7 +338,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
 
   async function deleteField(field) {
     if (selectedCollection?.system || field.field === 'id' || isManagedField(field)) return;
-    const accepted = await confirm({
+    const accepted = await confirmDialog({
       title: t('dataModel.deleteField'),
       description: t('dataModel.deleteFieldDescription', { collection: selected, field: field.field }),
       confirmLabel: t('dataModel.deleteFieldAction'),
@@ -380,7 +380,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
 
   async function deleteDirectRelation(relation) {
     const kind = relationKind(relation) === 'o2o' ? 'o2o' : 'm2o';
-    const accepted = await confirm({
+    const accepted = await confirmDialog({
       title: t('dataModel.deleteRelation'),
       description: t('dataModel.deleteRelationDescription', {
         collection: relation.many_collection,
@@ -422,7 +422,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
   }
 
   async function deleteM2M(junctionCollection) {
-    const accepted = await confirm({
+    const accepted = await confirmDialog({
       title: t('dataModel.deleteM2M'),
       description: t('dataModel.deleteM2MDescription', { name: junctionCollection }),
       confirmLabel: t('dataModel.deleteRelationAction'),
