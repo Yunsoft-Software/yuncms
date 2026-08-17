@@ -1,3 +1,5 @@
+import { useI18n } from '../i18n.js';
+
 const DEFAULT_PAGE_SIZES = [10, 25, 50, 100];
 
 function paginationItems(page, totalPages) {
@@ -26,8 +28,10 @@ export function Pagination({
   onPageSizeChange,
   loading = false,
   compact = false,
-  itemLabel = 'items',
+  itemLabel,
 }) {
+  const { t } = useI18n();
+  const label = itemLabel || t('pagination.items');
   const normalizedTotal = Math.max(0, Number(totalItems) || 0);
   const normalizedPageSize = Math.max(1, Number(pageSize) || 1);
   const totalPages = Math.max(1, Math.ceil(normalizedTotal / normalizedPageSize));
@@ -42,10 +46,10 @@ export function Pagination({
   }
 
   return (
-    <nav className={`pagination ${compact ? 'pagination-compact' : ''}`} aria-label={`${itemLabel} pagination`}>
+    <nav className={`pagination ${compact ? 'pagination-compact' : ''}`} aria-label={t('pagination.aria', { label })}>
       <div className="pagination-summary" aria-live="polite">
         <strong>{start}–{end}</strong>
-        <span>of {normalizedTotal} {itemLabel}</span>
+        <span>{t('pagination.ofTotal', { total: normalizedTotal, label })}</span>
       </div>
 
       <div className="pagination-controls">
@@ -54,12 +58,12 @@ export function Pagination({
           type="button"
           disabled={currentPage <= 1 || loading}
           onClick={() => changePage(currentPage - 1)}
-          aria-label="Previous page"
+          aria-label={t('pagination.previousPage')}
         >
           ‹
         </button>
 
-        <div className="pagination-pages" aria-label={`Page ${currentPage} of ${totalPages}`}>
+        <div className="pagination-pages" aria-label={t('pagination.pageOf', { page: currentPage, totalPages })}>
           {items.map((item) => typeof item === 'number' ? (
             <button
               className={`pagination-button ${item === currentPage ? 'active' : ''}`}
@@ -67,7 +71,7 @@ export function Pagination({
               type="button"
               disabled={loading}
               aria-current={item === currentPage ? 'page' : undefined}
-              aria-label={`Page ${item}`}
+              aria-label={t('pagination.page', { page: item })}
               onClick={() => changePage(item)}
             >
               {item}
@@ -82,7 +86,7 @@ export function Pagination({
           type="button"
           disabled={currentPage >= totalPages || loading}
           onClick={() => changePage(currentPage + 1)}
-          aria-label="Next page"
+          aria-label={t('pagination.nextPage')}
         >
           ›
         </button>
@@ -90,7 +94,7 @@ export function Pagination({
 
       {onPageSizeChange && (
         <label className="pagination-size">
-          <span>Per page</span>
+          <span>{t('pagination.perPage')}</span>
           <select
             value={normalizedPageSize}
             disabled={loading}
