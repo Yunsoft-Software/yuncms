@@ -14,6 +14,7 @@
 - [x] No GitHub Actions.
 - [x] No new UI/i18n/icon package for the current Studio pass.
 - [x] Small focused commits; docs/tests travel with source changes.
+- [x] `AGENTS.md` requires regression coverage for every behavior/config/schema/UI/authorization change and keeps `todo.md` as pending verification only, never completed-test history.
 
 ## 1. Runtime / CLI
 
@@ -50,6 +51,7 @@
 - [x] Timestamp/datetime creation supports a safe `CURRENT_TIMESTAMP(3)` default preset.
 - [x] Timestamp/datetime creation supports optional `ON UPDATE CURRENT_TIMESTAMP(3)` automation.
 - [x] Timestamp automation metadata survives later supported physical field edits instead of silently disappearing.
+- [x] Fixed date-time defaults from browser `datetime-local` controls are normalized to MySQL-compatible `YYYY-MM-DD HH:MM:SS` values.
 - [x] Required/default/index mutations with validation and compensation.
 - [x] Field metadata: readonly, hidden, sort, interface and options.
 - [x] Type conversion intentionally excluded from V1.
@@ -113,13 +115,17 @@
 - [x] Scrypt password hashing, email/password login, access/refresh sessions and refresh rotation.
 - [x] Logout current/all sessions and password-change revocation.
 - [x] API tokens.
-- [x] Password-reset and email-verification one-time token flows.
+- [x] Password-reset and email-verification one-time token flows remain available for existing/unverified accounts.
 - [x] Optional SMTP delivery.
 - [x] Login/session/refresh/API-token identity queries include human-readable `role_name` in addition to internal role id.
 - [x] Studio account footer shows email + role name; raw role UUID is not rendered as user-facing identity copy.
 - [x] UsersService read/create/update/delete can be delegated through explicit `yuncms_users` action permissions.
+- [x] Users created through the privileged UsersService management path (Administrator or delegated user manager) are immediately marked email-verified and do not need a verification email before use.
+- [x] First administrator creation uses the same trusted-management behavior.
+- [x] Self password change remains available and revokes sessions; delegated user managers cannot change another user's password.
 - [x] Delegated user managers cannot assign the Administrator role, cannot mutate/delete Administrator accounts and cannot assign the Public role to authenticated users.
 - [x] Self-read remains available for the authenticated user independently from broad user-list permission.
+- [x] Users Studio can render a granted Users list even when Roles: Read is not granted; missing role metadata degrades safely instead of rendering raw role UUIDs or failing the whole screen.
 
 ## 8. Roles / permissions / Public access
 
@@ -133,6 +139,7 @@
 - [x] Permission-managed system resources are explicit: `yuncms_users`, `yuncms_files`, `yuncms_roles` only.
 - [x] `yuncms_users` and `yuncms_files` support action-level read/create/update/delete delegation.
 - [x] `yuncms_roles` supports action-level read delegation only.
+- [x] MySQL JSON metadata flags are accepted whether the driver returns boolean `true` or numeric `1`.
 - [x] Advanced field/filter/validation rules are intentionally rejected for specialized system services until those services can enforce them truthfully.
 - [x] Public role is always forbidden from system-resource permissions.
 - [x] Non-registered internal system resources such as permission records remain fail-closed/non-delegatable.
@@ -165,7 +172,7 @@
 - [x] Legacy light-only Studio controls receive explicit dark-surface normalization, including Data Model, permissions, filters, pagination, file controls and preview surfaces.
 - [x] Field/accountability builders use the same theme variables and collapse to a one-column mobile layout.
 - [x] English and Turkish base dictionaries plus focused current-UI dictionary modules.
-- [x] New field-builder, accountability-field and system-resource permission copy exists in both EN/TR.
+- [x] New field-builder, accountability-field, managed-user and system-resource permission copy exists in both EN/TR.
 - [x] Personal locale preference can override and later return to the server default.
 - [x] Localization core remains pure JS; React hook is a thin adapter.
 
@@ -190,12 +197,14 @@
 - [x] File upload/select/clear/content-preview source contracts and rich preview-kind tests.
 - [x] Sidebar accordion/icon/collapse and role-name/no-UUID source contracts.
 - [x] Dark-mode legacy/new surface contracts.
-- [x] Grouped field builder tests cover field categories, timestamp current-time/auto-update payloads, decimal precision/scale and default accountability options.
+- [x] Grouped field builder tests cover field categories, timestamp current-time/auto-update payloads, decimal precision/scale, browser date-time default normalization and default accountability options.
 - [x] Core timestamp compiler tests cover CURRENT_TIMESTAMP / ON UPDATE validation and schema metadata preservation.
 - [x] Core accountability-field tests cover physical timestamp/FK definitions and actor/date mutation stamping.
 - [x] ItemsService tests cover automatic create/update actor/date injection.
-- [x] System resource permission policy tests cover bounded resources, action-only rules, protected actions and Public-role denial.
+- [x] System resource permission policy tests cover bounded resources, numeric/boolean MySQL metadata flags, action-only rules, protected actions and Public-role denial.
 - [x] Delegated Users/Files/Roles service tests cover permission reuse and privilege-escalation guards.
+- [x] UsersService tests cover immediate verification for management-created users, preserved self password-change/session-revocation behavior and delegated password-change denial.
+- [x] Users Studio source tests cover graceful operation without Roles: Read and no raw role-id fallback.
 - [x] Studio system-resource matrix tests cover system labels, protected actions and Public-role UI behavior.
 - [x] O2O deterministic unique-index and single-lock FK+UNIQUE lifecycle contracts.
 - [x] O2O API route/audit source contract.
@@ -205,6 +214,7 @@
 ## 13. Documentation / handoff
 
 - [x] README + architecture/development/database/REST/auth/permissions/extensions/setup/files/security/deployment/publishing docs.
+- [x] Authentication docs describe management-created verified users and fresh port 3008 URLs.
 - [x] Permissions documentation describes bounded system-resource delegation and escalation guards.
 - [x] Studio customization/localization and production-readiness docs.
 - [x] `todo.md` contains only outstanding Codex/runtime/browser/MySQL/provider checks; completed `[x]` history removed.
