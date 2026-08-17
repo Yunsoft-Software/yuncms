@@ -7,6 +7,7 @@ import './styles.css';
 import './ui-improvements.css';
 import './usability-pass.css';
 import './appearance.css';
+import './roles-polish.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
