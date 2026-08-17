@@ -4,6 +4,7 @@ import { App } from './App.jsx';
 import { DialogProvider } from './components/DialogProvider.jsx';
 import './styles.css';
 import './ui-improvements.css';
+import './usability-pass.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
