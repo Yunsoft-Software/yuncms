@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { API_URL, apiRequest, health, logout, readSession, subscribeSession } from './api.js';
-import { isContentCollection } from './collection-visibility.js';
+import { collectionUi, sortContentCollections } from './collection-ui.js';
+import { CollectionIcon } from './components/CollectionIcon.jsx';
 import { LanguageSwitcher, StudioBrand, YunsoftFooter } from './components/StudioBrand.jsx';
 import { SidebarIcon } from './components/SidebarIcon.jsx';
 import { useI18n } from './i18n.js';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
-import { CollectionVisibilityScreen } from './screens/CollectionVisibilityScreen.jsx';
 import { ContentScreen } from './screens/ContentScreen.jsx';
 import { DataModelScreen } from './screens/DataModelScreen.jsx';
 import { FilesScreen } from './screens/FilesScreen.jsx';
@@ -15,12 +15,7 @@ import { LoginScreen } from './screens/LoginScreen.jsx';
 import { RolesPermissionsScreen } from './screens/RolesPermissionsScreen.jsx';
 import { UsersScreen } from './screens/UsersScreen.jsx';
 
-const librarySections = [
-  { id: 'files', labelKey: 'nav.files', icon: 'files' },
-];
-
 const settingsSections = [
-  { id: 'content-visibility', labelKey: 'nav.contentVisibility', icon: 'visibility' },
   { id: 'data-model', labelKey: 'nav.dataModel', icon: 'model' },
   { id: 'users', labelKey: 'nav.users', icon: 'users' },
   { id: 'roles', labelKey: 'nav.roles', icon: 'roles' },
@@ -29,7 +24,6 @@ const settingsSections = [
 
 function sectionCopy(section, t) {
   const copy = {
-    'content-visibility': ['section.visibilityTitle', 'section.visibilityDescription'],
     'data-model': ['section.dataModelTitle', 'section.dataModelDescription'],
     users: ['section.usersTitle', 'section.usersDescription'],
     roles: ['section.rolesTitle', 'section.rolesDescription'],
@@ -89,7 +83,7 @@ export function App() {
   const [healthState, setHealthState] = useState('checking');
   const [loggingOut, setLoggingOut] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [groups, setGroups] = useState({ content: true, library: true, settings: true });
+  const [groups, setGroups] = useState({ content: true, settings: true });
 
   useEffect(() => subscribeSession(() => setSession(readSession())), []);
 
@@ -99,27 +93,38 @@ export function App() {
       .catch(() => setHealthState('offline'));
   }, []);
 
+  async function loadNavigationCollections() {
+    try {
+      const response = await apiRequest('/schema/collections');
+      const visible = sortContentCollections(response?.data ?? []);
+      setContentCollections(visible);
+      setContentCollection((current) => (
+        visible.some((entry) => entry.collection === current)
+          ? current
+          : visible[0]?.collection || ''
+      ));
+    } catch {
+      setContentCollections([]);
+    }
+  }
+
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-
-    async function loadNavigationCollections() {
-      try {
-        const response = await apiRequest('/schema/collections');
+    apiRequest('/schema/collections')
+      .then((response) => {
         if (cancelled) return;
-        const visible = (response?.data ?? []).filter(isContentCollection);
+        const visible = sortContentCollections(response?.data ?? []);
         setContentCollections(visible);
         setContentCollection((current) => (
           visible.some((entry) => entry.collection === current)
             ? current
             : visible[0]?.collection || ''
         ));
-      } catch {
+      })
+      .catch(() => {
         if (!cancelled) setContentCollections([]);
-      }
-    }
-
-    loadNavigationCollections();
+      });
     return () => { cancelled = true; };
   }, [session?.user?.id, section]);
 
@@ -130,8 +135,7 @@ export function App() {
     : sectionCopy(section, t);
 
   const activeScreen = useMemo(() => {
-    if (section === 'content-visibility') return <CollectionVisibilityScreen />;
-    if (section === 'data-model') return <DataModelScreen />;
+    if (section === 'data-model') return <DataModelScreen onCollectionsChanged={loadNavigationCollections} />;
     if (section === 'users') return <UsersScreen currentUserId={session?.user?.id} />;
     if (section === 'roles') return <RolesPermissionsScreen />;
     if (section === 'files') return <FilesScreen />;
@@ -162,9 +166,9 @@ export function App() {
     setGroups((current) => ({ ...current, [group]: !current[group] }));
   }
 
-  function openSection(nextSection, group) {
+  function openSection(nextSection, group = null) {
     setSection(nextSection);
-    setGroups((current) => ({ ...current, [group]: true }));
+    if (group) setGroups((current) => ({ ...current, [group]: true }));
   }
 
   if (authAction) {
@@ -219,14 +223,14 @@ export function App() {
             {contentCollections.map((entry) => (
               <button
                 key={entry.collection}
-                className={`nav-item nav-item-child ${section === 'content' && contentCollection === entry.collection ? 'active' : ''}`}
+                className={`nav-item nav-item-child collection-nav-item ${section === 'content' && contentCollection === entry.collection ? 'active' : ''}`}
                 type="button"
                 onClick={() => {
                   setContentCollection(entry.collection);
                   openSection('content', 'content');
                 }}
               >
-                <SidebarIcon name="content" size={15} />
+                <CollectionIcon name={collectionUi(entry).icon} size={16} />
                 <span className="nav-item-label">{entry.collection}</span>
               </button>
             ))}
@@ -236,32 +240,21 @@ export function App() {
                 type="button"
                 onClick={() => openSection('data-model', 'settings')}
               >
-                <SidebarIcon name="model" size={15} />
+                <SidebarIcon name="model" size={16} />
                 <span className="nav-item-label">{t('nav.createFirstCollection')}</span>
               </button>
             )}
           </AccordionGroup>
 
-          <AccordionGroup
-            id="library"
-            label={t('nav.library')}
-            icon="files"
-            open={groups.library}
-            collapsed={sidebarCollapsed}
-            onToggle={() => toggleGroup('library')}
+          <button
+            className={`nav-item nav-item-root ${section === 'files' ? 'active' : ''}`}
+            type="button"
+            title={sidebarCollapsed ? t('nav.files') : undefined}
+            onClick={() => openSection('files')}
           >
-            {librarySections.map((item) => (
-              <button
-                key={item.id}
-                className={`nav-item ${section === item.id ? 'active' : ''}`}
-                type="button"
-                onClick={() => openSection(item.id, 'library')}
-              >
-                <SidebarIcon name={item.icon} />
-                <span className="nav-item-label">{t(item.labelKey)}</span>
-              </button>
-            ))}
-          </AccordionGroup>
+            <SidebarIcon name="files" />
+            <span className="nav-item-label">{t('nav.files')}</span>
+          </button>
 
           <AccordionGroup
             id="settings"
@@ -274,11 +267,11 @@ export function App() {
             {settingsSections.map((item) => (
               <button
                 key={item.id}
-                className={`nav-item ${section === item.id ? 'active' : ''}`}
+                className={`nav-item nav-item-child ${section === item.id ? 'active' : ''}`}
                 type="button"
                 onClick={() => openSection(item.id, 'settings')}
               >
-                <SidebarIcon name={item.icon} />
+                <SidebarIcon name={item.icon} size={16} />
                 <span className="nav-item-label">{t(item.labelKey)}</span>
               </button>
             ))}
