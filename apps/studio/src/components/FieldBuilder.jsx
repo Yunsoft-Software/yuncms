@@ -24,7 +24,7 @@ function TypeCard({ option, active, onSelect, t }) {
   );
 }
 
-export function FieldBuilder({ form, setForm, onSubmit, onCancel }) {
+export function FieldBuilder({ form, setForm, onSubmit, onCancel, allowRequired = true }) {
   const { t } = useI18n();
   const isMedia = form.type === 'file' || form.type === 'image';
   const canValueDefault = !isMedia && supportsValueDefault(form.type);
@@ -35,6 +35,7 @@ export function FieldBuilder({ form, setForm, onSubmit, onCancel }) {
     setForm((current) => ({
       ...current,
       type,
+      required: allowRequired ? current.required : false,
       defaultMode: 'none',
       defaultValue: '',
       autoUpdate: false,
@@ -119,16 +120,20 @@ export function FieldBuilder({ form, setForm, onSubmit, onCancel }) {
             </div>
           )}
 
-          <div className="field-builder-switches">
-            <label className="field-option-card">
-              <input
-                type="checkbox"
-                checked={form.required}
-                onChange={(event) => setForm((current) => ({ ...current, required: event.target.checked }))}
-              />
-              <span><strong>{t('fieldBuilder.required')}</strong><small>{t('fieldBuilder.requiredHint')}</small></span>
-            </label>
-          </div>
+          {allowRequired ? (
+            <div className="field-builder-switches">
+              <label className="field-option-card">
+                <input
+                  type="checkbox"
+                  checked={form.required}
+                  onChange={(event) => setForm((current) => ({ ...current, required: event.target.checked }))}
+                />
+                <span><strong>{t('fieldBuilder.required')}</strong><small>{t('fieldBuilder.requiredHint')}</small></span>
+              </label>
+            </div>
+          ) : (
+            <div className="inline-info">{t('fieldBuilder.systemExtensionOptional')}</div>
+          )}
 
           {(canValueDefault || canNow) && (
             <div className="field-default-panel">
