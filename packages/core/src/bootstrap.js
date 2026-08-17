@@ -5,6 +5,7 @@ import { sessionAccessTokensMigration } from './migrations/0002-session-access-t
 import { publicRoleConstraintsMigration } from './migrations/0003-public-role-constraints.js';
 import { authActionTokensMigration } from './migrations/0004-auth-action-tokens.js';
 import { readSchemaVersion } from './schema-version.js';
+import { ensurePublicRole } from './setup.js';
 
 export const CORE_MIGRATIONS = Object.freeze([
   systemSchemaMigration,
@@ -23,10 +24,16 @@ export async function bootstrapDatabase(pool, { lockTimeoutSeconds = 10 } = {}) 
     'yuncms:bootstrap',
     async (connection) => {
       const migrationResult = await applyMigrations(connection, CORE_MIGRATIONS);
+      const publicRole = await ensurePublicRole(connection);
       const schemaVersion = await readSchemaVersion(connection);
 
       return {
         ...migrationResult,
+        publicRole: {
+          id: publicRole.id,
+          name: publicRole.name,
+          created: publicRole.created,
+        },
         schemaVersion,
       };
     },
