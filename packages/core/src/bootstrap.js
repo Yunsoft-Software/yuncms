@@ -28,13 +28,14 @@ export async function bootstrapDatabase(pool, { lockTimeoutSeconds = 10 } = {}) 
       const migrationResult = await applyMigrations(connection, CORE_MIGRATIONS);
       const publicRole = await ensurePublicRole(connection);
       const schemaVersion = await readSchemaVersion(connection);
+      const publicRoleMigrated = migrationResult.newlyApplied.includes(defaultPublicRoleMigration.id);
 
       return {
         ...migrationResult,
         publicRole: {
           id: publicRole.id,
           name: publicRole.name,
-          created: publicRole.created,
+          created: publicRole.created || publicRoleMigrated,
         },
         schemaVersion,
       };
