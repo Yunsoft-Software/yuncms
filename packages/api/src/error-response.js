@@ -87,6 +87,12 @@ const SAFE_DATABASE_MESSAGES = new Map([
 ]);
 
 function normalizeApiError(error) {
+  if (error?.type === 'entity.parse.failed') {
+    const normalized = new Error('Request body contains invalid JSON');
+    normalized.code = 'INVALID_PAYLOAD';
+    normalized.cause = error;
+    return normalized;
+  }
   if (error?.type === 'entity.too.large') {
     const normalized = new Error('Request body exceeds the configured upload limit');
     normalized.code = 'PAYLOAD_TOO_LARGE';
