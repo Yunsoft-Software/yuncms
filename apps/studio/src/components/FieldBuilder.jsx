@@ -5,6 +5,7 @@ import {
   supportsValueDefault,
 } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
+import { schemaKeyFromName } from '../schema-name.js';
 
 function TypeCard({ option, active, onSelect, t }) {
   return (
@@ -39,6 +40,14 @@ export function FieldBuilder({ form, setForm, onSubmit, onCancel, allowRequired 
       defaultMode: 'none',
       defaultValue: '',
       autoUpdate: false,
+    }));
+  }
+
+  function changeName(value) {
+    setForm((current) => ({
+      ...current,
+      name: value,
+      field: current.keyTouched ? current.field : schemaKeyFromName(value, 'field'),
     }));
   }
 
@@ -83,15 +92,26 @@ export function FieldBuilder({ form, setForm, onSubmit, onCancel, allowRequired 
           </div>
 
           <label className="field-label field-key-input">
-            <span>{t('dataModel.fieldName')}</span>
+            <span>{t('fieldBuilder.displayName')}</span>
             <input
-              value={form.field}
-              onChange={(event) => setForm((current) => ({ ...current, field: event.target.value }))}
-              placeholder={isMedia ? (form.type === 'image' ? 'cover_image' : 'attachment') : 'title'}
+              value={form.name || ''}
+              onChange={(event) => changeName(event.target.value)}
+              placeholder={isMedia ? (form.type === 'image' ? t('fieldBuilder.coverImageExample') : t('fieldBuilder.attachmentExample')) : t('fieldBuilder.titleExample')}
               required
               autoFocus
             />
-            <small>{t('fieldBuilder.keyHint')}</small>
+            <small>{t('fieldBuilder.displayNameHint')}</small>
+          </label>
+
+          <label className="field-label field-machine-key-input">
+            <span>{t('fieldBuilder.apiKey')}</span>
+            <input
+              value={form.field || ''}
+              onChange={(event) => setForm((current) => ({ ...current, field: schemaKeyFromName(event.target.value, 'field'), keyTouched: true }))}
+              placeholder={isMedia ? (form.type === 'image' ? 'cover_image' : 'attachment') : 'title'}
+              required
+            />
+            <small>{t('fieldBuilder.apiKeyHint')}</small>
           </label>
 
           {form.type === 'string' && (
