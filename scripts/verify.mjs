@@ -32,6 +32,7 @@ const FAST_TESTS = [
   'packages/api/test/production-app-config.test.js',
   'packages/api/test/rate-limit.test.js',
   'packages/api/test/security-headers.test.js',
+  'packages/api/test/studio-settings.test.js',
   'packages/api/test/studio.test.js',
   'packages/cli/test/cli.test.js',
   'packages/extensions-sdk/test/sdk.test.js',
