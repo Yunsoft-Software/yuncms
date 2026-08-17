@@ -81,6 +81,21 @@ test('Studio settings migration creates one safe branding/settings row', () => {
   assert.match(migration.statements[1], /https:\/\/yunsoft\.com\/light-logo\.png/);
 });
 
+test('system permission resources migration is required and registers only bounded resources', () => {
+  const migration = CORE_MIGRATIONS.find(({ id }) => id === '0007-system-permission-resources');
+  assert.ok(migration);
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0007-system-permission-resources'));
+  const source = migration.statements.join('\n');
+  assert.match(source, /'yuncms_users'/);
+  assert.match(source, /'yuncms_files'/);
+  assert.match(source, /'yuncms_roles'/);
+  assert.match(source, /'permissionManaged', TRUE/);
+  assert.match(source, /'allowedActions', JSON_ARRAY\('read'\)/);
+  assert.doesNotMatch(source, /'yuncms_permissions'.*permissionManaged/s);
+  assert.doesNotMatch(source, /password_hash/);
+  assert.equal(CORE_MIGRATIONS.at(-1).id, '0007-system-permission-resources');
+});
+
 test('advisory lock uses one connection and always releases it', async () => {
   const calls = [];
   let released = false;
