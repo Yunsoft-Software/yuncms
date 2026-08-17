@@ -1,5 +1,7 @@
 import { loadEnvFile } from 'node:process';
 
+export const DEFAULT_SERVER_PORT = 3008;
+
 function readInteger(value, fallback, name, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   if (value === undefined || value === '') return fallback;
 
@@ -33,7 +35,7 @@ export function loadEnvFileIfPresent(path = '.env') {
 }
 
 export function loadConfig(env = process.env) {
-  const serverPort = readInteger(env.PORT, 3008, 'PORT', { min: 1, max: 65535 });
+  const serverPort = readInteger(env.PORT, DEFAULT_SERVER_PORT, 'PORT', { min: 1, max: 65535 });
   const studioOrigin = readString(env.STUDIO_ORIGIN, `http://localhost:${serverPort}`);
 
   return {
