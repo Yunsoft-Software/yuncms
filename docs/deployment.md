@@ -10,7 +10,7 @@ YunCMS V1 targets Node.js 24 LTS with a MySQL 8-compatible server.
 - persistent local storage or configured S3-compatible bucket;
 - optional SMTP for password reset/email verification.
 
-Expose the API through a production reverse proxy/TLS terminator when internet-facing.
+Expose YunCMS through a production reverse proxy/TLS terminator when internet-facing.
 
 ## Startup flow
 
@@ -19,10 +19,10 @@ Expose the API through a production reverse proxy/TLS terminator when internet-f
 2. provide environment variables
 3. yuncms bootstrap
 4. yuncms start
-5. serve the built Studio separately/from the chosen web deployment
+5. reverse proxy/TLS -> the single YunCMS API + built Studio port
 ```
 
-`yuncms start` does not silently migrate an outdated DB. Startup checks required migrations before listening.
+`yuncms start` does not silently migrate an outdated DB. Startup checks required migrations before listening. After upgrading a version that introduces migrations (including `0005-default-public-role`), run `yuncms bootstrap` before restarting the API.
 
 ## Environment
 
@@ -31,6 +31,7 @@ Minimal DB/API example:
 ```text
 HOST=127.0.0.1
 PORT=3008
+TRUST_PROXY_HOPS=1
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=yuncms
@@ -38,12 +39,27 @@ DB_USER=yuncms
 DB_PASSWORD=...
 DB_CONNECTION_LIMIT=10
 DB_SSL=false
-STUDIO_ORIGIN=https://studio.example.com
+STUDIO_ORIGIN=https://cms.example.com
+AUTH_PUBLIC_URL=https://cms.example.com
 ```
+
+`TRUST_PROXY_HOPS=0` is the safe default when YunCMS is reached directly. When using a known reverse-proxy chain, set the exact hop count so Express `req.ip`, authentication session IP metadata and process-local rate limiting use the intended client address. Do not blindly enable forwarded-address trust on an unknown proxy topology.
 
 Use a least-privilege MySQL user scoped to the YunCMS database but able to perform the DDL required by the dynamic schema engine.
 
 `.env.example` also documents local/S3 storage, SMTP, auth rate limits, audit cleanup defaults and logging.
+
+## Public CMS access
+
+Bootstrap guarantees one protected Public role but grants it no collection permissions.
+
+For public content, explicitly configure only the needed permissions in Studio:
+
+- public articles/pages: `Read`, preferably with a published/status row filter and field allowlist;
+- public submission/contact forms: `Create` only, with restricted fields and validation;
+- avoid public `Update/Delete` unless the product explicitly requires them.
+
+Anonymous requests use the normal permission engine; there is no separate public-data bypass.
 
 ## Local storage
 
@@ -100,7 +116,7 @@ Shared MySQL schema mutation is serialized through advisory locks, but multi-ins
 - trusted extension code executes in each API process;
 - graceful deployment/draining before force termination.
 
-Redis/shared rate-limit infrastructure is not required for a single-process V1, but may become necessary when horizontally scaling authentication traffic.
+Redis/shared rate-limit infrastructure is not required for a single-process V1, but a shared limiter or equivalent edge policy is required if one cluster-wide authentication budget is a production requirement.
 
 ## TLS and HTTP headers
 
@@ -109,8 +125,9 @@ The API applies baseline application headers and narrow Studio CORS. Configure a
 - HTTPS certificates;
 - HTTP-to-HTTPS redirect;
 - HSTS once HTTPS is guaranteed;
-- trusted proxy/client IP behavior as appropriate;
-- body/request limits consistent with `FILES_MAX_UPLOAD_BYTES`.
+- correct `TRUST_PROXY_HOPS` for the deployed proxy topology;
+- body/request limits consistent with `FILES_MAX_UPLOAD_BYTES`;
+- a generic edge rate policy when exposing high-traffic public content endpoints.
 
 ## Backups
 
@@ -137,12 +154,43 @@ Monitor at minimum:
 - auth rate-limit spikes;
 - extension startup failures.
 
+## Verification commands
+
+Normal coding:
+
+```bash
+npm run test:fast
+```
+
+Complete source suite:
+
+```bash
+npm test
+```
+
+Release source/build/package gate:
+
+```bash
+npm run test:release
+```
+
+For a disposable MySQL integration DB whose name contains `test`, `ci` or `dev`:
+
+```bash
+YUNCMS_TEST_MYSQL=1 \
+YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1 \
+DB_DATABASE=yuncms_test \
+npm run test:release
+```
+
+See `docs/testing.md` and `docs/production-readiness.md` for the complete gate and current source-audit status.
+
 ## Release gate
 
 Do not call a deployment production-ready because source code exists. Complete applicable `todo.md` checks for:
 
 - dependency install/lockfile/tests/build;
-- bootstrap idempotency;
+- bootstrap idempotency and migration `0005` on upgrades;
 - real MySQL schema/CRUD/relation/RBAC/auth behavior;
 - Studio smoke/accessibility;
 - local/S3 file behavior + reconciliation;
