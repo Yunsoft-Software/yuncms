@@ -16,7 +16,7 @@ const schema = {
       collection: 'yuncms_users',
       system: true,
       metadata: {
-        permissionManaged: true,
+        permissionManaged: 1,
         permissionMode: 'action-only',
         resource: 'users',
         allowedActions: ['read', 'create', 'update', 'delete'],
