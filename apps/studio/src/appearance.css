@@ -181,45 +181,38 @@ button:focus-visible {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-inline: 6px;
+  padding-inline: 4px;
 }
 
 .studio-brand.compact {
-  gap: 7px;
+  justify-content: center;
   padding: 0;
 }
 
 .studio-brand-logo {
   width: auto;
-  max-width: 138px;
-  height: 36px;
+  max-width: 146px;
+  height: 38px;
   object-fit: contain;
   object-position: left center;
 }
 
 .studio-brand.compact .studio-brand-logo {
-  max-width: 94px;
-  height: 26px;
+  max-width: 42px;
+  height: 28px;
 }
 
-.studio-brand-copy {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.studio-brand-copy strong {
-  overflow: hidden;
-  color: var(--studio-text);
+.studio-brand-fallback {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--studio-accent-border);
+  border-radius: 10px;
+  background: var(--studio-accent-soft);
+  color: var(--studio-accent);
   font-size: 15px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.studio-brand-copy span {
-  color: var(--studio-text-muted);
-  font-size: 11px;
+  font-weight: 800;
 }
 
 .yunsoft-footer {
@@ -382,6 +375,417 @@ button:focus-visible {
   font-size: 12px;
 }
 
+/* Sidebar interaction */
+.studio-shell {
+  transition: grid-template-columns 160ms ease;
+}
+
+.studio-shell.sidebar-collapsed {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.sidebar {
+  overflow-x: hidden;
+  transition: padding 160ms ease;
+}
+
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 42px;
+}
+
+.sidebar-collapse-button,
+.nav-group-trigger {
+  border: 0;
+  background: transparent;
+  color: var(--studio-text-muted);
+}
+
+.sidebar-collapse-button {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+}
+
+.sidebar-collapse-button:hover,
+.nav-group-trigger:hover {
+  background: var(--studio-surface-hover);
+  color: var(--studio-text);
+}
+
+.sidebar-nav {
+  gap: 7px;
+}
+
+.nav-group {
+  display: grid;
+  gap: 4px;
+}
+
+.nav-group-trigger {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  text-align: left;
+}
+
+.nav-group-title,
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-group-title {
+  min-width: 0;
+  color: var(--studio-text-soft);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: .025em;
+}
+
+.nav-group-trigger .sidebar-icon,
+.nav-item .sidebar-icon {
+  flex: 0 0 auto;
+}
+
+.nav-chevron {
+  display: inline-flex;
+  transition: transform 150ms ease;
+}
+
+.nav-group.open .nav-chevron {
+  transform: rotate(90deg);
+}
+
+.nav-group-children {
+  display: grid;
+  gap: 3px;
+}
+
+.nav-group-children[hidden] {
+  display: none;
+}
+
+.nav-item {
+  justify-content: flex-start;
+  min-height: 38px;
+}
+
+.nav-item-child {
+  padding-left: 18px;
+}
+
+.nav-item-label,
+.nav-label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-collapsed .sidebar {
+  padding-inline: 12px;
+}
+
+.sidebar-collapsed .sidebar-brand-row {
+  flex-direction: column;
+  justify-content: center;
+  min-height: 78px;
+}
+
+.sidebar-collapsed .sidebar-collapse-button {
+  transform: rotate(180deg);
+}
+
+.sidebar-collapsed .nav-group-trigger {
+  justify-content: center;
+  padding-inline: 8px;
+}
+
+.sidebar-collapsed .nav-label-text,
+.sidebar-collapsed .nav-chevron,
+.sidebar-collapsed .sidebar-account,
+.sidebar-collapsed .sidebar-api-address,
+.sidebar-collapsed .sidebar-footer-text,
+.sidebar-collapsed .sidebar-branding-footer {
+  display: none;
+}
+
+.sidebar-collapsed .sidebar-health {
+  justify-content: center;
+}
+
+/* Relation builder */
+.relation-type-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.relation-type-card {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--studio-border);
+  border-radius: 11px;
+  background: var(--studio-surface-muted);
+  color: var(--studio-text-soft);
+  text-align: left;
+}
+
+.relation-type-card strong {
+  color: var(--studio-text);
+  font-size: 13px;
+}
+
+.relation-type-card small {
+  color: var(--studio-text-muted);
+  line-height: 1.4;
+}
+
+.relation-type-card:hover,
+.relation-type-card.active {
+  border-color: var(--studio-accent-border);
+  background: var(--studio-accent-soft);
+}
+
+.relation-existing-panel,
+.relation-create-card {
+  display: grid;
+  gap: 14px;
+}
+
+.relation-existing-panel {
+  padding: 18px;
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  background: var(--studio-surface);
+}
+
+.relation-summary-row > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 3px 8px;
+}
+
+.relation-summary-row small {
+  grid-column: 2;
+  color: var(--studio-text-muted);
+}
+
+.relation-kind-pill {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.relation-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field-interface-info {
+  background: var(--studio-accent-soft);
+  border-color: var(--studio-accent-border);
+}
+
+/* File/image field picker and previews */
+.file-field-label {
+  grid-column: 1 / -1;
+}
+
+.file-field-control {
+  display: grid;
+  gap: 10px;
+}
+
+.file-field-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.file-field-upload {
+  min-height: 41px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.file-field-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.file-field-upload.disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.file-field-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  background: var(--studio-surface-muted);
+}
+
+.file-field-preview-media,
+.file-value-thumb {
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--studio-border-soft);
+  border-radius: 8px;
+  background: var(--studio-surface);
+}
+
+.file-field-preview-media {
+  width: 92px;
+  height: 72px;
+}
+
+.file-field-preview-media > *,
+.file-field-preview-media img,
+.file-value-thumb > *,
+.file-value-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.file-field-preview-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.file-field-preview-copy strong,
+.file-value-preview span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-field-preview-copy small {
+  color: var(--studio-text-muted);
+  font-weight: 450;
+}
+
+.file-field-preview-copy .text-button {
+  justify-self: start;
+}
+
+.file-value-preview {
+  min-width: 130px;
+  max-width: 230px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-value-thumb {
+  width: 38px;
+  height: 38px;
+}
+
+.file-id-fallback {
+  color: var(--studio-text-muted);
+}
+
+.field-error {
+  color: #c84c4c;
+}
+
+/* Normalize legacy light-only surfaces */
+.field-choice,
+.control-placeholder,
+.status-pill,
+.segmented-control,
+.pagination-footer,
+.file-dropzone,
+.file-picker-label,
+.permission-toggle,
+.filter-chip,
+.system-collections summary,
+.sort-header-button {
+  border-color: var(--studio-border);
+  color: var(--studio-text-soft);
+}
+
+.field-choice,
+.control-placeholder,
+.pagination-footer,
+.file-dropzone,
+.file-picker-label {
+  background: var(--studio-surface-muted);
+}
+
+.segmented-control button,
+.sort-header-button {
+  background: transparent;
+  color: var(--studio-text-soft);
+}
+
+.segmented-control button.active {
+  background: var(--studio-surface);
+  color: var(--studio-text);
+}
+
+:root[data-theme="dark"] .field-row,
+:root[data-theme="dark"] .permission-matrix-heading,
+:root[data-theme="dark"] .field-choice,
+:root[data-theme="dark"] .secondary-button,
+:root[data-theme="dark"] .control-placeholder,
+:root[data-theme="dark"] .pagination-footer,
+:root[data-theme="dark"] .file-dropzone,
+:root[data-theme="dark"] .file-picker-label,
+:root[data-theme="dark"] .appearance-preview-card,
+:root[data-theme="dark"] .relation-existing-panel,
+:root[data-theme="dark"] .file-field-preview-card {
+  background: var(--studio-surface-muted);
+  border-color: var(--studio-border);
+  color: var(--studio-text);
+}
+
+:root[data-theme="dark"] .status-pill,
+:root[data-theme="dark"] .segmented-control,
+:root[data-theme="dark"] .language-switcher {
+  background: var(--studio-surface-muted);
+  border-color: var(--studio-border);
+}
+
+:root[data-theme="dark"] .segmented-control button.active,
+:root[data-theme="dark"] .language-switcher button.active {
+  background: var(--studio-surface-hover);
+}
+
+:root[data-theme="dark"] input[type="file"]::file-selector-button {
+  background: var(--studio-surface-hover);
+  color: var(--studio-text);
+  border-color: var(--studio-border);
+}
+
 :root[data-theme="dark"] .error-banner {
   border-color: #6b3439;
   background: #2b181c;
@@ -399,6 +803,12 @@ button:focus-visible {
   background: #2b181c;
 }
 
+@media (max-width: 1100px) {
+  .relation-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 @media (max-width: 920px) {
   .appearance-layout {
     grid-template-columns: 1fr;
@@ -406,6 +816,43 @@ button:focus-visible {
 
   .appearance-preview {
     position: static;
+  }
+
+  .relation-type-picker {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .studio-shell,
+  .studio-shell.sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    min-height: auto;
+    position: static;
+  }
+
+  .sidebar-collapsed .sidebar-brand-row {
+    flex-direction: row;
+  }
+
+  .sidebar-collapsed .nav-label-text,
+  .sidebar-collapsed .nav-chevron,
+  .sidebar-collapsed .sidebar-account,
+  .sidebar-collapsed .sidebar-footer-text,
+  .sidebar-collapsed .sidebar-branding-footer {
+    display: initial;
+  }
+
+  .sidebar-collapsed .sidebar-api-address {
+    display: block;
+  }
+
+  .relation-form-grid,
+  .file-field-picker-row {
+    grid-template-columns: 1fr;
   }
 }
 
