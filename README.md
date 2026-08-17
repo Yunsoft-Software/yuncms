@@ -1,174 +1,494 @@
 # YunCMS
 
-YunCMS is a small reusable Node.js backend platform for projects that need the Directus-style capabilities we use most without carrying the whole Directus product surface.
+**A fast, programmable MySQL CMS/backend with a focused React Studio, strong RBAC and an API you can understand without reverse-engineering the product.**
 
-It is an independent implementation, not a fork and not a Directus API-compatibility project.
+YunCMS is an independent, Directus-inspired backend project from **Yunsoft**. The goal is not to reproduce every feature of a giant headless CMS. The goal is to make the high-value parts — dynamic collections, fields, relations, permissions, Files, authentication and extensions — clean enough to build real products on top of them.
 
-## Project status and responsibility
+> YunCMS is currently pre-stable (`0.1.x`). The API and Studio are moving quickly. Use the documented migration/bootstrap flow and verify the current release checklist before production deployment.
 
-YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com).
+---
 
-YunCMS is under active development and should be treated as pre-stable software. APIs, migrations, configuration and behavior may change between releases. Test upgrades in a staging environment, keep verified backups and review [`todo.md`](./todo.md) before using YunCMS in production.
+## Why YunCMS?
 
-Use YunCMS at your own risk. The software is provided under the [MIT License](./LICENSE) without warranty; Yunsoft Software is not responsible for data loss, downtime, security incidents or other damage resulting from its use.
+Most applications need the same foundation:
 
-## Baseline
+- a database schema that can evolve without writing a custom admin panel every week;
+- a usable place for operators to manage data;
+- a REST API with real filtering, sorting and pagination;
+- authentication and role-based access control;
+- file storage and previews;
+- relations that are actually enforced by the database;
+- enough extension points to add product-specific behavior without forking the core.
 
-- Node.js 24 LTS
-- JavaScript / ESM
-- Express 5 REST API
-- MySQL only via `mysql2/promise`
-- React 19.2 Studio with Vite 8
-- npm workspaces
-- no GraphQL
-- no ORM/query builder
-- no GitHub Actions
-
-See [`plan.md`](./plan.md) for source status, [`AGENTS.md`](./AGENTS.md) for implementation rules and [`todo.md`](./todo.md) for checks that still require a real install/MySQL/provider/runtime environment.
-
-## Repository
+YunCMS puts those pieces behind a deliberately small architecture:
 
 ```text
-apps/studio                React administration UI
-packages/api               Express API/runtime and REST adapters
-packages/core              MySQL/schema/items/auth/RBAC/files/audit runtime
-packages/extensions-sdk    defineEndpoint/defineHook authoring helpers
-packages/cli               init/bootstrap/start CLI
-examples/extensions        endpoint + hook examples
-docs                       architecture/operations/security/API docs
+React Studio
+    │
+    ▼
+Express REST API
+    │
+    ▼
+Core services + accountability + RBAC
+    │
+    ▼
+mysql2/promise
+    │
+    ▼
+MySQL
 ```
 
-## Current V1 source surface
+No GraphQL layer. No ORM abstraction. No second SQL dialect hidden in the codebase.
 
-### Schema and data
+---
 
-- versioned MySQL bootstrap/migration journal;
-- schema version/cache and advisory-lock serialized DDL;
-- collection/field create/read/update/destructive-delete lifecycles;
-- field required/default/index mutations;
-- M2O create/delete + O2M inverse metadata;
-- M2M junction create + high-level destructive junction delete;
-- generic ItemsService CRUD;
-- allowlisted fields/filter/sort/limit/offset query language;
-- one-level direct M2O `expand` reads with source/target RBAC preserved.
+# What you get
 
-### Authentication and RBAC
+## Dynamic Data Model
 
-- scrypt password hashing;
-- opaque access/refresh sessions with rotation/revocation;
-- API tokens;
-- password reset + email verification one-time tokens;
-- Nodemailer SMTP delivery;
-- process-local configurable auth rate limits;
-- public/admin/system accountability;
-- role CRUD, permission field allowlists, row filters and create/update validation;
-- request-local permission cache;
-- auth responses marked `no-store`.
+Create project collections, fields and relations from Studio or through the Schema API.
 
-### Extensions
+Supported field families include:
 
-- `defineEndpoint` / `defineHook` SDK;
-- local and npm dependency discovery;
-- authenticated endpoint mount under `/extensions/<id>`;
-- filter/action/init hooks with recursion protection;
-- trusted context with services/database/schema/accountability/logger/storage;
-- direct service use; no YunCMS self-HTTP requirement.
+- short text / long text;
+- integer / bigint / decimal;
+- boolean;
+- date / datetime / timestamp;
+- JSON;
+- UUID;
+- semantic File / Image references.
 
-### Files, audit and operations
+Relations:
 
-- local storage + S3-compatible AWS SDK v3 driver;
-- file metadata/upload/download/update/delete;
-- storage inventory and guarded orphan reconciliation;
-- audit records for item/file/schema mutations;
-- recursive secret redaction;
-- explicit batched audit retention cleanup;
-- structured JSON runtime logs;
-- request ids, health/readiness, baseline security headers and graceful shutdown.
+- many-to-one;
+- one-to-one with a physical `UNIQUE` constraint;
+- many-to-many through a managed junction collection.
 
-### Studio
+YunCMS uses schema locks, explicit validation and compensation logic around dynamic DDL instead of pretending MySQL DDL behaves like ordinary application transactions.
 
-- login/logout/refresh;
-- password-reset and verification link flows;
-- generic content table + create/edit form;
-- direct M2O relation pickers/display labels;
-- collection/field/M2O/M2M Data Model workflows;
-- M2M junction delete control;
-- users management + verification action;
-- roles/permissions + validation editor;
-- file management.
+## Human names without ugly database identifiers
 
-Source presence is not a production-readiness claim. `todo.md` deliberately keeps real MySQL, build, SMTP, S3, browser, concurrency and package-install verification open until executed.
+Your editors should not have to name a field `urun_fiyati` just because MySQL and REST need a stable identifier.
 
-## Install from npm
+In Studio you can write:
 
-YunCMS `0.1.1` is published under the `@yunsoft` organization:
+```text
+Ürün Fiyatı
+```
+
+YunCMS suggests:
+
+```text
+urun_fiyati
+```
+
+Both are stored separately:
+
+```json
+{
+  "name": "Ürün Fiyatı",
+  "field": "urun_fiyati"
+}
+```
+
+The same applies to collections:
+
+```text
+Müşteri Talepleri  →  musteri_talepleri
+İçecek Ölçüsü      →  icecek_olcusu
+2026 Ürünleri      →  collection_2026_urunleri
+```
+
+Display names may later change without silently renaming your physical tables, columns, URLs or integration payloads.
+
+## REST-first Items API
+
+Every project collection becomes a resource:
+
+```text
+GET    /items/:collection
+GET    /items/:collection/:id
+POST   /items/:collection
+PATCH  /items/:collection/:id
+DELETE /items/:collection/:id
+```
+
+Example:
 
 ```bash
-npm install @yunsoft/yuncms
-npx yuncms init
-npx yuncms start
+curl --get 'http://localhost:3008/items/orders' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'fields=id,order_no,total,status,created_at' \
+  --data-urlencode 'filter={"status":{"_in":["paid","processing"]},"total":{"_gte":1000}}' \
+  --data-urlencode 'sort=-created_at' \
+  --data-urlencode 'limit=25' \
+  --data-urlencode 'offset=0'
 ```
 
-Node.js 24 LTS and MySQL are required. See [`docs/publishing.md`](./docs/publishing.md) for the package family and release details.
+The API supports:
 
-## Setup / development
+- field selection;
+- server-side filtering;
+- nested `_and` / `_or` logic;
+- equality and comparison operators;
+- `_in` / `_nin`;
+- NULL checks;
+- contains / starts-with / ends-with text search;
+- multi-column sorting;
+- limit/offset pagination;
+- direct relation expansion.
 
-First local validation should use Node 24 and a disposable MySQL database:
+See **[Items API Query Language](docs/api-query-language.md)** for the complete grammar and examples.
+
+## RBAC that is part of the query, not a UI decoration
+
+Project collection permissions support:
+
+- read;
+- create;
+- update;
+- delete;
+- field allowlists;
+- row filters;
+- create/update validation rules.
+
+User filters are combined with role filters rather than replacing them. Requesting `fields=*`, using `_or`, sorting or expanding a relation does not bypass permissions.
+
+The Public role exists but is **deny-by-default**.
+
+Selected system resources also have bounded delegation:
+
+- Users: action-level delegation;
+- Files: action-level delegation;
+- Roles: read-only delegation;
+- internal sessions/tokens/permissions stay closed.
+
+## Files that behave like a real library
+
+YunCMS supports:
+
+- local filesystem storage;
+- S3-compatible storage;
+- upload/list/read/update/delete;
+- safe physical storage keys;
+- reconciliation tooling;
+- gallery and list views;
+- search/filter/sort/pagination;
+- full-size preview modal;
+- image, PDF, video and audio preview;
+- File/Image field pickers in Content.
+
+Branding assets are selected from Files too. Logo and favicon pickers open a searchable, paginated modal instead of dumping the entire file library into the settings form.
+
+## Studio branding
+
+Studio supports:
+
+- brand name;
+- custom logo selected from Files;
+- custom favicon selected from Files;
+- accent color;
+- Light / Dark / System theme;
+- English / Turkish default language;
+- personal language override.
+
+When no custom branding asset is selected, YunCMS falls back to Yunsoft defaults.
+
+## Extensions
+
+The extension SDK provides trusted server-side extension entry points such as:
+
+```js
+import { defineEndpoint } from '@yunsoft/yuncms-extensions-sdk';
+
+export default defineEndpoint({
+  id: 'hello',
+  handler(router, context) {
+    router.get('/', async (req, res) => {
+      res.json({
+        message: 'Hello from YunCMS',
+        user: req.accountability.user,
+      });
+    });
+  },
+});
+```
+
+Extensions reuse YunCMS services/accountability instead of making HTTP requests back into the same process.
+
+---
+
+# Requirements
+
+YunCMS currently targets:
+
+```text
+Node.js 24 LTS
+npm 11+
+MySQL 8-compatible server
+```
+
+The repository intentionally rejects unsupported Node major versions rather than hoping they work.
+
+---
+
+# Quick start
+
+From the repository:
 
 ```bash
 npm install
 npm run init
-npm run dev:api
-npm run dev:studio
+npm run bootstrap
+npm start
 ```
 
-For an already configured database:
+Default local URL:
+
+```text
+http://localhost:3008
+```
+
+The same Express listener serves both the REST API and the built Studio.
+
+The published CLI package is:
+
+```text
+@yunsoft/yuncms
+```
+
+Package-level commands:
+
+```text
+yuncms init
+yuncms bootstrap
+yuncms start
+yuncms help
+```
+
+Fresh init uses port **3008** consistently for the server, Studio origin and public auth URL.
+
+Development/source validation:
 
 ```bash
-npm run bootstrap
-npm run dev:api
-npm run dev:studio
+npm run dev
+npm run test:fast
+npm test
+npm run test:release
 ```
 
-The published package-level commands are:
+`test:release` also builds Studio and verifies publishable package contracts. Real MySQL integration checks are opt-in so ordinary source tests remain fast.
+
+Read: [Setup CLI](docs/setup-cli.md)
+
+---
+
+# Build your first collection
+
+Use Studio, or call the Schema API directly.
+
+```bash
+curl 'http://localhost:3008/schema/collections' \
+  -X POST \
+  -H 'Authorization: Bearer ADMIN_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Müşteri Talepleri",
+    "collection": "musteri_talepleri",
+    "note": "Müşterilerden gelen destek ve teklif talepleri",
+    "metadata": {
+      "icon": "inbox",
+      "sort": 10
+    },
+    "systemFields": [
+      "created_at",
+      "updated_at",
+      "created_by",
+      "updated_by"
+    ]
+  }'
+```
+
+Add a field:
+
+```bash
+curl 'http://localhost:3008/schema/collections/musteri_talepleri/fields' \
+  -X POST \
+  -H 'Authorization: Bearer ADMIN_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Başlık",
+    "field": "baslik",
+    "type": "string",
+    "length": 255,
+    "required": true
+  }'
+```
+
+Add another:
+
+```bash
+curl 'http://localhost:3008/schema/collections/musteri_talepleri/fields' \
+  -X POST \
+  -H 'Authorization: Bearer ADMIN_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Öncelik",
+    "field": "oncelik",
+    "type": "integer"
+  }'
+```
+
+Then create data through the Items API:
+
+```bash
+curl 'http://localhost:3008/items/musteri_talepleri' \
+  -X POST \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "baslik": "Yeni fiyat teklifi",
+    "oncelik": 8
+  }'
+```
+
+The separation is deliberate:
 
 ```text
-npx yuncms init
-npx yuncms bootstrap
-npx yuncms start
+Studio display name: Müşteri Talepleri
+API / MySQL key:    musteri_talepleri
 ```
 
-The public registry package, CLI bootstrap and single-port API/Studio runtime have been verified from a clean consumer directory. Release policy is documented in [`docs/publishing.md`](./docs/publishing.md).
+---
 
-## Runtime probes
+# Query examples
+
+Published articles, newest first:
+
+```bash
+curl --get 'http://localhost:3008/items/articles' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'filter={"status":{"_eq":"published"}}' \
+  --data-urlencode 'sort=-published_at'
+```
+
+Price range:
+
+```bash
+curl --get 'http://localhost:3008/items/products' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'filter={"price":{"_gte":100,"_lte":500}}'
+```
+
+Search title:
+
+```bash
+curl --get 'http://localhost:3008/items/articles' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'filter={"title":{"_contains":"YunCMS"}}'
+```
+
+OR condition:
+
+```bash
+curl --get 'http://localhost:3008/items/tasks' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'filter={"_or":[{"priority":{"_gte":8}},{"featured":{"_eq":true}}]}'
+```
+
+Expand a direct relation:
+
+```bash
+curl --get 'http://localhost:3008/items/articles' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'fields=id,title,author_id' \
+  --data-urlencode 'expand=author_id'
+```
+
+There is a full operator table, nested filter examples and JavaScript examples in [API Query Language](docs/api-query-language.md).
+
+---
+
+# Repository layout
 
 ```text
-GET /health
-GET /ready
+apps/
+  studio/                 React Studio
+
+packages/
+  api/                    Express REST API
+  cli/                    @yunsoft/yuncms CLI
+  core/                   schema, auth, RBAC, Files, services
+  extensions-sdk/         extension helpers
+
+scripts/
+  verify.mjs              low-noise source/release test runner
+
+docs/                     architecture and API documentation
 ```
 
-API default: `http://127.0.0.1:3008`
-Studio default: `http://localhost:5173`
+---
 
-## Core design rule
+# Architecture principles
 
-HTTP is an adapter, not YunCMS's internal API.
+### Service authorization, not route-only authorization
 
-Services and trusted extensions call service/database APIs directly with explicit accountability. They do not send requests back into the same YunCMS HTTP server. This keeps authorization, transactions, hooks and error handling on one internal service path.
+Sensitive checks live in core services. A trusted extension cannot simply instantiate a service with ordinary user accountability and bypass schema/RBAC rules that only existed in Express middleware.
 
-## Documentation
+### No self-request architecture
 
-Start with:
+Internal code does not make HTTP requests back into YunCMS to reuse functionality. Extensions and routes call the same service layer directly.
 
-- [`docs/architecture.md`](./docs/architecture.md)
-- [`docs/database.md`](./docs/database.md)
-- [`docs/rest-api.md`](./docs/rest-api.md)
-- [`docs/auth.md`](./docs/auth.md)
-- [`docs/permissions.md`](./docs/permissions.md)
-- [`docs/extensions.md`](./docs/extensions.md)
-- [`docs/files.md`](./docs/files.md)
-- [`docs/studio.md`](./docs/studio.md)
-- [`docs/security.md`](./docs/security.md)
-- [`docs/deployment.md`](./docs/deployment.md)
-- [`docs/setup-cli.md`](./docs/setup-cli.md)
-- [`docs/publishing.md`](./docs/publishing.md)
+### Explicit dynamic DDL
+
+Schema changes are serialized with an advisory lock. MySQL DDL failures and metadata failures use explicit compensation strategies.
+
+### Stable API identifiers
+
+Human-facing labels are free to evolve; machine keys remain stable integration contracts.
+
+### Fail closed
+
+Unknown fields, query parameters, filter operators and internal system resources are rejected instead of guessed.
+
+---
+
+# Documentation
+
+## API
+
+- **[REST API Reference](docs/rest-api.md)** — complete endpoint map and request examples.
+- **[Items API Query Language](docs/api-query-language.md)** — fields, filters, operators, sort, pagination, expand and JavaScript examples.
+- [Authentication](docs/auth.md)
+- [Permissions / RBAC](docs/permissions.md)
+- [Files / storage](docs/files.md)
+
+## Architecture / operations
+
+- [Architecture](docs/architecture.md)
+- [Database & schema engine](docs/database.md)
+- [Development](docs/development.md)
+- [Extensions](docs/extensions.md)
+- [Setup CLI](docs/setup-cli.md)
+- [Security](docs/security.md)
+- [Deployment](docs/deployment.md)
+- [Production readiness](docs/production-readiness.md)
+- [Production readiness test plan](docs/production-readiness-test-plan.md)
+- [Publishing](docs/publishing.md)
+- [Studio customization](docs/studio-customization.md)
+
+---
+
+# Current status
+
+YunCMS already has a substantial source surface, but `0.1.x` should still be treated as active development.
+
+Before calling a specific commit production-ready, run the repository release gates and the environment-specific checks tracked in `todo.md` against the actual Node 24/MySQL/storage/browser environment you intend to deploy.
+
+The project intentionally keeps that distinction visible: **source-complete is not the same claim as deployment-verified**.
+
+---
+
+# License
+
+MIT.
