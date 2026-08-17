@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { API_URL, apiRequest, health, logout, readSession, subscribeSession } from './api.js';
 import { isContentCollection } from './collection-visibility.js';
 import { LanguageSwitcher, StudioBrand, YunsoftFooter } from './components/StudioBrand.jsx';
+import { SidebarIcon } from './components/SidebarIcon.jsx';
 import { useI18n } from './i18n.js';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
@@ -15,15 +16,15 @@ import { RolesPermissionsScreen } from './screens/RolesPermissionsScreen.jsx';
 import { UsersScreen } from './screens/UsersScreen.jsx';
 
 const librarySections = [
-  { id: 'files', labelKey: 'nav.files' },
+  { id: 'files', labelKey: 'nav.files', icon: 'files' },
 ];
 
 const settingsSections = [
-  { id: 'content-visibility', labelKey: 'nav.contentVisibility' },
-  { id: 'data-model', labelKey: 'nav.dataModel' },
-  { id: 'users', labelKey: 'nav.users' },
-  { id: 'roles', labelKey: 'nav.roles' },
-  { id: 'appearance', labelKey: 'nav.appearance' },
+  { id: 'content-visibility', labelKey: 'nav.contentVisibility', icon: 'visibility' },
+  { id: 'data-model', labelKey: 'nav.dataModel', icon: 'model' },
+  { id: 'users', labelKey: 'nav.users', icon: 'users' },
+  { id: 'roles', labelKey: 'nav.roles', icon: 'roles' },
+  { id: 'appearance', labelKey: 'nav.appearance', icon: 'appearance' },
 ];
 
 function sectionCopy(section, t) {
@@ -54,6 +55,30 @@ function clearAuthAction() {
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
+function AccordionGroup({ id, label, icon, open, collapsed, onToggle, children }) {
+  return (
+    <div className={`nav-group ${open ? 'open' : ''}`}>
+      <button
+        className="nav-group-trigger"
+        type="button"
+        aria-expanded={open && !collapsed}
+        aria-controls={`sidebar-group-${id}`}
+        title={collapsed ? label : undefined}
+        onClick={onToggle}
+      >
+        <span className="nav-group-title">
+          <SidebarIcon name={icon} />
+          <span className="nav-label-text">{label}</span>
+        </span>
+        <span className="nav-chevron"><SidebarIcon name="chevron" size={14} /></span>
+      </button>
+      <div id={`sidebar-group-${id}`} className="nav-group-children" hidden={!open || collapsed}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const { t } = useI18n();
   const [session, setSession] = useState(() => readSession());
@@ -63,6 +88,8 @@ export function App() {
   const [contentCollection, setContentCollection] = useState('');
   const [healthState, setHealthState] = useState('checking');
   const [loggingOut, setLoggingOut] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [groups, setGroups] = useState({ content: true, library: true, settings: true });
 
   useEffect(() => subscribeSession(() => setSession(readSession())), []);
 
@@ -126,6 +153,20 @@ export function App() {
     }
   }
 
+  function toggleGroup(group) {
+    if (sidebarCollapsed) {
+      setSidebarCollapsed(false);
+      setGroups((current) => ({ ...current, [group]: true }));
+      return;
+    }
+    setGroups((current) => ({ ...current, [group]: !current[group] }));
+  }
+
+  function openSection(nextSection, group) {
+    setSection(nextSection);
+    setGroups((current) => ({ ...current, [group]: true }));
+  }
+
   if (authAction) {
     return (
       <AuthActionScreen
@@ -150,86 +191,118 @@ export function App() {
       : t('app.apiChecking');
 
   return (
-    <div className="studio-shell">
+    <div className={`studio-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="sidebar">
-        <StudioBrand />
+        <div className="sidebar-brand-row">
+          <StudioBrand compact={sidebarCollapsed} />
+          <button
+            className="sidebar-collapse-button"
+            type="button"
+            aria-label={sidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+            aria-pressed={sidebarCollapsed}
+            title={sidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+            onClick={() => setSidebarCollapsed((value) => !value)}
+          >
+            <SidebarIcon name="collapse" />
+          </button>
+        </div>
 
-        <nav aria-label="Studio sections" className="sidebar-nav">
-          <div className="nav-group">
-            <div className="nav-group-label">{t('nav.content')}</div>
-            <div className="nav-children">
-              {contentCollections.map((entry) => (
-                <button
-                  key={entry.collection}
-                  className={`nav-item nav-item-child ${section === 'content' && contentCollection === entry.collection ? 'active' : ''}`}
-                  type="button"
-                  onClick={() => {
-                    setContentCollection(entry.collection);
-                    setSection('content');
-                  }}
-                >
-                  <span>{entry.collection}</span>
-                </button>
-              ))}
-              {contentCollections.length === 0 && (
-                <button
-                  className={`nav-item nav-item-child ${section === 'data-model' ? 'active' : ''}`}
-                  type="button"
-                  onClick={() => setSection('data-model')}
-                >
-                  <span>{t('nav.createFirstCollection')}</span>
-                </button>
-              )}
-            </div>
-          </div>
+        <nav aria-label={t('nav.studioSections')} className="sidebar-nav">
+          <AccordionGroup
+            id="content"
+            label={t('nav.content')}
+            icon="content"
+            open={groups.content}
+            collapsed={sidebarCollapsed}
+            onToggle={() => toggleGroup('content')}
+          >
+            {contentCollections.map((entry) => (
+              <button
+                key={entry.collection}
+                className={`nav-item nav-item-child ${section === 'content' && contentCollection === entry.collection ? 'active' : ''}`}
+                type="button"
+                onClick={() => {
+                  setContentCollection(entry.collection);
+                  openSection('content', 'content');
+                }}
+              >
+                <SidebarIcon name="content" size={15} />
+                <span className="nav-item-label">{entry.collection}</span>
+              </button>
+            ))}
+            {contentCollections.length === 0 && (
+              <button
+                className={`nav-item nav-item-child ${section === 'data-model' ? 'active' : ''}`}
+                type="button"
+                onClick={() => openSection('data-model', 'settings')}
+              >
+                <SidebarIcon name="model" size={15} />
+                <span className="nav-item-label">{t('nav.createFirstCollection')}</span>
+              </button>
+            )}
+          </AccordionGroup>
 
-          <div className="nav-group">
-            <div className="nav-group-label">{t('nav.library')}</div>
+          <AccordionGroup
+            id="library"
+            label={t('nav.library')}
+            icon="files"
+            open={groups.library}
+            collapsed={sidebarCollapsed}
+            onToggle={() => toggleGroup('library')}
+          >
             {librarySections.map((item) => (
               <button
                 key={item.id}
                 className={`nav-item ${section === item.id ? 'active' : ''}`}
                 type="button"
-                onClick={() => setSection(item.id)}
+                onClick={() => openSection(item.id, 'library')}
               >
-                <span>{t(item.labelKey)}</span>
+                <SidebarIcon name={item.icon} />
+                <span className="nav-item-label">{t(item.labelKey)}</span>
               </button>
             ))}
-          </div>
+          </AccordionGroup>
 
-          <div className="nav-group">
-            <div className="nav-group-label">{t('nav.settings')}</div>
+          <AccordionGroup
+            id="settings"
+            label={t('nav.settings')}
+            icon="appearance"
+            open={groups.settings}
+            collapsed={sidebarCollapsed}
+            onToggle={() => toggleGroup('settings')}
+          >
             {settingsSections.map((item) => (
               <button
                 key={item.id}
                 className={`nav-item ${section === item.id ? 'active' : ''}`}
                 type="button"
-                onClick={() => setSection(item.id)}
+                onClick={() => openSection(item.id, 'settings')}
               >
-                <span>{t(item.labelKey)}</span>
+                <SidebarIcon name={item.icon} />
+                <span className="nav-item-label">{t(item.labelKey)}</span>
               </button>
             ))}
-          </div>
+          </AccordionGroup>
         </nav>
 
         <div className="sidebar-footer">
-          <div className={`sidebar-health ${healthState}`} role="status">
+          <div className={`sidebar-health ${healthState}`} role="status" title={healthMessage}>
             <span className="status-dot" aria-hidden="true" />
-            <span>{healthMessage}</span>
+            <span className="sidebar-footer-text">{healthMessage}</span>
           </div>
           <small className="sidebar-api-address">{API_URL}</small>
 
           <div className="sidebar-account">
             <strong>{session.user?.email || t('app.authenticatedUser')}</strong>
-            <small>{session.user?.role || t('app.noRole')}</small>
-            <button className="text-button" type="button" disabled={loggingOut} onClick={handleLogout}>
+            <small>{session.user?.role_name || t('app.noRole')}</small>
+            <button className="text-button sidebar-signout" type="button" disabled={loggingOut} onClick={handleLogout}>
               {loggingOut ? t('app.signingOut') : t('app.signOut')}
             </button>
           </div>
 
           <div className="sidebar-branding-footer">
             <LanguageSwitcher compact />
-            <YunsoftFooter />
+            <YunsoftFooter compact={sidebarCollapsed} />
           </div>
         </div>
       </aside>
