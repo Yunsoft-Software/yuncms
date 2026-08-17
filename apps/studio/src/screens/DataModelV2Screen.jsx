@@ -13,6 +13,7 @@ import {
   isFileField,
 } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
+import { displaySchemaName, schemaKeyFromName } from '../schema-name.js';
 
 const ACCOUNTABILITY_FIELDS = Object.freeze([
   ['created_at', 'collectionBuilder.createdAt', 'collectionBuilder.createdAtHint'],
@@ -45,7 +46,9 @@ function isSystemExtension(field) {
 
 function emptyCollectionForm(nextSort = 10) {
   return {
+    name: '',
     collection: '',
+    keyTouched: false,
     note: '',
     icon: 'collection',
     visible: true,
@@ -81,7 +84,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
   const [showCreateField, setShowCreateField] = useState(false);
   const [collectionForm, setCollectionForm] = useState(() => emptyCollectionForm());
   const [fieldForm, setFieldForm] = useState(createEmptyFieldForm);
-  const [overview, setOverview] = useState({ note: '', icon: 'collection', visible: true });
+  const [overview, setOverview] = useState({ name: '', note: '', icon: 'collection', visible: true });
   const [relationMode, setRelationMode] = useState('m2o');
   const [directForm, setDirectForm] = useState({ manyField: '', oneCollection: '', onDelete: 'RESTRICT' });
   const [m2mForm, setM2mForm] = useState({ junctionCollection: '', leftCollection: '', rightCollection: '' });
@@ -102,18 +105,19 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
 
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return projectCollections.filter((entry) => !query || [entry.collection, entry.note]
+    return projectCollections.filter((entry) => !query || [entry.name, entry.collection, entry.note]
       .filter(Boolean).some((value) => String(value).toLowerCase().includes(query)));
   }, [projectCollections, search]);
   const filteredSystems = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return systemCollections.filter((entry) => !query || [entry.collection, entry.note]
+    return systemCollections.filter((entry) => !query || [entry.name, entry.collection, entry.note]
       .filter(Boolean).some((value) => String(value).toLowerCase().includes(query)));
   }, [systemCollections, search]);
 
   const visibleFields = useMemo(() => {
     const query = fieldSearch.trim().toLowerCase();
-    return fields.filter((field) => !query || [field.field, fieldDisplayType(field)]
+    return fields.filter((field) => !query || [field.name, field.field, fieldDisplayType(field)]
+      .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query)));
   }, [fields, fieldSearch]);
 
@@ -179,6 +183,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
     if (!selectedCollection) return;
     const ui = collectionUi(selectedCollection);
     setOverview({
+      name: displaySchemaName(selectedCollection, 'collection'),
       note: selectedCollection.note || '',
       icon: ui.icon,
       visible: !selectedCollection.hidden,
@@ -207,21 +212,24 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
     event.preventDefault();
     setError('');
     try {
-      const name = collectionForm.collection.trim();
-      await apiRequest('/schema/collections', {
+      const displayName = collectionForm.name.trim();
+      const key = collectionForm.collection.trim();
+      const response = await apiRequest('/schema/collections', {
         method: 'POST',
         body: {
-          collection: name,
+          name: displayName,
+          collection: key,
           note: collectionForm.note.trim() || null,
           hidden: !collectionForm.visible,
           metadata: { icon: collectionForm.icon, sort: Number(collectionForm.sort) || nextCollectionSort },
           systemFields: collectionForm.systemFields,
         },
       });
+      const createdKey = response?.data?.collection || key;
       setShowCreateCollection(false);
       setCollectionForm(emptyCollectionForm(nextCollectionSort + 10));
-      flash(t('dataModel.collectionCreated', { name }));
-      await notifyCollectionsChanged(name);
+      flash(t('dataModel.collectionCreated', { name: displayName }));
+      await notifyCollectionsChanged(createdKey);
     } catch (requestError) {
       setError(requestError.message || t('dataModel.collectionCreateError'));
     }
@@ -238,6 +246,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
       await apiRequest(`/schema/collections/${encodeURIComponent(selected)}`, {
         method: 'PATCH',
         body: {
+          name: overview.name.trim(),
           note: overview.note.trim() || null,
           hidden: !overview.visible,
           metadata,
@@ -290,14 +299,14 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
     if (!selectedCollection || selectedCollection.system) return;
     const accepted = await confirm({
       title: t('dataModel.deleteCollection'),
-      description: t('dataModel.deleteCollectionDescription', { name: selected }),
+      description: t('dataModel.deleteCollectionDescription', { name: displaySchemaName(selectedCollection, 'collection') }),
       confirmLabel: t('dataModel.deleteCollectionAction'),
       tone: 'danger',
     });
     if (!accepted) return;
     try {
       await apiRequest(`/schema/collections/${encodeURIComponent(selected)}?destructive=true`, { method: 'DELETE' });
-      flash(t('dataModel.collectionDeleted', { name: selected }));
+      flash(t('dataModel.collectionDeleted', { name: displaySchemaName(selectedCollection, 'collection') }));
       await notifyCollectionsChanged('');
     } catch (requestError) {
       setError(requestError.message || t('dataModel.collectionDeleteError'));
@@ -315,7 +324,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
       await apiRequest(path, { method: 'POST', body });
       setFieldForm(createEmptyFieldForm());
       setShowCreateField(false);
-      flash(t('dataModel.fieldAdded', { name: body.field }));
+      flash(t('dataModel.fieldAdded', { name: body.name || body.field }));
       await loadSelected();
     } catch (requestError) {
       setError(requestError.message || t('dataModel.fieldCreateError'));
@@ -329,7 +338,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
         `/schema/collections/${encodeURIComponent(selected)}/fields/${encodeURIComponent(field.field)}/schema`,
         { method: 'PATCH', body: { required: !Boolean(field.required) } },
       );
-      flash(t('dataModel.fieldUpdated', { name: field.field }));
+      flash(t('dataModel.fieldUpdated', { name: displaySchemaName(field, 'field') }));
       await loadSelected();
     } catch (requestError) {
       setError(requestError.message || t('dataModel.fieldUpdateError'));
@@ -340,14 +349,14 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
     if (selectedCollection?.system || field.field === 'id' || isManagedField(field)) return;
     const accepted = await confirm({
       title: t('dataModel.deleteField'),
-      description: t('dataModel.deleteFieldDescription', { collection: selected, field: field.field }),
+      description: t('dataModel.deleteFieldDescription', { collection: displaySchemaName(selectedCollection, 'collection'), field: displaySchemaName(field, 'field') }),
       confirmLabel: t('dataModel.deleteFieldAction'),
       tone: 'danger',
     });
     if (!accepted) return;
     try {
       await apiRequest(`/schema/collections/${encodeURIComponent(selected)}/fields/${encodeURIComponent(field.field)}?destructive=true`, { method: 'DELETE' });
-      flash(t('dataModel.fieldDeleted', { name: field.field }));
+      flash(t('dataModel.fieldDeleted', { name: displaySchemaName(field, 'field') }));
       await loadSelected();
     } catch (requestError) {
       setError(requestError.message || t('dataModel.fieldDeleteError'));
@@ -368,7 +377,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
         },
       });
       flash(t(kind === 'o2o' ? 'dataModel.o2oCreated' : 'dataModel.relationCreated', {
-        collection: selected,
+        collection: displaySchemaName(selectedCollection, 'collection'),
         field: directForm.manyField,
       }));
       setDirectForm({ manyField: '', oneCollection: '', onDelete: 'RESTRICT' });
@@ -448,6 +457,14 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
     }));
   }
 
+  function changeCollectionName(value) {
+    setCollectionForm((current) => ({
+      ...current,
+      name: value,
+      collection: current.keyTouched ? current.collection : schemaKeyFromName(value, 'collection'),
+    }));
+  }
+
   const selectedIndex = projectCollections.findIndex((entry) => entry.collection === selected);
 
   return (
@@ -497,7 +514,10 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
                 onDragEnd={() => setDraggedCollection('')}
               >
                 <CollectionIcon name={collectionUi(entry).icon} />
-                <span><strong>{entry.collection}</strong><small>{entry.hidden ? t('dataModel.hiddenFromContent') : entry.note || t('dataModel.visibleInContent')}</small></span>
+                <span>
+                  <strong>{displaySchemaName(entry, 'collection')}</strong>
+                  <small>{entry.collection} · {entry.hidden ? t('dataModel.hiddenFromContent') : entry.note || t('dataModel.visibleInContent')}</small>
+                </span>
                 {!search.trim() && <span className="collection-drag-handle" aria-hidden="true">⋮⋮</span>}
               </button>
             ))}
@@ -507,7 +527,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
             {filteredSystems.map((entry) => (
               <button className={`data-model-collection-item system ${selected === entry.collection ? 'active' : ''}`} type="button" key={entry.collection} onClick={() => setSelected(entry.collection)}>
                 <CollectionIcon name={entry.collection === 'yuncms_users' ? 'users' : entry.collection === 'yuncms_files' ? 'folder' : entry.collection === 'yuncms_roles' ? 'shield' : 'collection'} />
-                <span><strong>{entry.collection}</strong><small>{t('dataModel.systemManaged')}</small></span>
+                <span><strong>{displaySchemaName(entry, 'collection')}</strong><small>{entry.collection} · {t('dataModel.systemManaged')}</small></span>
               </button>
             ))}
           </div>
@@ -522,7 +542,16 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
               </div>
               <form className="data-model-create-form" onSubmit={createCollection}>
                 <div className="data-model-create-main">
-                  <label className="field-label"><span>{t('dataModel.collectionName')}</span><input value={collectionForm.collection} onChange={(event) => setCollectionForm((current) => ({ ...current, collection: event.target.value }))} placeholder="articles" required autoFocus /></label>
+                  <label className="field-label">
+                    <span>{t('dataModel.displayName')}</span>
+                    <input value={collectionForm.name} onChange={(event) => changeCollectionName(event.target.value)} placeholder="Müşteri Talepleri" required autoFocus />
+                    <small>{t('dataModel.displayNameHint')}</small>
+                  </label>
+                  <label className="field-label">
+                    <span>{t('dataModel.apiKey')}</span>
+                    <input value={collectionForm.collection} onChange={(event) => setCollectionForm((current) => ({ ...current, collection: schemaKeyFromName(event.target.value, 'collection'), keyTouched: true }))} placeholder="musteri_talepleri" required />
+                    <small>{t('dataModel.apiKeyHint')}</small>
+                  </label>
                   <label className="field-label"><span>{t('dataModel.description')}</span><input value={collectionForm.note} onChange={(event) => setCollectionForm((current) => ({ ...current, note: event.target.value }))} placeholder={t('dataModel.optionalDescription')} /></label>
                   <label className="collection-visibility-toggle"><input type="checkbox" checked={collectionForm.visible} onChange={(event) => setCollectionForm((current) => ({ ...current, visible: event.target.checked }))} /><span><strong>{t('dataModel.showInContent')}</strong><small>{t('dataModel.showInContentHint')}</small></span></label>
                   <div className="accountability-builder">
@@ -548,7 +577,12 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
               <header className="data-model-detail-heading">
                 <div className="data-model-detail-title">
                   <span className="data-model-detail-icon"><CollectionIcon name={selectedCollection.system ? (selected === 'yuncms_users' ? 'users' : selected === 'yuncms_files' ? 'folder' : selected === 'yuncms_roles' ? 'shield' : 'collection') : overview.icon} size={22} /></span>
-                  <div><p className="eyebrow">{selectedCollection.system ? t('dataModel.systemCollection') : t('visibility.collection')}</p><h2>{selected}</h2><p>{selectedCollection.note || t('dataModel.noDescription')}</p></div>
+                  <div>
+                    <p className="eyebrow">{selectedCollection.system ? t('dataModel.systemCollection') : t('visibility.collection')}</p>
+                    <h2>{displaySchemaName(selectedCollection, 'collection')}</h2>
+                    <code className="schema-machine-key">{selected}</code>
+                    <p>{selectedCollection.note || t('dataModel.noDescription')}</p>
+                  </div>
                 </div>
                 <div className="data-model-detail-actions"><span className="schema-count">{t('dataModel.fieldCount', { count: fields.length })}</span>{!selectedCollection.system && <button className="danger-button" type="button" onClick={deleteCollection}>{t('dataModel.deleteCollectionAction')}</button>}</div>
               </header>
@@ -569,6 +603,11 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
                   ) : (
                     <div className="collection-overview-grid">
                       <div className="collection-overview-settings">
+                        <label className="field-label">
+                          <span>{t('dataModel.displayName')}</span>
+                          <input value={overview.name} onChange={(event) => setOverview((current) => ({ ...current, name: event.target.value }))} required />
+                          <small>{t('dataModel.apiKeyHint')} <code>{selected}</code></small>
+                        </label>
                         <label className="field-label"><span>{t('dataModel.description')}</span><textarea rows="4" value={overview.note} onChange={(event) => setOverview((current) => ({ ...current, note: event.target.value }))} placeholder={t('dataModel.optionalDescription')} /></label>
                         <label className="collection-visibility-toggle"><input type="checkbox" checked={overview.visible} onChange={(event) => setOverview((current) => ({ ...current, visible: event.target.checked }))} /><span><strong>{t('dataModel.showInContent')}</strong><small>{t('dataModel.showInContentHint')}</small></span></label>
                         <div className="collection-order-card"><div><strong>{t('dataModel.sidebarOrder')}</strong><small>{t('dataModel.sidebarOrderHint')}</small></div><div className="collection-order-actions"><button className="secondary-button" type="button" disabled={selectedIndex <= 0} onClick={() => moveCollection(-1)}>↑ {t('dataModel.moveUp')}</button><button className="secondary-button" type="button" disabled={selectedIndex < 0 || selectedIndex >= projectCollections.length - 1} onClick={() => moveCollection(1)}>↓ {t('dataModel.moveDown')}</button></div></div>
@@ -592,7 +631,10 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
                       return (
                         <div className="field-workspace-row" key={field.field}>
                           <span className="field-icon">{String(displayType || '?').slice(0, 1).toUpperCase()}</span>
-                          <div className="field-workspace-copy"><strong>{field.field}</strong><small>{t(`fieldType.${displayType}`)}{metadata.defaultPreset === 'now' ? ` · ${t('fieldBuilder.currentTime')}` : ''}</small></div>
+                          <div className="field-workspace-copy">
+                            <strong>{displaySchemaName(field, 'field')}</strong>
+                            <small><code>{field.field}</code> · {t(`fieldType.${displayType}`)}{metadata.defaultPreset === 'now' ? ` · ${t('fieldBuilder.currentTime')}` : ''}</small>
+                          </div>
                           <div className="field-workspace-badges">
                             {isManagedField(field) && <span className="status-pill system-field-pill">{t('collectionBuilder.systemManaged')}</span>}
                             {isSystemExtension(field) && <span className="status-pill">{t('dataModel.customSystemField')}</span>}
@@ -644,9 +686,19 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
                       </div>
 
                       {relationMode === 'm2m' ? (
-                        <form className="relation-v2-form" onSubmit={createM2M}><label className="field-label"><span>{t('dataModel.junctionName')}</span><input value={m2mForm.junctionCollection} onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: event.target.value }))} placeholder="article_tags" required /></label><label className="field-label"><span>{t('dataModel.firstCollection')}</span><select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label><label className="field-label"><span>{t('dataModel.secondCollection')}</span><select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label><button className="primary-button" type="submit">{t('dataModel.createJunction')}</button></form>
+                        <form className="relation-v2-form" onSubmit={createM2M}>
+                          <label className="field-label"><span>{t('dataModel.junctionName')}</span><input value={m2mForm.junctionCollection} onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: schemaKeyFromName(event.target.value, 'collection') }))} placeholder="article_tags" required /></label>
+                          <label className="field-label"><span>{t('dataModel.firstCollection')}</span><select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
+                          <label className="field-label"><span>{t('dataModel.secondCollection')}</span><select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
+                          <button className="primary-button" type="submit">{t('dataModel.createJunction')}</button>
+                        </form>
                       ) : (
-                        <form className="relation-v2-form" onSubmit={createDirectRelation}><label className="field-label"><span>{t('dataModel.fieldIn', { collection: selected })}</span><select value={directForm.manyField} onChange={(event) => setDirectForm((current) => ({ ...current, manyField: event.target.value }))} required><option value="">{t('dataModel.chooseField')}</option>{relationFields.map((field) => <option key={field.field} value={field.field}>{field.field}</option>)}</select></label><label className="field-label"><span>{t('dataModel.targetCollection')}</span><select value={directForm.oneCollection} onChange={(event) => setDirectForm((current) => ({ ...current, oneCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label><label className="field-label"><span>{t('dataModel.ifTargetDeleted')}</span><select value={directForm.onDelete} onChange={(event) => setDirectForm((current) => ({ ...current, onDelete: event.target.value }))}><option value="RESTRICT">{t('dataModel.preventDeletion')}</option><option value="CASCADE">{t('dataModel.deleteLinked')}</option><option value="SET NULL">{t('dataModel.clearField')}</option></select></label><button className="primary-button" type="submit" disabled={relationFields.length === 0}>{t(relationMode === 'o2o' ? 'dataModel.createO2O' : 'dataModel.createRelation')}</button></form>
+                        <form className="relation-v2-form" onSubmit={createDirectRelation}>
+                          <label className="field-label"><span>{t('dataModel.fieldIn', { collection: displaySchemaName(selectedCollection, 'collection') })}</span><select value={directForm.manyField} onChange={(event) => setDirectForm((current) => ({ ...current, manyField: event.target.value }))} required><option value="">{t('dataModel.chooseField')}</option>{relationFields.map((field) => <option key={field.field} value={field.field}>{displaySchemaName(field, 'field')} ({field.field})</option>)}</select></label>
+                          <label className="field-label"><span>{t('dataModel.targetCollection')}</span><select value={directForm.oneCollection} onChange={(event) => setDirectForm((current) => ({ ...current, oneCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
+                          <label className="field-label"><span>{t('dataModel.ifTargetDeleted')}</span><select value={directForm.onDelete} onChange={(event) => setDirectForm((current) => ({ ...current, onDelete: event.target.value }))}><option value="RESTRICT">{t('dataModel.preventDeletion')}</option><option value="CASCADE">{t('dataModel.deleteLinked')}</option><option value="SET NULL">{t('dataModel.clearField')}</option></select></label>
+                          <button className="primary-button" type="submit" disabled={relationFields.length === 0}>{t(relationMode === 'o2o' ? 'dataModel.createO2O' : 'dataModel.createRelation')}</button>
+                        </form>
                       )}
                     </>
                   )}
