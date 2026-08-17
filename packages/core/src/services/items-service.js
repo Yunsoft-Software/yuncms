@@ -9,6 +9,7 @@ import {
   parseItemsQuery,
 } from '../query.js';
 import { SchemaCache } from '../schema.js';
+import { isSystemManagedField, systemMutationEntries } from '../system-fields.js';
 import { withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { PermissionsService } from './permissions-service.js';
@@ -74,12 +75,20 @@ function createCandidateRecord(schema, id, entries) {
       continue;
     }
     const metadata = parseMetadata(fieldSchema.schema_metadata);
+    if (metadata.defaultPreset === 'now') {
+      candidate[fieldSchema.field] = new Date();
+      continue;
+    }
     candidate[fieldSchema.field] = Object.hasOwn(metadata, 'defaultValue')
       ? metadata.defaultValue
       : null;
   }
 
   return candidate;
+}
+
+function mergeSystemEntries(entries, schema, accountability, operation, now = new Date()) {
+  return [...entries, ...systemMutationEntries(schema, accountability, operation, now)];
 }
 
 export class ItemsService extends BaseService {
@@ -113,6 +122,12 @@ export class ItemsService extends BaseService {
     const collectionSchema = snapshot?.collections?.[this.collection];
     if (!collectionSchema) {
       throw serviceError('COLLECTION_NOT_FOUND', `Unknown collection: ${this.collection}`);
+    }
+    if (collectionSchema.system) {
+      throw serviceError(
+        'SYSTEM_COLLECTION_USE_DEDICATED_SERVICE',
+        `System collection ${this.collection} must be accessed through its dedicated service`,
+      );
     }
     return collectionSchema;
   }
@@ -150,8 +165,9 @@ export class ItemsService extends BaseService {
       for (const fieldSchema of Object.values(schema.fields)) {
         if (!fieldSchema.required || fieldSchema.field === schema.primary_key) continue;
         if (Object.hasOwn(payload, fieldSchema.field)) continue;
+        if (isSystemManagedField(fieldSchema)) continue;
         const metadata = parseMetadata(fieldSchema.schema_metadata);
-        if (Object.hasOwn(metadata, 'defaultValue')) continue;
+        if (Object.hasOwn(metadata, 'defaultValue') || metadata.defaultPreset != null) continue;
         throw serviceError('REQUIRED_FIELD_MISSING', `Required field is missing: ${fieldSchema.field}`, fieldSchema.field);
       }
     }
@@ -230,7 +246,8 @@ export class ItemsService extends BaseService {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('create');
     const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create' });
-    const entries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
+    const callerEntries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
+    const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create');
     const id = randomUUID();
     const candidate = createCandidateRecord(schema, id, entries);
     enforcePermissionValidation(candidate, permission.validation, schema);
@@ -264,7 +281,8 @@ export class ItemsService extends BaseService {
         operation: 'create',
         bulk: true,
       });
-      const entries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
+      const callerEntries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
+      const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create');
       const id = randomUUID();
       const candidate = createCandidateRecord(schema, id, entries);
       enforcePermissionValidation(candidate, permission.validation, schema);
@@ -306,8 +324,10 @@ export class ItemsService extends BaseService {
       operation: 'update',
       key: id,
     });
-    const entries = this.validatePayload(filteredPayload, schema, permission);
-    if (entries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
+    const callerEntries = this.validatePayload(filteredPayload, schema, permission);
+    if (callerEntries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
+    const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'update');
+    const effectiveChanges = Object.fromEntries(entries);
 
     const table = quoteIdentifier(this.collection, 'collection name');
     const filter = combineCompiledFilters(
@@ -322,7 +342,7 @@ export class ItemsService extends BaseService {
       );
       const current = currentRows[0];
       if (!current) return null;
-      enforcePermissionValidation({ ...current, ...filteredPayload }, permission.validation, schema);
+      enforcePermissionValidation({ ...current, ...effectiveChanges }, permission.validation, schema);
     }
 
     const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
@@ -336,7 +356,7 @@ export class ItemsService extends BaseService {
     await this.actionMutation('items.update', {
       key: id,
       item: record,
-      changes: filteredPayload,
+      changes: effectiveChanges,
     }, { operation: 'update' });
     return record;
   }
@@ -354,8 +374,10 @@ export class ItemsService extends BaseService {
       bulk: true,
       filter: filterInput,
     });
-    const entries = this.validatePayload(filteredPayload, schema, permission);
-    if (entries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
+    const callerEntries = this.validatePayload(filteredPayload, schema, permission);
+    if (callerEntries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
+    const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'update');
+    const effectiveChanges = Object.fromEntries(entries);
     const filter = this.compileActionFilters(filterInput, permission.filter, accessSchema, schema);
     const table = quoteIdentifier(this.collection, 'collection name');
 
@@ -371,7 +393,7 @@ export class ItemsService extends BaseService {
         );
       }
       for (const row of rows) {
-        enforcePermissionValidation({ ...row, ...filteredPayload }, permission.validation, schema);
+        enforcePermissionValidation({ ...row, ...effectiveChanges }, permission.validation, schema);
       }
     }
 
@@ -382,7 +404,7 @@ export class ItemsService extends BaseService {
     );
     await this.actionMutation('items.update', {
       filter: filterInput,
-      changes: filteredPayload,
+      changes: effectiveChanges,
       affected: result.affectedRows,
     }, { operation: 'update', bulk: true });
     return result.affectedRows;
