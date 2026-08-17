@@ -12,11 +12,12 @@
     "npm": ">=11"
   },
   "scripts": {
+    "build:studio": "npm run build --workspace=@yuncms/studio",
+    "dev": "npm run build:studio && npm run dev --workspace=@yuncms/api",
     "dev:api": "npm run dev --workspace=@yuncms/api",
-    "dev:studio": "npm run dev --workspace=@yuncms/studio",
     "init": "node packages/cli/bin/yuncms.js init",
     "bootstrap": "node packages/cli/bin/yuncms.js bootstrap",
-    "start": "npm run start --workspace=@yuncms/api",
+    "start": "npm run build:studio && npm run start --workspace=@yuncms/api",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   }
