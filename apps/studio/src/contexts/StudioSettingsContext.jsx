@@ -6,6 +6,7 @@ import {
   applyStudioAppearance,
   normalizeStudioSettings,
   readLocalePreference,
+  resolveTheme,
   writeLocalePreference,
 } from '../studio-settings.js';
 
@@ -18,14 +19,20 @@ function prefersDarkMode() {
 
 export function StudioSettingsProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULT_STUDIO_SETTINGS);
+  const [resolvedTheme, setResolvedTheme] = useState(() => resolveTheme(
+    DEFAULT_STUDIO_SETTINGS.theme,
+    prefersDarkMode(),
+  ));
   const [localeOverride, setLocaleOverride] = useState(() => readLocalePreference());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
   const applySettings = useCallback((nextSettings) => {
     const normalized = normalizeStudioSettings(nextSettings);
+    const darkPreference = prefersDarkMode();
     setSettings(normalized);
-    applyStudioAppearance(normalized, prefersDarkMode());
+    setResolvedTheme(resolveTheme(normalized.theme, darkPreference));
+    applyStudioAppearance(normalized, darkPreference);
     return normalized;
   }, []);
 
@@ -52,7 +59,10 @@ export function StudioSettingsProvider({ children }) {
   useEffect(() => {
     if (settings.theme !== 'system' || typeof window === 'undefined' || !window.matchMedia) return undefined;
     const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = () => applyStudioAppearance(settings, media.matches);
+    const handleChange = () => {
+      setResolvedTheme(resolveTheme(settings.theme, media.matches));
+      applyStudioAppearance(settings, media.matches);
+    };
     media.addEventListener?.('change', handleChange);
     return () => media.removeEventListener?.('change', handleChange);
   }, [settings]);
@@ -79,6 +89,7 @@ export function StudioSettingsProvider({ children }) {
 
   const value = useMemo(() => ({
     settings,
+    resolvedTheme,
     locale,
     localeOverride,
     loading,
@@ -88,6 +99,7 @@ export function StudioSettingsProvider({ children }) {
     saveSettings,
   }), [
     settings,
+    resolvedTheme,
     locale,
     localeOverride,
     loading,
