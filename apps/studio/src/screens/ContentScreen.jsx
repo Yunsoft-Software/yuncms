@@ -54,6 +54,15 @@ function lookupLabel(lookup, value) {
   return label == null || label === '' ? String(value) : String(label);
 }
 
+function renderValue(field, record, relationLookups) {
+  const value = record[field.field];
+  const lookup = relationLookups[field.field];
+  if (lookup) return lookupLabel(lookup, value);
+  if (value == null) return '—';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
 function RecordForm({ collection, fields, relationLookups, record, onSaved, onCancel }) {
   const editable = useMemo(() => fields.filter((field) => !field.readonly), [fields]);
   const [values, setValues] = useState({});
@@ -93,11 +102,12 @@ function RecordForm({ collection, fields, relationLookups, record, onSaved, onCa
   }
 
   return (
-    <form className="panel form-panel" onSubmit={submit}>
+    <form className="panel form-panel record-editor" onSubmit={submit}>
       <div className="panel-heading">
         <div>
           <p className="eyebrow">{record?.id ? 'Edit record' : 'New record'}</p>
           <h2>{collection}</h2>
+          <p>{record?.id ? 'Update the fields below.' : 'Add a new item to this collection.'}</p>
         </div>
         <button className="text-button" type="button" onClick={onCancel}>Cancel</button>
       </div>
@@ -189,32 +199,16 @@ function RecordForm({ collection, fields, relationLookups, record, onSaved, onCa
   );
 }
 
-export function ContentScreen() {
-  const [collections, setCollections] = useState([]);
-  const [collection, setCollection] = useState('');
+export function ContentScreen({ collection, onOpenDataModel }) {
   const [fields, setFields] = useState([]);
   const [relationLookups, setRelationLookups] = useState({});
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState(null);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  async function loadCollections() {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await apiRequest('/schema/collections');
-      const visible = (response?.data ?? []).filter((entry) => !entry.system && !entry.hidden);
-      setCollections(visible);
-      setCollection((current) => current || visible[0]?.collection || '');
-    } catch (requestError) {
-      setError(requestError.message || 'Collections could not be loaded');
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function buildRelationLookups(target, relations) {
     const directRelations = relations.filter((relation) =>
@@ -246,6 +240,8 @@ export function ContentScreen() {
       setFields([]);
       setItems([]);
       setRelationLookups({});
+      setMeta(null);
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -271,12 +267,9 @@ export function ContentScreen() {
   }
 
   useEffect(() => {
-    loadCollections();
-  }, []);
-
-  useEffect(() => {
     setEditing(null);
     setCreating(false);
+    setSearch('');
     loadCollectionData(collection);
   }, [collection]);
 
@@ -294,7 +287,13 @@ export function ContentScreen() {
     }
   }
 
-  const tableFields = fields.filter((field) => !field.hidden).slice(0, 8);
+  const tableFields = useMemo(() => fields.filter((field) => !field.hidden).slice(0, 8), [fields]);
+  const filteredItems = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((record) => tableFields.some((field) =>
+      renderValue(field, record, relationLookups).toLowerCase().includes(query)));
+  }, [items, relationLookups, search, tableFields]);
 
   if (creating || editing) {
     return (
@@ -313,28 +312,43 @@ export function ContentScreen() {
     );
   }
 
-  return (
-    <div className="screen-stack">
-      <section className="panel toolbar-panel">
+  if (!collection) {
+    return (
+      <section className="panel empty-state empty-state-action">
         <div>
           <p className="eyebrow">Content</p>
-          <h2>Records</h2>
-          <p>Generic CRUD is generated from YunCMS schema metadata.</p>
+          <h2>No collections yet</h2>
+          <p>Create your first collection in Data Model. It will appear directly in the Content sidebar.</p>
         </div>
-        <div className="toolbar-actions">
-          <select
-            aria-label="Collection"
-            value={collection}
-            onChange={(event) => setCollection(event.target.value)}
-          >
-            {collections.map((entry) => (
-              <option key={entry.collection} value={entry.collection}>{entry.collection}</option>
-            ))}
-          </select>
+        {onOpenDataModel && (
+          <button className="primary-button" type="button" onClick={onOpenDataModel}>Open Data Model</button>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <div className="screen-stack">
+      <section className="panel toolbar-panel content-toolbar">
+        <div>
+          <p className="eyebrow">Collection</p>
+          <h2>{collection}</h2>
+          <p>{meta?.total_count != null ? `${meta.total_count} records` : 'Manage records in this collection.'}</p>
+        </div>
+        <div className="toolbar-actions content-toolbar-actions">
+          {items.length > 0 && (
+            <input
+              className="search-input"
+              type="search"
+              aria-label={`Search ${collection} records`}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search loaded records…"
+            />
+          )}
           <button
             className="primary-button"
             type="button"
-            disabled={!collection}
             onClick={() => setCreating(true)}
           >
             New record
@@ -344,15 +358,15 @@ export function ContentScreen() {
 
       {error && <div className="error-banner" role="alert">{error}</div>}
       {loading ? (
-        <section className="panel"><p>Loading…</p></section>
-      ) : !collection ? (
-        <section className="panel empty-state">
-          <div><h2>No collections</h2><p>Create a collection from Data Model first.</p></div>
-        </section>
+        <section className="panel"><p>Loading collection…</p></section>
       ) : items.length === 0 ? (
+        <section className="panel empty-state empty-state-action">
+          <div><h2>No records yet</h2><p>Add the first record to {collection}.</p></div>
+          <button className="primary-button" type="button" onClick={() => setCreating(true)}>Create first record</button>
+        </section>
+      ) : filteredItems.length === 0 ? (
         <section className="panel empty-state">
-          <div><h2>No records</h2><p>This collection is ready for its first record.</p></div>
-          <button className="primary-button" type="button" onClick={() => setCreating(true)}>Create record</button>
+          <div><h2>No matching records</h2><p>Try a different search term.</p></div>
         </section>
       ) : (
         <section className="table-panel">
@@ -365,21 +379,11 @@ export function ContentScreen() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((record) => (
+                {filteredItems.map((record) => (
                   <tr key={record.id}>
-                    {tableFields.map((field) => {
-                      const lookup = relationLookups[field.field];
-                      const value = record[field.field];
-                      return (
-                        <td key={field.field}>{
-                          lookup ? lookupLabel(lookup, value)
-                            : value == null ? '—'
-                              : typeof value === 'object'
-                                ? JSON.stringify(value)
-                                : String(value)
-                        }</td>
-                      );
-                    })}
+                    {tableFields.map((field) => (
+                      <td key={field.field}>{renderValue(field, record, relationLookups)}</td>
+                    ))}
                     <td className="row-actions">
                       <button className="text-button" type="button" onClick={() => setEditing(record)}>Edit</button>
                       <button className="danger-button" type="button" onClick={() => removeRecord(record)}>Delete</button>
@@ -389,7 +393,9 @@ export function ContentScreen() {
               </tbody>
             </table>
           </div>
-          <div className="table-footer">Showing {items.length}{meta?.total_count != null ? ` of ${meta.total_count}` : ''} records</div>
+          <div className="table-footer">
+            Showing {filteredItems.length}{search ? ` of ${items.length} loaded` : ''}{meta?.total_count != null ? ` · ${meta.total_count} total` : ''}
+          </div>
         </section>
       )}
     </div>
