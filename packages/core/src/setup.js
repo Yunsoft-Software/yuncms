@@ -103,7 +103,6 @@ export async function createInitialAdmin(pool, { email, password } = {}) {
       password,
       role: roleId,
       status: 'active',
-      emailVerified: true,
     });
 
     return {
