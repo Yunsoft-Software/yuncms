@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  DEFAULT_SERVER_PORT,
   bootstrapDatabase,
   closeDatabasePool,
   createDatabasePool,
@@ -21,12 +22,13 @@ export async function collectEnvironment(prompts) {
   const DB_USER = await prompts.line('MySQL user', { defaultValue: 'yuncms' });
   const DB_PASSWORD = await prompts.secret('MySQL password');
   const DB_SSL = await prompts.line('Use MySQL TLS (true/false)', { defaultValue: 'false' });
+  const studioUrl = `http://localhost:${DEFAULT_SERVER_PORT}`;
 
   return {
     HOST: '127.0.0.1',
-    PORT: '3008',
-    STUDIO_ORIGIN: 'http://localhost:3008',
-    AUTH_PUBLIC_URL: 'http://localhost:3008',
+    PORT: String(DEFAULT_SERVER_PORT),
+    STUDIO_ORIGIN: studioUrl,
+    AUTH_PUBLIC_URL: studioUrl,
     DB_HOST,
     DB_PORT,
     DB_DATABASE,
