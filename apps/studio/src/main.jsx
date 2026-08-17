@@ -10,6 +10,7 @@ import './appearance.css';
 import './roles-polish.css';
 import './media-preview.css';
 import './field-builder.css';
+import './visual-fixes.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
