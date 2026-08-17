@@ -79,6 +79,17 @@ async function assertTargetManageable(database, id, accountability) {
 }
 
 export class UsersService extends BaseService {
+  async #readOneUnsafe(id) {
+    const [rows] = await this.database.query(
+      `SELECT id, email, role, status, email_verified_at, last_access, created_at, updated_at
+       FROM yuncms_users
+       WHERE id = ?
+       LIMIT 1`,
+      [id],
+    );
+    return rows[0] ?? null;
+  }
+
   async readMany() {
     await resolveSystemResourceAccess(this, 'read', 'yuncms_users');
     const [rows] = await this.database.query(
@@ -92,15 +103,7 @@ export class UsersService extends BaseService {
   async readOne(id) {
     const self = this.accountability.user === id;
     if (!self) await resolveSystemResourceAccess(this, 'read', 'yuncms_users');
-
-    const [rows] = await this.database.query(
-      `SELECT id, email, role, status, email_verified_at, last_access, created_at, updated_at
-       FROM yuncms_users
-       WHERE id = ?
-       LIMIT 1`,
-      [id],
-    );
-    return rows[0] ?? null;
+    return this.#readOneUnsafe(id);
   }
 
   async createOne(input = {}) {
@@ -124,7 +127,7 @@ export class UsersService extends BaseService {
       ],
     );
 
-    return this.readOne(id);
+    return this.#readOneUnsafe(id);
   }
 
   async updateOne(id, patch = {}) {
