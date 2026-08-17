@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { API_URL, health, logout, readSession, subscribeSession } from './api.js';
+import { API_URL, apiRequest, health, logout, readSession, subscribeSession } from './api.js';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
 import { ContentScreen } from './screens/ContentScreen.jsx';
 import { DataModelScreen } from './screens/DataModelScreen.jsx';
@@ -9,20 +9,21 @@ import { LoginScreen } from './screens/LoginScreen.jsx';
 import { RolesPermissionsScreen } from './screens/RolesPermissionsScreen.jsx';
 import { UsersScreen } from './screens/UsersScreen.jsx';
 
-const sections = [
-  { id: 'content', label: 'Content' },
-  { id: 'data-model', label: 'Data Model' },
-  { id: 'users', label: 'Users' },
-  { id: 'roles', label: 'Roles & Permissions' },
+const librarySections = [
   { id: 'files', label: 'Files' },
 ];
 
+const settingsSections = [
+  { id: 'data-model', label: 'Data Model' },
+  { id: 'users', label: 'Users' },
+  { id: 'roles', label: 'Roles & Permissions' },
+];
+
 const sectionCopy = {
-  content: ['Content', 'Manage records through schema-aware generic CRUD.'],
   'data-model': ['Data Model', 'Create collections, fields and relations backed by MySQL.'],
   users: ['Users', 'Manage administrator-created users, roles and account status.'],
   roles: ['Roles & Permissions', 'Configure role access, field allowlists and row filters.'],
-  files: ['Files', 'Upload, download and manage files through the configured storage driver.'],
+  files: ['Files', 'Upload, preview and manage files through the configured storage driver.'],
 };
 
 function readAuthAction() {
@@ -44,6 +45,8 @@ export function App() {
   const [session, setSession] = useState(() => readSession());
   const [authAction, setAuthAction] = useState(() => readAuthAction());
   const [section, setSection] = useState('content');
+  const [contentCollections, setContentCollections] = useState([]);
+  const [contentCollection, setContentCollection] = useState('');
   const [healthState, setHealthState] = useState({ state: 'checking', message: 'Checking API…' });
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -55,14 +58,48 @@ export function App() {
       .catch(() => setHealthState({ state: 'offline', message: 'API unavailable' }));
   }, []);
 
-  const [title, description] = sectionCopy[section];
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+
+    async function loadNavigationCollections() {
+      try {
+        const response = await apiRequest('/schema/collections');
+        if (cancelled) return;
+        const visible = (response?.data ?? []).filter((entry) => !entry.system && !entry.hidden);
+        setContentCollections(visible);
+        setContentCollection((current) => (
+          visible.some((entry) => entry.collection === current)
+            ? current
+            : visible[0]?.collection || ''
+        ));
+      } catch {
+        if (!cancelled) setContentCollections([]);
+      }
+    }
+
+    loadNavigationCollections();
+    return () => { cancelled = true; };
+  }, [session?.user?.id, section]);
+
+  const [title, description] = section === 'content'
+    ? [contentCollection || 'Content', contentCollection
+      ? 'Manage records in this collection.'
+      : 'Create a collection in Settings to start managing content.']
+    : sectionCopy[section];
+
   const activeScreen = useMemo(() => {
     if (section === 'data-model') return <DataModelScreen />;
     if (section === 'users') return <UsersScreen currentUserId={session?.user?.id} />;
     if (section === 'roles') return <RolesPermissionsScreen />;
     if (section === 'files') return <FilesScreen />;
-    return <ContentScreen />;
-  }, [section, session?.user?.id]);
+    return (
+      <ContentScreen
+        collection={contentCollection}
+        onOpenDataModel={() => setSection('data-model')}
+      />
+    );
+  }, [contentCollection, section, session?.user?.id]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -98,25 +135,78 @@ export function App() {
           <div className="brand-subtitle">Studio</div>
         </div>
 
-        <nav aria-label="Studio sections">
-          {sections.map((item) => (
-            <button
-              key={item.id}
-              className={`nav-item ${section === item.id ? 'active' : ''}`}
-              type="button"
-              onClick={() => setSection(item.id)}
-            >
-              <span>{item.label}</span>
-            </button>
-          ))}
+        <nav aria-label="Studio sections" className="sidebar-nav">
+          <div className="nav-group">
+            <div className="nav-group-label">Content</div>
+            <div className="nav-children">
+              {contentCollections.map((entry) => (
+                <button
+                  key={entry.collection}
+                  className={`nav-item nav-item-child ${section === 'content' && contentCollection === entry.collection ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => {
+                    setContentCollection(entry.collection);
+                    setSection('content');
+                  }}
+                >
+                  <span>{entry.collection}</span>
+                </button>
+              ))}
+              {contentCollections.length === 0 && (
+                <button
+                  className={`nav-item nav-item-child ${section === 'data-model' ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setSection('data-model')}
+                >
+                  <span>Create first collection</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="nav-group">
+            <div className="nav-group-label">Library</div>
+            {librarySections.map((item) => (
+              <button
+                key={item.id}
+                className={`nav-item ${section === item.id ? 'active' : ''}`}
+                type="button"
+                onClick={() => setSection(item.id)}
+              >
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="nav-group">
+            <div className="nav-group-label">Settings</div>
+            {settingsSections.map((item) => (
+              <button
+                key={item.id}
+                className={`nav-item ${section === item.id ? 'active' : ''}`}
+                type="button"
+                onClick={() => setSection(item.id)}
+              >
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
         </nav>
 
-        <div className="sidebar-account">
-          <strong>{session.user?.email || 'Authenticated user'}</strong>
-          <small>{session.user?.role || 'No role'}</small>
-          <button className="text-button" type="button" disabled={loggingOut} onClick={handleLogout}>
-            {loggingOut ? 'Signing out…' : 'Sign out'}
-          </button>
+        <div className="sidebar-footer">
+          <div className={`sidebar-health ${healthState.state}`} role="status">
+            <span className="status-dot" aria-hidden="true" />
+            <span>{healthState.message}</span>
+          </div>
+          <small className="sidebar-api-address">{API_URL}</small>
+
+          <div className="sidebar-account">
+            <strong>{session.user?.email || 'Authenticated user'}</strong>
+            <small>{session.user?.role || 'No role'}</small>
+            <button className="text-button" type="button" disabled={loggingOut} onClick={handleLogout}>
+              {loggingOut ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -126,13 +216,6 @@ export function App() {
             <p className="eyebrow">YunCMS Studio</p>
             <h1>{title}</h1>
             <p className="lede">{description}</p>
-          </div>
-          <div className="header-statuses">
-            <div className={`status ${healthState.state}`} role="status">
-              <span className="status-dot" aria-hidden="true" />
-              {healthState.message}
-            </div>
-            <small className="api-address">{API_URL}</small>
           </div>
         </header>
 
