@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { LogoFilePicker } from '../components/LogoFilePicker.jsx';
+import { BrandAssetPicker } from '../components/BrandAssetPicker.jsx';
 import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/StudioBrand.jsx';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
@@ -32,18 +32,6 @@ export function AppearanceScreen() {
     setNotice('');
   }
 
-  function updateLogoFile(fileId) {
-    setForm((current) => ({
-      ...current,
-      logo_file: fileId || null,
-      // Clearing a Files-backed logo means “use Yunsoft default”, including for
-      // installations that still carry a legacy external logo_url in the DB.
-      logo_url: fileId ? current.logo_url : DEFAULT_STUDIO_SETTINGS.logo_url,
-    }));
-    setError('');
-    setNotice('');
-  }
-
   async function handleSave(event) {
     event.preventDefault();
     setSaving(true);
@@ -53,6 +41,7 @@ export function AppearanceScreen() {
       const patch = {
         brand_name: form.brand_name,
         logo_file: form.logo_file || null,
+        favicon_file: form.favicon_file || null,
         accent_color: form.accent_color,
         theme: form.theme,
         default_locale: form.default_locale,
@@ -75,6 +64,7 @@ export function AppearanceScreen() {
       brand_name: DEFAULT_STUDIO_SETTINGS.brand_name,
       logo_url: DEFAULT_STUDIO_SETTINGS.logo_url,
       logo_file: null,
+      favicon_file: null,
       accent_color: DEFAULT_STUDIO_SETTINGS.accent_color,
     }));
     setError('');
@@ -111,8 +101,17 @@ export function AppearanceScreen() {
             <small>{t('appearance.brandNameHint')}</small>
           </label>
 
-          <div className="appearance-logo-field">
-            <LogoFilePicker value={form.logo_file || null} onChange={updateLogoFile} />
+          <div className="appearance-brand-assets">
+            <BrandAssetPicker
+              kind="logo"
+              value={form.logo_file || null}
+              onChange={(fileId) => update('logo_file', fileId)}
+            />
+            <BrandAssetPicker
+              kind="favicon"
+              value={form.favicon_file || null}
+              onChange={(fileId) => update('favicon_file', fileId)}
+            />
           </div>
 
           <label className="field-label">
