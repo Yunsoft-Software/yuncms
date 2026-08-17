@@ -24,6 +24,8 @@ test('field compiler allowlists mysql types and keeps defaults parameterized', (
         precision: undefined,
         scale: undefined,
         defaultValue: 'draft',
+        defaultPreset: undefined,
+        autoUpdate: undefined,
       },
     },
   );
