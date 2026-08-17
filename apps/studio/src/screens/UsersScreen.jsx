@@ -38,6 +38,7 @@ export function UsersScreen({ currentUserId }) {
   const requestConfirmation = useConfirmDialog();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [rolesAvailable, setRolesAvailable] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
@@ -54,12 +55,22 @@ export function UsersScreen({ currentUserId }) {
     setLoading(true);
     setError('');
     try {
-      const [usersResponse, rolesResponse] = await Promise.all([
+      const [usersResult, rolesResult] = await Promise.allSettled([
         apiRequest('/users'),
         apiRequest('/roles'),
       ]);
-      setUsers(usersResponse?.data ?? []);
-      setRoles(rolesResponse?.data ?? []);
+      if (usersResult.status === 'rejected') throw usersResult.reason;
+
+      setUsers(usersResult.value?.data ?? []);
+      if (rolesResult.status === 'fulfilled') {
+        setRoles(rolesResult.value?.data ?? []);
+        setRolesAvailable(true);
+      } else {
+        setRoles([]);
+        setRolesAvailable(false);
+        setRoleFilter((current) => (current === 'all' || current === 'none' ? current : 'all'));
+        setForm((current) => ({ ...current, role: '' }));
+      }
     } catch (requestError) {
       setError(requestError.message || t('users.loadError'));
     } finally {
@@ -106,7 +117,7 @@ export function UsersScreen({ currentUserId }) {
         body: {
           email: form.email,
           password: form.password,
-          role: form.role || null,
+          role: rolesAvailable ? (form.role || null) : null,
           status: form.status,
         },
       });
@@ -195,6 +206,8 @@ export function UsersScreen({ currentUserId }) {
           </button>
         </div>
 
+        {!rolesAvailable && <div className="inline-info">{t('users.roleAccessUnavailable')}</div>}
+
         <div className="list-controls user-list-controls">
           <label className="field-label">
             <span>{t('common.search')}</span>
@@ -210,7 +223,7 @@ export function UsersScreen({ currentUserId }) {
             <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
               <option value="all">{t('users.allRoles')}</option>
               <option value="none">{t('app.noRole')}</option>
-              {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+              {rolesAvailable && roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
             </select>
           </label>
           <label className="field-label">
@@ -254,13 +267,20 @@ export function UsersScreen({ currentUserId }) {
               <span>{t('auth.password')}</span>
               <input type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required />
             </label>
-            <label className="field-label">
-              <span>{t('users.role')}</span>
-              <select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>
-                <option value="">{t('app.noRole')}</option>
-                {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-              </select>
-            </label>
+            {rolesAvailable ? (
+              <label className="field-label">
+                <span>{t('users.role')}</span>
+                <select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>
+                  <option value="">{t('app.noRole')}</option>
+                  {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+                </select>
+              </label>
+            ) : (
+              <div className="field-label">
+                <span>{t('users.role')}</span>
+                <div className="inline-info compact-info">{t('users.roleUnavailableForCreate')}</div>
+              </div>
+            )}
             <label className="field-label">
               <span>{t('common.status')}</span>
               <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
@@ -302,10 +322,14 @@ export function UsersScreen({ currentUserId }) {
                       </div>
                     </td>
                     <td>
-                      <select aria-label={t('users.roleFor', { email: user.email })} value={user.role ?? ''} onChange={(event) => updateUser(user, { role: event.target.value || null })}>
-                        <option value="">{t('app.noRole')}</option>
-                        {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-                      </select>
+                      {rolesAvailable ? (
+                        <select aria-label={t('users.roleFor', { email: user.email })} value={user.role ?? ''} onChange={(event) => updateUser(user, { role: event.target.value || null })}>
+                          <option value="">{t('app.noRole')}</option>
+                          {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+                        </select>
+                      ) : (
+                        <span className="status-pill">{user.role ? t('users.roleDetailsUnavailable') : t('app.noRole')}</span>
+                      )}
                     </td>
                     <td>
                       <select aria-label={t('users.statusFor', { email: user.email })} value={user.status} disabled={user.id === currentUserId} onChange={(event) => updateUser(user, { status: event.target.value })}>
