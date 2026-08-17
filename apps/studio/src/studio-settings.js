@@ -1,11 +1,14 @@
 export const YUNSOFT_LIGHT_LOGO_URL = 'https://yunsoft.com/light-logo.png';
 export const YUNSOFT_DARK_LOGO_URL = 'https://yunsoft.com/dark-logo.png';
+export const YUNSOFT_DEFAULT_FAVICON_URL = 'https://yunsoft.com/light-icon.png';
 export const STUDIO_LOGO_ASSET_PATH = '/studio-settings/logo';
+export const STUDIO_FAVICON_ASSET_PATH = '/studio-settings/favicon';
 
 export const DEFAULT_STUDIO_SETTINGS = Object.freeze({
   brand_name: 'YunCMS',
   logo_url: YUNSOFT_LIGHT_LOGO_URL,
   logo_file: null,
+  favicon_file: null,
   accent_color: '#2563eb',
   theme: 'system',
   default_locale: 'en',
@@ -26,6 +29,9 @@ export function normalizeStudioSettings(value = {}) {
       : DEFAULT_STUDIO_SETTINGS.logo_url,
     logo_file: typeof value.logo_file === 'string' && value.logo_file.trim()
       ? value.logo_file.trim()
+      : null,
+    favicon_file: typeof value.favicon_file === 'string' && value.favicon_file.trim()
+      ? value.favicon_file.trim()
       : null,
     accent_color: ACCENT_PATTERN.test(value.accent_color || '')
       ? value.accent_color.toLowerCase()
@@ -68,9 +74,26 @@ export function resolveStudioLogo(settings, resolvedTheme = 'light') {
     || normalized.logo_url === YUNSOFT_DARK_LOGO_URL;
   if (!isYunsoftDefault) return normalized.logo_url;
 
-  // Asset names describe the logo artwork, not the surface it belongs on.
-  // The light artwork is for dark surfaces; the dark artwork is for light surfaces.
   return resolvedTheme === 'dark' ? YUNSOFT_LIGHT_LOGO_URL : YUNSOFT_DARK_LOGO_URL;
+}
+
+export function resolveStudioFavicon(settings) {
+  const normalized = normalizeStudioSettings(settings);
+  return normalized.favicon_file ? STUDIO_FAVICON_ASSET_PATH : YUNSOFT_DEFAULT_FAVICON_URL;
+}
+
+export function applyStudioFavicon(settings, apiUrl = '') {
+  if (typeof document === 'undefined') return;
+  const resolved = resolveStudioFavicon(settings);
+  const href = resolved.startsWith('/') ? `${apiUrl}${resolved}` : resolved;
+  let link = document.querySelector('link[data-yuncms-favicon]');
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    link.dataset.yuncmsFavicon = 'true';
+    document.head.append(link);
+  }
+  link.href = href;
 }
 
 export function applyStudioAppearance(settings, prefersDark = false) {
