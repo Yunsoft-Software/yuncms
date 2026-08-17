@@ -70,11 +70,18 @@ export function supportsAutoUpdate(type) {
   return CURRENT_TIME_TYPES.has(type);
 }
 
+function normalizeDateTimeDefault(value) {
+  const normalized = String(value ?? '').trim().replace('T', ' ');
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)) return `${normalized}:00`;
+  return normalized;
+}
+
 function normalizeDefaultValue(type, value) {
   if (type === 'boolean') return value === true || value === 'true';
   if (type === 'integer') return Number.parseInt(value, 10);
   if (type === 'bigint') return String(value);
   if (type === 'decimal') return Number(value);
+  if (type === 'datetime' || type === 'timestamp') return normalizeDateTimeDefault(value);
   return value;
 }
 
