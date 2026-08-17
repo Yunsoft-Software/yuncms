@@ -2,6 +2,7 @@ export { DEFAULT_SERVER_PORT, loadConfig, loadEnvFileIfPresent } from './config.
 export { createDatabasePool, pingDatabase, closeDatabasePool } from './database.js';
 export { withTransaction, withConnectionTransaction } from './transaction.js';
 export { assertIdentifier, quoteIdentifier } from './identifier.js';
+export { normalizeDisplayName, normalizeSchemaKey, resolveSchemaName } from './schema-key.js';
 export { YunCmsDatabaseError, normalizeDatabaseError, isRetryableDatabaseError } from './errors.js';
 export { withDatabaseRetry } from './retry.js';
 export {
