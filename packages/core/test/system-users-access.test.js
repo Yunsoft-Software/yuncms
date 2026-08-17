@@ -100,6 +100,57 @@ test('management-created users are immediately email verified', async () => {
   assert.ok(user.email_verified_at instanceof Date);
 });
 
+test('self password change remains available and revokes existing sessions', async () => {
+  const calls = [];
+  const connection = {
+    async beginTransaction() { calls.push('begin'); },
+    async commit() { calls.push('commit'); },
+    async rollback() { calls.push('rollback'); },
+    release() { calls.push('release'); },
+    async query(sql, params = []) {
+      const normalized = sql.replace(/\s+/g, ' ').trim();
+      if (normalized.startsWith('UPDATE yuncms_users SET password_hash')) {
+        calls.push({ type: 'password', user: params[1], hash: params[0] });
+        return [{ affectedRows: 1 }, []];
+      }
+      if (normalized.startsWith('DELETE FROM yuncms_sessions')) {
+        calls.push({ type: 'sessions', user: params[0] });
+        return [{ affectedRows: 2 }, []];
+      }
+      throw new Error(`Unexpected query: ${normalized}`);
+    },
+  };
+  const database = { async getConnection() { return connection; } };
+  const service = new UsersService({
+    database,
+    schema,
+    accountability: createAccountability({ user: 'user-self', role: 'role-1' }),
+  });
+
+  await service.updatePassword('user-self', 'new-password-123');
+  const passwordCall = calls.find((entry) => entry?.type === 'password');
+  const sessionsCall = calls.find((entry) => entry?.type === 'sessions');
+  assert.equal(passwordCall.user, 'user-self');
+  assert.match(passwordCall.hash, /^scrypt\$/);
+  assert.equal(sessionsCall.user, 'user-self');
+  assert.equal(calls.includes('commit'), true);
+  assert.equal(calls.includes('release'), true);
+});
+
+test('delegated user manager cannot change another user password', async () => {
+  const database = {
+    async getConnection() {
+      throw new Error('connection should not be requested');
+    },
+  };
+  const service = new UsersService({ database, schema, accountability: delegatedAccountability() });
+
+  await assert.rejects(
+    service.updatePassword('user-2', 'new-password-123'),
+    (error) => error.code === 'FORBIDDEN',
+  );
+});
+
 test('delegated manager cannot assign administrator role', async () => {
   let updateCalled = false;
   const database = {
