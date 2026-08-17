@@ -17,7 +17,7 @@ import { createSchemaRouter } from './routes/schema.js';
 import { createUsersRouter } from './routes/users.js';
 import { createStudioMiddleware } from './studio.js';
 
-const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
 
 function securityHeaders(req, res, next) {
   res.set('x-content-type-options', 'nosniff');
