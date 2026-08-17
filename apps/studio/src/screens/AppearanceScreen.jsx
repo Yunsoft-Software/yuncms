@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 
+import { LogoFilePicker } from '../components/LogoFilePicker.jsx';
 import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/StudioBrand.jsx';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
-import { DEFAULT_STUDIO_SETTINGS } from '../studio-settings.js';
+import {
+  DEFAULT_STUDIO_SETTINGS,
+  YUNSOFT_DARK_LOGO_URL,
+  YUNSOFT_LIGHT_LOGO_URL,
+} from '../studio-settings.js';
 
 export function AppearanceScreen() {
   const {
@@ -33,13 +38,17 @@ export function AppearanceScreen() {
     setError('');
     setNotice('');
     try {
-      await saveSettings({
+      const patch = {
         brand_name: form.brand_name,
-        logo_url: form.logo_url,
+        logo_file: form.logo_file || null,
         accent_color: form.accent_color,
         theme: form.theme,
         default_locale: form.default_locale,
-      });
+      };
+      if ([YUNSOFT_LIGHT_LOGO_URL, YUNSOFT_DARK_LOGO_URL].includes(form.logo_url)) {
+        patch.logo_url = form.logo_url;
+      }
+      await saveSettings(patch);
       setNotice(t('appearance.saved'));
     } catch (requestError) {
       setError(requestError.message || t('auth.requestFailed'));
@@ -53,6 +62,7 @@ export function AppearanceScreen() {
       ...current,
       brand_name: DEFAULT_STUDIO_SETTINGS.brand_name,
       logo_url: DEFAULT_STUDIO_SETTINGS.logo_url,
+      logo_file: null,
       accent_color: DEFAULT_STUDIO_SETTINGS.accent_color,
     }));
     setError('');
@@ -89,17 +99,9 @@ export function AppearanceScreen() {
             <small>{t('appearance.brandNameHint')}</small>
           </label>
 
-          <label className="field-label appearance-logo-field">
-            <span>{t('appearance.logoUrl')}</span>
-            <input
-              type="url"
-              value={form.logo_url || ''}
-              maxLength={512}
-              onChange={(event) => update('logo_url', event.target.value)}
-              required
-            />
-            <small>{t('appearance.logoHint')}</small>
-          </label>
+          <div className="appearance-logo-field">
+            <LogoFilePicker value={form.logo_file || null} onChange={(fileId) => update('logo_file', fileId)} />
+          </div>
 
           <label className="field-label">
             <span>{t('appearance.accentColor')}</span>
