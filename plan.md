@@ -297,13 +297,21 @@ yuncms help
 - [x] Task-oriented sidebar groups: Content / Library / Settings.
 - [x] Non-system collections rendered directly as nested Content navigation instead of a collection toolbar dropdown.
 - [x] Content workspace keeps collection context stable across list/create/edit states.
-- [x] Content page includes lightweight search across the currently loaded records.
+- [x] Content search is server-backed across readable text fields rather than limited to the current page.
+- [x] Content supports field-aware filters, removable filter chips and one-click view reset.
+- [x] Content sorting uses REST `sort` semantics and supports clickable table headers plus explicit direction controls.
+- [x] Content pagination uses REST `limit`, `offset` and filtered `total_count`, with selectable page sizes.
 - [x] Files defaults to a gallery with authenticated image previews, file placeholders, search and grid/list switching.
+- [x] Files includes type filters, useful sort presets, visible/total counts and state-preserving Gallery/List switching.
 - [x] File metadata editing moved from `window.prompt()` into an in-page editor.
+- [x] Users is list-first with creation behind `New user`, plus search, role/status filters and sort controls.
 - [x] Data Model uses a collection master/detail settings layout with focused `New collection` flow and Fields/Relations tabs.
+- [x] Data Model collection and field lists support search, sorting and visible/total counts.
 - [x] Roles/Permissions uses a role-first collection/action matrix with direct simple toggles.
+- [x] Roles support search/sort; permission collections support search and a configured-only audit view.
 - [x] Advanced field allowlist/filter/validation permission editing is in-page and validates JSON before save.
 - [x] Important file/role/permission edits no longer depend on prompt-only workflows.
+- [x] Shared list-control patterns expose result counts/reset actions and stack on narrow screens without a new dependency.
 - [x] Refreshed workspaces have narrow-screen responsive rules without a new UI dependency.
 - [x] Studio API URL defaults to browser same-origin; `VITE_API_URL` remains an explicit override.
 - [x] Vite build output targets the API package runtime bundle directory.
@@ -389,7 +397,7 @@ The major V1 feature source implementations now exist. These milestone boxes sta
 
 ## 17. Remaining source work excluding manual verification
 
-There is no known blocking V1 source feature left in the current roadmap after the Studio usability and single-port source pass.
+There is no known blocking V1 source feature left in the current roadmap after the Studio usability, sortable/filterable data-control and single-port source passes.
 
 Future/non-blocking follow-ups are deliberately outside the V1 release gate unless product requirements change:
 
