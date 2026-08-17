@@ -1,9 +1,11 @@
 export const YUNSOFT_LIGHT_LOGO_URL = 'https://yunsoft.com/light-logo.png';
 export const YUNSOFT_DARK_LOGO_URL = 'https://yunsoft.com/dark-logo.png';
+export const STUDIO_LOGO_ASSET_PATH = '/studio-settings/logo';
 
 export const DEFAULT_STUDIO_SETTINGS = Object.freeze({
   brand_name: 'YunCMS',
   logo_url: YUNSOFT_LIGHT_LOGO_URL,
+  logo_file: null,
   accent_color: '#2563eb',
   theme: 'system',
   default_locale: 'en',
@@ -22,6 +24,9 @@ export function normalizeStudioSettings(value = {}) {
     logo_url: typeof value.logo_url === 'string' && value.logo_url.trim()
       ? value.logo_url.trim()
       : DEFAULT_STUDIO_SETTINGS.logo_url,
+    logo_file: typeof value.logo_file === 'string' && value.logo_file.trim()
+      ? value.logo_file.trim()
+      : null,
     accent_color: ACCENT_PATTERN.test(value.accent_color || '')
       ? value.accent_color.toLowerCase()
       : DEFAULT_STUDIO_SETTINGS.accent_color,
@@ -57,6 +62,8 @@ export function resolveTheme(theme, prefersDark = false) {
 
 export function resolveStudioLogo(settings, resolvedTheme = 'light') {
   const normalized = normalizeStudioSettings(settings);
+  if (normalized.logo_file) return STUDIO_LOGO_ASSET_PATH;
+
   const isYunsoftDefault = normalized.logo_url === YUNSOFT_LIGHT_LOGO_URL
     || normalized.logo_url === YUNSOFT_DARK_LOGO_URL;
   if (!isYunsoftDefault) return normalized.logo_url;
