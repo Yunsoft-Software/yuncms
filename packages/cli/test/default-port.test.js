@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
@@ -27,4 +27,18 @@ test('.env.example matches the clean-install 3008 contract and contains no legac
   assert.match(envExample, /^STUDIO_ORIGIN=http:\/\/localhost:3008$/m);
   assert.match(envExample, /^AUTH_PUBLIC_URL=http:\/\/localhost:3008$/m);
   assert.doesNotMatch(envExample, /(?:^|[^0-9])(8055|5173)(?:[^0-9]|$)/);
+});
+
+test('operator documentation uses the single-port 3008 runtime contract', () => {
+  const root = resolve(import.meta.dirname, '../../..');
+  const paths = [
+    resolve(root, 'README.md'),
+    ...readdirSync(resolve(root, 'docs'))
+      .filter((name) => name.endsWith('.md'))
+      .map((name) => resolve(root, 'docs', name)),
+  ];
+  const documentation = paths.map((path) => readFileSync(path, 'utf8')).join('\n');
+
+  assert.doesNotMatch(documentation, /(?:^|[^0-9])(8055|5173)(?:[^0-9]|$)/);
+  assert.match(documentation, /http:\/\/localhost:3008/);
 });
