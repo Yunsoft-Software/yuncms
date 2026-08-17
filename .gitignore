@@ -1,5 +1,6 @@
 node_modules/
 dist/
+packages/api/studio-dist/
 coverage/
 .yuncms/
 .env
