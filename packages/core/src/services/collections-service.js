@@ -21,11 +21,15 @@ function assertUserCollectionName(collection) {
   return collection;
 }
 
+function invalidSchemaPayload(message) {
+  const error = new Error(message);
+  error.code = 'INVALID_SCHEMA_PAYLOAD';
+  return error;
+}
+
 function assertCollectionMetadataPatch(patch) {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
-    const error = new Error('Collection metadata patch must be an object');
-    error.code = 'INVALID_SCHEMA_PAYLOAD';
-    throw error;
+    throw invalidSchemaPayload('Collection metadata patch must be an object');
   }
   for (const key of Object.keys(patch)) {
     if (!COLLECTION_METADATA_KEYS.has(key)) {
@@ -35,9 +39,36 @@ function assertCollectionMetadataPatch(patch) {
     }
   }
   if (Object.keys(patch).length === 0) {
-    const error = new Error('Collection metadata patch cannot be empty');
-    error.code = 'INVALID_SCHEMA_PAYLOAD';
-    throw error;
+    throw invalidSchemaPayload('Collection metadata patch cannot be empty');
+  }
+  for (const key of ['singleton', 'hidden']) {
+    if (Object.hasOwn(patch, key) && typeof patch[key] !== 'boolean') {
+      throw invalidSchemaPayload(`Collection ${key} must be a boolean`);
+    }
+  }
+  if (Object.hasOwn(patch, 'note') && patch.note != null && typeof patch.note !== 'string') {
+    throw invalidSchemaPayload('Collection note must be a string or null');
+  }
+  if (Object.hasOwn(patch, 'metadata') && patch.metadata != null && (
+    typeof patch.metadata !== 'object' || Array.isArray(patch.metadata)
+  )) {
+    throw invalidSchemaPayload('Collection metadata must be an object or null');
+  }
+}
+
+function assertCollectionCreateMetadata(input) {
+  for (const key of ['singleton', 'hidden']) {
+    if (Object.hasOwn(input, key) && typeof input[key] !== 'boolean') {
+      throw invalidSchemaPayload(`Collection ${key} must be a boolean`);
+    }
+  }
+  if (Object.hasOwn(input, 'note') && input.note != null && typeof input.note !== 'string') {
+    throw invalidSchemaPayload('Collection note must be a string or null');
+  }
+  if (Object.hasOwn(input, 'metadata') && input.metadata != null && (
+    typeof input.metadata !== 'object' || Array.isArray(input.metadata)
+  )) {
+    throw invalidSchemaPayload('Collection metadata must be an object or null');
   }
 }
 
@@ -59,6 +90,7 @@ export class CollectionsService extends BaseService {
 
   async createOne(input = {}) {
     assertSchemaManager(this.accountability);
+    assertCollectionCreateMetadata(input);
     const collection = assertUserCollectionName(input.collection);
     const primaryKey = input.primaryKey ?? 'id';
 
