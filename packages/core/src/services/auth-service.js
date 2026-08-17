@@ -31,6 +31,7 @@ function publicUser(user) {
     id: user.id,
     email: user.email,
     role: user.role ?? null,
+    role_name: user.role_name ?? null,
     status: user.status,
     email_verified_at: user.email_verified_at ?? null,
   };
@@ -95,7 +96,7 @@ export class AuthService extends BaseService {
     if (tokenType(token) !== 'api') throw invalidToken();
     const [rows] = await this.database.query(
       `SELECT t.id AS api_token_id, t.user, u.email, u.role, u.status,
-              r.admin AS role_admin
+              r.name AS role_name, r.admin AS role_admin
        FROM yuncms_api_tokens t
        INNER JOIN yuncms_users u ON u.id = t.user
        LEFT JOIN yuncms_roles r ON r.id = u.role
@@ -119,6 +120,7 @@ export class AuthService extends BaseService {
     return {
       user: row.user,
       role: row.role ?? null,
+      role_name: row.role_name ?? null,
       admin: Boolean(row.role_admin),
       email: row.email,
       session: null,
@@ -141,6 +143,7 @@ export class AuthService extends BaseService {
         id: result.user,
         email: result.email,
         role: result.role,
+        role_name: result.role_name ?? null,
       },
       access_token: result.access_token,
       access_expires_at: result.access_expires_at,
