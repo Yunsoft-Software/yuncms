@@ -51,6 +51,7 @@
 - [x] Core service registry.
 - [x] Same service/accountability model exposed to trusted extension runtime.
 - [x] Dedicated auth/user/session/token/file/audit/maintenance services own special behavior.
+- [x] Dedicated `StudioSettingsService` owns safe public display settings and administrator-only branding/theme/default-locale mutation.
 
 ## 3. MySQL/bootstrap foundation
 
@@ -63,12 +64,13 @@
 - [x] MySQL duplicate/FK/deadlock/lock/connection normalization.
 - [x] Bounded retry helper for retryable lock/deadlock classes.
 - [x] Migration journal.
-- [x] Versioned core migrations (`0001`–`0005`).
+- [x] Versioned core migrations (`0001`–`0006`).
 - [x] `0005-default-public-role` guarantees the protected Public role exists on new and upgraded databases without granting collection permissions.
+- [x] `0006-studio-settings` creates one bounded Studio branding/appearance/default-locale settings row.
 - [x] Bootstrap advisory lock.
 - [x] Schema advisory lock.
 - [x] Schema version state/read/increment.
-- [x] API startup compatibility guard; API does not auto-bootstrap and requires `0005` after upgrade.
+- [x] API startup compatibility guard; API does not auto-bootstrap and requires current migrations after upgrade.
 - [x] Real-MySQL bootstrap/transaction/concurrency verification — `todo.md`.
 
 ## 4. Dynamic schema engine
@@ -329,11 +331,18 @@ yuncms help
 - [x] Important file/role/permission edits no longer depend on prompt-only workflows.
 - [x] Shared list-control patterns expose result counts/reset actions and stack on narrow screens without a new dependency.
 - [x] Refreshed workspaces have narrow-screen responsive rules without a new UI dependency.
+- [x] Server-backed Branding & Appearance settings cover brand name, logo URL, accent color, light/dark/system theme and default EN/TR locale.
+- [x] Official Yunsoft logo is the default Studio logo; one configured custom logo replaces it rather than rendering a second Yunsoft logo.
+- [x] Small Yunsoft powered-by/copyright footer remains independent from configurable logo branding.
+- [x] Theme implementation uses shared CSS custom properties instead of duplicated component trees or a new UI package.
+- [x] English and Turkish dictionaries cover auth, Content, Files, Users, Data Model, Roles & Permissions, Content Visibility, Branding & Appearance, dialogs and shared pagination.
+- [x] Personal browser locale override takes precedence over the server default locale and can be reset to follow the server default.
+- [x] Localization pure utilities are separated from the React hook/context for cheap Node-based testing.
 - [x] Studio API URL defaults to browser same-origin; `VITE_API_URL` remains an explicit override.
 - [x] Vite build output targets the API package runtime bundle directory.
 - [x] Relation picker V1 intentionally caps target list at 200; paginated/search picker is scale polish rather than a V1 correctness blocker.
-- [ ] Formal accessibility/keyboard review — `todo.md`.
-- [ ] Refreshed Studio browser/build/runtime smoke — `todo.md`.
+- [ ] Formal accessibility/keyboard/contrast review — `todo.md`.
+- [ ] Refreshed Studio branding/localization/browser/build/runtime smoke — `todo.md`.
 
 ## 13. API/runtime/observability
 
@@ -355,13 +364,16 @@ yuncms help
 - [x] Runtime logger secret redaction.
 - [x] Auth rate-limit headers/HTTP 429.
 - [x] Process-local rate limiter has a hard bounded client-bucket cap.
+- [x] `GET /studio-settings` exposes only safe pre-auth branding/theme/default-locale display settings.
+- [x] `PATCH /studio-settings` reuses explicit accountability and is administrator/system-only.
+- [x] Studio settings logo URL accepts only bounded HTTP/HTTPS URLs; accent/theme/locale values use strict allowlists.
 - [x] Built Studio index and hashed assets served from the same Express listener with Node filesystem streams.
 - [x] Studio static handler is restricted to `/` and `/assets/...`; unrelated requests continue through normal API routing.
 - [x] Root `npm start` builds Studio before starting the single API/Studio listener.
 - [x] Default Studio/auth public URLs align with the API port.
 - [x] API package file list includes the generated Studio bundle for packed and public-registry installs.
 - [x] API/runtime/security-header/graceful-shutdown smoke — `todo.md`.
-- [ ] Current production-readiness pass Node24/release/MySQL/browser/proxy smoke — `todo.md`.
+- [ ] Current production-readiness/customization pass Node24/release/MySQL/browser/proxy smoke — `todo.md`.
 - [ ] Single-port built Studio HTML/assets/API browser smoke — `todo.md`.
 
 ## 14. Documentation
@@ -378,9 +390,10 @@ yuncms help
 - [x] `docs/studio.md`.
 - [x] `docs/studio-ui-improvement-plan.md` live UI improvement checklist.
 - [x] `docs/studio-usability-pass.md` focused shared-pagination/media/settings usability checklist.
-- [x] `docs/production-readiness-test-plan.md` source implementation checklist for this pass.
+- [x] `docs/production-readiness-test-plan.md` source implementation checklist for the production-readiness pass.
 - [x] `docs/testing.md` low-noise fast/full/release/real-MySQL test workflow.
 - [x] `docs/production-readiness.md` current source audit, fixed hazards, release gates and known V1 constraints.
+- [x] `docs/studio-customization.md` branding/theme/localization architecture and operator behavior.
 - [x] `docs/files.md`.
 - [x] `docs/security.md`.
 - [x] `docs/deployment.md`.
@@ -391,7 +404,7 @@ yuncms help
 
 - [x] DB config/identifier/error/retry.
 - [x] Bootstrap/advisory-lock.
-- [x] Required migration `0005` + public-role bootstrap/idempotency invariants.
+- [x] Required migrations `0005`/`0006` plus public-role and Studio-settings invariants.
 - [x] Schema/query/ItemsService.
 - [x] Schema service authorization/destructive/M2M preflight/lifecycle.
 - [x] Collection visibility metadata + Studio visibility rule behavior.
@@ -399,6 +412,9 @@ yuncms help
 - [x] Auth/session/API-token/action-token.
 - [x] Public-role fail-closed permission resolution plus field/row restriction behavior.
 - [x] RBAC/permission cache/validation evaluator.
+- [x] Studio settings public-read/admin-write boundary and strict branding/theme/locale validation.
+- [x] Studio appearance normalization/custom-logo/theme resolution helpers.
+- [x] EN/TR dictionary key parity and static translation-key source scan.
 - [x] Hook recursion/item hooks.
 - [x] Extension manifest/discovery/runtime context.
 - [x] API malformed-JSON/request-id/error-contract/MySQL normalization.
@@ -411,8 +427,9 @@ yuncms help
 - [x] Audit redaction + bounded cleanup.
 - [x] Single-port Studio default config and static asset path/traversal resolution.
 - [x] Low-noise `test:fast`, auto-discovered complete `npm test`, and release build/package runner exist.
+- [x] Branding/localization regressions are part of the low-noise fast suite.
 - [x] Opt-in destructive-guarded real MySQL/API cross-feature integration flow exists.
-- [ ] Execute the current production-readiness test commands on Node 24/real target infrastructure — `todo.md`.
+- [ ] Execute the current production-readiness/customization test commands on Node 24/real target infrastructure — `todo.md`.
 
 ## 16. Verification milestones
 
@@ -421,14 +438,14 @@ The major V1 feature source implementations now exist. These milestone boxes sta
 - [x] Milestone A — dependency install/lockfile + Node 24 + tests + API/Studio build/start verified for the earlier baseline.
 - [x] Milestone B — real MySQL bootstrap/schema/CRUD/query/relation lifecycle and rollback behavior verified for the earlier baseline.
 - [x] Milestone C — real auth/SMTP/replay/RBAC/validation/rate-limit behavior verified for the earlier baseline.
-- [ ] Current production-readiness pass — rerun Node24 fast/full/release suites, migration `0005`, public RBAC, Content Visibility, proxy and browser smoke — `todo.md`.
+- [ ] Current customization/production-readiness pass — rerun Node24 fast/full/release suites, migration `0006`, branding/theme/EN-TR behavior, public RBAC, Content Visibility, proxy and browser smoke — `todo.md`.
 - [ ] Milestone D — extension local/npm runtime + refreshed Studio end-to-end and single-port smoke verified.
 - [ ] Milestone E — local/S3 files, reconciliation, audit cleanup, logging/security headers and graceful shutdown verified.
 - [x] Release baseline — npm naming ownership, tarballs, fresh install and `yuncms init/bootstrap/start` previously verified; rerun the current release source gate before the next publish.
 
 ## 17. Remaining source work excluding manual verification
 
-There is no known blocking single-instance V1 source feature left in the current roadmap after the Studio usability, collection visibility/public-role and production-readiness source passes.
+There is no known blocking single-instance V1 source feature left in the current roadmap after the Studio usability, collection visibility/public-role, production-readiness and lightweight customization/localization source passes.
 
 Future/non-blocking follow-ups are deliberately outside the V1 release gate unless product requirements or deployment scale change:
 
@@ -437,6 +454,8 @@ Future/non-blocking follow-ups are deliberately outside the V1 release gate unle
 - O2M/M2M nested item expansion;
 - paginated/search relation picker beyond the current 200-item Studio picker;
 - M2M multi-select content editor on top of explicit junction records;
+- additional Studio locales beyond English/Turkish;
+- uploaded/binary logo asset management if URL-based branding later proves insufficient;
 - session-management UI, MFA and SSO families;
 - extension sandbox/marketplace isolation;
 - automatic scheduled maintenance/retention jobs if operators later want them;
