@@ -32,6 +32,18 @@ export function AppearanceScreen() {
     setNotice('');
   }
 
+  function updateLogoFile(fileId) {
+    setForm((current) => ({
+      ...current,
+      logo_file: fileId || null,
+      // Clearing a Files-backed logo means “use Yunsoft default”, including for
+      // installations that still carry a legacy external logo_url in the DB.
+      logo_url: fileId ? current.logo_url : DEFAULT_STUDIO_SETTINGS.logo_url,
+    }));
+    setError('');
+    setNotice('');
+  }
+
   async function handleSave(event) {
     event.preventDefault();
     setSaving(true);
@@ -100,7 +112,7 @@ export function AppearanceScreen() {
           </label>
 
           <div className="appearance-logo-field">
-            <LogoFilePicker value={form.logo_file || null} onChange={(fileId) => update('logo_file', fileId)} />
+            <LogoFilePicker value={form.logo_file || null} onChange={updateLogoFile} />
           </div>
 
           <label className="field-label">
