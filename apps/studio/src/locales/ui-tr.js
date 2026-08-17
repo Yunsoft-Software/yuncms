@@ -75,6 +75,7 @@ export const UI_TR = Object.freeze({
   'fileField.uploadNew': 'Yeni dosya yükle',
   'fileField.clear': 'Dosyayı temizle',
 
+  'users.createDescription': 'Giriş bilgilerini ve isteğe bağlı rolü belirleyin. Yönetim panelinden oluşturulan kullanıcıların e-postası otomatik doğrulanmış sayılır ve hemen giriş yapabilirler.',
   'users.managedVerifiedHint': 'Buradan oluşturulan kullanıcılar yönetim tarafından güvenilen hesaplar olarak kabul edilir ve e-posta adresleri anında doğrulanmış sayılır. Doğrulama e-postası beklemeden giriş yapabilirler.',
 
   'dataModel.fieldBuilderHint': 'Önce veri türünü seçin. Dosya ve görsel alanları bir dosya referansı tutar ve İçerik ekranında özel seçici kullanır.',
