@@ -5,10 +5,12 @@ import { createAccountability, createPublicAccountability } from '../src/account
 import { StudioSettingsService } from '../src/services/studio-settings-service.js';
 
 const LOGO_FILE_ID = '123e4567-e89b-42d3-a456-426614174000';
+const FAVICON_FILE_ID = '223e4567-e89b-42d3-a456-426614174001';
 const SETTINGS_ROW = {
   brand_name: 'YunCMS',
   logo_url: 'https://yunsoft.com/light-logo.png',
   logo_file: null,
+  favicon_file: null,
   accent_color: '#2563eb',
   theme: 'system',
   default_locale: 'en',
@@ -47,17 +49,23 @@ test('non-admin accountability cannot mutate Studio settings before database acc
   );
 });
 
-test('administrator can choose an existing image file as Studio logo', async () => {
+test('administrator can choose existing image files as Studio logo and favicon', async () => {
   const calls = [];
   const database = {
     async query(sql, params = []) {
       calls.push({ sql, params });
       if (sql.includes('SELECT id, mimetype FROM yuncms_files')) {
-        return [[{ id: LOGO_FILE_ID, mimetype: 'image/svg+xml' }], []];
+        return [[{ id: params[0], mimetype: 'image/png' }], []];
       }
       if (sql.includes('UPDATE yuncms_studio_settings')) return [{ affectedRows: 1 }, []];
       if (sql.includes('FROM yuncms_studio_settings')) {
-        return [[{ ...SETTINGS_ROW, logo_file: LOGO_FILE_ID, brand_name: 'Acme CMS', theme: 'dark' }], []];
+        return [[{
+          ...SETTINGS_ROW,
+          logo_file: LOGO_FILE_ID,
+          favicon_file: FAVICON_FILE_ID,
+          brand_name: 'Acme CMS',
+          theme: 'dark',
+        }], []];
       }
       throw new Error(`Unexpected query: ${sql}`);
     },
@@ -70,27 +78,29 @@ test('administrator can choose an existing image file as Studio logo', async () 
   const result = await service.updateOne({
     brand_name: '  Acme CMS  ',
     logo_file: LOGO_FILE_ID,
+    favicon_file: FAVICON_FILE_ID,
     theme: 'DARK',
   });
 
   assert.equal(result.logo_file, LOGO_FILE_ID);
+  assert.equal(result.favicon_file, FAVICON_FILE_ID);
   const update = calls.find(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'));
-  assert.deepEqual(update.params.slice(0, -1), ['Acme CMS', LOGO_FILE_ID, 'dark']);
+  assert.deepEqual(update.params.slice(0, -1), ['Acme CMS', LOGO_FILE_ID, FAVICON_FILE_ID, 'dark']);
 });
 
-test('public logo content reads only the configured image through storage', async () => {
+function imageAssetFixture(settingKey, fileId) {
   const bytes = Buffer.from('<svg/>');
   const database = {
     async query(sql, params = []) {
       if (sql.includes('FROM yuncms_studio_settings')) {
-        return [[{ ...SETTINGS_ROW, logo_file: LOGO_FILE_ID }], []];
+        return [[{ ...SETTINGS_ROW, [settingKey]: fileId }], []];
       }
       if (sql.includes('FROM yuncms_files')) {
-        assert.deepEqual(params, [LOGO_FILE_ID]);
+        assert.deepEqual(params, [fileId]);
         return [[{
-          id: LOGO_FILE_ID,
+          id: fileId,
           storage: 'local',
-          filename_disk: LOGO_FILE_ID,
+          filename_disk: fileId,
           mimetype: 'image/svg+xml',
           filesize: bytes.length,
         }], []];
@@ -101,25 +111,43 @@ test('public logo content reads only the configured image through storage', asyn
   const storage = {
     get(name) {
       assert.equal(name, 'local');
-      return { async get(key) { assert.equal(key, LOGO_FILE_ID); return bytes; } };
+      return { async get(key) { assert.equal(key, fileId); return bytes; } };
     },
   };
+  return { bytes, database, storage };
+}
+
+test('public logo content reads only the configured image through storage', async () => {
+  const fixture = imageAssetFixture('logo_file', LOGO_FILE_ID);
   const service = new StudioSettingsService({
-    database,
-    storage,
+    database: fixture.database,
+    storage: fixture.storage,
     accountability: createPublicAccountability(),
   });
 
   const result = await service.readLogoContent();
   assert.equal(result.file.mimetype, 'image/svg+xml');
-  assert.equal(result.contents, bytes);
+  assert.equal(result.contents, fixture.bytes);
 });
 
-test('Studio settings reject external logo URLs, non-image logo files and malformed accent colors', async () => {
+test('public favicon content reads only the configured image through storage', async () => {
+  const fixture = imageAssetFixture('favicon_file', FAVICON_FILE_ID);
+  const service = new StudioSettingsService({
+    database: fixture.database,
+    storage: fixture.storage,
+    accountability: createPublicAccountability(),
+  });
+
+  const result = await service.readFaviconContent();
+  assert.equal(result.file.id, FAVICON_FILE_ID);
+  assert.equal(result.contents, fixture.bytes);
+});
+
+test('Studio settings reject external logo URLs, non-image branding files and malformed accent colors', async () => {
   const database = {
-    async query(sql) {
+    async query(sql, params = []) {
       if (sql.includes('SELECT id, mimetype FROM yuncms_files')) {
-        return [[{ id: LOGO_FILE_ID, mimetype: 'application/pdf' }], []];
+        return [[{ id: params[0], mimetype: 'application/pdf' }], []];
       }
       throw new Error('database must not otherwise be touched');
     },
@@ -135,6 +163,10 @@ test('Studio settings reject external logo URLs, non-image logo files and malfor
   );
   await assert.rejects(
     service.updateOne({ logo_file: LOGO_FILE_ID }),
+    (error) => error.code === 'INVALID_PAYLOAD',
+  );
+  await assert.rejects(
+    service.updateOne({ favicon_file: FAVICON_FILE_ID }),
     (error) => error.code === 'INVALID_PAYLOAD',
   );
   await assert.rejects(
