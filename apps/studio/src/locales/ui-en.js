@@ -1,4 +1,6 @@
 export const UI_EN = Object.freeze({
+  'appearance.brandNameHint': 'Used for logo alt text, fallbacks and Studio branding settings.',
+
   'nav.expandSidebar': 'Expand sidebar',
   'nav.collapseSidebar': 'Collapse sidebar',
   'nav.studioSections': 'Studio sections',
