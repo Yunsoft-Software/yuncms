@@ -10,9 +10,13 @@ export function parseCollectionMetadata(value) {
   }
 }
 
+function isEnabledFlag(value) {
+  return value === true || value === 1;
+}
+
 export function permissionResourcePolicy(collection) {
   const metadata = parseCollectionMetadata(collection?.metadata);
-  const systemManaged = Boolean(collection?.system && metadata.permissionManaged === true);
+  const systemManaged = Boolean(collection?.system && isEnabledFlag(metadata.permissionManaged));
   const allowedActions = systemManaged && Array.isArray(metadata.allowedActions)
     ? metadata.allowedActions.filter((action) => ACTIONS.includes(action))
     : [...ACTIONS];
