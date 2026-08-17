@@ -6,6 +6,7 @@ import { publicRoleConstraintsMigration } from './migrations/0003-public-role-co
 import { authActionTokensMigration } from './migrations/0004-auth-action-tokens.js';
 import { defaultPublicRoleMigration } from './migrations/0005-default-public-role.js';
 import { studioSettingsMigration } from './migrations/0006-studio-settings.js';
+import { systemPermissionResourcesMigration } from './migrations/0007-system-permission-resources.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -16,6 +17,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   authActionTokensMigration,
   defaultPublicRoleMigration,
   studioSettingsMigration,
+  systemPermissionResourcesMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(
