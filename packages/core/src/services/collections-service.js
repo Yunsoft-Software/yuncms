@@ -3,13 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { withAdvisoryLock } from '../advisory-lock.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
+import { normalizeDisplayName, resolveSchemaName } from '../schema-key.js';
 import { incrementSchemaVersion } from '../schema-version.js';
 import { compileCollectionSystemFields, normalizeCollectionSystemFields } from '../system-fields.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { assertSchemaManager } from './schema-access.js';
 
-const COLLECTION_METADATA_KEYS = new Set(['note', 'singleton', 'hidden', 'metadata']);
+const COLLECTION_METADATA_KEYS = new Set(['name', 'note', 'singleton', 'hidden', 'metadata']);
 
 function assertUserCollectionName(collection) {
   assertIdentifier(collection, 'collection name');
@@ -46,6 +47,9 @@ function assertCollectionMetadataPatch(patch) {
     if (Object.hasOwn(patch, key) && typeof patch[key] !== 'boolean') {
       throw invalidSchemaPayload(`Collection ${key} must be a boolean`);
     }
+  }
+  if (Object.hasOwn(patch, 'name')) {
+    patch.name = normalizeDisplayName(patch.name);
   }
   if (Object.hasOwn(patch, 'note') && patch.note != null && typeof patch.note !== 'string') {
     throw invalidSchemaPayload('Collection note must be a string or null');
@@ -93,7 +97,13 @@ export class CollectionsService extends BaseService {
   async createOne(input = {}) {
     assertSchemaManager(this.accountability);
     assertCollectionCreateMetadata(input);
-    const collection = assertUserCollectionName(input.collection);
+    const resolvedName = resolveSchemaName({
+      displayName: input.name ?? input.collection,
+      key: input.collection,
+      prefix: 'collection',
+    });
+    const collection = assertUserCollectionName(resolvedName.key);
+    const name = resolvedName.name;
     const primaryKey = input.primaryKey ?? 'id';
 
     if (primaryKey !== 'id') {
@@ -132,6 +142,7 @@ export class CollectionsService extends BaseService {
         return await withConnectionTransaction(connection, async () => {
           const created = await metadata.createCollection({
             collection,
+            name,
             primaryKey,
             note: input.note ?? null,
             singleton: input.singleton === true,
@@ -145,6 +156,7 @@ export class CollectionsService extends BaseService {
           await metadata.createField({
             collection,
             field: 'id',
+            name: 'ID',
             type: 'uuid',
             required: true,
             readonly: true,
