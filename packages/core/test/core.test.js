@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { loadConfig } from '../src/config.js';
 import { pingDatabase } from '../src/database.js';
+import { compileFieldColumn } from '../src/field-types.js';
 import { quoteIdentifier } from '../src/identifier.js';
 import { normalizeDatabaseError } from '../src/errors.js';
 import { withDatabaseRetry } from '../src/retry.js';
@@ -28,6 +29,15 @@ test('loadConfig uses stable defaults and parses numeric values', () => {
   assert.equal(config.database.connectionLimit, 20);
   assert.equal(config.database.ssl, true);
   assert.equal(config.database.host, '127.0.0.1');
+});
+
+test('file and image interfaces require UUID physical storage', () => {
+  assert.match(compileFieldColumn({ type: 'uuid', interface: 'file' }).sql, /^CHAR\(36\)/);
+  assert.match(compileFieldColumn({ type: 'uuid', interface: 'image' }).sql, /^CHAR\(36\)/);
+  assert.throws(
+    () => compileFieldColumn({ type: 'string', interface: 'image' }),
+    (error) => error.code === 'INVALID_FIELD_INTERFACE',
+  );
 });
 
 test('database ping accepts mysql2 bigNumberStrings results', async () => {
