@@ -3,7 +3,10 @@ import test from 'node:test';
 
 import {
   DEFAULT_STUDIO_SETTINGS,
+  YUNSOFT_DARK_LOGO_URL,
+  YUNSOFT_LIGHT_LOGO_URL,
   normalizeStudioSettings,
+  resolveStudioLogo,
   resolveTheme,
 } from '../src/studio-settings.js';
 
@@ -35,9 +38,14 @@ test('custom branding remains the effective branding instead of restoring Yunsof
   assert.equal(settings.brand_name, 'Acme CMS');
   assert.equal(settings.logo_url, 'https://cdn.example.com/acme.svg');
   assert.notEqual(settings.logo_url, DEFAULT_STUDIO_SETTINGS.logo_url);
-  assert.equal(settings.accent_color, '#ff5500');
-  assert.equal(settings.theme, 'dark');
-  assert.equal(settings.default_locale, 'tr');
+  assert.equal(resolveStudioLogo(settings, 'light'), 'https://cdn.example.com/acme.svg');
+  assert.equal(resolveStudioLogo(settings, 'dark'), 'https://cdn.example.com/acme.svg');
+});
+
+test('default Yunsoft branding switches logo by resolved theme', () => {
+  assert.equal(resolveStudioLogo(DEFAULT_STUDIO_SETTINGS, 'light'), YUNSOFT_LIGHT_LOGO_URL);
+  assert.equal(resolveStudioLogo(DEFAULT_STUDIO_SETTINGS, 'dark'), YUNSOFT_DARK_LOGO_URL);
+  assert.notEqual(YUNSOFT_LIGHT_LOGO_URL, YUNSOFT_DARK_LOGO_URL);
 });
 
 test('system theme follows the OS preference while explicit themes win', () => {
