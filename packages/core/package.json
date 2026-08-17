@@ -1,0 +1,36 @@
+{
+  "name": "@yunsoft/yuncms-core",
+  "version": "0.1.1",
+  "description": "Core services, schema, authentication, permissions and storage primitives for YunCMS.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yunsoft-Software/yuncms.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/Yunsoft-Software/yuncms#readme",
+  "bugs": {
+    "url": "https://github.com/Yunsoft-Software/yuncms/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1100.0",
+    "mysql2": "3.23.2",
+    "nodemailer": "9.0.3"
+  }
+}

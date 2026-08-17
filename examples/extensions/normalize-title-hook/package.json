@@ -1,0 +1,14 @@
+{
+  "name": "yuncms-extension-normalize-title",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@yunsoft/yuncms-extensions-sdk": "0.1.0"
+  },
+  "yuncms": {
+    "id": "normalize-title",
+    "type": "hook",
+    "entry": "./src/index.js"
+  }
+}

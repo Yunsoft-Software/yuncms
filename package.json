@@ -1,0 +1,27 @@
+{
+  "name": "yuncms-workspace",
+  "version": "0.1.1",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "build:studio": "npm run build --workspace=@yunsoft/yuncms-studio",
+    "dev": "npm run build:studio && node --watch packages/api/src/server.js",
+    "dev:api": "node --watch packages/api/src/server.js",
+    "init": "node packages/cli/bin/yuncms.js init",
+    "bootstrap": "node packages/cli/bin/yuncms.js bootstrap",
+    "start": "npm run build:studio && node packages/api/src/server.js",
+    "build": "npm run build --workspaces --if-present",
+    "test": "node scripts/verify.mjs full",
+    "test:fast": "node scripts/verify.mjs fast",
+    "test:release": "node scripts/verify.mjs release"
+  }
+}

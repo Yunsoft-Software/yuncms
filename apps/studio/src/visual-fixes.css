@@ -1,0 +1,210 @@
+/* Focused visual corrections discovered during browser smoke on 2026-08-17. */
+
+.pagination,
+.file-library-results,
+.permission-list-controls,
+.permission-matrix th:first-child,
+.permission-matrix td:first-child,
+.permission-matrix thead th:first-child,
+.table-footer {
+  border-color: var(--studio-border-soft);
+  background: var(--studio-surface);
+  color: var(--studio-text);
+}
+
+.pagination-summary,
+.pagination-size,
+.pagination-ellipsis {
+  color: var(--studio-text-muted);
+}
+
+.pagination-summary strong {
+  color: var(--studio-text-soft);
+}
+
+.pagination-button {
+  color: var(--studio-text-soft);
+}
+
+.pagination-button:hover:not(:disabled) {
+  border-color: var(--studio-border);
+  background: var(--studio-surface-hover);
+  color: var(--studio-text);
+}
+
+.pagination-button.active {
+  border-color: var(--studio-accent-border);
+  background: var(--studio-accent-soft);
+  color: var(--studio-text);
+}
+
+.pagination-size select {
+  border-color: var(--studio-border);
+  background: var(--studio-input);
+  color: var(--studio-text);
+}
+
+.file-library-results .file-grid,
+.permission-matrix-scroll,
+.permission-matrix,
+.permission-matrix tbody,
+.permission-matrix tr,
+.permission-matrix td {
+  background: var(--studio-surface);
+  color: var(--studio-text);
+}
+
+.permission-matrix th,
+.permission-matrix thead th,
+.permission-matrix thead th:first-child {
+  border-color: var(--studio-border-soft);
+  background: var(--studio-surface-muted);
+  color: var(--studio-text-soft);
+}
+
+.permission-matrix td:first-child {
+  box-shadow: 1px 0 0 var(--studio-border-soft);
+}
+
+.permission-matrix tbody tr:hover td,
+.permission-matrix tbody tr:hover td:first-child {
+  background: var(--studio-surface-hover);
+}
+
+:root[data-theme="dark"] .pagination,
+:root[data-theme="dark"] .file-library-results,
+:root[data-theme="dark"] .permission-list-controls,
+:root[data-theme="dark"] .permission-matrix th:first-child,
+:root[data-theme="dark"] .permission-matrix td:first-child,
+:root[data-theme="dark"] .permission-matrix thead th:first-child {
+  background: var(--studio-surface);
+  color: var(--studio-text);
+}
+
+:root[data-theme="dark"] .permission-matrix th,
+:root[data-theme="dark"] .permission-matrix thead th,
+:root[data-theme="dark"] .permission-matrix thead th:first-child {
+  background: var(--studio-surface-muted);
+}
+
+:root[data-theme="dark"] .pagination-button.active {
+  background: var(--studio-accent-soft);
+}
+
+/* Branding file picker */
+.logo-file-picker {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  background: var(--studio-surface-muted);
+}
+
+.logo-file-picker-heading,
+.logo-file-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.logo-file-picker-heading p {
+  margin: 3px 0 0;
+  color: var(--studio-text-muted);
+  font-size: 11px;
+}
+
+.logo-file-search {
+  margin: 0;
+}
+
+.logo-file-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.logo-file-option {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  background: var(--studio-surface);
+  color: var(--studio-text-soft);
+  text-align: left;
+}
+
+.logo-file-option:hover,
+.logo-file-option.active {
+  border-color: var(--studio-accent-border);
+  background: var(--studio-accent-soft);
+  color: var(--studio-text);
+}
+
+.logo-file-thumb,
+.logo-file-selected-preview {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--studio-border);
+  border-radius: 9px;
+  background: var(--studio-input);
+}
+
+.logo-file-thumb {
+  width: 52px;
+  height: 42px;
+}
+
+.logo-file-selected-preview {
+  width: 72px;
+  height: 52px;
+  flex: 0 0 72px;
+}
+
+.logo-file-thumb img,
+.logo-file-selected-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.logo-file-copy,
+.logo-file-selected > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.logo-file-copy strong,
+.logo-file-selected strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logo-file-copy small,
+.logo-file-selected small {
+  color: var(--studio-text-muted);
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .logo-file-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .logo-file-picker-heading,
+  .logo-file-selected {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

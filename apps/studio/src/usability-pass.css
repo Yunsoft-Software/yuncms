@@ -1,0 +1,497 @@
+.pagination {
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  border-top: 1px solid #edf0f5;
+  background: #fff;
+}
+
+.pagination-summary {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: #7a8498;
+  font-size: 12px;
+}
+
+.pagination-summary strong {
+  color: #45536a;
+  font-weight: 750;
+}
+
+.pagination-controls,
+.pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pagination-controls {
+  justify-self: center;
+}
+
+.pagination-button {
+  min-width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #5f6c82;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pagination-button:hover:not(:disabled) {
+  border-color: #dfe5ee;
+  background: #f7f9fc;
+  color: #1d2738;
+}
+
+.pagination-button.active {
+  border-color: #d4dce7;
+  background: #eef2f8;
+  color: #1d2738;
+}
+
+.pagination-arrow {
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.pagination-ellipsis {
+  min-width: 22px;
+  color: #a0a8b6;
+  text-align: center;
+}
+
+.pagination-size {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #7a8498;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.pagination-size select {
+  width: auto;
+  min-width: 72px;
+  padding-block: 7px;
+}
+
+.pagination-compact {
+  grid-template-columns: 1fr;
+  gap: 9px;
+  padding: 10px 0 0;
+  border-top: 0;
+  background: transparent;
+}
+
+.pagination-compact .pagination-summary,
+.pagination-compact .pagination-controls,
+.pagination-compact .pagination-size {
+  justify-self: stretch;
+}
+
+.pagination-compact .pagination-controls {
+  justify-content: space-between;
+}
+
+.pagination-compact .pagination-pages {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pagination-compact .pagination-size {
+  justify-content: space-between;
+}
+
+.content-data-controls-main {
+  grid-template-columns: minmax(240px, 1.4fr) minmax(160px, 0.7fr) minmax(140px, 0.6fr);
+}
+
+.library-header-panel,
+.users-header-panel {
+  padding-block: 22px;
+}
+
+.file-upload-compact,
+.create-user-panel {
+  padding-block: 22px;
+}
+
+.file-library-results {
+  overflow: hidden;
+  border: 1px solid #e1e6ef;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.file-library-results .file-grid {
+  padding: 14px;
+}
+
+.file-library-results .pagination {
+  margin-top: 2px;
+}
+
+.file-preview-state {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  color: #8a95a7;
+}
+
+.file-preview-state small {
+  font-size: 10px;
+}
+
+.file-preview-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid #dce2eb;
+  border-top-color: #708099;
+  border-radius: 50%;
+  animation: file-preview-spin 700ms linear infinite;
+}
+
+.file-type-placeholder.preview-error {
+  width: auto;
+  min-width: 92px;
+  height: auto;
+  min-height: 72px;
+  gap: 5px;
+  padding: 12px;
+}
+
+.file-type-placeholder.preview-error strong {
+  font-size: 11px;
+}
+
+.file-type-placeholder.preview-error small {
+  max-width: 90px;
+  color: #9a7280;
+  font-size: 9px;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.file-list-name {
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.file-list-name > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.file-list-name strong,
+.file-list-name small {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-list-name small {
+  color: #8a95a7;
+  font-size: 10px;
+}
+
+.file-list-thumb {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #e5e9f0;
+  border-radius: 9px;
+  background: #f4f6f9;
+}
+
+.file-list-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.file-list-thumb .file-type-placeholder {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  font-size: 7px;
+}
+
+.file-list-thumb .file-type-placeholder small,
+.file-list-thumb .file-preview-state small {
+  display: none;
+}
+
+.file-list-thumb .file-preview-spinner {
+  width: 16px;
+  height: 16px;
+}
+
+.user-identity-cell {
+  min-width: 210px;
+  display: grid;
+  gap: 6px;
+}
+
+.user-cell-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.user-status-pill {
+  text-transform: capitalize;
+}
+
+.user-status-pill.active,
+.verification-pill.verified {
+  background: #eef8f1;
+  color: #34714a;
+}
+
+.user-status-pill.suspended {
+  background: #fff7e8;
+  color: #876324;
+}
+
+.user-status-pill.disabled {
+  background: #f5f1f1;
+  color: #8b6565;
+}
+
+.verification-pill {
+  white-space: nowrap;
+}
+
+.data-model-sidebar,
+.access-role-sidebar {
+  gap: 16px;
+  padding: 20px;
+}
+
+.model-sidebar-heading,
+.role-sidebar-heading {
+  align-items: flex-start;
+}
+
+.collection-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.collection-group-heading > span {
+  color: #8a95a7;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.collection-list-page,
+.role-list-page {
+  min-height: 44px;
+}
+
+.model-detail-heading {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.model-heading-actions,
+.role-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.field-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef2f8;
+  color: #5d6c84;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.field-name-stack {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.field-name-stack strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-name-stack small {
+  color: #8a95a7;
+  font-size: 10px;
+}
+
+.role-summary-panel {
+  align-items: flex-end;
+}
+
+.role-summary-stat {
+  display: grid;
+  gap: 1px;
+  min-width: 92px;
+  padding: 8px 10px;
+  border: 1px solid #e5e9f0;
+  border-radius: 10px;
+  background: #fafbfd;
+}
+
+.role-summary-stat strong {
+  font-size: 15px;
+}
+
+.role-summary-stat small {
+  color: #8791a2;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.permission-list-controls {
+  padding: 14px 18px;
+  border-bottom: 1px solid #edf0f5;
+  background: #fbfcfe;
+}
+
+.permission-matrix-scroll {
+  max-height: min(62vh, 720px);
+}
+
+.permission-matrix thead th {
+  top: 0;
+  z-index: 3;
+}
+
+.permission-matrix th:first-child,
+.permission-matrix td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 1px 0 0 #edf0f5;
+}
+
+.permission-matrix thead th:first-child {
+  z-index: 4;
+  background: #fafbfd;
+}
+
+.permission-toggle.enabled {
+  color: #2f6f49;
+}
+
+.permission-toggle.enabled span {
+  font-weight: 750;
+}
+
+.permission-editor-modal {
+  width: min(960px, 100%);
+}
+
+.permission-editor-modal .modal-body {
+  margin-top: 18px;
+}
+
+.permission-editor-modal .advanced-permission-grid {
+  align-items: start;
+}
+
+@keyframes file-preview-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-preview-spinner {
+    animation: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .permission-editor-modal .advanced-permission-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .pagination {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .pagination-summary,
+  .pagination-controls,
+  .pagination-size {
+    justify-self: stretch;
+  }
+
+  .pagination-controls {
+    justify-content: space-between;
+  }
+
+  .pagination-pages {
+    min-width: 0;
+    overflow-x: auto;
+    padding: 1px;
+  }
+
+  .pagination-size {
+    justify-content: space-between;
+  }
+
+  .content-data-controls-main {
+    grid-template-columns: 1fr;
+  }
+
+  .file-library-results .file-grid {
+    padding: 10px;
+  }
+
+  .model-heading-actions,
+  .role-summary-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .role-summary-stat {
+    width: 100%;
+  }
+
+  .permission-matrix-scroll {
+    max-height: none;
+  }
+}

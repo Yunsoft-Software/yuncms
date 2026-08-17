@@ -1,0 +1,31 @@
+{
+  "name": "@yunsoft/yuncms-extensions-sdk",
+  "version": "0.1.1",
+  "description": "Extension authoring helpers for YunCMS endpoints and hooks.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yunsoft-Software/yuncms.git",
+    "directory": "packages/extensions-sdk"
+  },
+  "homepage": "https://github.com/Yunsoft-Software/yuncms#readme",
+  "bugs": {
+    "url": "https://github.com/Yunsoft-Software/yuncms/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

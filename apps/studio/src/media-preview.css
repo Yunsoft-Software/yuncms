@@ -1,0 +1,69 @@
+.file-preview-pdf,
+.file-preview-video,
+.file-preview-audio-shell {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--studio-surface-muted);
+  color: var(--studio-text);
+}
+
+.file-preview-pdf {
+  display: block;
+  min-height: 100%;
+}
+
+.file-preview-video {
+  display: block;
+  object-fit: cover;
+}
+
+.file-preview-audio-shell {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 10px;
+  text-align: center;
+}
+
+.file-preview-audio-shell strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.file-preview-audio {
+  width: min(100%, 240px);
+  height: 34px;
+}
+
+.file-card .file-preview iframe,
+.file-card .file-preview video,
+.file-card .file-preview .file-preview-audio-shell {
+  min-height: 168px;
+}
+
+.file-list-thumb .file-preview-pdf,
+.file-list-thumb .file-preview-video {
+  pointer-events: none;
+}
+
+.file-list-thumb .file-preview-audio-shell strong,
+.file-list-thumb .file-preview-audio {
+  display: none;
+}
+
+.file-list-thumb .file-preview-audio-shell::before {
+  content: '♪';
+  font-size: 18px;
+  color: var(--studio-text-muted);
+}
+
+:root[data-theme="dark"] .file-preview-pdf,
+:root[data-theme="dark"] .file-preview-video,
+:root[data-theme="dark"] .file-preview-audio-shell {
+  background: var(--studio-surface-muted);
+}
