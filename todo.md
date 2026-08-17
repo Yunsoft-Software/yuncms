@@ -121,6 +121,13 @@ Run the built Studio against the disposable API/DB.
 - [x] Roles/Permissions CRUD plus field/filter/validation editor.
 - [x] Files upload/list/download/edit/delete.
 - [x] Narrow-screen responsive behavior.
+- [ ] Content: verify server-backed text search, multiple field filters, ascending/descending sort, header sort toggles, page-size changes and previous/next pagination against more than one page of records; confirm filtered `total_count` is accurate.
+- [ ] Content: rapidly change search/filter/sort controls and verify stale responses never replace the newest result set.
+- [ ] Files: verify type filters and newest/oldest/name/size sort presets in both Gallery and List; confirm switching view preserves the active controls.
+- [ ] Users: verify collapsed `New user` flow plus search, role/status filters, sorting and reset without breaking inline role/status updates.
+- [ ] Data Model: verify collection search/sort and field search/type/required sorting on a project with many collections/fields.
+- [ ] Roles/Permissions: verify role search/sort, collection search and `Configured only` against roles with mixed permission coverage.
+- [ ] Re-check the new control strips, filter chips, counters and pagination on narrow screens.
 - [ ] Formal keyboard/focus/labels/screen-reader accessibility review.
 
 ## 8. Local storage + reconciliation
