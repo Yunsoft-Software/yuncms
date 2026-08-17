@@ -1,4 +1,8 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3008';
+const SAME_ORIGIN_API_URL = typeof window !== 'undefined'
+  ? window.location.origin
+  : 'http://127.0.0.1:3008';
+
+export const API_URL = import.meta.env.VITE_API_URL || SAME_ORIGIN_API_URL;
 
 const SESSION_KEY = 'yuncms.studio.session';
 const SESSION_EVENT = 'yuncms:session-changed';
