@@ -12,6 +12,7 @@ import './media-preview.css';
 import './field-builder.css';
 import './visual-fixes.css';
 import './navigation-v2.css';
+import './data-model-v2.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
