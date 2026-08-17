@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { validateMigration, applyMigrations, assertMigrationsApplied } from '../src/migrations.js';
 import { withAdvisoryLock } from '../src/advisory-lock.js';
-import { CORE_MIGRATIONS } from '../src/bootstrap.js';
+import { CORE_MIGRATIONS, REQUIRED_CORE_MIGRATION_IDS } from '../src/bootstrap.js';
 
 function createMigrationDatabase({ applied = [] } = {}) {
   const journal = new Set(applied);
@@ -61,6 +61,14 @@ test('system schema quotes the MySQL reserved system column', () => {
   ));
 
   assert.match(collectionsTable, /`system` TINYINT\(1\)/);
+});
+
+test('default public role migration is part of the required compatibility gate', () => {
+  const migration = CORE_MIGRATIONS.find(({ id }) => id === '0005-default-public-role');
+  assert.ok(migration);
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0005-default-public-role'));
+  assert.match(migration.statements[0], /WHERE NOT EXISTS .*public = 1/s);
+  assert.doesNotMatch(migration.statements[0], /yuncms_permissions/);
 });
 
 test('advisory lock uses one connection and always releases it', async () => {
