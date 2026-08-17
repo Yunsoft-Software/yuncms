@@ -1,0 +1,143 @@
+.pagination {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  border-top: 1px solid #edf0f5;
+  background: #fff;
+}
+
+.pagination-summary {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: #7a8498;
+  font-size: 12px;
+}
+
+.pagination-summary strong {
+  color: #45536a;
+  font-weight: 750;
+}
+
+.pagination-controls,
+.pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pagination-controls {
+  justify-self: center;
+}
+
+.pagination-button {
+  min-width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #5f6c82;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pagination-button:hover:not(:disabled) {
+  border-color: #dfe5ee;
+  background: #f7f9fc;
+  color: #1d2738;
+}
+
+.pagination-button.active {
+  border-color: #d4dce7;
+  background: #eef2f8;
+  color: #1d2738;
+}
+
+.pagination-arrow {
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.pagination-ellipsis {
+  min-width: 22px;
+  color: #a0a8b6;
+  text-align: center;
+}
+
+.pagination-size {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #7a8498;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.pagination-size select {
+  width: auto;
+  min-width: 72px;
+  padding-block: 7px;
+}
+
+.pagination-compact {
+  grid-template-columns: 1fr;
+  gap: 9px;
+  padding: 10px 0 0;
+  border-top: 0;
+  background: transparent;
+}
+
+.pagination-compact .pagination-summary,
+.pagination-compact .pagination-controls,
+.pagination-compact .pagination-size {
+  justify-self: stretch;
+}
+
+.pagination-compact .pagination-controls {
+  justify-content: space-between;
+}
+
+.pagination-compact .pagination-pages {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pagination-compact .pagination-size {
+  justify-content: space-between;
+}
+
+@media (max-width: 760px) {
+  .pagination {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .pagination-summary,
+  .pagination-controls,
+  .pagination-size {
+    justify-self: stretch;
+  }
+
+  .pagination-controls {
+    justify-content: space-between;
+  }
+
+  .pagination-pages {
+    min-width: 0;
+    overflow-x: auto;
+    padding: 1px;
+  }
+
+  .pagination-size {
+    justify-content: space-between;
+  }
+}
