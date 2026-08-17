@@ -9,10 +9,11 @@ import {
   isImageField,
 } from '../src/field-ui.js';
 
-test('file fields use UUID storage with a file interface', () => {
-  const payload = fieldCreationPayload({ field: 'attachment', type: 'file', required: false });
+test('file fields keep human labels while using UUID storage with a file interface', () => {
+  const payload = fieldCreationPayload({ name: 'Ek Dosya', field: 'ek_dosya', type: 'file', required: false });
   assert.deepEqual(payload, {
-    field: 'attachment',
+    name: 'Ek Dosya',
+    field: 'ek_dosya',
     type: 'uuid',
     required: false,
     interface: 'file',
@@ -25,7 +26,9 @@ test('file fields use UUID storage with a file interface', () => {
 });
 
 test('image fields use UUID storage and image-only picker metadata', () => {
-  const payload = fieldCreationPayload({ field: 'cover', type: 'image', required: true });
+  const payload = fieldCreationPayload({ name: 'Kapak Görseli', field: 'kapak_gorseli', type: 'image', required: true });
+  assert.equal(payload.name, 'Kapak Görseli');
+  assert.equal(payload.field, 'kapak_gorseli');
   assert.equal(payload.type, 'uuid');
   assert.equal(payload.interface, 'image');
   assert.deepEqual(payload.options, { accept: 'image/*', preview: true });
@@ -35,9 +38,9 @@ test('image fields use UUID storage and image-only picker metadata', () => {
   assert.equal(fileAcceptForField(payload), 'image/*');
 });
 
-test('normal fields keep their physical type and supported options', () => {
+test('normal fields keep separate display name, API key and physical options', () => {
   assert.deepEqual(
-    fieldCreationPayload({ field: 'title', type: 'string', required: true, length: 180 }),
-    { field: 'title', type: 'string', required: true, length: 180 },
+    fieldCreationPayload({ name: 'Ürün Başlığı', field: 'urun_basligi', type: 'string', required: true, length: 180 }),
+    { name: 'Ürün Başlığı', field: 'urun_basligi', type: 'string', required: true, length: 180 },
   );
 });
