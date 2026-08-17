@@ -4,7 +4,7 @@ export const studioSettingsMigration = {
     `CREATE TABLE IF NOT EXISTS yuncms_studio_settings (
       id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
       brand_name VARCHAR(100) NOT NULL DEFAULT 'YunCMS',
-      logo_url VARCHAR(512) NOT NULL DEFAULT 'https://yunsoft.com/favicon.ico',
+      logo_url VARCHAR(512) NOT NULL DEFAULT 'https://yunsoft.com/light-logo.png',
       accent_color CHAR(7) NOT NULL DEFAULT '#2563eb',
       theme VARCHAR(16) NOT NULL DEFAULT 'system',
       default_locale VARCHAR(5) NOT NULL DEFAULT 'en',
@@ -15,6 +15,6 @@ export const studioSettingsMigration = {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `INSERT IGNORE INTO yuncms_studio_settings
       (id, brand_name, logo_url, accent_color, theme, default_locale)
-     VALUES (1, 'YunCMS', 'https://yunsoft.com/favicon.ico', '#2563eb', 'system', 'en')`,
+     VALUES (1, 'YunCMS', 'https://yunsoft.com/light-logo.png', '#2563eb', 'system', 'en')`,
   ],
 };
