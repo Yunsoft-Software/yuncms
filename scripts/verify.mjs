@@ -59,6 +59,7 @@ const FAST_TESTS = [
   'apps/studio/test/dark-mode.test.js',
   'apps/studio/test/roles-permissions-ui.test.js',
   'apps/studio/test/permission-resource-ui.test.js',
+  'apps/studio/test/users-access-ui.test.js',
 ];
 
 function collectTests(path) {
