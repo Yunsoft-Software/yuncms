@@ -34,8 +34,12 @@ async function auditSchema(req, { action, collection = null, itemKey = null, pay
   }
 }
 
-export function createSchemaRouter() {
+export function createSchemaRouter({ schemaCache = null } = {}) {
   const router = express.Router();
+
+  function clearSchemaCache() {
+    schemaCache?.clear();
+  }
 
   router.get('/collections', async (req, res) => {
     res.json({ data: await service(req, 'CollectionsService').readMany() });
@@ -43,6 +47,7 @@ export function createSchemaRouter() {
 
   router.post('/collections', async (req, res) => {
     const data = await service(req, 'CollectionsService').createOne(req.body ?? {});
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.collection.create',
       collection: data.collection,
@@ -66,6 +71,7 @@ export function createSchemaRouter() {
     const collections = service(req, 'CollectionsService');
     const before = await collections.readOne(req.params.collection);
     const data = await collections.updateOne(req.params.collection, req.body ?? {});
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.collection.update',
       collection: req.params.collection,
@@ -81,6 +87,7 @@ export function createSchemaRouter() {
     await collections.deleteOne(req.params.collection, {
       destructive: destructiveRequested(req),
     });
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.collection.delete',
       collection: req.params.collection,
@@ -99,6 +106,7 @@ export function createSchemaRouter() {
       req.params.collection,
       req.body ?? {},
     );
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.field.create',
       collection: req.params.collection,
@@ -129,6 +137,7 @@ export function createSchemaRouter() {
       req.params.field,
       req.body ?? {},
     );
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.field.update',
       collection: req.params.collection,
@@ -146,6 +155,7 @@ export function createSchemaRouter() {
       req.params.field,
       req.body ?? {},
     );
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.field.alter',
       collection: req.params.collection,
@@ -163,6 +173,7 @@ export function createSchemaRouter() {
       req.params.field,
       { destructive: destructiveRequested(req) },
     );
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.field.delete',
       collection: req.params.collection,
@@ -197,6 +208,7 @@ export function createSchemaRouter() {
 
   router.post('/relations/m2o', async (req, res) => {
     const data = await service(req, 'RelationsService').createM2O(req.body ?? {});
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.relation.create',
       collection: data.many_collection,
@@ -213,6 +225,7 @@ export function createSchemaRouter() {
       req.params.manyCollection,
       req.params.manyField,
     );
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.relation.delete',
       collection: req.params.manyCollection,
@@ -224,6 +237,7 @@ export function createSchemaRouter() {
 
   router.post('/relations/m2m', async (req, res) => {
     const data = await service(req, 'RelationsService').createM2M(req.body ?? {});
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.relation.m2m.create',
       collection: data.junctionCollection,
@@ -244,6 +258,7 @@ export function createSchemaRouter() {
       junctionCollection: req.params.junctionCollection,
       destructive: destructiveRequested(req),
     });
+    clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.relation.m2m.delete',
       collection: req.params.junctionCollection,

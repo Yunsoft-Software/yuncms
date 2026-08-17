@@ -122,6 +122,7 @@
 
 - [x] Metadata repository.
 - [x] Schema snapshot/cache keyed by schema version.
+- [x] Successful API schema mutations eagerly invalidate the shared cache to avoid TTL-stale follow-up requests.
 - [x] Metadata + schema-version transaction discipline after physical DDL.
 - [x] Admin/system-only schema service access.
 - [x] Explicit destructive intent guards.
@@ -418,6 +419,7 @@ yuncms help
 - [x] Hook recursion/item hooks.
 - [x] Extension manifest/discovery/runtime context.
 - [x] API malformed-JSON/request-id/error-contract/MySQL normalization.
+- [x] API schema mutations invalidate the shared schema cache before immediate follow-up requests.
 - [x] Security/auth cache-header middleware.
 - [x] Production config/trusted-proxy/rate-limit memory guards.
 - [x] CLI start dispatch.

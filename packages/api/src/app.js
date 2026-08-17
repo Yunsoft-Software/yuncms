@@ -111,7 +111,7 @@ export function createApp({
   app.use('/studio-settings', createStudioSettingsRouter());
   app.use('/auth', createAuthRouter({ mailer, config, logger }));
   app.use('/items', createItemsRouter());
-  app.use('/schema', createSchemaRouter());
+  app.use('/schema', createSchemaRouter({ schemaCache }));
   app.use('/users', createUsersRouter());
   app.use('/roles', createRolesRouter());
   app.use('/permissions', createPermissionsRouter());

@@ -29,6 +29,7 @@ const FAST_TESTS = [
   'packages/api/test/authentication.test.js',
   'packages/api/test/error-response.test.js',
   'packages/api/test/request-identity.test.js',
+  'packages/api/test/schema-cache.test.js',
   'packages/api/test/production-app-config.test.js',
   'packages/api/test/rate-limit.test.js',
   'packages/api/test/security-headers.test.js',
