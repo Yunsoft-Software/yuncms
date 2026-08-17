@@ -6,6 +6,7 @@ import { FileFieldControl, FileValuePreview } from '../components/FileFieldContr
 import { Pagination } from '../components/Pagination.jsx';
 import { isFileField, isImageField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
+import { displaySchemaName } from '../schema-name.js';
 
 const PAGE_SIZES = [25, 50, 100];
 
@@ -42,6 +43,10 @@ const UUID_OPERATORS = [
   ['_null', 'content.opEmpty'],
   ['_nnull', 'content.opNotEmpty'],
 ];
+
+function fieldLabel(field) {
+  return displaySchemaName(field, 'field');
+}
 
 function inputValueForField(field, value) {
   if (value == null) return field.type === 'boolean' ? false : '';
@@ -147,7 +152,7 @@ function buildItemsPath({ collection, fields, search, filters, sortField, sortDi
   return `/items/${encodeURIComponent(collection)}?${params.toString()}`;
 }
 
-function RecordForm({ collection, fields, relationLookups, files, record, onFileUploaded, onSaved, onCancel }) {
+function RecordForm({ collection, collectionLabel, fields, relationLookups, files, record, onFileUploaded, onSaved, onCancel }) {
   const { t } = useI18n();
   const editable = useMemo(() => fields.filter((field) => !field.readonly), [fields]);
   const [values, setValues] = useState({});
@@ -191,7 +196,8 @@ function RecordForm({ collection, fields, relationLookups, files, record, onFile
       <div className="panel-heading">
         <div>
           <p className="eyebrow">{record?.id ? t('content.editRecord') : t('content.newRecord')}</p>
-          <h2>{collection}</h2>
+          <h2>{collectionLabel || collection}</h2>
+          {collectionLabel && collectionLabel !== collection && <code className="schema-machine-key">{collection}</code>}
           <p>{record?.id ? t('content.updateDescription') : t('content.createDescription')}</p>
         </div>
         <button className="text-button" type="button" onClick={onCancel}>{t('common.cancel')}</button>
@@ -204,10 +210,12 @@ function RecordForm({ collection, fields, relationLookups, files, record, onFile
           const hasCurrentOption = relationLookup?.items.some(
             (entry) => String(entry[relationLookup.keyField]) === String(currentValue),
           );
+          const label = fieldLabel(field);
 
           return (
             <label className={`field-label ${isFileField(field) ? 'file-field-label' : ''}`} key={field.field}>
-              <span>{field.field}{field.required ? ' *' : ''}</span>
+              <span>{label}{field.required ? ' *' : ''}</span>
+              {label !== field.field && <small className="field-api-key">{field.field}</small>}
               {isFileField(field) ? (
                 <FileFieldControl
                   field={field}
@@ -275,7 +283,7 @@ function RecordForm({ collection, fields, relationLookups, files, record, onFile
   );
 }
 
-export function ContentScreen({ collection, onOpenDataModel }) {
+export function ContentScreen({ collection, collectionLabel = '', onOpenDataModel }) {
   const { t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const requestVersion = useRef(0);
@@ -418,7 +426,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
     if (!record?.id) return;
     const accepted = await requestConfirmation({
       title: t('content.deleteRecord'),
-      description: t('content.deleteRecordDescription', { id: record.id, collection }),
+      description: t('content.deleteRecordDescription', { id: record.id, collection: collectionLabel || collection }),
       confirmLabel: t('content.deleteRecordAction'),
       tone: 'danger',
     });
@@ -514,6 +522,11 @@ export function ContentScreen({ collection, onOpenDataModel }) {
     return lookup ? lookupLabel(lookup, filter.value) : String(filter.value);
   }
 
+  function filterFieldLabel(fieldKey) {
+    const field = filterableFields.find((entry) => entry.field === fieldKey);
+    return field ? fieldLabel(field) : fieldKey;
+  }
+
   function registerUploadedFile(file) {
     setFiles((current) => [file, ...current.filter((entry) => entry.id !== file.id)]);
   }
@@ -522,6 +535,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
     return (
       <RecordForm
         collection={collection}
+        collectionLabel={collectionLabel}
         fields={fields}
         relationLookups={relationLookups}
         files={files}
@@ -552,12 +566,15 @@ export function ContentScreen({ collection, onOpenDataModel }) {
     );
   }
 
+  const visibleCollectionName = collectionLabel || collection;
+
   return (
     <div className="screen-stack">
       <section className="panel toolbar-panel content-toolbar">
         <div>
           <p className="eyebrow">{t('visibility.collection')}</p>
-          <h2>{collection}</h2>
+          <h2>{visibleCollectionName}</h2>
+          {visibleCollectionName !== collection && <code className="schema-machine-key">{collection}</code>}
           <p>{meta?.total_count != null ? t('content.matchingRecords', { count: meta.total_count }) : t('app.contentDescription')}</p>
         </div>
         <button className="primary-button" type="button" onClick={() => setCreating(true)}>
@@ -566,7 +583,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
       </section>
 
       {!schemaLoading && (
-        <section className="panel data-controls-panel" aria-label={t('content.dataControls', { collection })}>
+        <section className="panel data-controls-panel" aria-label={t('content.dataControls', { collection: visibleCollectionName })}>
           <div className="data-controls-main content-data-controls-main">
             <label className="field-label control-search">
               <span>{t('common.search')}</span>
@@ -583,7 +600,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
               <span>{t('content.sortBy')}</span>
               <select value={sortField} onChange={(event) => { setSortField(event.target.value); setOffset(0); }}>
                 <option value="">{t('content.defaultOrder')}</option>
-                {filterableFields.map((field) => <option key={field.field} value={field.field}>{field.field}</option>)}
+                {filterableFields.map((field) => <option key={field.field} value={field.field}>{fieldLabel(field)}</option>)}
               </select>
             </label>
 
@@ -605,7 +622,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
               <span>{t('content.filterField')}</span>
               <select value={filterDraft.field} onChange={(event) => updateFilterField(event.target.value)}>
                 <option value="">{t('dataModel.chooseField')}</option>
-                {filterableFields.map((field) => <option key={field.field} value={field.field}>{field.field}</option>)}
+                {filterableFields.map((field) => <option key={field.field} value={field.field}>{fieldLabel(field)}</option>)}
               </select>
             </label>
             <label className="field-label compact-control filter-operator-control">
@@ -681,7 +698,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
                 ).find(([value]) => value === filter.operator)?.[1];
                 return (
                   <button className="filter-chip" key={filter.id} type="button" onClick={() => removeFilter(filter.id)}>
-                    <span>{filter.field} · {operatorKey ? t(operatorKey) : filter.operator} · {filterValueLabel(filter)}</span>
+                    <span>{filterFieldLabel(filter.field)} · {operatorKey ? t(operatorKey) : filter.operator} · {filterValueLabel(filter)}</span>
                     <strong aria-hidden="true">×</strong>
                   </button>
                 );
@@ -698,7 +715,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
         <section className="panel"><p>{t('content.loadingCollection')}</p></section>
       ) : !itemsLoading && totalCount === 0 && !hasActiveControls ? (
         <section className="panel empty-state empty-state-action">
-          <div><h2>{t('content.noRecordsYet')}</h2><p>{t('content.firstRecordDescription', { collection })}</p></div>
+          <div><h2>{t('content.noRecordsYet')}</h2><p>{t('content.firstRecordDescription', { collection: visibleCollectionName })}</p></div>
           <button className="primary-button" type="button" onClick={() => setCreating(true)}>{t('content.createFirstRecord')}</button>
         </section>
       ) : !itemsLoading && totalCount === 0 ? (
@@ -716,9 +733,10 @@ export function ContentScreen({ collection, onOpenDataModel }) {
                     <th
                       key={field.field}
                       aria-sort={sortField === field.field ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      title={field.field}
                     >
                       <button className="sort-header-button" type="button" onClick={() => toggleColumnSort(field.field)}>
-                        <span>{field.field}</span>
+                        <span>{fieldLabel(field)}</span>
                         <span className="sort-indicator" aria-hidden="true">
                           {sortField === field.field ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
                         </span>
@@ -765,3 +783,5 @@ export function ContentScreen({ collection, onOpenDataModel }) {
     </div>
   );
 }
+
+export { buildItemsPath, fieldLabel };
