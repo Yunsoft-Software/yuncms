@@ -41,6 +41,7 @@ export { AuditService, redactAuditValue } from './services/audit-service.js';
 export { ItemsService } from './services/items-service.js';
 export { CollectionsService } from './services/collections-service.js';
 export { FieldsService } from './services/fields-service.js';
+export { SystemCollectionFieldsService } from './services/system-collection-fields-service.js';
 export { RelationsService } from './services/relations-service.js';
 export { UsersService } from './services/users-service.js';
 export { RolesService } from './services/roles-service.js';
