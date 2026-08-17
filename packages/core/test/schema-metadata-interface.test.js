@@ -10,11 +10,12 @@ function databaseForField(type) {
     async query(sql, params = []) {
       const normalized = sql.replace(/\s+/g, ' ').trim();
       calls.push({ sql: normalized, params });
-      if (normalized.startsWith('SELECT id, collection, field, type')) {
+      if (normalized.startsWith('SELECT id, collection, field, name, type')) {
         return [[{
           id: 1,
           collection: 'articles',
           field: 'asset',
+          name: 'Asset',
           type,
           required: 0,
           readonly: 0,
@@ -47,6 +48,7 @@ test('metadata repository allows file/image interface on UUID fields', async () 
   const repository = new SchemaMetadataRepository(database);
   const updated = await repository.updateFieldMetadata('articles', 'asset', { interface: 'file' });
 
+  assert.equal(updated.name, 'Asset');
   assert.equal(updated.type, 'uuid');
   assert.equal(database.calls.some(({ sql }) => sql.startsWith('UPDATE yuncms_fields')), true);
 });
