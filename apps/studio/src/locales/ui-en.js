@@ -75,6 +75,7 @@ export const UI_EN = Object.freeze({
   'fileField.uploadNew': 'Upload new',
   'fileField.clear': 'Clear file',
 
+  'users.createDescription': 'Set login credentials and an optional role. Management-created users are marked email-verified automatically and can sign in immediately.',
   'users.managedVerifiedHint': 'Users created here are trusted management-created accounts and are marked email-verified immediately. They can sign in without a verification email.',
 
   'dataModel.fieldBuilderHint': 'Choose the data kind first. File and image fields store a file reference and get a dedicated picker in Content.',
