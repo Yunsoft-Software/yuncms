@@ -11,6 +11,7 @@ import { PermissionsService } from './permissions-service.js';
 import { RelationsService } from './relations-service.js';
 import { RolesService } from './roles-service.js';
 import { StudioSettingsService } from './studio-settings-service.js';
+import { SystemCollectionFieldsService } from './system-collection-fields-service.js';
 import { UsersService } from './users-service.js';
 import { createServiceRegistry } from './service-registry.js';
 
@@ -23,6 +24,7 @@ export function createCoreServiceRegistry() {
     ItemsService,
     CollectionsService,
     FieldsService,
+    SystemCollectionFieldsService,
     RelationsService,
     UsersService,
     RolesService,
