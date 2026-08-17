@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createAccountability } from '../src/accountability.js';
+import { createAccountability, createSystemAccountability } from '../src/accountability.js';
 import { UsersService } from '../src/services/users-service.js';
 
 const schema = {
@@ -58,6 +58,46 @@ test('delegated manager can read users only with explicit system users permissio
   const rows = await service.readMany();
   assert.equal(rows.length, 1);
   assert.equal(rows[0].email, 'user@example.com');
+});
+
+test('management-created users are immediately email verified', async () => {
+  let inserted = null;
+  const database = {
+    async query(sql, params = []) {
+      const normalized = sql.replace(/\s+/g, ' ').trim();
+      if (normalized.startsWith('INSERT INTO yuncms_users')) {
+        inserted = params;
+        return [{ affectedRows: 1 }, []];
+      }
+      if (normalized.startsWith('SELECT id, email, role, status')) {
+        return [[{
+          id: inserted?.[0],
+          email: inserted?.[1],
+          role: inserted?.[3] ?? null,
+          status: inserted?.[4],
+          email_verified_at: inserted?.[5] ?? null,
+        }], []];
+      }
+      throw new Error(`Unexpected query: ${normalized}`);
+    },
+  };
+  const service = new UsersService({
+    database,
+    schema,
+    accountability: createSystemAccountability(),
+  });
+
+  const user = await service.createOne({
+    email: 'Managed@Example.com',
+    password: 'long-enough-password',
+    status: 'active',
+    emailVerified: false,
+  });
+
+  assert.ok(inserted);
+  assert.equal(inserted[1], 'managed@example.com');
+  assert.ok(inserted[5] instanceof Date);
+  assert.ok(user.email_verified_at instanceof Date);
 });
 
 test('delegated manager cannot assign administrator role', async () => {
