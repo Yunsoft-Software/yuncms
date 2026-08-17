@@ -1,5 +1,10 @@
-import { EN } from './locales/en.js';
-import { TR } from './locales/tr.js';
+import { EN as BASE_EN } from './locales/en.js';
+import { TR as BASE_TR } from './locales/tr.js';
+import { UI_EN } from './locales/ui-en.js';
+import { UI_TR } from './locales/ui-tr.js';
+
+export const EN = Object.freeze({ ...BASE_EN, ...UI_EN });
+export const TR = Object.freeze({ ...BASE_TR, ...UI_TR });
 
 const DICTIONARIES = Object.freeze({ en: EN, tr: TR });
 
@@ -20,4 +25,3 @@ export function translate(locale, key, values = {}) {
 }
 
 export const SUPPORTED_LOCALES = Object.freeze(['en', 'tr']);
-export { EN, TR };
