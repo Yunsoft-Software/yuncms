@@ -63,11 +63,12 @@
 - [x] MySQL duplicate/FK/deadlock/lock/connection normalization.
 - [x] Bounded retry helper for retryable lock/deadlock classes.
 - [x] Migration journal.
-- [x] Versioned core migrations (`0001`–`0004`).
+- [x] Versioned core migrations (`0001`–`0005`).
+- [x] `0005-default-public-role` guarantees the protected Public role exists on new and upgraded databases without granting collection permissions.
 - [x] Bootstrap advisory lock.
 - [x] Schema advisory lock.
 - [x] Schema version state/read/increment.
-- [x] API startup compatibility guard; API does not auto-bootstrap.
+- [x] API startup compatibility guard; API does not auto-bootstrap and requires `0005` after upgrade.
 - [x] Real-MySQL bootstrap/transaction/concurrency verification — `todo.md`.
 
 ## 4. Dynamic schema engine
@@ -78,6 +79,8 @@
 - [x] `id CHAR(36)` primary key + matching field metadata.
 - [x] Reserved `yuncms_` prefix protection.
 - [x] Safe metadata update.
+- [x] Collection `hidden` metadata controls Content navigation without changing physical schema or records.
+- [x] Collection visibility/singleton metadata require explicit booleans rather than ambiguous truthy values.
 - [x] Explicit destructive delete.
 - [x] Tombstone rename + metadata compensation.
 
@@ -104,6 +107,7 @@
 - [x] M2O delete with FK restoration compensation.
 - [x] O2M inverse metadata read.
 - [x] M2M junction create with two FKs + unique pair + paired metadata.
+- [x] M2M junction collections are hidden from Content by default but remain independently show/hide configurable.
 - [x] High-level destructive M2M junction delete lifecycle with tombstone restore/cleanup behavior.
 - [x] M2M delete REST surface with schema audit.
 - [x] One-level direct M2O expansion in generic item responses.
@@ -158,7 +162,7 @@ DELETE /items/:collection/:id
 - [x] Logout current/all sessions.
 - [x] Password-change session revocation.
 - [x] Bearer authentication middleware.
-- [x] Explicit public-role resolution.
+- [x] Explicit public-role resolution for anonymous requests.
 - [x] API token create/list/revoke/authentication.
 - [x] Password-reset one-time hashed-token lifecycle.
 - [x] Email-verification one-time hashed-token lifecycle.
@@ -169,6 +173,7 @@ DELETE /items/:collection/:id
 - [x] Verification confirmation endpoint.
 - [x] Raw reset/verification tokens are not returned by public request endpoints.
 - [x] Configurable process-local login/refresh/action rate limiting.
+- [x] Authentication rate-limit bucket memory is hard-bounded even under many unique client keys.
 - [x] Auth responses explicitly use `Cache-Control: no-store`.
 - [x] Shared-store/cluster-wide limiter intentionally remains a multi-instance follow-up, not a single-process V1 requirement.
 - [x] Real MySQL/SMTP/replay/rate-limit verification — `todo.md`.
@@ -177,6 +182,9 @@ DELETE /items/:collection/:id
 
 - [x] Administrator/system-managed role CRUD.
 - [x] Protected admin/public role rules.
+- [x] Exactly one protected Public role is guaranteed by migration/bootstrap invariants.
+- [x] Public role receives no collection permissions automatically and therefore remains fail-closed by default.
+- [x] Anonymous access uses the same action/field/row-filter/write-validation permission engine as authenticated roles.
 - [x] Permission CRUD.
 - [x] Exact role + collection + action resolution.
 - [x] Field allowlists.
@@ -295,6 +303,9 @@ yuncms help
 - [x] Files management UI.
 - [x] Loading/error/empty-state basics.
 - [x] Task-oriented sidebar groups: Content / Library / Settings.
+- [x] Settings → Content Visibility can show/hide any non-system collection, including M2M junctions, without changing schema/data.
+- [x] M2M junctions are identified in visibility settings and remain hidden by default.
+- [x] Content navigation uses the shared non-system/non-hidden visibility rule.
 - [x] Non-system collections rendered directly as nested Content navigation instead of selecting a collection from a toolbar dropdown.
 - [x] Content workspace keeps collection context stable across list/create/edit states.
 - [x] Content search is server-backed across readable text fields rather than limited to the current page.
@@ -312,6 +323,7 @@ yuncms help
 - [x] Data Model `Add field` form stays collapsed until explicitly requested.
 - [x] Roles/Permissions uses a role-first collection/action matrix with direct simple toggles.
 - [x] Roles support search/sort/pagination; permission collections support search, configured-only auditing and shared pagination.
+- [x] Public role is visible/configurable through normal Roles & Permissions controls while its protected role semantics remain enforced server-side.
 - [x] Advanced field allowlist/filter/validation permission editing uses the existing focused modal layer and validates JSON before save.
 - [x] Permission matrix keeps the collection column/header scannable while preserving current RBAC API behavior and administrator/public protections.
 - [x] Important file/role/permission edits no longer depend on prompt-only workflows.
@@ -327,12 +339,14 @@ yuncms help
 
 - [x] Express runtime.
 - [x] Request ids.
+- [x] Request identity is assigned before JSON parsing, caller ids are safe/64-character bounded and malformed JSON returns stable HTTP 400 `INVALID_PAYLOAD`.
 - [x] `/health`.
 - [x] `/ready`.
 - [x] Graceful HTTP + MySQL shutdown path.
 - [x] Narrow configured Studio CORS origin.
 - [x] Baseline security headers (`nosniff`, frame deny, no-referrer, restrictive permissions policy, same-origin resource policy).
 - [x] HSTS intentionally left to the TLS/reverse-proxy deployment layer.
+- [x] Explicit bounded `TRUST_PROXY_HOPS` configuration controls Express client-IP trust; default remains no proxy trust.
 - [x] Read-only migration compatibility check before listen.
 - [x] Canonical error body/status mapping.
 - [x] Raw unexpected internal messages hidden from clients.
@@ -340,12 +354,14 @@ yuncms help
 - [x] Structured line-delimited JSON logger wired into runtime.
 - [x] Runtime logger secret redaction.
 - [x] Auth rate-limit headers/HTTP 429.
+- [x] Process-local rate limiter has a hard bounded client-bucket cap.
 - [x] Built Studio index and hashed assets served from the same Express listener with Node filesystem streams.
 - [x] Studio static handler is restricted to `/` and `/assets/...`; unrelated requests continue through normal API routing.
 - [x] Root `npm start` builds Studio before starting the single API/Studio listener.
 - [x] Default Studio/auth public URLs align with the API port.
 - [x] API package file list includes the generated Studio bundle for packed and public-registry installs.
 - [x] API/runtime/security-header/graceful-shutdown smoke — `todo.md`.
+- [ ] Current production-readiness pass Node24/release/MySQL/browser/proxy smoke — `todo.md`.
 - [ ] Single-port built Studio HTML/assets/API browser smoke — `todo.md`.
 
 ## 14. Documentation
@@ -362,6 +378,9 @@ yuncms help
 - [x] `docs/studio.md`.
 - [x] `docs/studio-ui-improvement-plan.md` live UI improvement checklist.
 - [x] `docs/studio-usability-pass.md` focused shared-pagination/media/settings usability checklist.
+- [x] `docs/production-readiness-test-plan.md` source implementation checklist for this pass.
+- [x] `docs/testing.md` low-noise fast/full/release/real-MySQL test workflow.
+- [x] `docs/production-readiness.md` current source audit, fixed hazards, release gates and known V1 constraints.
 - [x] `docs/files.md`.
 - [x] `docs/security.md`.
 - [x] `docs/deployment.md`.
@@ -372,44 +391,53 @@ yuncms help
 
 - [x] DB config/identifier/error/retry.
 - [x] Bootstrap/advisory-lock.
+- [x] Required migration `0005` + public-role bootstrap/idempotency invariants.
 - [x] Schema/query/ItemsService.
 - [x] Schema service authorization/destructive/M2M preflight/lifecycle.
+- [x] Collection visibility metadata + Studio visibility rule behavior.
 - [x] Direct relation expansion + source permission guard.
 - [x] Auth/session/API-token/action-token.
+- [x] Public-role fail-closed permission resolution plus field/row restriction behavior.
 - [x] RBAC/permission cache/validation evaluator.
 - [x] Hook recursion/item hooks.
 - [x] Extension manifest/discovery/runtime context.
-- [x] API error-contract/MySQL normalization.
+- [x] API malformed-JSON/request-id/error-contract/MySQL normalization.
 - [x] Security/auth cache-header middleware.
+- [x] Production config/trusted-proxy/rate-limit memory guards.
 - [x] CLI start dispatch.
 - [x] Local storage/FilesService security/cleanup.
 - [x] S3 driver contract.
 - [x] Guarded storage reconciliation.
 - [x] Audit redaction + bounded cleanup.
 - [x] Single-port Studio default config and static asset path/traversal resolution.
-- [x] Execute tests after dependency install — `todo.md`.
+- [x] Low-noise `test:fast`, auto-discovered complete `npm test`, and release build/package runner exist.
+- [x] Opt-in destructive-guarded real MySQL/API cross-feature integration flow exists.
+- [ ] Execute the current production-readiness test commands on Node 24/real target infrastructure — `todo.md`.
 
 ## 16. Verification milestones
 
 The major V1 feature source implementations now exist. These milestone boxes stay open until the corresponding runtime checks are actually executed.
 
-- [x] Milestone A — dependency install/lockfile + Node 24 + tests + API/Studio build/start verified.
-- [x] Milestone B — real MySQL bootstrap/schema/CRUD/query/relation lifecycle and rollback behavior verified.
-- [x] Milestone C — real auth/SMTP/replay/RBAC/validation/rate-limit behavior verified.
+- [x] Milestone A — dependency install/lockfile + Node 24 + tests + API/Studio build/start verified for the earlier baseline.
+- [x] Milestone B — real MySQL bootstrap/schema/CRUD/query/relation lifecycle and rollback behavior verified for the earlier baseline.
+- [x] Milestone C — real auth/SMTP/replay/RBAC/validation/rate-limit behavior verified for the earlier baseline.
+- [ ] Current production-readiness pass — rerun Node24 fast/full/release suites, migration `0005`, public RBAC, Content Visibility, proxy and browser smoke — `todo.md`.
 - [ ] Milestone D — extension local/npm runtime + refreshed Studio end-to-end and single-port smoke verified.
 - [ ] Milestone E — local/S3 files, reconciliation, audit cleanup, logging/security headers and graceful shutdown verified.
-- [x] Release — npm naming ownership, tarballs, fresh install and `yuncms init/bootstrap/start` verified.
+- [x] Release baseline — npm naming ownership, tarballs, fresh install and `yuncms init/bootstrap/start` previously verified; rerun the current release source gate before the next publish.
 
 ## 17. Remaining source work excluding manual verification
 
-There is no known blocking V1 source feature left in the current roadmap after the Studio usability, sortable/filterable data-control and single-port source passes.
+There is no known blocking single-instance V1 source feature left in the current roadmap after the Studio usability, collection visibility/public-role and production-readiness source passes.
 
-Future/non-blocking follow-ups are deliberately outside the V1 release gate unless product requirements change:
+Future/non-blocking follow-ups are deliberately outside the V1 release gate unless product requirements or deployment scale change:
 
 - cluster-wide/shared-store rate limiting for multi-instance deployments;
+- server-side pagination/filtering for Files/Users/other administrative lists when data volume outgrows current client-side administration flows;
 - O2M/M2M nested item expansion;
 - paginated/search relation picker beyond the current 200-item Studio picker;
 - M2M multi-select content editor on top of explicit junction records;
 - session-management UI, MFA and SSO families;
 - extension sandbox/marketplace isolation;
-- automatic scheduled maintenance/retention jobs if operators later want them.
+- automatic scheduled maintenance/retention jobs if operators later want them;
+- generic edge/reverse-proxy rate policy for high-traffic public content deployments.
