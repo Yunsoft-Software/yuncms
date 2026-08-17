@@ -94,7 +94,7 @@ test('anonymous Studio can read safe display settings before login', async () =>
   });
 });
 
-test('anonymous Studio can read only the configured file-backed branding image', async () => {
+test('anonymous Studio can read only the configured file-backed branding image with sandboxed revalidation', async () => {
   const bytes = Buffer.from('<svg/>');
   const storage = {
     get(name) {
@@ -112,6 +112,9 @@ test('anonymous Studio can read only the configured file-backed branding image',
     const response = await fetch(`${origin}/studio-settings/logo`);
     assert.equal(response.status, 200);
     assert.match(response.headers.get('content-type') || '', /image\/svg\+xml/);
+    assert.equal(response.headers.get('content-security-policy'), 'sandbox');
+    assert.equal(response.headers.get('cache-control'), 'no-cache, must-revalidate');
+    assert.equal(response.headers.get('content-disposition'), 'inline');
     assert.equal(Buffer.from(await response.arrayBuffer()).toString(), bytes.toString());
   }, { logoFile: LOGO_FILE_ID, storage });
 });
