@@ -9,7 +9,7 @@ export function AuthActionScreen({ action, token, onDone }) {
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [state, setState] = useState(action === 'verify' ? 'working' : 'idle');
-  const [message, setMessage] = useState('');
+  const [messageKey, setMessageKey] = useState('');
 
   useEffect(() => {
     if (action !== 'verify') return;
@@ -21,22 +21,22 @@ export function AuthActionScreen({ action, token, onDone }) {
       .then(() => {
         if (!active) return;
         setState('success');
-        setMessage(t('auth.actionDone'));
+        setMessageKey('auth.actionDone');
       })
       .catch(() => {
         if (!active) return;
         setState('error');
-        setMessage(t('auth.actionFailed'));
+        setMessageKey('auth.actionFailed');
       });
     return () => { active = false; };
-  }, [action, token, t]);
+  }, [action, token]);
 
   async function resetPassword(event) {
     event.preventDefault();
-    setMessage('');
+    setMessageKey('');
     if (password !== confirmation) {
       setState('error');
-      setMessage(t('auth.passwordMismatch'));
+      setMessageKey('auth.passwordMismatch');
       return;
     }
     setState('working');
@@ -46,10 +46,10 @@ export function AuthActionScreen({ action, token, onDone }) {
         body: { token, password },
       }, { retryAuth: false });
       setState('success');
-      setMessage(t('auth.passwordChanged'));
+      setMessageKey('auth.passwordChanged');
     } catch {
       setState('error');
-      setMessage(t('auth.actionFailed'));
+      setMessageKey('auth.actionFailed');
     }
   }
 
@@ -98,8 +98,8 @@ export function AuthActionScreen({ action, token, onDone }) {
           )}
 
           {state === 'working' && action === 'verify' && <div className="notice-banner">{t('auth.actionWorking')}</div>}
-          {message && (
-            <div className={state === 'error' ? 'error-banner' : 'notice-banner'} role="status">{message}</div>
+          {messageKey && (
+            <div className={state === 'error' ? 'error-banner' : 'notice-banner'} role="status">{t(messageKey)}</div>
           )}
           {(state === 'success' || state === 'error') && (
             <button className="primary-button" type="button" onClick={onDone}>{t('auth.backToSignIn')}</button>
