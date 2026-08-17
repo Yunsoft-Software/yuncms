@@ -1,6 +1,8 @@
 # Package naming and publishing policy
 
-This document records the final npm package family and release procedure. The first public release, `0.1.0`, was published under the MIT license on 2026-08-17.
+This document records the final npm package family and release procedure. YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com). The first public release, `0.1.0`, was published under the MIT License on 2026-08-17.
+
+YunCMS remains under active development. Publishing a package does not make it a stability or production-readiness guarantee; consumers should test upgrades, keep verified backups and use the software at their own risk under the MIT License.
 
 ## Verified npm account and registry state
 

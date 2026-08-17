@@ -4,6 +4,14 @@ YunCMS is a small reusable Node.js backend platform for projects that need the D
 
 It is an independent implementation, not a fork and not a Directus API-compatibility project.
 
+## Project status and responsibility
+
+YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com).
+
+YunCMS is under active development and should be treated as pre-stable software. APIs, migrations, configuration and behavior may change between releases. Test upgrades in a staging environment, keep verified backups and review [`todo.md`](./todo.md) before using YunCMS in production.
+
+Use YunCMS at your own risk. The software is provided under the [MIT License](./LICENSE) without warranty; Yunsoft Software is not responsible for data loss, downtime, security incidents or other damage resulting from its use.
+
 ## Baseline
 
 - Node.js 24 LTS
@@ -93,7 +101,7 @@ Source presence is not a production-readiness claim. `todo.md` deliberately keep
 
 ## Install from npm
 
-YunCMS `0.1.0` is published under the `@yunsoft` organization:
+YunCMS `0.1.1` is published under the `@yunsoft` organization:
 
 ```bash
 npm install @yunsoft/yuncms

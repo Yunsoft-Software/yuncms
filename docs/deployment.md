@@ -2,6 +2,8 @@
 
 YunCMS V1 targets Node.js 24 LTS with a MySQL 8-compatible server.
 
+> YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com) and remains under active development. Treat every deployment as your own operational responsibility: test upgrades in staging, keep verified backups and review [`todo.md`](../todo.md) for outstanding environment checks. Use YunCMS at your own risk; it is provided under the MIT License without warranty.
+
 ## Required runtime pieces
 
 - Node.js 24 LTS;

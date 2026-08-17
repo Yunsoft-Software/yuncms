@@ -2,6 +2,8 @@
 
 Audit target: branch `16-08-2026` after the collection-visibility, public-role and production-guard pass.
 
+> This audit describes the source state at the time of review; it is not a warranty or a substitute for validating the target environment. YunCMS is maintained by [Yunsoft Software](https://yunsoft.com), remains under active development and is used at the operator's own risk under the MIT License.
+
 ## Verdict
 
 **Source status: production candidate for a single-instance/self-hosted V1 deployment.**

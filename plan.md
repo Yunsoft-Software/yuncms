@@ -380,6 +380,7 @@ yuncms help
 ## 14. Documentation
 
 - [x] `README.md` project overview.
+- [x] Yunsoft attribution and active-development/use-at-own-risk notice in repository, package and deployment documentation.
 - [x] `docs/architecture.md`.
 - [x] `docs/development.md`.
 - [x] `docs/database.md`.
