@@ -23,6 +23,8 @@ const FAST_TESTS = [
   'packages/core/test/collection-visibility.test.js',
   'packages/core/test/public-access.test.js',
   'packages/core/test/studio-settings-service.test.js',
+  'packages/core/test/auth.test.js',
+  'packages/core/test/o2o-relation.test.js',
   'packages/core/test/items-service.test.js',
   'packages/core/test/permissions-service.test.js',
   'packages/core/test/relation-expansion.test.js',
@@ -30,6 +32,7 @@ const FAST_TESTS = [
   'packages/api/test/error-response.test.js',
   'packages/api/test/request-identity.test.js',
   'packages/api/test/schema-cache.test.js',
+  'packages/api/test/schema-o2o.test.js',
   'packages/api/test/production-app-config.test.js',
   'packages/api/test/rate-limit.test.js',
   'packages/api/test/security-headers.test.js',
@@ -40,6 +43,11 @@ const FAST_TESTS = [
   'apps/studio/test/collection-visibility.test.js',
   'apps/studio/test/studio-settings.test.js',
   'apps/studio/test/localization.test.js',
+  'apps/studio/test/field-ui.test.js',
+  'apps/studio/test/file-field-preview.test.js',
+  'apps/studio/test/sidebar-ui.test.js',
+  'apps/studio/test/dark-mode.test.js',
+  'apps/studio/test/roles-permissions-ui.test.js',
 ];
 
 function collectTests(path) {
