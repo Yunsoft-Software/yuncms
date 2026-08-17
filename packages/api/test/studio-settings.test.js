@@ -9,6 +9,7 @@ import {
 import { createApp } from '../src/app.js';
 
 const LOGO_FILE_ID = '123e4567-e89b-42d3-a456-426614174000';
+const FAVICON_FILE_ID = '223e4567-e89b-42d3-a456-426614174001';
 
 class PublicAuthService {
   async resolvePublicAccountability() {
@@ -20,7 +21,7 @@ class PublicAuthService {
   }
 }
 
-function settingsDatabase({ logoFile = null } = {}) {
+function settingsDatabase({ logoFile = null, faviconFile = null } = {}) {
   return {
     async query(sql, params = []) {
       if (sql.includes('FROM yuncms_studio_settings')) {
@@ -28,6 +29,7 @@ function settingsDatabase({ logoFile = null } = {}) {
           brand_name: 'YunCMS',
           logo_url: 'https://yunsoft.com/light-logo.png',
           logo_file: logoFile,
+          favicon_file: faviconFile,
           accent_color: '#2563eb',
           theme: 'system',
           default_locale: 'en',
@@ -35,12 +37,13 @@ function settingsDatabase({ logoFile = null } = {}) {
         }], []];
       }
       if (sql.includes('FROM yuncms_files')) {
-        assert.deepEqual(params, [LOGO_FILE_ID]);
+        const id = params[0];
+        const favicon = id === FAVICON_FILE_ID;
         return [[{
-          id: LOGO_FILE_ID,
+          id,
           storage: 'local',
-          filename_disk: 'branding-logo.svg',
-          mimetype: 'image/svg+xml',
+          filename_disk: favicon ? 'branding-favicon.png' : 'branding-logo.svg',
+          mimetype: favicon ? 'image/png' : 'image/svg+xml',
           filesize: 6,
         }], []];
       }
@@ -49,8 +52,8 @@ function settingsDatabase({ logoFile = null } = {}) {
   };
 }
 
-async function withServer(operation, { logoFile = null, storage = null } = {}) {
-  const pool = settingsDatabase({ logoFile });
+async function withServer(operation, { logoFile = null, faviconFile = null, storage = null } = {}) {
+  const pool = settingsDatabase({ logoFile, faviconFile });
   const registry = createServiceRegistry({
     AuthService: PublicAuthService,
     StudioSettingsService,
@@ -86,6 +89,7 @@ test('anonymous Studio can read safe display settings before login', async () =>
       brand_name: 'YunCMS',
       logo_url: 'https://yunsoft.com/light-logo.png',
       logo_file: null,
+      favicon_file: null,
       accent_color: '#2563eb',
       theme: 'system',
       default_locale: 'en',
@@ -94,29 +98,42 @@ test('anonymous Studio can read safe display settings before login', async () =>
   });
 });
 
-test('anonymous Studio can read only the configured file-backed branding image with sandboxed revalidation', async () => {
-  const bytes = Buffer.from('<svg/>');
-  const storage = {
+function storageFixture() {
+  return {
     get(name) {
       assert.equal(name, 'local');
       return {
         async get(key) {
-          assert.equal(key, 'branding-logo.svg');
-          return bytes;
+          assert.ok(['branding-logo.svg', 'branding-favicon.png'].includes(key));
+          return Buffer.from(key.includes('favicon') ? 'PNG123' : '<svg/>');
         },
       };
     },
   };
+}
 
+async function assertPublicImageResponse(response, contentType) {
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') || '', contentType);
+  assert.equal(response.headers.get('content-security-policy'), 'sandbox');
+  assert.equal(response.headers.get('cache-control'), 'no-cache, must-revalidate');
+  assert.equal(response.headers.get('content-disposition'), 'inline');
+}
+
+test('anonymous Studio can read only the configured file-backed logo with sandboxed revalidation', async () => {
   await withServer(async (origin) => {
     const response = await fetch(`${origin}/studio-settings/logo`);
-    assert.equal(response.status, 200);
-    assert.match(response.headers.get('content-type') || '', /image\/svg\+xml/);
-    assert.equal(response.headers.get('content-security-policy'), 'sandbox');
-    assert.equal(response.headers.get('cache-control'), 'no-cache, must-revalidate');
-    assert.equal(response.headers.get('content-disposition'), 'inline');
-    assert.equal(Buffer.from(await response.arrayBuffer()).toString(), bytes.toString());
-  }, { logoFile: LOGO_FILE_ID, storage });
+    await assertPublicImageResponse(response, /image\/svg\+xml/);
+    assert.equal(Buffer.from(await response.arrayBuffer()).toString(), '<svg/>');
+  }, { logoFile: LOGO_FILE_ID, storage: storageFixture() });
+});
+
+test('anonymous Studio can read only the configured file-backed favicon with sandboxed revalidation', async () => {
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/studio-settings/favicon`);
+    await assertPublicImageResponse(response, /image\/png/);
+    assert.equal(Buffer.from(await response.arrayBuffer()).toString(), 'PNG123');
+  }, { faviconFile: FAVICON_FILE_ID, storage: storageFixture() });
 });
 
 test('anonymous Studio cannot mutate branding settings', async () => {
