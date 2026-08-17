@@ -6,6 +6,8 @@ import { useI18n } from '../i18n.js';
 const IMAGE_EXTENSIONS = new Set([
   'avif', 'bmp', 'gif', 'heic', 'heif', 'ico', 'jpeg', 'jpg', 'png', 'svg', 'webp',
 ]);
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'm4v']);
+const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac']);
 
 function fileExtension(file) {
   const name = file?.filename_download || '';
@@ -13,14 +15,24 @@ function fileExtension(file) {
   return dot === -1 ? '' : name.slice(dot + 1).toLowerCase();
 }
 
+export function filePreviewKind(file) {
+  const mimetype = String(file?.mimetype || '').toLowerCase();
+  const extension = fileExtension(file);
+  if (mimetype.startsWith('image/') || IMAGE_EXTENSIONS.has(extension)) return 'image';
+  if (mimetype === 'application/pdf' || extension === 'pdf') return 'pdf';
+  if (mimetype.startsWith('video/') || VIDEO_EXTENSIONS.has(extension)) return 'video';
+  if (mimetype.startsWith('audio/') || AUDIO_EXTENSIONS.has(extension)) return 'audio';
+  return 'placeholder';
+}
+
 export function isPreviewableImage(file) {
-  if (file?.mimetype?.toLowerCase().startsWith('image/')) return true;
-  return IMAGE_EXTENSIONS.has(fileExtension(file));
+  return filePreviewKind(file) === 'image';
 }
 
 export function FilePreview({ file, label, alt = '' }) {
   const { t } = useI18n();
-  const previewable = isPreviewableImage(file);
+  const previewKind = filePreviewKind(file);
+  const previewable = previewKind !== 'placeholder';
   const [state, setState] = useState({ status: previewable ? 'loading' : 'placeholder', url: '' });
 
   useEffect(() => {
@@ -47,9 +59,36 @@ export function FilePreview({ file, label, alt = '' }) {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [file.id, previewable]);
+  }, [file.id, previewable, previewKind]);
 
   if (state.status === 'ready') {
+    if (previewKind === 'pdf') {
+      return (
+        <iframe
+          className="file-preview-pdf"
+          src={state.url}
+          title={alt || file.filename_download || t('files.pdf')}
+          loading="lazy"
+        />
+      );
+    }
+    if (previewKind === 'video') {
+      return (
+        <video className="file-preview-video" src={state.url} controls preload="metadata">
+          {t('files.previewUnavailable')}
+        </video>
+      );
+    }
+    if (previewKind === 'audio') {
+      return (
+        <div className="file-preview-audio-shell">
+          <strong>{label || t('files.audio')}</strong>
+          <audio className="file-preview-audio" src={state.url} controls preload="metadata">
+            {t('files.previewUnavailable')}
+          </audio>
+        </div>
+      );
+    }
     return (
       <img
         src={state.url}
