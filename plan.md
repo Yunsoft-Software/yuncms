@@ -1,238 +1,151 @@
 # YunCMS Development Plan
 
-> Live source-status document for branch `16-08-2026`. Source implementation is checked here; real Node/MySQL/browser/provider verification stays in `todo.md`. Completed runtime history is intentionally not duplicated.
+> Live source-status document for branch `16-08-2026`. Source-complete behavior is checked here. Anything that still needs an actual Node 24 checkout, MySQL, browser, SMTP/S3 or deployment environment belongs in `todo.md`.
 
-## 0. Product / engineering constraints
+## 0. Permanent engineering rules
 
-- [x] Independent Directus-inspired CMS/backend; interaction ideas may be borrowed, visual/product identity is not a Directus clone.
-- [x] Node.js 24 LTS, JavaScript/ESM, Express 5.
-- [x] MySQL + `mysql2/promise` only; no ORM/query builder or second database driver.
-- [x] React 19.2 + Vite 8 Studio.
-- [x] REST only; no GraphQL.
-- [x] npm workspaces.
-- [x] Internal services/extensions never self-request YunCMS over HTTP.
-- [x] No GitHub Actions.
-- [x] No new UI/i18n/icon package for the current Studio pass.
-- [x] Small focused commits; docs/tests travel with source changes.
-- [x] `AGENTS.md` requires regression coverage for every behavior/config/schema/UI/authorization change and keeps `todo.md` as pending verification only, never completed-test history.
+- [x] Node.js 24 LTS, JavaScript/ESM, Express 5, MySQL + `mysql2/promise`, React 19.2 + Vite 8, REST only.
+- [x] npm workspaces; no ORM, GraphQL, speculative monorepo tooling or GitHub Actions.
+- [x] Internal code/extensions call services directly and never self-request YunCMS HTTP endpoints.
+- [x] Accountability is explicit; public/system/admin behavior never comes from a null identity.
+- [x] Dynamic identifiers are validated/quoted and SQL values use placeholders.
+- [x] Small focused commits.
+- [x] Every behavior/config/schema/authorization/UI change receives regression coverage. Unexecutable verification is tracked in `todo.md`; passed checks are removed rather than archived there.
 
-## 1. Runtime / CLI
+## 1. Runtime / install
 
-- [x] `yuncms init`, `bootstrap`, `start`, `help` CLI surface.
-- [x] Node 24 runtime guard.
-- [x] Single Express listener serves REST API and built Studio.
-- [x] One exported `DEFAULT_SERVER_PORT` is the source of truth and equals `3008`.
-- [x] Core runtime defaults and fresh `yuncms init` derive from the same 3008 constant.
-- [x] Fresh init writes `PORT=3008`, `STUDIO_ORIGIN=http://localhost:3008` and `AUTH_PUBLIC_URL=http://localhost:3008`; `.env.example` matches the same contract.
-- [x] Explicit environment values remain operator-controlled; YunCMS does not silently overwrite an existing untracked `.env`.
-- [x] Request ids, safe error normalization, security headers, structured logging and graceful shutdown.
-- [x] Explicit bounded `TRUST_PROXY_HOPS` configuration.
-- [x] Process-local authentication rate limiting with bounded bucket memory.
+- [x] `yuncms init`, bootstrap/start/help and Node 24 guard.
+- [x] API + built Studio use one Express listener.
+- [x] One `DEFAULT_SERVER_PORT = 3008` is shared by core runtime and fresh init.
+- [x] Fresh init writes `PORT=3008`, `STUDIO_ORIGIN=http://localhost:3008`, `AUTH_PUBLIC_URL=http://localhost:3008`.
+- [x] `.env.example` uses 3008.
+- [x] Request ids, safe errors, security headers, structured logs, bounded trust-proxy and auth rate limits.
 
-## 2. MySQL / schema foundation
+## 2. MySQL / migrations
 
-- [x] Single MySQL pool + pinned transactions + advisory locks.
-- [x] Identifier allowlisting / quoted identifiers / placeholder-bound values.
-- [x] Retry handling for deadlocks/lock waits.
-- [x] Migration journal and compatibility gate.
-- [x] Core migrations `0001`–`0007`.
-- [x] `0005-default-public-role` guarantees one protected Public role without granting data permissions.
-- [x] `0006-studio-settings` stores one bounded Studio branding/theme/default-locale row.
-- [x] `0007-system-permission-resources` registers only the bounded system resources that may participate in role access configuration.
-- [x] Schema version + cache; successful API schema mutations invalidate the shared cache.
-- [x] DDL compensation/tombstone patterns for destructive dynamic-schema work.
+- [x] MySQL pool, pinned transactions, retryable DB errors and advisory schema locks.
+- [x] Migration journal + compatibility gate.
+- [x] Core migrations `0001`–`0008` are registered.
+- [x] `0005` creates the deny-by-default Public role.
+- [x] `0006` creates Studio branding/theme/locale settings.
+- [x] `0007` registers only bounded permission-managed system resources: Users, Files and Roles.
+- [x] `0008` adds a nullable `logo_file` FK to `yuncms_files` with `ON DELETE SET NULL`.
+- [x] Schema version/cache invalidation and DDL compensation patterns remain in place.
 
-## 3. Dynamic collections / fields
+## 3. Collections / Data Model
 
-- [x] Collection list/read/create/update/delete.
-- [x] Collection Content visibility metadata; non-system hidden collections remain stored but leave Content navigation.
-- [x] M2M junction collections hidden by default and manually show/hide configurable.
-- [x] Primitive fields: integer, bigint, decimal, string, text, boolean, date, datetime, timestamp, JSON and UUID.
-- [x] Timestamp/datetime creation supports a safe `CURRENT_TIMESTAMP(3)` default preset.
-- [x] Timestamp/datetime creation supports optional `ON UPDATE CURRENT_TIMESTAMP(3)` automation.
-- [x] Timestamp automation metadata survives later supported physical field edits instead of silently disappearing.
-- [x] Fixed date-time defaults from browser `datetime-local` controls are normalized to MySQL-compatible `YYYY-MM-DD HH:MM:SS` values.
-- [x] Required/default/index mutations with validation and compensation.
-- [x] Field metadata: readonly, hidden, sort, interface and options.
-- [x] Type conversion intentionally excluded from V1.
-- [x] Studio semantic File and Image field choices map to UUID physical storage plus `file` / `image` interfaces rather than inventing new MySQL types.
-- [x] Core field compiler rejects `file` / `image` interfaces on non-UUID storage.
-- [x] Data Model field rows show semantic File/Image/User type rather than leaking their UUID storage implementation.
-- [x] New collection creation can include `created_at`, `updated_at`, `created_by`, `updated_by` as explicit system-managed accountability fields.
-- [x] Studio defaults all four accountability fields on for new collections while allowing each to be disabled before creation.
-- [x] `created_at` / `updated_at` use real timestamp defaults; `updated_at` refreshes automatically on writes.
-- [x] `created_by` / `updated_by` are real nullable FKs to `yuncms_users(id)` with `ON DELETE SET NULL`.
-- [x] `ItemsService` stamps actor/date fields on create/update/bulk paths; callers cannot write those readonly fields directly.
-- [x] System-managed accountability fields cannot be deleted or mutated through normal field schema APIs after creation.
-- [x] Data Model uses a dedicated grouped field builder with type cards, descriptions, precision/scale, required state, fixed/current-time defaults and timestamp auto-update instead of the old raw type dropdown.
+- [x] Project collection create/read/update/delete and metadata.
+- [x] New collection creation can add `created_at`, `updated_at`, `created_by`, `updated_by`; all four are recommended/default-on in Studio.
+- [x] Actor/date fields are physically backed and system-managed; ItemsService stamps them and callers cannot overwrite them.
+- [x] Data Model now uses a collection-workspace flow rather than the old paginated settings-heavy layout.
+- [x] Collection list stays visible; selecting a collection opens `Overview / Fields / Relations`.
+- [x] Collection visibility is edited directly in Data Model Overview; separate Content Visibility navigation is removed.
+- [x] Collections have a searchable icon picker with an internal icon registry and no added icon dependency.
+- [x] Collection icon + sidebar sort live in collection metadata.
+- [x] Content sidebar uses collection metadata icon/order and ignores hidden/system collections.
+- [x] Collections can be moved up/down from Data Model; legacy collections receive stable reorderable fallback sort values.
+- [x] New collection create flow includes visibility, icon and accountability settings in one workspace.
+- [x] Data Model is responsive and uses theme variables rather than light-only surfaces.
 
-## 4. Relations
+## 4. Fields
 
-- [x] M2O physical foreign key lifecycle with target/type/on-delete validation and delete compensation.
-- [x] O2M inverse metadata reads.
-- [x] M2M hidden junction lifecycle with two FKs, unique pair, paired metadata and destructive cleanup compensation.
-- [x] O2O is a real backend relation type, not a UI alias: one schema-locked `ALTER TABLE` adds FK + UNIQUE index and metadata records `kind: "o2o"`.
-- [x] O2O delete removes FK + UNIQUE in one DDL step and restores them if metadata cleanup fails.
-- [x] O2O supports RESTRICT/CASCADE and optional-field SET NULL; required fields reject SET NULL.
-- [x] O2O create/delete REST routes are audited and invalidate schema cache.
-- [x] Direct to-one Content picker logic handles M2O/O2O metadata.
-- [x] Data Model Relations UI uses explicit M2O / O2O / M2M relationship cards plus an existing-relations summary.
-- [x] File/Image and system-managed user UUID fields are excluded from relation-source field choices.
-- [x] Direct relation target picker remains capped at 200 records in V1; searchable/paginated relation picker is a scale follow-up.
-- [x] O2M/M2M nested expansion remains outside V1.
+- [x] Primitive fields: string/text/integer/bigint/decimal/boolean/date/datetime/timestamp/json/uuid.
+- [x] Grouped visual field builder with type cards and relevant-only settings.
+- [x] Decimal precision/scale.
+- [x] Fixed defaults plus current-time defaults for datetime/timestamp.
+- [x] Timestamp auto-update with preserved schema metadata.
+- [x] Browser `datetime-local` values normalize to MySQL date-time format.
+- [x] File/Image are semantic UUID-backed fields with dedicated picker/preview behavior.
+- [x] Native/system-managed fields remain protected.
+- [x] A dedicated bounded service/route allows schema administrators to add custom fields to registered Users/Files/Roles system collections without opening internal Sessions/Tokens/Permissions/Audit tables.
+- [x] Custom system additions are tagged `systemExtension: true` in schema metadata and use locked/compensated DDL.
 
-## 5. Generic content / ItemsService
+## 5. Relations
 
-- [x] Generic read/read-one/create/update/delete REST and service paths for project collections.
-- [x] Generic `ItemsService` explicitly refuses system collections so specialized Users/Files/Roles safeguards cannot be bypassed with `/items/yuncms_*`.
-- [x] Server-backed fields/filter/sort/limit/offset/count.
-- [x] Safe filter compiler and field/operator allowlists.
-- [x] Bulk create/update/delete safeguards and transactional behavior.
-- [x] Direct relation expansion reuses target RBAC and source field visibility.
-- [x] Content Studio list/create/edit/delete, server text search, filters, sort and pagination.
-- [x] Direct relation fields use readable target labels.
-- [x] File/Image fields use file-library selectors instead of raw UUID inputs.
-- [x] Record form can upload a new file directly into a File/Image field and select it immediately.
-- [x] Optional File/Image references can be cleared; required fields preserve required semantics.
-- [x] Content tables show readable file metadata/preview instead of raw UUID when file metadata exists.
+- [x] M2O physical FK lifecycle.
+- [x] O2O physical FK + UNIQUE lifecycle, compensation and REST routes.
+- [x] M2M junction lifecycle.
+- [x] Data Model Relations workspace separates M2O/O2O/M2M and summarizes existing relationships.
+- [x] File/Image and system-managed UUID fields are excluded as relation-source fields.
+- [x] Relation target picker remains capped at 200 records in V1; server-paginated relation search is a scale follow-up.
 
-## 6. Files / preview / storage
+## 6. Content / Files
 
-- [x] Local filesystem storage driver.
-- [x] S3-compatible storage driver.
-- [x] File metadata/storage coordination, upload/list/read/content/update/delete.
-- [x] Upload size guard, safe physical keys, Unicode-safe download filenames.
-- [x] Reconciliation dry-run plus guarded orphan cleanup.
-- [x] Files Studio gallery/list, filters, sorting, pagination and metadata editing.
-- [x] Shared authenticated `FilePreview` fetches protected file bytes through `/files/:id/content`.
-- [x] Rich preview classifier supports image, PDF, video and audio with a clean unsupported-file placeholder.
-- [x] Image previews use thumbnails; PDFs embed in the preview surface; video/audio use native controls.
-- [x] File/Image record controls and Files library reuse the same preview component.
-- [x] Preview classification is isolated into pure JS for cheap Node tests.
+- [x] Generic project collection CRUD with fields/filter/sort/limit/offset/count and RBAC.
+- [x] Generic ItemsService refuses system collections so specialized safeguards cannot be bypassed.
+- [x] Content list/create/edit/delete and relation/file inputs.
+- [x] Local and S3-compatible storage drivers.
+- [x] File upload/list/read/content/update/delete and reconciliation safeguards.
+- [x] Files gallery/list UX.
+- [x] Authenticated preview supports image/PDF/video/audio plus unsupported placeholder.
+- [x] File/Image content fields can select existing Files or upload a new file.
 
-## 7. Authentication / users
+## 7. Authentication / Users
 
-- [x] Scrypt password hashing, email/password login, access/refresh sessions and refresh rotation.
-- [x] Logout current/all sessions and password-change revocation.
-- [x] API tokens.
-- [x] Password-reset and email-verification one-time token flows remain available for existing/unverified accounts.
-- [x] Optional SMTP delivery.
-- [x] Login/session/refresh/API-token identity queries include human-readable `role_name` in addition to internal role id.
-- [x] Studio account footer shows email + role name; raw role UUID is not rendered as user-facing identity copy.
-- [x] UsersService read/create/update/delete can be delegated through explicit `yuncms_users` action permissions.
-- [x] Users created through the privileged UsersService management path (Administrator or delegated user manager) are immediately marked email-verified and do not need a verification email before use.
-- [x] First administrator creation uses the same trusted-management behavior.
-- [x] Self password change remains available and revokes sessions; delegated user managers cannot change another user's password.
-- [x] Delegated user managers cannot assign the Administrator role, cannot mutate/delete Administrator accounts and cannot assign the Public role to authenticated users.
-- [x] Self-read remains available for the authenticated user independently from broad user-list permission.
-- [x] Users Studio can render a granted Users list even when Roles: Read is not granted; missing role metadata degrades safely instead of rendering raw role UUIDs or failing the whole screen.
+- [x] Scrypt passwords, sessions, refresh rotation, logout/revocation, API tokens, reset/verification token flows.
+- [x] First admin and every account created through privileged UsersService management are immediately email-verified.
+- [x] Existing email-verification flow remains available for legacy/unverified accounts.
+- [x] Human-readable `role_name` is propagated through login/refresh/API-token identity.
+- [x] Sidebar shows email + role name, never raw role UUID.
+- [x] Users CRUD can be delegated through bounded system-resource permissions.
+- [x] Delegated user managers cannot assign Public/Admin roles or mutate/delete administrator accounts.
+- [x] Self password changes revoke sessions; delegated managers cannot change another user's password.
+- [x] Users Studio degrades safely when Users access exists without Roles: Read.
 
-## 8. Roles / permissions / Public access
+## 8. Roles / permissions
 
-- [x] Role mutation with protected Administrator/Public semantics remains administrator/system-only.
-- [x] Role labels may be delegated through `yuncms_roles:read`; role create/update/delete are not delegatable.
-- [x] Public role exists after bootstrap/migration but is deny-by-default.
-- [x] Anonymous requests use normal action/field/row-filter/write-validation RBAC for project collections; no special bypass.
-- [x] Read/create/update/delete permission rows.
-- [x] Field allowlists, row filters and create/update prospective-record validation for normal project collections.
-- [x] Request-local permission cache and mutation invalidation.
-- [x] Permission-managed system resources are explicit: `yuncms_users`, `yuncms_files`, `yuncms_roles` only.
-- [x] `yuncms_users` and `yuncms_files` support action-level read/create/update/delete delegation.
-- [x] `yuncms_roles` supports action-level read delegation only.
-- [x] MySQL JSON metadata flags are accepted whether the driver returns boolean `true` or numeric `1`.
-- [x] Advanced field/filter/validation rules are intentionally rejected for specialized system services until those services can enforce them truthfully.
-- [x] Public role is always forbidden from system-resource permissions.
-- [x] Non-registered internal system resources such as permission records remain fail-closed/non-delegatable.
-- [x] Studio role-first matrix shows project collections plus only explicitly permission-managed system resources.
-- [x] System resources are labeled, unsupported actions render as Protected, and action-only resources do not expose a fake Advanced editor.
-- [x] Simple access remains a direct toggle; project-collection advanced field/filter/validation editing remains in a focused modal.
-- [x] Selected Public role shows explicit anonymous-access guidance.
-- [x] Selected non-admin role shows enabled/restricted-rule overview before the matrix.
+- [x] Project collection read/create/update/delete permissions, field allowlists, row filters and write validation.
+- [x] Public role remains deny-by-default.
+- [x] Users/Files can be delegated action-by-action; Roles can be delegated read-only.
+- [x] Public cannot receive system-resource permissions.
+- [x] Internal system resources remain fail-closed.
+- [x] Permission-managed system resources are action-only; fake advanced field/filter editors are not shown.
+- [x] Role screen has Public guidance and access overview.
+- [x] Dark-mode permission matrix/sticky cells use Studio surface variables instead of white backgrounds.
 
-## 9. Studio shell / navigation UX
+## 9. Sidebar / Studio UX
 
-- [x] Content / Library / Settings task-oriented navigation.
-- [x] Non-system visible collections appear directly under Content rather than a collection dropdown.
-- [x] Content, Library and Settings are independent accessible accordion groups.
-- [x] Lightweight inline SVG icons cover primary navigation without adding an icon dependency.
-- [x] Full sidebar collapse/expand produces a narrow icon rail and preserves current section/content context.
-- [x] Clicking an accordion group while collapsed expands the sidebar and opens that group.
-- [x] Logo row no longer renders redundant “YunCMS / Studio” copy beside the logo.
-- [x] Sidebar account area no longer renders raw role UUID.
-- [x] Narrow-screen rules preserve usable navigation rather than forcing the desktop icon rail.
+- [x] Content remains the only accordion containing dynamic collections.
+- [x] Files is a direct root destination; the pointless one-item Library accordion is removed.
+- [x] Settings remains an accordion for Data Model, Users, Roles & Permissions and Branding & Appearance.
+- [x] Parent navigation is visually stronger than child navigation.
+- [x] Collection child entries use selected collection icons.
+- [x] Sidebar can fully collapse to an icon rail.
+- [x] Redundant `YunCMS Studio` copy beside the logo remains removed.
+- [x] Pagination surfaces use theme variables in dark mode.
 
-## 10. Branding / theme / localization
+## 10. Branding / appearance
 
-- [x] DB-backed Branding & Appearance settings: brand name, logo URL, accent color, Light/Dark/System theme and default EN/TR locale.
-- [x] Safe pre-auth GET exposes display-only Studio settings; PATCH is admin/system-only.
-- [x] Custom logo replaces Yunsoft logo completely while Yunsoft powered-by/copyright attribution stays independent.
-- [x] Default Yunsoft branding resolves theme-specific light/dark logo URLs; custom logos remain unchanged across themes.
-- [x] System theme follows browser/OS color scheme and updates resolved theme state.
-- [x] Shared CSS custom properties drive surfaces, text, borders, inputs and accents.
-- [x] Legacy light-only Studio controls receive explicit dark-surface normalization, including Data Model, permissions, filters, pagination, file controls and preview surfaces.
-- [x] Field/accountability builders use the same theme variables and collapse to a one-column mobile layout.
-- [x] English and Turkish base dictionaries plus focused current-UI dictionary modules.
-- [x] New field-builder, accountability-field, managed-user and system-resource permission copy exists in both EN/TR.
-- [x] Personal locale preference can override and later return to the server default.
-- [x] Localization core remains pure JS; React hook is a thin adapter.
+- [x] Brand name, accent, Light/Dark/System theme and EN/TR default locale remain server-backed.
+- [x] Arbitrary logo URL entry has been removed from current Studio editing.
+- [x] Administrator chooses an existing `image/*` item from Files through a searchable logo picker.
+- [x] Selected logo is stored as `logo_file`; deleting that File clears the reference via FK.
+- [x] A narrow public `/studio-settings/logo` endpoint exposes only the configured branding image so pre-login branding works without making Files public.
+- [x] File-backed logo resolution honors `VITE_API_URL`/API origin in separate-origin development.
+- [x] Default Yunsoft artwork mapping is corrected: dark Studio uses `light-logo.png`; light Studio uses `dark-logo.png`.
+- [x] Custom logo replaces Yunsoft artwork while Powered by Yunsoft attribution remains independent.
+- [x] English/Turkish copy covers current logo picker, Data Model workspace, fields and permission UX.
 
-## 11. Extensions / audit / operations
+## 11. Source regression coverage
 
-- [x] `@yunsoft/yuncms-extensions-sdk` with `defineEndpoint` / `defineHook`.
-- [x] Local and npm dependency extension discovery with manifest/root/type checks.
-- [x] Trusted extension context reuses services, accountability, DB, schema, hooks, storage and request-local permission cache.
-- [x] Audit actor/action/collection/item/request-id history with secret redaction.
-- [x] Bounded explicit audit cleanup.
-- [x] Storage reconciliation and operational docs.
+- [x] Low-noise `npm run test:fast`, auto-discovered `npm test`, and `npm run test:release` runner.
+- [x] Port 3008/init/config contracts.
+- [x] Migration/bootstrap compatibility including `0008`.
+- [x] Accountability/timestamp/File/Image/O2O/system-resource permission contracts.
+- [x] Management-created verified-user and delegated-user guards.
+- [x] Dark pagination/permission surface contracts.
+- [x] Files-backed branding service/client/source contracts.
+- [x] Collection icon/search/order/metadata contracts.
+- [x] Data Model V2 source/workspace/system-field contracts.
+- [x] Sidebar hierarchy/direct-Files contracts.
+- [x] EN/TR parity/static key scan plus dynamic field/action/Data Model tab coverage.
+- [ ] Execute the changed test suites and browser/MySQL verification in `todo.md` before calling this exact source state deployment-verified.
 
-## 12. Source regression coverage
+## 12. Known follow-ups, not current source claims
 
-- [x] Low-noise `npm run test:fast`, auto-discovered `npm test`, and build/package `npm run test:release` workflows.
-- [x] Shared default-port constant, fresh-init generated environment and `.env.example` 3008 contract tests.
-- [x] Public-role / collection-visibility / production-config / request-id / rate-limit regressions.
-- [x] Studio-settings public-read/admin-write and branding validation tests.
-- [x] Theme-aware Yunsoft/default-vs-custom logo resolution tests.
-- [x] EN/TR key parity, static translation-key scan and dynamic field/action label coverage.
-- [x] File/Image field payload/storage-interface tests.
-- [x] File upload/select/clear/content-preview source contracts and rich preview-kind tests.
-- [x] Sidebar accordion/icon/collapse and role-name/no-UUID source contracts.
-- [x] Dark-mode legacy/new surface contracts.
-- [x] Grouped field builder tests cover field categories, timestamp current-time/auto-update payloads, decimal precision/scale, browser date-time default normalization and default accountability options.
-- [x] Core timestamp compiler tests cover CURRENT_TIMESTAMP / ON UPDATE validation and schema metadata preservation.
-- [x] Core accountability-field tests cover physical timestamp/FK definitions and actor/date mutation stamping.
-- [x] ItemsService tests cover automatic create/update actor/date injection.
-- [x] System resource permission policy tests cover bounded resources, numeric/boolean MySQL metadata flags, action-only rules, protected actions and Public-role denial.
-- [x] Delegated Users/Files/Roles service tests cover permission reuse and privilege-escalation guards.
-- [x] UsersService tests cover immediate verification for management-created users, preserved self password-change/session-revocation behavior and delegated password-change denial.
-- [x] Users Studio source tests cover graceful operation without Roles: Read and no raw role-id fallback.
-- [x] Studio system-resource matrix tests cover system labels, protected actions and Public-role UI behavior.
-- [x] O2O deterministic unique-index and single-lock FK+UNIQUE lifecycle contracts.
-- [x] O2O API route/audit source contract.
-- [x] Auth refresh identity role-name regression.
-- [x] Opt-in real-MySQL integration suite includes O2O/File/Image plus accountability-field and bounded system-resource access checks without slowing normal fast/full source runs.
-
-## 13. Documentation / handoff
-
-- [x] README + architecture/development/database/REST/auth/permissions/extensions/setup/files/security/deployment/publishing docs.
-- [x] Authentication docs describe management-created verified users and fresh port 3008 URLs.
-- [x] Permissions documentation describes bounded system-resource delegation and escalation guards.
-- [x] Studio customization/localization and production-readiness docs.
-- [x] `todo.md` contains only outstanding Codex/runtime/browser/MySQL/provider checks; completed `[x]` history removed.
-- [ ] Execute the current Node 24 / MySQL / browser / provider gates in `todo.md` before calling this exact branch deployment-verified production ready.
-
-## 14. Known non-blocking follow-ups
-
-These are not current single-instance V1 source blockers unless scale/product requirements change:
-
-- cluster-wide/shared-store rate limiting for multi-instance deployments;
-- shared object storage requirement for multi-instance deployments using files;
-- server-side pagination/filtering for Files/Users administrative lists once client-side admin lists outgrow current scale;
-- searchable/paginated relation picker beyond the current 200-item target list;
-- O2M/M2M nested expansion and richer M2M multi-select content editing;
-- optional UI lookup/display polish for accountability user fields beyond their current protected UUID storage and Data Model user semantics;
-- adding system-managed accountability fields to already-existing collections through a dedicated post-creation migration flow;
-- binary/uploaded branding asset management instead of URL-only custom logos;
-- additional locales beyond English/Turkish;
-- session-management UI, MFA and SSO;
-- untrusted extension sandbox/marketplace isolation;
-- optional scheduled maintenance jobs.
+- Server-side pagination/search for very large Files/Users/relation-picker datasets.
+- O2M/M2M nested expansion and richer M2M editing.
+- Full generic editing of custom extension fields inside specialized Users/Files/Roles record screens; current work adds the schema fields safely, while specialized service screens still own their native record contracts.
+- Adding accountability fields to pre-existing project collections through a dedicated migration workflow.
+- Shared-store rate limiting/object storage requirements for multi-instance deployment.
+- MFA/SSO/session-management UI and untrusted extension sandboxing.
