@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { LanguageSwitcher, StudioBrand } from '../components/StudioBrand.jsx';
+import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/StudioBrand.jsx';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
 import { DEFAULT_STUDIO_SETTINGS } from '../studio-settings.js';
@@ -162,9 +162,10 @@ export function AppearanceScreen() {
       <aside className="panel appearance-preview" aria-label={t('appearance.preview')}>
         <p className="eyebrow">{t('appearance.preview')}</p>
         <div className="appearance-preview-card" style={{ '--preview-accent': form.accent_color }}>
-          <StudioBrand />
+          <StudioBrand previewSettings={form} />
           <div className="appearance-preview-accent" />
           <p>{t('section.appearanceDescription')}</p>
+          <YunsoftFooter compact />
         </div>
       </aside>
     </div>
