@@ -14,6 +14,7 @@ import { createItemsRouter } from './routes/items.js';
 import { createPermissionsRouter } from './routes/permissions.js';
 import { createRolesRouter } from './routes/roles.js';
 import { createSchemaRouter } from './routes/schema.js';
+import { createStudioSettingsRouter } from './routes/studio-settings.js';
 import { createUsersRouter } from './routes/users.js';
 import { createStudioMiddleware } from './studio.js';
 
@@ -107,6 +108,7 @@ export function createApp({
     emitter,
     storage,
   }));
+  app.use('/studio-settings', createStudioSettingsRouter());
   app.use('/auth', createAuthRouter({ mailer, config, logger }));
   app.use('/items', createItemsRouter());
   app.use('/schema', createSchemaRouter());
