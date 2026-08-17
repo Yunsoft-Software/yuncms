@@ -1,153 +1,155 @@
 # YunCMS Development Plan
 
-> Live source-status document for branch `16-08-2026`. Source-complete behavior is checked here. Anything that still needs an actual Node 24 checkout, MySQL, browser, SMTP/S3 or deployment environment belongs in `todo.md`.
+> Live source-status document for branch `16-08-2026`. Checked items describe source-complete behavior only. Node 24/MySQL/browser/provider verification stays in `todo.md` until actually executed.
 
 ## 0. Permanent engineering rules
 
 - [x] Node.js 24 LTS, JavaScript/ESM, Express 5, MySQL + `mysql2/promise`, React 19.2 + Vite 8, REST only.
-- [x] npm workspaces; no ORM, GraphQL, speculative monorepo tooling or GitHub Actions.
-- [x] Internal code/extensions call services directly and never self-request YunCMS HTTP endpoints.
-- [x] Accountability is explicit; public/system/admin behavior never comes from a null identity.
-- [x] Dynamic identifiers are validated/quoted and SQL values use placeholders.
-- [x] Small focused commits.
-- [x] Every behavior/config/schema/authorization/UI change receives regression coverage. Unexecutable verification is tracked in `todo.md`; passed checks are removed rather than archived there.
+- [x] npm workspaces; no ORM, GraphQL or GitHub Actions.
+- [x] Internal code/extensions use services directly and never self-request YunCMS HTTP endpoints.
+- [x] Accountability is explicit and authorization lives in services, not UI hiding alone.
+- [x] Dynamic identifiers are validated/quoted; SQL data values use placeholders.
+- [x] Small focused commits and regression coverage for behavior/schema/authorization/UI changes.
+- [x] `todo.md` contains pending verification only; completed checks are removed rather than kept as history.
 
 ## 1. Runtime / install
 
 - [x] `yuncms init`, bootstrap/start/help and Node 24 guard.
 - [x] API + built Studio use one Express listener.
-- [x] One `DEFAULT_SERVER_PORT = 3008` is shared by core runtime and fresh init.
-- [x] Fresh init writes `PORT=3008`, `STUDIO_ORIGIN=http://localhost:3008`, `AUTH_PUBLIC_URL=http://localhost:3008`.
-- [x] `.env.example` uses 3008.
+- [x] Default/fresh-init port contract is 3008 for server, Studio origin and public auth URL.
 - [x] Request ids, safe errors, security headers, structured logs, bounded trust-proxy and auth rate limits.
 
 ## 2. MySQL / migrations
 
 - [x] MySQL pool, pinned transactions, retryable DB errors and advisory schema locks.
 - [x] Migration journal + compatibility gate.
-- [x] Core migrations `0001`–`0008` are registered.
-- [x] `0005` creates the deny-by-default Public role.
-- [x] `0006` creates Studio branding/theme/locale settings.
-- [x] `0007` registers only bounded permission-managed system resources: Users, Files and Roles.
-- [x] `0008` adds a nullable `logo_file` FK to `yuncms_files` with `ON DELETE SET NULL`.
-- [x] Schema version/cache invalidation and DDL compensation patterns remain in place.
+- [x] Core migrations `0001`–`0010` registered.
+- [x] `0005`: deny-by-default Public role.
+- [x] `0006`: Studio branding/theme/locale.
+- [x] `0007`: bounded permission-managed system resources.
+- [x] `0008`: nullable Files-backed `logo_file` FK.
+- [x] `0009`: human display-name columns for collections and fields, with legacy key backfill.
+- [x] `0010`: nullable Files-backed `favicon_file` FK.
+- [x] Dynamic schema mutations retain version/cache invalidation and compensation patterns.
 
-## 3. Collections / Data Model
+## 3. Human names vs stable API keys
+
+- [x] Collections store `name` separately from stable `collection` API/MySQL key.
+- [x] Fields store `name` separately from stable `field` API/MySQL key.
+- [x] Studio accepts natural names with spaces, Turkish characters and Unicode.
+- [x] Turkish normalization examples: `Müşteri Talepleri -> musteri_talepleri`, `Ürün Fiyatı -> urun_fiyati`, `İçecek Ölçüsü -> icecek_olcusu`.
+- [x] Leading numeric names receive a safe semantic prefix.
+- [x] Backend repeats normalization; correctness does not depend on browser-only logic.
+- [x] Studio shows the human label prominently and the API key as secondary technical information.
+- [x] Changing a display name later does not silently rename physical tables/columns or integration URLs.
+- [x] Registered custom system fields use the same name/key separation.
+
+## 4. Collections / Data Model
 
 - [x] Project collection create/read/update/delete and metadata.
-- [x] New collection creation can add `created_at`, `updated_at`, `created_by`, `updated_by`; all four are recommended/default-on in Studio.
-- [x] Actor/date fields are physically backed and system-managed; ItemsService stamps them and callers cannot overwrite them.
-- [x] Data Model uses a collection-workspace flow rather than the old paginated settings-heavy layout.
-- [x] Collection list stays visible; selecting a collection opens `Overview / Fields / Relations`.
-- [x] Collection visibility is edited directly in Data Model Overview; separate Content Visibility navigation is removed.
-- [x] Collections have a searchable icon picker with an internal icon registry and no added icon dependency.
-- [x] Collection icon + sidebar sort live in collection metadata.
-- [x] Content sidebar uses collection metadata icon/order and ignores hidden/system collections.
-- [x] Project collections support both drag-and-drop ordering in the Data Model list and explicit move up/down controls.
-- [x] Order persistence normalizes project collection sort values to stable 10-point slots; legacy collections without sort metadata receive stable fallback values so first reorder is not a no-op.
-- [x] New collection create flow includes visibility, icon and accountability settings in one workspace.
-- [x] Data Model is responsive and uses theme variables rather than light-only surfaces.
+- [x] Data Model is a collection workspace with `Overview / Fields / Relations` rather than a settings-heavy paginated form.
+- [x] Collection list remains visible and shows display label + machine key.
+- [x] Overview owns display name, description, Content visibility, icon and sidebar order.
+- [x] Searchable collection icon registry with no added icon dependency.
+- [x] Content visibility is managed inside Data Model; separate Content Visibility navigation is removed.
+- [x] Content sidebar uses collection display names, icons, visibility and persisted order.
+- [x] Drag-and-drop and explicit move-up/down ordering normalize sort values into stable slots.
+- [x] New collections default to recommended accountability fields: `created_at`, `updated_at`, `created_by`, `updated_by`.
+- [x] Data Model remains responsive and theme-variable driven.
 
-## 4. Fields
+## 5. Fields / relations
 
 - [x] Primitive fields: string/text/integer/bigint/decimal/boolean/date/datetime/timestamp/json/uuid.
-- [x] Grouped visual field builder with type cards and relevant-only settings.
-- [x] Decimal precision/scale.
-- [x] Fixed defaults plus current-time defaults for datetime/timestamp.
-- [x] Timestamp auto-update with preserved schema metadata.
-- [x] Browser `datetime-local` values normalize to MySQL date-time format.
+- [x] Visual field builder separates Display name from generated/editable API key.
+- [x] Decimal precision/scale, supported defaults, current-time presets and timestamp auto-update.
 - [x] File/Image are semantic UUID-backed fields with dedicated picker/preview behavior.
-- [x] Native/system-managed fields remain protected.
-- [x] A dedicated bounded service/route allows schema administrators to add custom fields to registered Users/Files/Roles system collections without opening internal Sessions/Tokens/Permissions/Audit tables.
-- [x] Custom system additions are tagged `systemExtension: true` in schema metadata and use locked/compensated DDL.
-- [x] Custom system extension fields are optional-only in V1 at both UI and service layers so existing system rows cannot be invalidated by a new `NOT NULL` column.
-
-## 5. Relations
-
 - [x] M2O physical FK lifecycle.
-- [x] O2O physical FK + UNIQUE lifecycle, compensation and REST routes.
-- [x] M2M junction lifecycle.
-- [x] Data Model Relations workspace separates M2O/O2O/M2M, summarizes existing relationships and preserves direct/M2M delete actions.
-- [x] File/Image and system-managed UUID fields are excluded as relation-source fields.
-- [x] Relation target picker remains capped at 200 records in V1; server-paginated relation search is a scale follow-up.
+- [x] O2O physical FK + UNIQUE lifecycle and compensation.
+- [x] M2M managed junction lifecycle.
+- [x] Relations workspace supports M2O/O2O/M2M creation, summary and deletion.
+- [x] Relation selectors show human labels while submitting stable machine keys.
+- [x] Schema managers can add bounded optional custom fields to Users/Files/Roles system collections; internal sessions/tokens/permissions/audit remain closed.
 
-## 6. Content / Files
+## 6. Items API / content
 
-- [x] Generic project collection CRUD with fields/filter/sort/limit/offset/count and RBAC.
+- [x] Project collection read/read-one/create/update/delete.
+- [x] `fields`, `filter`, `sort`, `limit`, `offset`, direct `expand` query surface.
+- [x] Filter operators include comparisons, IN/NOT IN, NULL checks, text matching and nested AND/OR.
+- [x] RBAC row filters and field allowlists remain part of every query.
+- [x] Direct relation expansion reuses target RBAC and supports up to eight fields.
 - [x] Generic ItemsService refuses system collections so specialized safeguards cannot be bypassed.
-- [x] Content list/create/edit/delete and relation/file inputs.
+- [x] Detailed Items query-language documentation includes operator tables, curl examples, pagination, relation expansion and JavaScript usage.
+
+## 7. Files / previews / branding assets
+
 - [x] Local and S3-compatible storage drivers.
 - [x] File upload/list/read/content/update/delete and reconciliation safeguards.
-- [x] Files gallery/list UX.
+- [x] Files gallery/list with search/filter/sort/pagination.
 - [x] Authenticated preview supports image/PDF/video/audio plus unsupported placeholder.
+- [x] Gallery media uses contain-style presentation instead of crop-style cover presentation.
+- [x] Files gallery/list exposes a dedicated large preview modal.
 - [x] File/Image content fields can select existing Files or upload a new file.
+- [x] Branding asset settings use a compact summary and open a Files modal on demand rather than rendering the entire image library inline.
+- [x] Branding Files modal filters to images, supports search and renders 12 results per page.
 
-## 7. Authentication / Users
+## 8. Authentication / Users / permissions
 
-- [x] Scrypt passwords, sessions, refresh rotation, logout/revocation, API tokens, reset/verification token flows.
-- [x] First admin and every account created through privileged UsersService management are immediately email-verified.
-- [x] Existing email-verification flow remains available for legacy/unverified accounts.
-- [x] Human-readable `role_name` is propagated through login/refresh/API-token identity.
-- [x] Sidebar shows email + role name, never raw role UUID.
-- [x] Users CRUD can be delegated through bounded system-resource permissions.
-- [x] Delegated user managers cannot assign Public/Admin roles or mutate/delete administrator accounts.
-- [x] Self password changes revoke sessions; delegated managers cannot change another user's password.
-- [x] Users Studio degrades safely when Users access exists without Roles: Read.
+- [x] Scrypt passwords, sessions, refresh rotation, logout/revocation, API tokens and reset/verification flows.
+- [x] Management-created users are immediately verified.
+- [x] Human-readable `role_name` propagates through auth identity and sidebar presentation.
+- [x] Users/Files action permissions and Roles read delegation remain bounded with escalation guards.
+- [x] Public remains deny-by-default and cannot receive system-resource permissions.
+- [x] Project permissions support action toggles, field allowlists, row filters and write validation.
+- [x] Dark-mode permission matrix, sticky cells, pagination and permission-rule count badges use Studio surface variables rather than white backgrounds.
 
-## 8. Roles / permissions
+## 9. Studio shell / navigation
 
-- [x] Project collection read/create/update/delete permissions, field allowlists, row filters and write validation.
-- [x] Public role remains deny-by-default.
-- [x] Users/Files can be delegated action-by-action; Roles can be delegated read-only.
-- [x] Public cannot receive system-resource permissions.
-- [x] Internal system resources remain fail-closed.
-- [x] Permission-managed system resources are action-only; fake advanced field/filter editors are not shown.
-- [x] Role screen has Public guidance and access overview.
-- [x] Dark-mode permission matrix/sticky cells use Studio surface variables instead of white backgrounds.
+- [x] Content accordion contains dynamic collections.
+- [x] Files is a direct root destination; no pointless one-item Library accordion.
+- [x] Settings groups Data Model, Users, Roles & Permissions and Branding & Appearance.
+- [x] Parent navigation is visually stronger than children.
+- [x] Collection children show human label + configured icon while retaining stable machine identity internally.
+- [x] Sidebar can collapse to an icon rail without losing section context.
 
-## 9. Sidebar / Studio UX
+## 10. Branding / appearance / localization
 
-- [x] Content remains the only accordion containing dynamic collections.
-- [x] Files is a direct root destination; the pointless one-item Library accordion is removed.
-- [x] Settings remains an accordion for Data Model, Users, Roles & Permissions and Branding & Appearance.
-- [x] Parent navigation is visually stronger than child navigation.
-- [x] Collection child entries use selected collection icons and persisted collection order.
-- [x] Sidebar can fully collapse to an icon rail.
-- [x] Redundant `YunCMS Studio` copy beside the logo remains removed.
-- [x] Pagination surfaces use theme variables in dark mode.
+- [x] Brand name, accent, Light/Dark/System and EN/TR default locale remain server-backed.
+- [x] Logo is selected from existing image Files; arbitrary external logo editing is removed.
+- [x] Favicon is selected from existing image Files through the same modal interaction.
+- [x] `logo_file` / `favicon_file` use nullable Files FKs with `ON DELETE SET NULL`.
+- [x] Narrow public `/studio-settings/logo` and `/studio-settings/favicon` expose only the configured branding image without making Files public.
+- [x] Branding image responses use revalidation and CSP sandboxing.
+- [x] Default dark surface uses `light-logo.png`; light surface uses `dark-logo.png`.
+- [x] Default favicon is the Yunsoft `light-icon.png` asset and is present in initial HTML before React hydration.
+- [x] Custom branding asset paths respect configured API origin in split-origin development.
+- [x] English/Turkish copy covers schema labels, Files asset modal, favicon and current Data Model UX.
 
-## 10. Branding / appearance
+## 11. Documentation
 
-- [x] Brand name, accent, Light/Dark/System theme and EN/TR default locale remain server-backed.
-- [x] Arbitrary logo URL entry has been removed from current Studio editing.
-- [x] Administrator chooses an existing `image/*` item from Files through a searchable logo picker.
-- [x] Selected logo is stored as `logo_file`; deleting that File clears the reference via FK.
-- [x] A narrow public `/studio-settings/logo` endpoint exposes only the configured branding image so pre-login branding works without making Files public.
-- [x] File-backed logo resolution honors `VITE_API_URL`/API origin in separate-origin development.
-- [x] Default Yunsoft artwork mapping is corrected: dark Studio uses `light-logo.png`; light Studio uses `dark-logo.png`.
-- [x] Custom logo replaces Yunsoft artwork while Powered by Yunsoft attribution remains independent.
-- [x] English/Turkish copy covers current logo picker, Data Model workspace, fields and permission UX.
+- [x] README is product-oriented and explains architecture, capabilities, quick start, schema naming and API examples.
+- [x] `docs/rest-api.md` is a detailed endpoint reference with auth, Items, schema, relations, Users/Roles/Files, branding and health examples.
+- [x] `docs/api-query-language.md` documents all implemented collection query parameters/operators, URL encoding, pagination, nested filters, relation expansion and JavaScript examples.
+- [x] Studio customization documentation covers Files-backed logo/favicon selection and public branding endpoints.
+- [x] Existing architecture/auth/permissions/files/database/security/deployment documentation remains linked from README.
 
-## 11. Source regression coverage
+## 12. Source regression coverage
 
 - [x] Low-noise `npm run test:fast`, auto-discovered `npm test`, and `npm run test:release` runner.
-- [x] Port 3008/init/config contracts.
-- [x] Migration/bootstrap compatibility including `0008`.
-- [x] Accountability/timestamp/File/Image/O2O/system-resource permission contracts.
-- [x] Management-created verified-user and delegated-user guards.
-- [x] Dark pagination/permission surface contracts.
-- [x] Files-backed branding service/client/API source contracts.
-- [x] Collection icon/search/order/metadata contracts.
-- [x] Data Model V2 source/workspace, drag-order, relation-cleanup and bounded system-field contracts.
-- [x] Sidebar hierarchy/direct-Files contracts.
-- [x] EN/TR parity/static key scan plus dynamic field/action/Data Model tab coverage.
-- [ ] Execute the changed test suites and browser/MySQL verification in `todo.md` before calling this exact source state deployment-verified.
+- [x] Port/init/config and migration compatibility tests.
+- [x] Core + Studio schema-name normalization tests.
+- [x] Human field-label/API-key payload tests.
+- [x] Data Model V2 label/key, ordering, relation and system-field source contracts.
+- [x] Files full-preview and contain-style UI contracts.
+- [x] File-backed logo/favicon service/API/client source contracts.
+- [x] Dark pagination/permission/badge surface contracts.
+- [x] EN/TR parity/static key scan remains in the complete suite.
+- [ ] Execute Node 24, real MySQL and browser gates in `todo.md` before calling this exact source state deployment-verified.
 
-## 12. Known follow-ups, not current source claims
+## 13. Known follow-ups, not current source claims
 
-- Server-side pagination/search for very large Files/Users/relation-picker datasets.
+- Server-side search/pagination for very large Files/Users/relation-picker datasets; current branding modal only limits rendered results client-side.
 - O2M/M2M nested expansion and richer M2M editing.
-- Full generic editing of custom extension fields inside specialized Users/Files/Roles record screens; current work adds the schema fields safely, while specialized service screens still own their native record contracts.
-- Adding accountability fields to pre-existing project collections through a dedicated migration workflow.
+- Generic value editors for custom extension columns inside specialized Users/Files/Roles record screens.
+- Dedicated migration workflow for adding accountability fields to pre-existing project collections.
 - Shared-store rate limiting/object storage requirements for multi-instance deployment.
 - MFA/SSO/session-management UI and untrusted extension sandboxing.
