@@ -6,7 +6,7 @@ Only checks that still require a real checkout, browser, MySQL instance or deplo
 
 Run on branch `16-08-2026` from a fresh Node.js 24 checkout.
 
-- [ ] Run `npm run test:fast`. The fast suite now includes the latest migration `0008`, file-backed branding, dark pagination/permission surfaces, simplified sidebar, collection icon/order metadata, Data Model V2, bounded system-collection field additions, existing auth/RBAC/O2O/File/Image/accountability regressions and EN/TR coverage.
+- [ ] Run `npm run test:fast`. The fast suite now includes migration `0008`, file-backed branding, dark pagination/permission surfaces, simplified sidebar, collection icon/order metadata, drag ordering, Data Model V2, bounded optional-only system-collection field additions, relation cleanup, existing auth/RBAC/O2O/File/Image/accountability regressions and EN/TR coverage.
 - [ ] Run `npm test`; confirm the complete auto-discovered core/API/CLI/extensions/Studio source suite passes.
 - [ ] Run `npm run test:release`; confirm complete tests, Studio production build and every publishable `npm pack --dry-run` contract pass.
 - [ ] Confirm the Studio production build has no JSX/import errors or unresolved translation keys after `DataModelV2Screen`, `CollectionIconPicker`, `LogoFilePicker`, new CSS modules and system-schema route additions.
@@ -55,8 +55,9 @@ Verify the exact problem areas shown in the 2026-08-17 browser screenshots.
 - [ ] Collapse/expand the sidebar and verify current collection/section context is preserved and icons remain understandable.
 - [ ] Create several collections with different icons; verify selected icons render next to collections under Content.
 - [ ] Hide a collection in Data Model Overview; it must disappear from Content without deleting schema/data and reappear when enabled again.
-- [ ] Reorder collections with Move up/Move down; verify the Content sidebar order updates and survives page reload.
-- [ ] Specifically test two or more legacy collections that previously had no metadata sort value; first reorder must persist rather than becoming a no-op.
+- [ ] Reorder collections both with drag-and-drop and Move up/Move down; verify Content sidebar order updates, normalized sort metadata is persisted and order survives page reload.
+- [ ] While collection search is active, verify drag ordering is disabled so filtered-list drops cannot accidentally rewrite the full order.
+- [ ] Specifically test two or more legacy collections that previously had no metadata sort value; first drag or move must persist rather than becoming a no-op.
 - [ ] Check keyboard focus/accordion behavior and narrow-screen sidebar layout.
 
 ## 7. Data Model V2 browser smoke
@@ -67,14 +68,16 @@ Verify the exact problem areas shown in the 2026-08-17 browser screenshots.
 - [ ] Overview allows description, Content visibility, icon and sidebar order changes from one place.
 - [ ] Icon search returns sensible icons and selection survives save/reload/sidebar navigation.
 - [ ] Fields tab opens the grouped visual field builder and existing fields remain readable/compact on normal desktop width.
-- [ ] Relations tab can still create M2O, O2O and M2M relationships and correctly summarizes existing relations.
+- [ ] Relations tab can create M2O, O2O and M2M relationships, summarize existing relations, and delete direct/O2O/M2M relationships without losing the underlying field where applicable.
 - [ ] Verify no separate Content Visibility navigation item remains necessary for normal collection visibility management.
 - [ ] Walk the new screen in English and Turkish; no raw `dataModel.*`, `appearance.*`, `fieldBuilder.*` or `collectionBuilder.*` translation keys may leak.
 
 ## 8. System collection custom fields
 
 - [ ] As an Administrator/schema manager, open registered system collections `yuncms_users`, `yuncms_files`, `yuncms_roles` in Data Model and verify Add custom field is available.
-- [ ] Add a harmless test field to each supported system collection; inspect physical MySQL column + `yuncms_fields` metadata with `systemExtension: true`.
+- [ ] Confirm the system collection field builder does **not** offer a Required toggle for new custom system fields.
+- [ ] Attempt raw API creation with `required: true`; it must fail with `SYSTEM_EXTENSION_REQUIRED_UNSUPPORTED` before DDL.
+- [ ] Add a harmless optional test field to each supported system collection; inspect physical MySQL column + `yuncms_fields` metadata with `systemExtension: true`.
 - [ ] Attempt the bounded system-field endpoint against internal system collections such as sessions/tokens/permissions/audit; it must fail closed with `SYSTEM_SCHEMA_READ_ONLY`.
 - [ ] Attempt the endpoint as a non-schema-manager; it must fail authorization before DDL.
 - [ ] Force/observe a metadata failure in a disposable DB and verify physical added-column compensation removes the partial field.
