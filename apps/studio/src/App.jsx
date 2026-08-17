@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { API_URL, apiRequest, health, logout, readSession, subscribeSession } from './api.js';
 import { isContentCollection } from './collection-visibility.js';
+import { LanguageSwitcher, StudioBrand, YunsoftFooter } from './components/StudioBrand.jsx';
+import { useI18n } from './i18n.js';
+import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
 import { CollectionVisibilityScreen } from './screens/CollectionVisibilityScreen.jsx';
 import { ContentScreen } from './screens/ContentScreen.jsx';
@@ -12,23 +15,29 @@ import { RolesPermissionsScreen } from './screens/RolesPermissionsScreen.jsx';
 import { UsersScreen } from './screens/UsersScreen.jsx';
 
 const librarySections = [
-  { id: 'files', label: 'Files' },
+  { id: 'files', labelKey: 'nav.files' },
 ];
 
 const settingsSections = [
-  { id: 'content-visibility', label: 'Content Visibility' },
-  { id: 'data-model', label: 'Data Model' },
-  { id: 'users', label: 'Users' },
-  { id: 'roles', label: 'Roles & Permissions' },
+  { id: 'content-visibility', labelKey: 'nav.contentVisibility' },
+  { id: 'data-model', labelKey: 'nav.dataModel' },
+  { id: 'users', labelKey: 'nav.users' },
+  { id: 'roles', labelKey: 'nav.roles' },
+  { id: 'appearance', labelKey: 'nav.appearance' },
 ];
 
-const sectionCopy = {
-  'content-visibility': ['Content Visibility', 'Choose which collections appear in the Content navigation without changing their data.'],
-  'data-model': ['Data Model', 'Create collections, fields and relations backed by MySQL.'],
-  users: ['Users', 'Manage administrator-created users, roles and account status.'],
-  roles: ['Roles & Permissions', 'Configure role access, field allowlists and row filters.'],
-  files: ['Files', 'Upload, preview and manage files through the configured storage driver.'],
-};
+function sectionCopy(section, t) {
+  const copy = {
+    'content-visibility': ['section.visibilityTitle', 'section.visibilityDescription'],
+    'data-model': ['section.dataModelTitle', 'section.dataModelDescription'],
+    users: ['section.usersTitle', 'section.usersDescription'],
+    roles: ['section.rolesTitle', 'section.rolesDescription'],
+    files: ['section.filesTitle', 'section.filesDescription'],
+    appearance: ['section.appearanceTitle', 'section.appearanceDescription'],
+  };
+  const keys = copy[section];
+  return keys ? keys.map((key) => t(key)) : ['', ''];
+}
 
 function readAuthAction() {
   const params = new URLSearchParams(window.location.search);
@@ -46,20 +55,21 @@ function clearAuthAction() {
 }
 
 export function App() {
+  const { t } = useI18n();
   const [session, setSession] = useState(() => readSession());
   const [authAction, setAuthAction] = useState(() => readAuthAction());
   const [section, setSection] = useState('content');
   const [contentCollections, setContentCollections] = useState([]);
   const [contentCollection, setContentCollection] = useState('');
-  const [healthState, setHealthState] = useState({ state: 'checking', message: 'Checking API…' });
+  const [healthState, setHealthState] = useState('checking');
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => subscribeSession(() => setSession(readSession())), []);
 
   useEffect(() => {
     health()
-      .then(() => setHealthState({ state: 'online', message: 'API online' }))
-      .catch(() => setHealthState({ state: 'offline', message: 'API unavailable' }));
+      .then(() => setHealthState('online'))
+      .catch(() => setHealthState('offline'));
   }, []);
 
   useEffect(() => {
@@ -87,10 +97,10 @@ export function App() {
   }, [session?.user?.id, section]);
 
   const [title, description] = section === 'content'
-    ? [contentCollection || 'Content', contentCollection
-      ? 'Manage records in this collection.'
-      : 'Create a collection in Settings to start managing content.']
-    : sectionCopy[section];
+    ? [contentCollection || t('nav.content'), contentCollection
+      ? t('app.contentDescription')
+      : t('app.contentEmpty')]
+    : sectionCopy(section, t);
 
   const activeScreen = useMemo(() => {
     if (section === 'content-visibility') return <CollectionVisibilityScreen />;
@@ -98,6 +108,7 @@ export function App() {
     if (section === 'users') return <UsersScreen currentUserId={session?.user?.id} />;
     if (section === 'roles') return <RolesPermissionsScreen />;
     if (section === 'files') return <FilesScreen />;
+    if (section === 'appearance') return <AppearanceScreen />;
     return (
       <ContentScreen
         collection={contentCollection}
@@ -132,17 +143,20 @@ export function App() {
     return <LoginScreen onAuthenticated={setSession} />;
   }
 
+  const healthMessage = healthState === 'online'
+    ? t('app.apiOnline')
+    : healthState === 'offline'
+      ? t('app.apiUnavailable')
+      : t('app.apiChecking');
+
   return (
     <div className="studio-shell">
       <aside className="sidebar">
-        <div>
-          <div className="brand">YunCMS</div>
-          <div className="brand-subtitle">Studio</div>
-        </div>
+        <StudioBrand />
 
         <nav aria-label="Studio sections" className="sidebar-nav">
           <div className="nav-group">
-            <div className="nav-group-label">Content</div>
+            <div className="nav-group-label">{t('nav.content')}</div>
             <div className="nav-children">
               {contentCollections.map((entry) => (
                 <button
@@ -163,14 +177,14 @@ export function App() {
                   type="button"
                   onClick={() => setSection('data-model')}
                 >
-                  <span>Create first collection</span>
+                  <span>{t('nav.createFirstCollection')}</span>
                 </button>
               )}
             </div>
           </div>
 
           <div className="nav-group">
-            <div className="nav-group-label">Library</div>
+            <div className="nav-group-label">{t('nav.library')}</div>
             {librarySections.map((item) => (
               <button
                 key={item.id}
@@ -178,13 +192,13 @@ export function App() {
                 type="button"
                 onClick={() => setSection(item.id)}
               >
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </button>
             ))}
           </div>
 
           <div className="nav-group">
-            <div className="nav-group-label">Settings</div>
+            <div className="nav-group-label">{t('nav.settings')}</div>
             {settingsSections.map((item) => (
               <button
                 key={item.id}
@@ -192,25 +206,30 @@ export function App() {
                 type="button"
                 onClick={() => setSection(item.id)}
               >
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </button>
             ))}
           </div>
         </nav>
 
         <div className="sidebar-footer">
-          <div className={`sidebar-health ${healthState.state}`} role="status">
+          <div className={`sidebar-health ${healthState}`} role="status">
             <span className="status-dot" aria-hidden="true" />
-            <span>{healthState.message}</span>
+            <span>{healthMessage}</span>
           </div>
           <small className="sidebar-api-address">{API_URL}</small>
 
           <div className="sidebar-account">
-            <strong>{session.user?.email || 'Authenticated user'}</strong>
-            <small>{session.user?.role || 'No role'}</small>
+            <strong>{session.user?.email || t('app.authenticatedUser')}</strong>
+            <small>{session.user?.role || t('app.noRole')}</small>
             <button className="text-button" type="button" disabled={loggingOut} onClick={handleLogout}>
-              {loggingOut ? 'Signing out…' : 'Sign out'}
+              {loggingOut ? t('app.signingOut') : t('app.signOut')}
             </button>
+          </div>
+
+          <div className="sidebar-branding-footer">
+            <LanguageSwitcher compact />
+            <YunsoftFooter />
           </div>
         </div>
       </aside>
@@ -218,7 +237,7 @@ export function App() {
       <main className="main-content">
         <header className="page-header">
           <div>
-            <p className="eyebrow">YunCMS Studio</p>
+            <p className="eyebrow">YunCMS {t('app.studio')}</p>
             <h1>{title}</h1>
             <p className="lede">{description}</p>
           </div>
