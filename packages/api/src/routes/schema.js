@@ -1,5 +1,9 @@
 import express from 'express';
-import { deleteM2MJunction } from '@yunsoft/yuncms-core';
+import {
+  createO2ORelation,
+  deleteM2MJunction,
+  deleteO2ORelation,
+} from '@yunsoft/yuncms-core';
 
 import { serviceOptionsFromRequest } from '../service-options.js';
 
@@ -228,6 +232,41 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
     clearSchemaCache();
     await auditSchema(req, {
       action: 'schema.relation.delete',
+      collection: req.params.manyCollection,
+      itemKey: req.params.manyField,
+      payload: { before },
+    });
+    res.status(204).end();
+  });
+
+  router.post('/relations/o2o', async (req, res) => {
+    const data = await createO2ORelation({
+      database: req.context.database,
+      accountability: req.accountability,
+      input: req.body ?? {},
+    });
+    clearSchemaCache();
+    await auditSchema(req, {
+      action: 'schema.relation.o2o.create',
+      collection: data.many_collection,
+      itemKey: data.many_field,
+      payload: { after: data },
+    });
+    res.status(201).json({ data });
+  });
+
+  router.delete('/relations/o2o/:manyCollection/:manyField', async (req, res) => {
+    const relations = service(req, 'RelationsService');
+    const before = await relations.readOne(req.params.manyCollection, req.params.manyField);
+    await deleteO2ORelation({
+      database: req.context.database,
+      accountability: req.accountability,
+      manyCollection: req.params.manyCollection,
+      manyField: req.params.manyField,
+    });
+    clearSchemaCache();
+    await auditSchema(req, {
+      action: 'schema.relation.o2o.delete',
       collection: req.params.manyCollection,
       itemKey: req.params.manyField,
       payload: { before },
