@@ -45,10 +45,11 @@ test('every statically referenced Studio translation exists in English and Turki
   assert.deepEqual(missing, []);
 });
 
-test('dynamic field and permission labels are also translated in both locales', () => {
+test('dynamic field, permission and Data Model tab labels are translated in both locales', () => {
   const dynamicKeys = [
     ...FIELD_TYPE_OPTIONS.map((option) => option.labelKey),
     ...['read', 'create', 'update', 'delete'].map((action) => `roles.${action}`),
+    ...['overview', 'fields', 'relations'].map((tab) => `dataModel.tab.${tab}`),
   ];
   const missing = [];
   for (const key of dynamicKeys) {
@@ -65,10 +66,11 @@ test('translations interpolate values and fall back safely for an unknown locale
   assert.equal(translate('de', 'common.save'), 'Save');
 });
 
-test('Turkish locale contains real localized navigation and destructive-action copy', () => {
+test('Turkish locale contains real localized navigation and current customization copy', () => {
   assert.equal(TR['nav.settings'], 'Ayarlar');
   assert.equal(TR['content.deleteRecordAction'], 'Kaydı sil');
-  assert.equal(TR['appearance.logoHint'], 'Özel logo, varsayılan Yunsoft logosunun tamamen yerine geçer.');
+  assert.equal(TR['appearance.logoFromFiles'], 'Dosyalardan logo seç');
   assert.equal(TR['fieldType.image'], 'Görsel');
   assert.equal(TR['dataModel.oneToOne'], 'Bire bir');
+  assert.equal(TR['dataModel.tab.overview'], 'Genel');
 });
