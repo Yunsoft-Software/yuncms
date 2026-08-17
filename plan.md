@@ -37,13 +37,14 @@
 - [x] Project collection create/read/update/delete and metadata.
 - [x] New collection creation can add `created_at`, `updated_at`, `created_by`, `updated_by`; all four are recommended/default-on in Studio.
 - [x] Actor/date fields are physically backed and system-managed; ItemsService stamps them and callers cannot overwrite them.
-- [x] Data Model now uses a collection-workspace flow rather than the old paginated settings-heavy layout.
+- [x] Data Model uses a collection-workspace flow rather than the old paginated settings-heavy layout.
 - [x] Collection list stays visible; selecting a collection opens `Overview / Fields / Relations`.
 - [x] Collection visibility is edited directly in Data Model Overview; separate Content Visibility navigation is removed.
 - [x] Collections have a searchable icon picker with an internal icon registry and no added icon dependency.
 - [x] Collection icon + sidebar sort live in collection metadata.
 - [x] Content sidebar uses collection metadata icon/order and ignores hidden/system collections.
-- [x] Collections can be moved up/down from Data Model; legacy collections receive stable reorderable fallback sort values.
+- [x] Project collections support both drag-and-drop ordering in the Data Model list and explicit move up/down controls.
+- [x] Order persistence normalizes project collection sort values to stable 10-point slots; legacy collections without sort metadata receive stable fallback values so first reorder is not a no-op.
 - [x] New collection create flow includes visibility, icon and accountability settings in one workspace.
 - [x] Data Model is responsive and uses theme variables rather than light-only surfaces.
 
@@ -59,13 +60,14 @@
 - [x] Native/system-managed fields remain protected.
 - [x] A dedicated bounded service/route allows schema administrators to add custom fields to registered Users/Files/Roles system collections without opening internal Sessions/Tokens/Permissions/Audit tables.
 - [x] Custom system additions are tagged `systemExtension: true` in schema metadata and use locked/compensated DDL.
+- [x] Custom system extension fields are optional-only in V1 at both UI and service layers so existing system rows cannot be invalidated by a new `NOT NULL` column.
 
 ## 5. Relations
 
 - [x] M2O physical FK lifecycle.
 - [x] O2O physical FK + UNIQUE lifecycle, compensation and REST routes.
 - [x] M2M junction lifecycle.
-- [x] Data Model Relations workspace separates M2O/O2O/M2M and summarizes existing relationships.
+- [x] Data Model Relations workspace separates M2O/O2O/M2M, summarizes existing relationships and preserves direct/M2M delete actions.
 - [x] File/Image and system-managed UUID fields are excluded as relation-source fields.
 - [x] Relation target picker remains capped at 200 records in V1; server-paginated relation search is a scale follow-up.
 
@@ -109,7 +111,7 @@
 - [x] Files is a direct root destination; the pointless one-item Library accordion is removed.
 - [x] Settings remains an accordion for Data Model, Users, Roles & Permissions and Branding & Appearance.
 - [x] Parent navigation is visually stronger than child navigation.
-- [x] Collection child entries use selected collection icons.
+- [x] Collection child entries use selected collection icons and persisted collection order.
 - [x] Sidebar can fully collapse to an icon rail.
 - [x] Redundant `YunCMS Studio` copy beside the logo remains removed.
 - [x] Pagination surfaces use theme variables in dark mode.
@@ -134,9 +136,9 @@
 - [x] Accountability/timestamp/File/Image/O2O/system-resource permission contracts.
 - [x] Management-created verified-user and delegated-user guards.
 - [x] Dark pagination/permission surface contracts.
-- [x] Files-backed branding service/client/source contracts.
+- [x] Files-backed branding service/client/API source contracts.
 - [x] Collection icon/search/order/metadata contracts.
-- [x] Data Model V2 source/workspace/system-field contracts.
+- [x] Data Model V2 source/workspace, drag-order, relation-cleanup and bounded system-field contracts.
 - [x] Sidebar hierarchy/direct-Files contracts.
 - [x] EN/TR parity/static key scan plus dynamic field/action/Data Model tab coverage.
 - [ ] Execute the changed test suites and browser/MySQL verification in `todo.md` before calling this exact source state deployment-verified.
