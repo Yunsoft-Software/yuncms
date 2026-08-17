@@ -20,6 +20,7 @@ export {
 export { HookEmitter } from './hooks.js';
 export { createJsonLogger, LEVELS as LOG_LEVELS } from './logger.js';
 export { deleteM2MJunction } from './m2m-lifecycle.js';
+export { createO2ORelation, deleteO2ORelation, o2oUniqueIndexName } from './o2o-relation.js';
 export {
   MAX_EXPAND_FIELDS,
   parseExpandInput,
