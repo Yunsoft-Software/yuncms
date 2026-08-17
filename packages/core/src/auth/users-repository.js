@@ -1,7 +1,7 @@
 export async function readAuthenticationUserByEmail(database, email) {
   const [rows] = await database.query(
     `SELECT u.id, u.email, u.password_hash, u.role, u.status, u.email_verified_at,
-            r.admin AS role_admin, r.public AS role_public
+            r.name AS role_name, r.admin AS role_admin, r.public AS role_public
      FROM yuncms_users u
      LEFT JOIN yuncms_roles r ON r.id = u.role
      WHERE u.email = ?
@@ -14,7 +14,7 @@ export async function readAuthenticationUserByEmail(database, email) {
 export async function readAuthenticationUserById(database, id) {
   const [rows] = await database.query(
     `SELECT u.id, u.email, u.password_hash, u.role, u.status, u.email_verified_at,
-            r.admin AS role_admin, r.public AS role_public
+            r.name AS role_name, r.admin AS role_admin, r.public AS role_public
      FROM yuncms_users u
      LEFT JOIN yuncms_roles r ON r.id = u.role
      WHERE u.id = ?
