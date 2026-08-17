@@ -29,7 +29,7 @@ This plan focuses on usability polish for the existing `16-08-2026` Studio imple
 - [x] Use the selected collection as the page title/context and keep `New record` as the primary action.
 - [x] Improve empty states so the first useful action is obvious.
 - [x] Make table action placement consistent and reduce visual noise around metadata.
-- [x] Add lightweight client-side search for the currently loaded page of records.
+- [x] Add lightweight client-side search for the currently loaded page of records as the initial usability pass.
 - [x] Keep relation pickers readable; the existing 200-item relation limit remains a documented V1 scale constraint.
 - [ ] Later polish: add pagination/search-backed relation selection when the API supports it cleanly.
 
@@ -84,40 +84,40 @@ This plan focuses on usability polish for the existing `16-08-2026` Studio imple
 
 ## Phase 8 — shared list controls and scanability
 
-- [ ] Add a compact control-strip pattern for search, filter, sort, result count and clear/reset actions.
-- [ ] Add reusable visual treatment for active filter chips and compact select controls without adding a dependency.
-- [ ] Keep data controls responsive so they stack cleanly on narrow screens.
-- [ ] Make filtered/visible counts explicit so users understand whether they are looking at all records or a subset.
+- [x] Add a compact control-strip pattern for search, filter, sort, result count and clear/reset actions.
+- [x] Add reusable visual treatment for active filter chips and compact select controls without adding a dependency.
+- [x] Keep data controls responsive so they stack cleanly on narrow screens.
+- [x] Make filtered/visible counts explicit so users understand whether they are looking at all records or a subset.
 
 ## Phase 9 — Content data explorer
 
-- [ ] Replace current-page-only search with server-backed search across readable text fields.
-- [ ] Add field-aware filters using the existing REST filter operators and combine multiple active filters with AND semantics.
-- [ ] Add server-backed sorting with ascending/descending direction.
-- [ ] Add page-size selection plus previous/next pagination using API `limit`, `offset` and filtered `total_count` metadata.
-- [ ] Reset pagination when search/filter/sort/page-size changes so users never land on an empty stale page.
-- [ ] Show active filters as removable chips and provide one-click reset.
+- [x] Replace current-page-only search with server-backed search across readable text fields.
+- [x] Add field-aware filters using the existing REST filter operators and combine multiple active filters with AND semantics.
+- [x] Add server-backed sorting with ascending/descending direction.
+- [x] Add page-size selection plus previous/next pagination using API `limit`, `offset` and filtered `total_count` metadata.
+- [x] Reset pagination when search/filter/sort/page-size changes so users never land on an empty stale page.
+- [x] Show active filters as removable chips and provide one-click reset.
 
 ## Phase 10 — Files library controls
 
-- [ ] Add file-type filtering for images, video, audio, PDF and other files.
-- [ ] Add useful sort presets for newest/oldest, name and file size.
-- [ ] Show visible-result counts and a clear-filters affordance in both Gallery and List views.
-- [ ] Keep the same search/filter/sort state when switching Gallery/List.
+- [x] Add file-type filtering for images, video, audio, PDF and other files.
+- [x] Add useful sort presets for newest/oldest, name and file size.
+- [x] Show visible-result counts and a clear-filters affordance in both Gallery and List views.
+- [x] Keep the same search/filter/sort state when switching Gallery/List.
 
 ## Phase 11 — Users, Data Model and permission-heavy settings
 
-- [ ] Users: collapse creation behind a clear `New user` action so the user list remains the primary workspace.
-- [ ] Users: add search, role/status filters and useful sort options with visible result counts.
-- [ ] Data Model: add collection search/sort in the master sidebar and field search/sort in the Fields tab.
-- [ ] Roles & Permissions: add role search and collection filtering so large permission matrices remain manageable.
-- [ ] Roles & Permissions: add a quick `configured only` view for auditing granted access.
+- [x] Users: collapse creation behind a clear `New user` action so the user list remains the primary workspace.
+- [x] Users: add search, role/status filters and useful sort options with visible result counts.
+- [x] Data Model: add collection search/sort in the master sidebar and field search/sort in the Fields tab.
+- [x] Roles & Permissions: add role search/sort and collection filtering so large permission matrices remain manageable.
+- [x] Roles & Permissions: add a quick `configured only` view for auditing granted access.
 
 ## Phase 12 — interaction refinements
 
-- [ ] Make sortable/filterable toolbars visually consistent across Content, Files, Users, Data Model and Roles & Permissions.
-- [ ] Keep primary actions visually separate from list controls so `New record`, `Upload`, `New user`, `New collection` and `New role` stay obvious.
-- [ ] Keep destructive actions out of dense filter toolbars and preserve explicit confirmation dialogs.
+- [x] Make sortable/filterable toolbars visually consistent across Content, Files, Users, Data Model and Roles & Permissions.
+- [x] Keep primary actions visually separate from list controls so `New record`, `Upload`, `New user`, `New collection` and `New role` stay obvious.
+- [x] Keep destructive actions out of dense filter toolbars and preserve explicit confirmation dialogs.
 - [ ] Re-run source/build/runtime/browser verification after the data-control pass; environment-only checks remain in `todo.md`.
 
 ## Delivery order
@@ -129,11 +129,11 @@ This plan focuses on usability polish for the existing `16-08-2026` Studio imple
 5. Role-first permission matrix and advanced editor. — done
 6. Shared responsive/accessibility polish and runtime smoke. — source polish done; formal accessibility/runtime checks remain
 7. Single-port Studio/API runtime. — source implementation done; runtime smoke remains
-8. Shared list-control styling + server-backed Content sort/filter/pagination.
-9. Files type filtering/sort presets.
-10. Users list-first workflow + search/filter/sort.
-11. Data Model and Roles/Permissions search/filter polish.
-12. Final consistency pass and runtime verification.
+8. Shared list-control styling + server-backed Content sort/filter/pagination. — done
+9. Files type filtering/sort presets. — done
+10. Users list-first workflow + search/filter/sort. — done
+11. Data Model and Roles/Permissions search/filter polish. — done
+12. Final consistency pass and runtime verification. — source implementation done; runtime/browser verification remains
 
 ## Verification
 
