@@ -15,6 +15,12 @@ test('Appearance uses Files-backed logo selection instead of a URL input', () =>
   assert.doesNotMatch(appearanceSource, /appearance\.logoUrl/);
 });
 
+test('clearing a Files-backed logo restores the Yunsoft fallback even from legacy URL state', () => {
+  assert.match(appearanceSource, /function updateLogoFile/);
+  assert.match(appearanceSource, /logo_url:\s*fileId \? current\.logo_url : DEFAULT_STUDIO_SETTINGS\.logo_url/);
+  assert.match(appearanceSource, /onChange=\{updateLogoFile\}/);
+});
+
 test('logo picker loads existing Files, filters images and renders previews', () => {
   assert.match(pickerSource, /apiRequest\('\/files'\)/);
   assert.match(pickerSource, /startsWith\('image\/'\)/);
