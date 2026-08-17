@@ -1,10 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
+import { useI18n } from '../i18n.js';
 import { Modal } from './Modal.jsx';
 
 const DialogContext = createContext(null);
 
 export function DialogProvider({ children }) {
+  const { t } = useI18n();
   const [dialog, setDialog] = useState(null);
   const resolverRef = useRef(null);
   const cancelButtonRef = useRef(null);
@@ -22,11 +24,11 @@ export function DialogProvider({ children }) {
     setDialog({
       title: options.title,
       description: options.description || '',
-      confirmLabel: options.confirmLabel || 'Confirm',
-      cancelLabel: options.cancelLabel || 'Cancel',
+      confirmLabel: options.confirmLabel || t('common.confirm'),
+      cancelLabel: options.cancelLabel || t('common.cancel'),
       tone: options.tone || 'primary',
     });
-  }), []);
+  }), [t]);
 
   useEffect(() => () => resolverRef.current?.(false), []);
 
