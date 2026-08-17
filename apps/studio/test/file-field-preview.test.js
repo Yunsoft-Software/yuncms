@@ -38,6 +38,7 @@ test('file field control can select, upload, clear and preview files', () => {
 test('content loads file metadata only when file fields exist and renders previews', () => {
   assert.match(content, /loadedFields\.some\(isFileField\)/);
   assert.match(content, /apiRequest\('\/files'\)/);
+  assert.match(content, /contentTableFields\(fields\)/);
   assert.match(content, /<FileFieldControl/);
   assert.match(content, /<FileValuePreview/);
 });

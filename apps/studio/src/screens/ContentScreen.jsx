@@ -4,7 +4,7 @@ import { apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
 import { FileFieldControl, FileValuePreview } from '../components/FileFieldControl.jsx';
 import { Pagination } from '../components/Pagination.jsx';
-import { isFileField, isImageField } from '../field-ui.js';
+import { contentTableFields, isFileField, isImageField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
 
@@ -447,7 +447,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     }
   }
 
-  const tableFields = useMemo(() => fields.filter((field) => !field.hidden).slice(0, 8), [fields]);
+  const tableFields = useMemo(() => contentTableFields(fields), [fields]);
   const filterableFields = useMemo(() => fields.filter((field) => !field.hidden && field.type !== 'json'), [fields]);
   const selectedFilterField = filterableFields.find((field) => field.field === filterDraft.field) ?? null;
   const filterOperators = operatorsForField(selectedFilterField, relationLookups[filterDraft.field]);

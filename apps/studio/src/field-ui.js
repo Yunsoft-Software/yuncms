@@ -51,6 +51,30 @@ export function isUserField(field) {
   return field?.interface === 'user';
 }
 
+function fieldSchemaMetadata(field) {
+  const metadata = field?.schema_metadata;
+  if (!metadata) return {};
+  if (typeof metadata === 'object') return metadata;
+  try {
+    return JSON.parse(metadata);
+  } catch {
+    return {};
+  }
+}
+
+export function isSystemManagedField(field) {
+  const value = fieldSchemaMetadata(field).systemManaged;
+  return value === true || value === 1;
+}
+
+export function contentTableFields(fields = [], limit = 8) {
+  const visible = fields.filter((field) => !field.hidden);
+  const primary = visible.filter((field) => field.field === 'id' || fieldSchemaMetadata(field).primaryKey === true);
+  const content = visible.filter((field) => !primary.includes(field) && !isSystemManagedField(field));
+  const managed = visible.filter((field) => !primary.includes(field) && isSystemManagedField(field));
+  return [...primary, ...content, ...managed].slice(0, limit);
+}
+
 export function fieldDisplayType(field) {
   if (field?.interface === 'image') return 'image';
   if (field?.interface === 'file') return 'file';
