@@ -42,9 +42,9 @@ test('custom branding remains the effective branding instead of restoring Yunsof
   assert.equal(resolveStudioLogo(settings, 'dark'), 'https://cdn.example.com/acme.svg');
 });
 
-test('default Yunsoft branding switches logo by resolved theme', () => {
-  assert.equal(resolveStudioLogo(DEFAULT_STUDIO_SETTINGS, 'light'), YUNSOFT_LIGHT_LOGO_URL);
-  assert.equal(resolveStudioLogo(DEFAULT_STUDIO_SETTINGS, 'dark'), YUNSOFT_DARK_LOGO_URL);
+test('default Yunsoft branding uses contrasting artwork for each surface theme', () => {
+  assert.equal(resolveStudioLogo(DEFAULT_STUDIO_SETTINGS, 'light'), YUNSOFT_DARK_LOGO_URL);
+  assert.equal(resolveStudioLogo(DEFAULT_STUDIO_SETTINGS, 'dark'), YUNSOFT_LIGHT_LOGO_URL);
   assert.notEqual(YUNSOFT_LIGHT_LOGO_URL, YUNSOFT_DARK_LOGO_URL);
 });
 
