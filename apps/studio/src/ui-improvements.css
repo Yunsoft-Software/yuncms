@@ -1,0 +1,387 @@
+.model-layout,
+.permissions-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.model-sidebar,
+.role-sidebar {
+  position: sticky;
+  top: 20px;
+}
+
+.model-detail-stack,
+.permissions-detail-stack,
+.schema-tab-content {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.model-detail,
+.advanced-permission-panel {
+  min-width: 0;
+}
+
+.collection-group,
+.system-collections {
+  display: grid;
+  gap: 8px;
+}
+
+.collection-group-label {
+  color: #949eae;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.collection-list-button,
+.role-list-button {
+  align-items: flex-start;
+  padding: 10px 11px;
+}
+
+.collection-list-button > span,
+.role-list-button > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.collection-list-button strong,
+.role-list-button strong {
+  font-size: 13px;
+}
+
+.collection-list-button small,
+.role-list-button small {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.system-collections {
+  padding-top: 8px;
+  border-top: 1px solid #edf0f5;
+}
+
+.system-collections summary {
+  color: #7d8798;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.system-collections[open] summary {
+  margin-bottom: 8px;
+}
+
+.schema-create-card {
+  padding: 18px;
+  border: 1px solid #e5e9f0;
+  border-radius: 12px;
+  background: #fafbfd;
+}
+
+.schema-create-card p {
+  margin: 5px 0 0;
+  color: #7b8598;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.schema-tabs {
+  justify-self: start;
+}
+
+.schema-section-heading,
+.permission-matrix-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.schema-section-heading h3,
+.schema-create-card h3,
+.permission-matrix-heading h2 {
+  margin: 0 0 5px;
+}
+
+.schema-section-heading p,
+.permission-matrix-heading p {
+  margin: 0;
+  color: #7b8598;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.schema-count,
+.permission-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #eef2f8;
+  color: #657087;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.field-list {
+  display: grid;
+  border: 1px solid #e8ecf2;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf0f5;
+  background: #fff;
+}
+
+.field-row:last-child {
+  border-bottom: 0;
+}
+
+.field-row-main,
+.field-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.field-row-main {
+  min-width: 0;
+}
+
+.field-row-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-row-main > span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f1f4f8;
+  color: #748096;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.status-pill {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #f3f5f8;
+  color: #818b9d;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.status-pill.required {
+  background: #eef2f8;
+  color: #55647d;
+}
+
+.schema-checkbox {
+  align-self: end;
+  min-height: 41px;
+}
+
+.relation-builder-grid {
+  align-items: start;
+}
+
+.relation-list {
+  padding: 0 2px;
+}
+
+.inline-info {
+  padding: 14px 16px;
+  border: 1px solid #dfe5ee;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #68758b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.role-detail-header {
+  align-items: flex-end;
+}
+
+.role-name-form {
+  min-width: min(520px, 100%);
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.role-name-form > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.role-name-field {
+  margin: 0;
+}
+
+.permission-matrix-panel {
+  overflow: hidden;
+}
+
+.permission-matrix-heading {
+  padding: 22px 24px;
+  border-bottom: 1px solid #edf0f5;
+  background: #fff;
+}
+
+.permission-matrix th:not(:first-child),
+.permission-matrix td:not(:first-child) {
+  min-width: 132px;
+  text-align: center;
+}
+
+.permission-matrix td:first-child {
+  min-width: 180px;
+}
+
+.matrix-note {
+  display: block;
+  max-width: 220px;
+  margin-top: 3px;
+  color: #9099a8;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-cell {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.permission-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #5d6980;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.permission-toggle input {
+  width: auto;
+}
+
+.permission-configure {
+  padding: 4px 6px;
+  font-size: 10px;
+}
+
+.advanced-permission-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+}
+
+.field-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.field-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid #e5e9f0;
+  border-radius: 9px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.field-choice input {
+  width: auto;
+  margin-top: 2px;
+}
+
+.field-choice > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.field-choice strong {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-choice small,
+.field-label > small {
+  color: #8791a2;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+@media (max-width: 1180px) {
+  .model-layout,
+  .permissions-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .model-sidebar,
+  .role-sidebar {
+    position: static;
+  }
+
+  .advanced-permission-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .field-row,
+  .role-detail-header,
+  .role-name-form,
+  .schema-section-heading,
+  .permission-matrix-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .field-row-meta {
+    flex-wrap: wrap;
+  }
+
+  .role-name-form {
+    min-width: 0;
+  }
+
+  .field-choice-grid {
+    grid-template-columns: 1fr;
+  }
+}
