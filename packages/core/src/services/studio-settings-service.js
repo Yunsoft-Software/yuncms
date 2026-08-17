@@ -133,7 +133,7 @@ export class StudioSettingsService extends BaseService {
 
 export const STUDIO_SETTING_DEFAULTS = Object.freeze({
   brand_name: 'YunCMS',
-  logo_url: 'https://yunsoft.com/favicon.ico',
+  logo_url: 'https://yunsoft.com/light-logo.png',
   accent_color: '#2563eb',
   theme: 'system',
   default_locale: 'en',
