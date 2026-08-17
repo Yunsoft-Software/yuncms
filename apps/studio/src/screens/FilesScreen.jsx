@@ -37,6 +37,7 @@ export function FilesScreen() {
 
   async function upload(event) {
     event.preventDefault();
+    const form = event.currentTarget;
     if (!selectedFile) return;
     setUploading(true);
     setError('');
@@ -52,7 +53,7 @@ export function FilesScreen() {
         body: selectedFile,
       });
       setSelectedFile(null);
-      event.currentTarget.reset();
+      form.reset();
       setNotice('File uploaded');
       await load();
     } catch (requestError) {
