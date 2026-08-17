@@ -14,7 +14,7 @@ import {
 import { writeEnvFile } from './env-file.js';
 import { createInteractivePrompts } from './prompts.js';
 
-async function collectEnvironment(prompts) {
+export async function collectEnvironment(prompts) {
   const DB_HOST = await prompts.line('MySQL host', { defaultValue: '127.0.0.1' });
   const DB_PORT = await prompts.line('MySQL port', { defaultValue: '3306' });
   const DB_DATABASE = await prompts.line('MySQL database', { defaultValue: 'yuncms' });
@@ -24,8 +24,9 @@ async function collectEnvironment(prompts) {
 
   return {
     HOST: '127.0.0.1',
-    PORT: '8055',
-    STUDIO_ORIGIN: 'http://localhost:5173',
+    PORT: '3008',
+    STUDIO_ORIGIN: 'http://localhost:3008',
+    AUTH_PUBLIC_URL: 'http://localhost:3008',
     DB_HOST,
     DB_PORT,
     DB_DATABASE,
