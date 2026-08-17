@@ -12,7 +12,7 @@ export class SchemaMetadataRepository {
 
   async listCollections() {
     const [rows] = await this.database.query(
-      `SELECT collection, primary_key, note, singleton, hidden, \`system\`, metadata, created_at, updated_at
+      `SELECT collection, name, primary_key, note, singleton, hidden, \`system\`, metadata, created_at, updated_at
        FROM yuncms_collections
        ORDER BY collection ASC`,
     );
@@ -21,7 +21,7 @@ export class SchemaMetadataRepository {
 
   async readCollection(collection) {
     const [rows] = await this.database.query(
-      `SELECT collection, primary_key, note, singleton, hidden, \`system\`, metadata, created_at, updated_at
+      `SELECT collection, name, primary_key, note, singleton, hidden, \`system\`, metadata, created_at, updated_at
        FROM yuncms_collections
        WHERE collection = ?
        LIMIT 1`,
@@ -32,6 +32,7 @@ export class SchemaMetadataRepository {
 
   async createCollection({
     collection,
+    name,
     primaryKey = 'id',
     note = null,
     singleton = false,
@@ -41,10 +42,11 @@ export class SchemaMetadataRepository {
   }) {
     await this.database.query(
       `INSERT INTO yuncms_collections
-       (collection, primary_key, note, singleton, hidden, \`system\`, metadata)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (collection, name, primary_key, note, singleton, hidden, \`system\`, metadata)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         collection,
+        name,
         primaryKey,
         note,
         singleton ? 1 : 0,
@@ -60,6 +62,10 @@ export class SchemaMetadataRepository {
     const assignments = [];
     const params = [];
 
+    if (Object.hasOwn(patch, 'name')) {
+      assignments.push('name = ?');
+      params.push(patch.name);
+    }
     if (Object.hasOwn(patch, 'note')) {
       assignments.push('note = ?');
       params.push(patch.note ?? null);
@@ -96,7 +102,7 @@ export class SchemaMetadataRepository {
 
   async listFields(collection) {
     const [rows] = await this.database.query(
-      `SELECT id, collection, field, type, required, readonly, hidden, sort, interface, options, schema_metadata,
+      `SELECT id, collection, field, name, type, required, readonly, hidden, sort, interface, options, schema_metadata,
               created_at, updated_at
        FROM yuncms_fields
        WHERE collection = ?
@@ -108,7 +114,7 @@ export class SchemaMetadataRepository {
 
   async readField(collection, field) {
     const [rows] = await this.database.query(
-      `SELECT id, collection, field, type, required, readonly, hidden, sort, interface, options, schema_metadata,
+      `SELECT id, collection, field, name, type, required, readonly, hidden, sort, interface, options, schema_metadata,
               created_at, updated_at
        FROM yuncms_fields
        WHERE collection = ? AND field = ?
@@ -121,6 +127,7 @@ export class SchemaMetadataRepository {
   async createField({
     collection,
     field,
+    name,
     type,
     required = false,
     readonly = false,
@@ -137,11 +144,12 @@ export class SchemaMetadataRepository {
     }
     await this.database.query(
       `INSERT INTO yuncms_fields
-       (collection, field, type, required, readonly, hidden, sort, interface, options, schema_metadata)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (collection, field, name, type, required, readonly, hidden, sort, interface, options, schema_metadata)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         collection,
         field,
+        name,
         type,
         required ? 1 : 0,
         readonly ? 1 : 0,
@@ -169,6 +177,10 @@ export class SchemaMetadataRepository {
       }
     }
 
+    if (Object.hasOwn(patch, 'name')) {
+      assignments.push('name = ?');
+      params.push(patch.name);
+    }
     if (Object.hasOwn(patch, 'readonly')) {
       assignments.push('readonly = ?');
       params.push(patch.readonly ? 1 : 0);
