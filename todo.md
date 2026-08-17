@@ -1,15 +1,15 @@
 # Environment / Manual TODO
 
-Only checks that still require a real checkout, browser, MySQL instance or deployment provider belong here. Completed history is intentionally removed; source implementation status lives in `plan.md`.
+Only checks that still require a real checkout, browser, MySQL instance or deployment provider belong here. This file is a **pending verification list**: completed checks are removed, never kept as `[x]` history. If covered source/test code changes after a successful run, the affected check becomes pending again and is re-added.
 
 ## 1. Codex / Node 24 release checks
 
 Run on branch `16-08-2026` from a fresh Node.js 24 checkout.
 
-- [ ] Run `npm run test:fast`; fix only real failures. The fast gate now includes port-3008, accountability fields, timestamp presets, bounded system-resource permissions, delegated Users/Files/Roles guards, O2O, File/Image fields, localization, sidebar, dark-mode and Data Model field-builder regressions.
+- [ ] Run `npm run test:fast`; fix only real failures. The fast gate now includes port-3008, accountability fields, timestamp presets/date-time normalization, bounded system-resource permissions, delegated Users/Files/Roles guards, management-created user verification, password-change compatibility, Users-without-Roles-read Studio behavior, O2O, File/Image fields, localization, sidebar, dark-mode and Data Model field-builder regressions.
 - [ ] Run `npm test`; confirm the complete auto-discovered core/API/CLI/extensions/Studio suite passes.
 - [ ] Run `npm run test:release`; confirm source tests, Studio production build and all publishable `npm pack --dry-run` contracts pass.
-- [ ] Inspect the production Studio build for unresolved translation keys or JSX/build errors introduced by the new Data Model field/accountability builder and system-resource permission matrix.
+- [ ] Inspect the production Studio build for unresolved translation keys or JSX/build errors introduced by the Data Model field/accountability builder, system-resource permission matrix and delegated Users screen fallback.
 
 ## 2. Fresh init / port 3008
 
@@ -31,13 +31,18 @@ Use a disposable MySQL 8-compatible database whose name clearly contains `test`,
 - [ ] Delete an actor user and confirm historical records remain while the corresponding actor FK becomes `NULL`.
 - [ ] Attempt to PATCH or DELETE a system-managed accountability field through schema endpoints; verify the backend returns `SYSTEM_SCHEMA_READ_ONLY` and leaves the physical schema intact.
 - [ ] Create a custom Timestamp field through Studio with “Current time” and “Update time automatically”; inspect its MySQL default/extra definition and verify metadata survives a supported later field-schema edit.
+- [ ] Create a Date & time field with a fixed value from the browser `datetime-local` control; verify the stored/default MySQL value is normalized correctly rather than preserving the browser `T` separator.
 
-## 4. Default/system resource RBAC
+## 4. Default/system resource RBAC and managed users
 
 - [ ] In Roles & Permissions verify the matrix contains normal project collections plus only the explicitly registered system resources: Users, Files and Roles.
 - [ ] Verify internal tables such as permissions/sessions/tokens/audit are not exposed as delegatable matrix rows.
-- [ ] Grant a custom role `Users: Read`; sign in as that role and verify user listing works while ungranted user actions fail.
+- [ ] Grant a custom role `Users: Read` **without** `Roles: Read`; sign in as that role and verify the Users screen still loads. Role UUIDs must not leak; the UI should explain that role details are unavailable.
+- [ ] Then grant `Roles: Read`; verify role names/selectors appear without requiring any additional Users permission.
 - [ ] Grant selected Users create/update/delete actions and verify the delegated manager still cannot assign the Administrator role, change/delete an Administrator account or assign the Public role to a user.
+- [ ] Create a user from Studio as Administrator; verify `email_verified_at` is populated immediately, the new account appears Verified, no verification email is required, and the user can sign in with the configured credentials.
+- [ ] Create a user through a delegated user-manager role with `Users: Create`; verify the account is likewise immediately marked verified. If that manager lacks `Roles: Read`, creation must safely create the account without exposing or guessing a role id.
+- [ ] Change the currently signed-in user's password through the existing user-password API path; verify sessions are revoked as before. Confirm a delegated user manager cannot change another user's password.
 - [ ] Grant Files read/create/update/delete selectively and verify each specialized `/files` action follows the corresponding permission.
 - [ ] Grant `Roles: Read` and verify role labels/listing works; confirm create/update/delete stay protected and cannot be granted.
 - [ ] Verify system-resource permissions stay action-only: no fake field/filter/validation editor should appear for Users/Files/Roles.
@@ -54,7 +59,7 @@ Use a disposable MySQL 8-compatible database whose name clearly contains `test`,
 - [ ] File/Image: verify the builder does not expose their UUID storage detail and Content still uses file/image pickers + previews.
 - [ ] In an existing collection created with accountability fields, verify those rows are visibly marked System managed, are not offered as relation-source UUID fields and do not expose Delete/required mutation actions.
 - [ ] Re-check Data Model field builder and collection-accountability UI on narrow screens and in both Light/Dark themes.
-- [ ] Walk all new copy once in English and once in Turkish; no `fieldBuilder.*`, `collectionBuilder.*`, `roles.*` or `fieldType.*` keys may leak into UI.
+- [ ] Walk all new copy once in English and once in Turkish; no `fieldBuilder.*`, `collectionBuilder.*`, `users.*`, `roles.*` or `fieldType.*` keys may leak into UI.
 
 ## 6. Existing relation / file / Content smoke
 
