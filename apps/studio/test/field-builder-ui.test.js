@@ -11,7 +11,8 @@ import {
 
 const SRC = resolve(import.meta.dirname, '../src');
 const builderSource = readFileSync(resolve(SRC, 'components/FieldBuilder.jsx'), 'utf8');
-const dataModelSource = readFileSync(resolve(SRC, 'screens/DataModelScreen.jsx'), 'utf8');
+const dataModelSource = readFileSync(resolve(SRC, 'screens/DataModelV2Screen.jsx'), 'utf8');
+const dataModelEntrySource = readFileSync(resolve(SRC, 'screens/DataModelScreen.jsx'), 'utf8');
 
 test('field type browser separates common, media and advanced choices', () => {
   assert.deepEqual(FIELD_TYPE_GROUPS.map((group) => group.key), ['common', 'media', 'advanced']);
@@ -62,10 +63,12 @@ test('decimal field builder sends explicit precision and scale', () => {
   assert.equal(payload.scale, 4);
 });
 
-test('Data Model uses the dedicated visual builder and defaults accountability fields on new collections', () => {
+test('Data Model V2 uses the dedicated visual builder and defaults accountability fields on new collections', () => {
+  assert.match(dataModelEntrySource, /DataModelV2Screen as DataModelScreen/);
   assert.match(dataModelSource, /<FieldBuilder/);
   assert.match(dataModelSource, /systemFields: ACCOUNTABILITY_FIELDS\.map/);
   assert.match(dataModelSource, /systemFields: collectionForm\.systemFields/);
+  assert.match(dataModelSource, /system-collections\/\$\{encodeURIComponent\(selected\)\}\/fields/);
   for (const field of ['created_at', 'updated_at', 'created_by', 'updated_by']) {
     assert.match(dataModelSource, new RegExp(field));
   }
