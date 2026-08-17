@@ -321,11 +321,13 @@ export function ContentScreen({ collection, onOpenDataModel }) {
   }
 
   async function loadCollectionSchema(target = collection) {
+    const version = ++requestVersion.current;
+    setFields([]);
+    setRelationLookups({});
+    setItems([]);
+    setMeta(null);
+    setItemsLoading(false);
     if (!target) {
-      setFields([]);
-      setItems([]);
-      setRelationLookups({});
-      setMeta(null);
       setSchemaLoading(false);
       return;
     }
@@ -339,12 +341,14 @@ export function ContentScreen({ collection, onOpenDataModel }) {
       const loadedFields = fieldResponse?.data ?? [];
       const loadedRelations = relationResponse?.data ?? [];
       const lookups = await buildRelationLookups(target, loadedRelations);
+      if (version !== requestVersion.current) return;
       setFields(loadedFields);
       setRelationLookups(lookups);
     } catch (requestError) {
+      if (version !== requestVersion.current) return;
       setError(requestError.message || 'Collection schema could not be loaded');
     } finally {
-      setSchemaLoading(false);
+      if (version === requestVersion.current) setSchemaLoading(false);
     }
   }
 
@@ -394,8 +398,6 @@ export function ContentScreen({ collection, onOpenDataModel }) {
     setSortField('');
     setSortDirection('asc');
     setOffset(0);
-    setMeta(null);
-    setItems([]);
     loadCollectionSchema(collection);
   }, [collection]);
 
