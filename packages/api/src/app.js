@@ -71,6 +71,7 @@ export function createApp({
   const services = serviceRegistry.toObject();
   const app = express();
   app.disable('x-powered-by');
+  if (config.server?.trustProxyHops > 0) app.set('trust proxy', config.server.trustProxyHops);
   app.use(securityHeaders);
   app.use(studioCors(config));
   app.use(requestIdentity);
