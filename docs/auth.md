@@ -50,7 +50,7 @@ Authorization: Bearer <access-or-api-token>
 
 Refresh/reset/verification tokens are not valid application Bearer credentials.
 
-Verified identity becomes explicit accountability containing user, role and administrator state. Requests without a bearer credential receive explicit public accountability and the configured public role when one exists. Missing role/permission access fails closed.
+Authenticated identity becomes explicit accountability containing user, role and administrator state. Requests without a bearer credential receive explicit public accountability and the configured public role when one exists. Missing role/permission access fails closed.
 
 ## API tokens
 
@@ -86,7 +86,7 @@ Consumption locks/rechecks the unused unexpired token, changes the password, mar
 
 ## Email verification
 
-Verification mail issuance is available for the authenticated user, or for another user under admin/system accountability:
+Verification mail issuance remains available for an existing active user, or for another user under admin/system accountability:
 
 ```text
 POST /auth/email-verification/request
@@ -94,6 +94,18 @@ POST /auth/email-verification/confirm
 ```
 
 Older unused verification tokens are replaced. Confirmation sets `email_verified_at` for an active user and consumes the one-time token.
+
+### Users created by management
+
+`UsersService.createOne()` is a privileged management path, not a public signup path. Accounts created from Studio/API through this service are trusted as management-created users and receive `email_verified_at` immediately.
+
+Consequences:
+
+- an administrator-created user does not need a verification email before normal use;
+- a delegated user manager with explicit `yuncms_users:create` permission gets the same management-created behavior;
+- the first administrator created by `yuncms init` follows the same rule;
+- old/unverified accounts can still use the verification workflow above;
+- a future public/self-registration flow must be implemented separately if email ownership verification is required there.
 
 ## SMTP delivery
 
@@ -106,7 +118,7 @@ SMTP_SECURE=false
 SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM=
-AUTH_PUBLIC_URL=http://localhost:5173
+AUTH_PUBLIC_URL=http://localhost:3008
 ```
 
 `SMTP_HOST` and `SMTP_FROM` are required together when mail delivery is configured. Nodemailer file and URL message access are disabled so message content cannot load arbitrary local/remote resources through the transport.
@@ -155,7 +167,8 @@ The interactive init flow is wired to the reusable first-admin helper:
 3. bootstrap migrations;
 4. detect an existing administrator;
 5. when absent, prompt for admin email/password and create/reuse the Administrator role;
-6. reruns do not silently create a second initial administrator.
+6. create the first administrator as an already verified management-created account;
+7. reruns do not silently create a second initial administrator.
 
 ## Tables
 
@@ -176,6 +189,7 @@ Not part of current single-process V1:
 - shared-store/cluster-wide auth rate limiting;
 - session-management UI/list endpoint;
 - MFA/2FA;
-- SSO/OIDC/SAML/LDAP.
+- SSO/OIDC/SAML/LDAP;
+- public/self-registration flow.
 
 Real MySQL, SMTP and replay/rate-limit verification remains in `todo.md`.
