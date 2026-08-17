@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { apiRequest } from '../api.js';
+import { API_URL, apiRequest } from '../api.js';
 import {
   DEFAULT_STUDIO_SETTINGS,
   applyStudioAppearance,
+  applyStudioFavicon,
   normalizeStudioSettings,
   readLocalePreference,
   resolveTheme,
@@ -33,6 +34,7 @@ export function StudioSettingsProvider({ children }) {
     setSettings(normalized);
     setResolvedTheme(resolveTheme(normalized.theme, darkPreference));
     applyStudioAppearance(normalized, darkPreference);
+    applyStudioFavicon(normalized, API_URL);
     return normalized;
   }, []);
 
