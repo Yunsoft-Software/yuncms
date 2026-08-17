@@ -10,10 +10,14 @@ function parseMetadata(value) {
   }
 }
 
+function isEnabledFlag(value) {
+  return value === true || value === 1;
+}
+
 export function systemPermissionConfig(collectionSchema) {
   if (!collectionSchema?.system) return null;
   const metadata = parseMetadata(collectionSchema.metadata);
-  if (metadata.permissionManaged !== true) return null;
+  if (!isEnabledFlag(metadata.permissionManaged)) return null;
   const allowedActions = Array.isArray(metadata.allowedActions)
     ? metadata.allowedActions.filter((action) => ALL_ACTIONS.includes(action))
     : [];
