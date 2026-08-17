@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
+import { FieldBuilder } from '../components/FieldBuilder.jsx';
 import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
 import {
-  FIELD_TYPE_OPTIONS,
+  createEmptyFieldForm,
   fieldCreationPayload,
   fieldDisplayType,
   isFileField,
@@ -25,6 +26,20 @@ const FIELD_SORT_OPTIONS = [
 
 const COLLECTION_PAGE_SIZES = [6, 12, 24];
 const FIELD_PAGE_SIZES = [10, 20, 50];
+const ACCOUNTABILITY_FIELDS = Object.freeze([
+  ['created_at', 'collectionBuilder.createdAt', 'collectionBuilder.createdAtHint'],
+  ['updated_at', 'collectionBuilder.updatedAt', 'collectionBuilder.updatedAtHint'],
+  ['created_by', 'collectionBuilder.createdBy', 'collectionBuilder.createdByHint'],
+  ['updated_by', 'collectionBuilder.updatedBy', 'collectionBuilder.updatedByHint'],
+]);
+
+function createEmptyCollectionForm() {
+  return {
+    collection: '',
+    note: '',
+    systemFields: ACCOUNTABILITY_FIELDS.map(([field]) => field),
+  };
+}
 
 function parseJson(value) {
   if (!value) return null;
@@ -37,6 +52,14 @@ function parseJson(value) {
 
 function relationKind(relation) {
   return parseJson(relation?.metadata)?.kind || 'm2o';
+}
+
+function fieldSchemaMetadata(field) {
+  return parseJson(field?.schema_metadata) ?? {};
+}
+
+function isManagedSystemField(field) {
+  return fieldSchemaMetadata(field).systemManaged === true;
 }
 
 function compareCollections(left, right, sort) {
@@ -81,8 +104,8 @@ export function DataModelScreen() {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const [collectionForm, setCollectionForm] = useState({ collection: '', note: '' });
-  const [fieldForm, setFieldForm] = useState({ field: '', type: 'string', required: false, length: 255 });
+  const [collectionForm, setCollectionForm] = useState(createEmptyCollectionForm);
+  const [fieldForm, setFieldForm] = useState(createEmptyFieldForm);
   const [directForm, setDirectForm] = useState({ manyField: '', oneCollection: '', onDelete: 'RESTRICT' });
   const [m2mForm, setM2mForm] = useState({ junctionCollection: '', leftCollection: '', rightCollection: '' });
 
@@ -139,6 +162,7 @@ export function DataModelScreen() {
     setFieldSort('name-asc');
     setFieldPage(1);
     setShowCreateField(false);
+    setFieldForm(createEmptyFieldForm());
     loadSelected(selected);
   }, [selected]);
 
@@ -179,6 +203,7 @@ export function DataModelScreen() {
         field.field,
         fieldDisplayType(field),
         field.required ? t('common.required') : t('common.optional'),
+        isManagedSystemField(field) ? t('collectionBuilder.systemManaged') : '',
       ].some((value) => String(value).toLowerCase().includes(query)))
       .slice()
       .sort((left, right) => compareFields(left, right, fieldSort));
@@ -203,7 +228,20 @@ export function DataModelScreen() {
     }));
   }, [relations, selected]);
   const relationFields = useMemo(() => fields.filter((field) =>
-    field.field !== 'id' && field.type === 'uuid' && !isFileField(field)), [fields]);
+    field.field !== 'id'
+    && field.type === 'uuid'
+    && !field.readonly
+    && !isFileField(field)
+    && !isManagedSystemField(field)), [fields]);
+
+  function toggleCollectionSystemField(field) {
+    setCollectionForm((current) => ({
+      ...current,
+      systemFields: current.systemFields.includes(field)
+        ? current.systemFields.filter((entry) => entry !== field)
+        : [...current.systemFields, field],
+    }));
+  }
 
   async function createCollection(event) {
     event.preventDefault();
@@ -213,9 +251,13 @@ export function DataModelScreen() {
       const name = collectionForm.collection.trim();
       await apiRequest('/schema/collections', {
         method: 'POST',
-        body: { collection: name, note: collectionForm.note.trim() || null },
+        body: {
+          collection: name,
+          note: collectionForm.note.trim() || null,
+          systemFields: collectionForm.systemFields,
+        },
       });
-      setCollectionForm({ collection: '', note: '' });
+      setCollectionForm(createEmptyCollectionForm());
       setShowCreateCollection(false);
       setCollectionPage(1);
       setNotice(t('dataModel.collectionCreated', { name }));
@@ -254,7 +296,7 @@ export function DataModelScreen() {
       const body = fieldCreationPayload(fieldForm);
       await apiRequest(`/schema/collections/${encodeURIComponent(selected)}/fields`, { method: 'POST', body });
       setNotice(t('dataModel.fieldAdded', { name: body.field }));
-      setFieldForm({ field: '', type: 'string', required: false, length: 255 });
+      setFieldForm(createEmptyFieldForm());
       setShowCreateField(false);
       setFieldPage(1);
       await loadSelected();
@@ -264,7 +306,7 @@ export function DataModelScreen() {
   }
 
   async function deleteField(field) {
-    if (field.field === 'id') return;
+    if (field.field === 'id' || isManagedSystemField(field)) return;
     const accepted = await requestConfirmation({
       title: t('dataModel.deleteField'),
       description: t('dataModel.deleteFieldDescription', { collection: selected, field: field.field }),
@@ -287,7 +329,7 @@ export function DataModelScreen() {
   }
 
   async function toggleRequired(field) {
-    if (field.field === 'id') return;
+    if (field.field === 'id' || field.readonly || isManagedSystemField(field)) return;
     setError('');
     setNotice('');
     try {
@@ -420,11 +462,41 @@ export function DataModelScreen() {
           </div>
 
           {showCreateCollection && (
-            <form className="schema-create-card form-stack compact" onSubmit={createCollection}>
+            <form className="schema-create-card form-stack collection-create-card" onSubmit={createCollection}>
               <div><strong>{t('dataModel.createCollection')}</strong><p>{t('dataModel.createCollectionHint')}</p></div>
               <label className="field-label"><span>{t('common.name')}</span><input value={collectionForm.collection} onChange={(event) => setCollectionForm((current) => ({ ...current, collection: event.target.value }))} placeholder="articles" required autoFocus /></label>
               <label className="field-label"><span>{t('dataModel.description')}</span><input value={collectionForm.note} onChange={(event) => setCollectionForm((current) => ({ ...current, note: event.target.value }))} placeholder={t('dataModel.optionalDescription')} /></label>
-              <button className="primary-button" type="submit">{t('common.create')}</button>
+
+              <div className="accountability-builder">
+                <div className="accountability-builder-heading">
+                  <span>
+                    <strong>{t('collectionBuilder.accountability')}</strong>
+                    <small>{t('collectionBuilder.recommended')}</small>
+                  </span>
+                  <p>{t('collectionBuilder.accountabilityHint')}</p>
+                </div>
+                <div className="accountability-option-list">
+                  {ACCOUNTABILITY_FIELDS.map(([field, titleKey, hintKey]) => (
+                    <label className={`accountability-option ${collectionForm.systemFields.includes(field) ? 'active' : ''}`} key={field}>
+                      <input
+                        type="checkbox"
+                        checked={collectionForm.systemFields.includes(field)}
+                        onChange={() => toggleCollectionSystemField(field)}
+                      />
+                      <span>
+                        <strong>{t(titleKey)}</strong>
+                        <code>{field}</code>
+                        <small>{t(hintKey)}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-actions collection-create-actions">
+                <button className="text-button" type="button" onClick={() => { setShowCreateCollection(false); setCollectionForm(createEmptyCollectionForm()); }}>{t('common.cancel')}</button>
+                <button className="primary-button" type="submit">{t('dataModel.createCollection')}</button>
+              </div>
             </form>
           )}
 
@@ -493,23 +565,19 @@ export function DataModelScreen() {
                 <div className="schema-tab-content">
                   <div className="schema-section-heading">
                     <div><h3>{t('dataModel.fields')}</h3><p>{t('dataModel.fieldsDescription')}</p></div>
-                    {!selectedCollection.system && <button className="primary-button" type="button" onClick={() => setShowCreateField((value) => !value)}>{showCreateField ? t('users.closeForm') : t('dataModel.addField')}</button>}
+                    {!selectedCollection.system && !showCreateField && <button className="primary-button" type="button" onClick={() => setShowCreateField(true)}>{t('dataModel.addField')}</button>}
                   </div>
 
                   {showCreateField && !selectedCollection.system && (
-                    <form className="schema-create-card form-stack field-builder-card" onSubmit={createField}>
-                      <div><strong>{t('dataModel.addField')}</strong><p>{t('dataModel.fieldBuilderHint')}</p></div>
-                      <div className="form-grid">
-                        <label className="field-label"><span>{t('dataModel.fieldName')}</span><input value={fieldForm.field} onChange={(event) => setFieldForm((current) => ({ ...current, field: event.target.value }))} placeholder="cover_image" required autoFocus /></label>
-                        <label className="field-label"><span>{t('dataModel.fieldType')}</span><select value={fieldForm.type} onChange={(event) => setFieldForm((current) => ({ ...current, type: event.target.value }))}>{FIELD_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{t(option.labelKey)}</option>)}</select></label>
-                        {fieldForm.type === 'string' && <label className="field-label"><span>{t('dataModel.maxLength')}</span><input type="number" min="1" max="4096" value={fieldForm.length} onChange={(event) => setFieldForm((current) => ({ ...current, length: event.target.value }))} /></label>}
-                        <label className="checkbox-label schema-checkbox"><input type="checkbox" checked={fieldForm.required} onChange={(event) => setFieldForm((current) => ({ ...current, required: event.target.checked }))} />{t('dataModel.requiredValue')}</label>
-                      </div>
-                      {(fieldForm.type === 'file' || fieldForm.type === 'image') && (
-                        <div className="inline-info field-interface-info">{t(fieldForm.type === 'image' ? 'dataModel.imageFieldInfo' : 'dataModel.fileFieldInfo')}</div>
-                      )}
-                      <div className="form-actions"><button className="primary-button" type="submit">{t('dataModel.addField')}</button></div>
-                    </form>
+                    <FieldBuilder
+                      form={fieldForm}
+                      setForm={setFieldForm}
+                      onSubmit={createField}
+                      onCancel={() => {
+                        setShowCreateField(false);
+                        setFieldForm(createEmptyFieldForm());
+                      }}
+                    />
                   )}
 
                   <div className="field-list-controls">
@@ -521,16 +589,23 @@ export function DataModelScreen() {
                   <div className="field-list">
                     {pagedFields.items.map((field) => {
                       const displayType = fieldDisplayType(field);
+                      const metadata = fieldSchemaMetadata(field);
+                      const managed = metadata.systemManaged === true;
                       return (
-                        <div className="field-row" key={field.field}>
+                        <div className={`field-row ${managed ? 'system-managed-field' : ''}`} key={field.field}>
                           <div className="field-row-main">
                             <span className="field-icon" aria-hidden="true">{displayType === 'image' ? '▧' : displayType === 'file' ? '⌑' : String(displayType || '?').slice(0, 1).toUpperCase()}</span>
-                            <span className="field-name-stack"><strong>{field.field}</strong><small>{t(`fieldType.${displayType}`)}</small></span>
+                            <span className="field-name-stack">
+                              <strong>{field.field}</strong>
+                              <small>{t(`fieldType.${displayType}`)}{metadata.defaultPreset === 'now' ? ` · ${t('fieldBuilder.currentTime')}` : ''}</small>
+                            </span>
                           </div>
                           <div className="field-row-meta">
+                            {managed && <span className="status-pill system-field-pill">{t('collectionBuilder.systemManaged')}</span>}
                             <span className={`status-pill ${field.required ? 'required' : ''}`}>{field.required ? t('common.required') : t('common.optional')}</span>
                             {field.readonly && <span className="status-pill">{t('common.readonly')}</span>}
-                            {field.field !== 'id' && !selectedCollection.system && (
+                            {metadata.autoUpdate === true && <span className="status-pill">{t('fieldBuilder.autoUpdate')}</span>}
+                            {field.field !== 'id' && !field.readonly && !managed && !selectedCollection.system && (
                               <>
                                 <button className="text-button" type="button" onClick={() => toggleRequired(field)}>{field.required ? t('dataModel.makeOptional') : t('dataModel.makeRequired')}</button>
                                 <button className="danger-button" type="button" onClick={() => deleteField(field)}>{t('common.delete')}</button>
