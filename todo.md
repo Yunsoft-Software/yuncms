@@ -2,6 +2,24 @@
 
 This file contains only work that cannot be truthfully verified from the GitHub-connector environment. Source/product roadmap work belongs in `plan.md`.
 
+## 0. Current production-readiness pass — re-run on branch `16-08-2026`
+
+These checks cover source added after the previously completed environment milestones.
+
+- [ ] On Node.js 24 with dependencies installed, run `npm run test:fast`; expect one concise successful stage line and no detailed output unless a test fails.
+- [ ] Run `npm test`; confirm the complete discovered core/API/CLI/extensions/Studio source suite passes.
+- [ ] Run `npm run test:release`; confirm the complete suite, Studio production build and all four `npm pack --dry-run` package contracts pass.
+- [ ] Against a disposable DB whose name contains `test`, `ci` or `dev`, run `YUNCMS_TEST_MYSQL=1 YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1 npm run test:release`; confirm the real MySQL/API integration flow passes and cleans up its temporary schema/data.
+- [ ] Upgrade a DB that has migrations `0001`–`0004`: confirm `yuncms start` refuses to listen until `yuncms bootstrap` applies `0005-default-public-role`.
+- [ ] After `0005`, confirm exactly one protected Public role exists and it has zero permission rows by default; rerun bootstrap and confirm idempotency.
+- [ ] In Roles & Permissions, grant Public a filtered/field-limited `Read` permission and verify anonymous reads expose only the intended rows/fields; remove it and verify anonymous access returns 403 again.
+- [ ] If public form submission is needed, grant Public only `Create` with a strict field allowlist/validation and verify anonymous create works while read/update/delete remain forbidden.
+- [ ] In Settings → Content Visibility, hide/show a normal collection and an M2M junction; confirm Content navigation updates while schema/data remain intact and junctions start hidden by default.
+- [ ] Send malformed JSON with a valid `X-Request-Id`; verify HTTP 400 `INVALID_PAYLOAD`, the same request id in response/error body, and no internal parser message leakage.
+- [ ] Verify caller request ids longer than 64 characters or containing unsafe characters are replaced with a UUID.
+- [ ] Behind the actual reverse proxy, set the exact `TRUST_PROXY_HOPS` and verify login/session IP plus auth rate-limit buckets use the intended client IP. Also confirm `TRUST_PROXY_HOPS=0` ignores forwarded client addresses when YunCMS is reached directly.
+- [ ] Repeat the refreshed Studio browser smoke after this pass, including Content Visibility, Public role configuration and narrow-screen behavior.
+
 ## 1. Fresh checkout / dependency graph
 
 - [x] Switch to branch `16-08-2026` and confirm a clean working tree.
