@@ -20,6 +20,7 @@ const FAST_TESTS = [
   'packages/core/test/production-config.test.js',
   'packages/core/test/schema-query.test.js',
   'packages/core/test/schema-access.test.js',
+  'packages/core/test/schema-metadata-interface.test.js',
   'packages/core/test/collection-visibility.test.js',
   'packages/core/test/public-access.test.js',
   'packages/core/test/studio-settings-service.test.js',
