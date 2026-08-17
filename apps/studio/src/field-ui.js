@@ -47,9 +47,14 @@ export function isImageField(field) {
   return field?.interface === 'image';
 }
 
+export function isUserField(field) {
+  return field?.interface === 'user';
+}
+
 export function fieldDisplayType(field) {
   if (field?.interface === 'image') return 'image';
   if (field?.interface === 'file') return 'file';
+  if (field?.interface === 'user') return 'user';
   return field?.type || 'unknown';
 }
 
@@ -67,7 +72,8 @@ export function supportsAutoUpdate(type) {
 
 function normalizeDefaultValue(type, value) {
   if (type === 'boolean') return value === true || value === 'true';
-  if (type === 'integer' || type === 'bigint') return Number.parseInt(value, 10);
+  if (type === 'integer') return Number.parseInt(value, 10);
+  if (type === 'bigint') return String(value);
   if (type === 'decimal') return Number(value);
   return value;
 }
