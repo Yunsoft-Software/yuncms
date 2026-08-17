@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 
 import { assertSupportedNode, runCli } from '../src/cli.js';
 import { serializeEnv } from '../src/env-file.js';
+import { collectEnvironment } from '../src/init-command.js';
 import { runStartCommand } from '../src/start-command.js';
 
 test('node guard accepts only node 24 baseline', () => {
@@ -12,6 +13,19 @@ test('node guard accepts only node 24 baseline', () => {
     () => assertSupportedNode('22.20.0'),
     (error) => error.code === 'UNSUPPORTED_NODE_VERSION',
   );
+});
+
+test('init writes same-origin port 3008 defaults', async () => {
+  const answers = ['127.0.0.1', '3306', 'yuncms', 'yuncms', 'false'];
+  const prompts = {
+    async line() { return answers.shift(); },
+    async secret() { return 'secret'; },
+  };
+  const env = await collectEnvironment(prompts);
+  assert.equal(env.PORT, '3008');
+  assert.equal(env.STUDIO_ORIGIN, 'http://localhost:3008');
+  assert.equal(env.AUTH_PUBLIC_URL, 'http://localhost:3008');
+  assert.equal(Object.values(env).includes('8055'), false);
 });
 
 test('help advertises init, bootstrap and start', async () => {
