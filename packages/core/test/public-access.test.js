@@ -97,6 +97,19 @@ test('anonymous accountability resolves to the configured public role', async ()
 
 test('public role is fail-closed until an explicit collection permission exists', async () => {
   const accountability = createPublicAccountability({ role: 'public-role' });
+  const schema = {
+    collections: {
+      articles: {
+        collection: 'articles',
+        system: false,
+        fields: {
+          id: { field: 'id', type: 'uuid' },
+          title: { field: 'title', type: 'string' },
+          status: { field: 'status', type: 'string' },
+        },
+      },
+    },
+  };
   const deniedDatabase = {
     async query(sql, params) {
       assert.match(normalized(sql), /FROM yuncms_permissions/);
@@ -106,7 +119,7 @@ test('public role is fail-closed until an explicit collection permission exists'
   };
 
   await assert.rejects(
-    new PermissionsService({ accountability, database: deniedDatabase }).resolve('read', 'articles'),
+    new PermissionsService({ accountability, database: deniedDatabase, schema }).resolve('read', 'articles'),
     (error) => error.code === 'FORBIDDEN',
   );
 
@@ -126,7 +139,7 @@ test('public role is fail-closed until an explicit collection permission exists'
     },
   };
 
-  const permission = await new PermissionsService({ accountability, database: allowedDatabase })
+  const permission = await new PermissionsService({ accountability, database: allowedDatabase, schema })
     .resolve('read', 'articles');
   assert.equal(permission.fullAccess, false);
   assert.deepEqual(permission.fields, ['id', 'title']);
