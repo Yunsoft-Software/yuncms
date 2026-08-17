@@ -7,17 +7,23 @@ function settingsService(req) {
   return new Service(serviceOptionsFromRequest(req));
 }
 
+function sendImageAsset(res, asset) {
+  const { file, contents } = asset;
+  res.set('cache-control', 'no-cache, must-revalidate');
+  res.set('content-security-policy', 'sandbox');
+  res.set('content-disposition', 'inline');
+  return res.type(file.mimetype || 'application/octet-stream').send(contents);
+}
+
 export function createStudioSettingsRouter() {
   const router = express.Router();
 
   router.get('/logo', async (req, res) => {
-    const { file, contents } = await settingsService(req).readLogoContent();
-    // Revalidate immediately after branding changes. Sandbox also prevents an uploaded SVG
-    // from becoming a same-origin active document if somebody opens this asset directly.
-    res.set('cache-control', 'no-cache, must-revalidate');
-    res.set('content-security-policy', 'sandbox');
-    res.set('content-disposition', 'inline');
-    res.type(file.mimetype || 'application/octet-stream').send(contents);
+    sendImageAsset(res, await settingsService(req).readLogoContent());
+  });
+
+  router.get('/favicon', async (req, res) => {
+    sendImageAsset(res, await settingsService(req).readFaviconContent());
   });
 
   router.get('/', async (req, res) => {
