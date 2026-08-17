@@ -71,6 +71,16 @@ test('default public role migration is part of the required compatibility gate',
   assert.doesNotMatch(migration.statements[0], /yuncms_permissions/);
 });
 
+test('Studio settings migration creates one safe branding/settings row', () => {
+  const migration = CORE_MIGRATIONS.find(({ id }) => id === '0006-studio-settings');
+  assert.ok(migration);
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0006-studio-settings'));
+  assert.match(migration.statements[0], /CREATE TABLE IF NOT EXISTS yuncms_studio_settings/);
+  assert.match(migration.statements[0], /theme IN \('system', 'light', 'dark'\)/);
+  assert.match(migration.statements[0], /default_locale IN \('en', 'tr'\)/);
+  assert.match(migration.statements[1], /https:\/\/yunsoft\.com\/light-logo\.png/);
+});
+
 test('advisory lock uses one connection and always releases it', async () => {
   const calls = [];
   let released = false;
