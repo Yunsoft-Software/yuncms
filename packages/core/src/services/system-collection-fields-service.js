@@ -2,6 +2,7 @@ import { withAdvisoryLock } from '../advisory-lock.js';
 import { compileFieldColumn } from '../field-types.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
+import { resolveSchemaName } from '../schema-key.js';
 import { incrementSchemaVersion } from '../schema-version.js';
 import { isPermissionManagedSystemResource } from '../system-permissions.js';
 import { withConnectionTransaction } from '../transaction.js';
@@ -44,7 +45,13 @@ export class SystemCollectionFieldsService extends BaseService {
     assertSchemaManager(this.accountability);
     assertIdentifier(collectionName, 'collection name');
     assertSystemExtensionInput(input);
-    const field = fieldName(input.field);
+    const resolvedName = resolveSchemaName({
+      displayName: input.name ?? input.field,
+      key: input.field,
+      prefix: 'field',
+    });
+    const field = fieldName(resolvedName.key);
+    const name = resolvedName.name;
     const compiled = compileFieldColumn({ ...input, required: false });
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
@@ -76,6 +83,7 @@ export class SystemCollectionFieldsService extends BaseService {
           const created = await metadata.createField({
             collection: collectionName,
             field,
+            name,
             type: input.type,
             required: false,
             readonly: input.readonly === true,
