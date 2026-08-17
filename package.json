@@ -20,6 +20,8 @@
     "bootstrap": "node packages/cli/bin/yuncms.js bootstrap",
     "start": "npm run build:studio && node packages/api/src/server.js",
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "node scripts/verify.mjs full",
+    "test:fast": "node scripts/verify.mjs fast",
+    "test:release": "node scripts/verify.mjs release"
   }
 }
