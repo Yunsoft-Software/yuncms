@@ -15,10 +15,12 @@
   border-color: var(--studio-accent-border);
 }
 
-.collection-drag-handle {
+.data-model-collection-item > .collection-drag-handle {
+  min-width: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0;
   color: var(--studio-text-muted);
   font-size: 14px;
   letter-spacing: -3px;
