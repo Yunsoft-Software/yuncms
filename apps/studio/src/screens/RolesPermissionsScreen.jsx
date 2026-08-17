@@ -4,13 +4,13 @@ import { apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
 import { Modal } from '../components/Modal.jsx';
 import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
+import { useI18n } from '../i18n.js';
 
 const ACTIONS = ['read', 'create', 'update', 'delete'];
-const ACTION_LABELS = { read: 'Read', create: 'Create', update: 'Update', delete: 'Delete' };
 const ROLE_SORT_OPTIONS = [
-  ['name-asc', 'Name A–Z'],
-  ['name-desc', 'Name Z–A'],
-  ['rules-desc', 'Most rules'],
+  ['name-asc', 'roles.nameAsc'],
+  ['name-desc', 'roles.nameDesc'],
+  ['rules-desc', 'roles.mostRules'],
 ];
 const ROLE_PAGE_SIZES = [6, 12, 24];
 const COLLECTION_PAGE_SIZES = [10, 20, 50];
@@ -32,7 +32,18 @@ function prettyJson(value) {
   return value ? JSON.stringify(value, null, 2) : '';
 }
 
+function actionLabel(action, t) {
+  return t(`roles.${action}`);
+}
+
+function roleKindLabel(role, t) {
+  if (role?.admin) return t('roles.administrator');
+  if (role?.public) return t('roles.public');
+  return t('roles.custom');
+}
+
 export function RolesPermissionsScreen() {
+  const { t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
@@ -78,7 +89,7 @@ export function RolesPermissionsScreen() {
         return nextRoles.find((role) => !role.admin)?.id || nextRoles[0]?.id || '';
       });
     } catch (requestError) {
-      setError(requestError.message || 'Roles and permissions could not be loaded');
+      setError(requestError.message || t('roles.loadError'));
     } finally {
       setLoading(false);
     }
@@ -106,8 +117,7 @@ export function RolesPermissionsScreen() {
       .filter((role) => !query || [
         role.name,
         role.description,
-        role.admin ? 'administrator' : null,
-        role.public ? 'public' : 'custom',
+        roleKindLabel(role, t),
       ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query)))
       .slice()
       .sort((left, right) => {
@@ -118,7 +128,7 @@ export function RolesPermissionsScreen() {
         const nameResult = String(left.name || '').localeCompare(String(right.name || ''));
         return roleSort === 'name-desc' ? -nameResult : nameResult;
       });
-  }, [roleRuleCounts, roleSearch, roleSort, roles]);
+  }, [roleRuleCounts, roleSearch, roleSort, roles, t]);
   const visibleCollections = useMemo(() => {
     const query = collectionSearch.trim().toLowerCase();
     return collections
@@ -134,14 +144,8 @@ export function RolesPermissionsScreen() {
   const pagedRoles = useMemo(() => paginateClientItems(visibleRoles, rolePage, rolePageSize), [rolePage, rolePageSize, visibleRoles]);
   const pagedCollections = useMemo(() => paginateClientItems(visibleCollections, collectionPage, collectionPageSize), [collectionPage, collectionPageSize, visibleCollections]);
 
-  useEffect(() => {
-    setRolePage(1);
-  }, [roleSearch, roleSort]);
-
-  useEffect(() => {
-    setCollectionPage(1);
-  }, [collectionSearch, configuredOnly, selectedRoleId]);
-
+  useEffect(() => setRolePage(1), [roleSearch, roleSort]);
+  useEffect(() => setCollectionPage(1), [collectionSearch, configuredOnly, selectedRoleId]);
   useEffect(() => {
     setRoleName(selectedRole?.name || '');
     setAdvancedPermission(null);
@@ -164,10 +168,10 @@ export function RolesPermissionsScreen() {
       setRoleForm({ name: '', description: '', public: false });
       setShowCreateRole(false);
       setRolePage(1);
-      setNotice('Role created');
+      setNotice(t('roles.createdNotice'));
       await load(createdId);
     } catch (requestError) {
-      setError(requestError.message || 'Role could not be created');
+      setError(requestError.message || t('roles.createError'));
     }
   }
 
@@ -182,10 +186,10 @@ export function RolesPermissionsScreen() {
         method: 'PATCH',
         body: { name: roleName.trim() },
       });
-      setNotice('Role updated');
+      setNotice(t('roles.updatedNotice'));
       await load(selectedRole.id);
     } catch (requestError) {
-      setError(requestError.message || 'Role could not be updated');
+      setError(requestError.message || t('roles.updateError'));
     } finally {
       setSavingRole(false);
     }
@@ -193,9 +197,9 @@ export function RolesPermissionsScreen() {
 
   async function deleteRole(role) {
     const accepted = await requestConfirmation({
-      title: 'Delete role?',
-      description: `${role.name} and all of its permission rules will be permanently deleted.`,
-      confirmLabel: 'Delete role',
+      title: t('roles.deleteTitle'),
+      description: t('roles.deleteDescription', { name: role.name }),
+      confirmLabel: t('roles.deleteRole'),
       tone: 'danger',
     });
     if (!accepted) return;
@@ -203,11 +207,11 @@ export function RolesPermissionsScreen() {
     setNotice('');
     try {
       await apiRequest(`/roles/${encodeURIComponent(role.id)}`, { method: 'DELETE' });
-      setNotice('Role deleted');
+      setNotice(t('roles.deletedNotice'));
       setAdvancedPermission(null);
       await load('');
     } catch (requestError) {
-      setError(requestError.message || 'Role could not be deleted');
+      setError(requestError.message || t('roles.deleteError'));
     }
   }
 
@@ -222,7 +226,7 @@ export function RolesPermissionsScreen() {
       if (existing) {
         await apiRequest(`/permissions/${encodeURIComponent(existing.id)}`, { method: 'DELETE' });
         if (advancedPermission?.id === existing.id) setAdvancedPermission(null);
-        setNotice(`${ACTION_LABELS[action]} access removed for ${collection}`);
+        setNotice(t('roles.accessRemoved', { action: actionLabel(action, t), collection }));
       } else {
         await apiRequest('/permissions', {
           method: 'POST',
@@ -235,11 +239,11 @@ export function RolesPermissionsScreen() {
             validation: null,
           },
         });
-        setNotice(`${ACTION_LABELS[action]} access granted for ${collection}`);
+        setNotice(t('roles.accessGranted', { action: actionLabel(action, t), collection }));
       }
       await load(selectedRole.id);
     } catch (requestError) {
-      setError(requestError.message || 'Permission could not be updated');
+      setError(requestError.message || t('roles.permissionUpdateError'));
     } finally {
       setBusyKey('');
     }
@@ -259,7 +263,7 @@ export function RolesPermissionsScreen() {
         validation: prettyJson(permission.validation),
       });
     } catch (requestError) {
-      setError(requestError.message || 'Permission details could not be loaded');
+      setError(requestError.message || t('roles.permissionDetailsError'));
     }
   }
 
@@ -284,7 +288,7 @@ export function RolesPermissionsScreen() {
         ? parseJsonInput(advancedForm.validation)
         : null;
       if (!advancedForm.allFields && advancedForm.fields.length === 0) {
-        throw new Error('Choose at least one allowed field or enable all fields.');
+        throw new Error(t('roles.chooseFieldError'));
       }
       await apiRequest(`/permissions/${encodeURIComponent(advancedPermission.id)}`, {
         method: 'PATCH',
@@ -294,19 +298,17 @@ export function RolesPermissionsScreen() {
           validation,
         },
       });
-      setNotice('Advanced permission rules saved');
+      setNotice(t('roles.advancedSaved'));
       setAdvancedPermission(null);
       await load(selectedRoleId);
     } catch (requestError) {
       setError(requestError instanceof SyntaxError
-        ? 'Filter and validation rules must contain valid JSON.'
-        : requestError.message || 'Permission could not be updated');
+        ? t('roles.invalidJson')
+        : requestError.message || t('roles.permissionUpdateError'));
     } finally {
       setSavingAdvanced(false);
     }
   }
-
-  const roleKind = selectedRole?.admin ? 'Administrator' : selectedRole?.public ? 'Public' : 'Custom';
 
   return (
     <div className="screen-stack">
@@ -317,79 +319,79 @@ export function RolesPermissionsScreen() {
         <aside className="panel form-panel role-sidebar access-role-sidebar">
           <div className="panel-heading role-sidebar-heading">
             <div>
-              <p className="eyebrow">Access</p>
-              <h2>Roles</h2>
-              <p>{roles.length} roles · choose one to manage access.</p>
+              <p className="eyebrow">{t('roles.access')}</p>
+              <h2>{t('roles.roles')}</h2>
+              <p>{t('roles.summary', { count: roles.length })}</p>
             </div>
             <button className="primary-button" type="button" onClick={() => setShowCreateRole((value) => !value)}>
-              {showCreateRole ? 'Cancel' : 'New'}
+              {showCreateRole ? t('common.cancel') : t('common.create')}
             </button>
           </div>
 
           {showCreateRole && (
             <form className="schema-create-card form-stack compact" onSubmit={createRole}>
-              <label className="field-label"><span>Name</span><input value={roleForm.name} onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))} required autoFocus /></label>
-              <label className="field-label"><span>Description</span><input value={roleForm.description} onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))} /></label>
-              <label className="checkbox-label"><input type="checkbox" checked={roleForm.public} onChange={(event) => setRoleForm((current) => ({ ...current, public: event.target.checked }))} />Public role</label>
-              <button className="primary-button" type="submit">Create role</button>
+              <label className="field-label"><span>{t('common.name')}</span><input value={roleForm.name} onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))} required autoFocus /></label>
+              <label className="field-label"><span>{t('dataModel.description')}</span><input value={roleForm.description} onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))} /></label>
+              <label className="checkbox-label"><input type="checkbox" checked={roleForm.public} onChange={(event) => setRoleForm((current) => ({ ...current, public: event.target.checked }))} />{t('roles.publicRole')}</label>
+              <button className="primary-button" type="submit">{t('roles.createRole')}</button>
             </form>
           )}
 
           <div className="sidebar-filter-row">
-            <label className="field-label"><span>Find role</span><input type="search" value={roleSearch} onChange={(event) => setRoleSearch(event.target.value)} placeholder="Name or description…" /></label>
-            <label className="field-label"><span>Sort</span><select value={roleSort} onChange={(event) => setRoleSort(event.target.value)}>{ROLE_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label className="field-label"><span>{t('roles.findRole')}</span><input type="search" value={roleSearch} onChange={(event) => setRoleSearch(event.target.value)} placeholder={t('visibility.searchPlaceholder')} /></label>
+            <label className="field-label"><span>{t('common.sort')}</span><select value={roleSort} onChange={(event) => setRoleSort(event.target.value)}>{ROLE_SORT_OPTIONS.map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}</select></label>
           </div>
 
           <div className="list-stack role-list role-list-page">
             {pagedRoles.items.map((role) => (
               <button className={`list-button role-list-button ${role.id === selectedRoleId ? 'active' : ''}`} key={role.id} type="button" onClick={() => setSelectedRoleId(role.id)}>
-                <span><strong>{role.name}</strong><small>{role.admin ? 'Administrator · full access' : role.public ? 'Public role' : role.description || 'Custom role'}</small></span>
+                <span><strong>{role.name}</strong><small>{role.admin ? t('roles.adminFullAccess') : role.public ? t('roles.publicRole') : role.description || t('roles.customRole')}</small></span>
                 {!role.admin && <span className="permission-count">{roleRuleCounts.get(role.id) || 0}</span>}
               </button>
             ))}
-            {roles.length > 0 && visibleRoles.length === 0 && <p className="muted-line">No matching roles.</p>}
+            {roles.length > 0 && visibleRoles.length === 0 && <p className="muted-line">{t('roles.noRoles')}</p>}
           </div>
           {visibleRoles.length > 0 && (
-            <Pagination compact page={pagedRoles.page} pageSize={rolePageSize} totalItems={visibleRoles.length} pageSizeOptions={ROLE_PAGE_SIZES} itemLabel="roles" onPageChange={setRolePage} onPageSizeChange={(size) => { setRolePageSize(size); setRolePage(1); }} />
+            <Pagination compact page={pagedRoles.page} pageSize={rolePageSize} totalItems={visibleRoles.length} pageSizeOptions={ROLE_PAGE_SIZES} itemLabel={t('roles.rolesLower')} onPageChange={setRolePage} onPageSizeChange={(size) => { setRolePageSize(size); setRolePage(1); }} />
           )}
         </aside>
 
         <div className="permissions-detail-stack">
           {!selectedRole ? (
-            <section className="panel empty-state"><div><h2>Select a role</h2><p>Choose a role to manage its access.</p></div></section>
+            <section className="panel empty-state"><div><h2>{t('roles.selectRole')}</h2><p>{t('roles.selectRoleDescription')}</p></div></section>
           ) : (
             <>
               <section className="panel role-detail-header role-summary-panel">
                 <form className="role-name-form" onSubmit={saveRoleName}>
                   <div>
-                    <p className="eyebrow">{roleKind} role</p>
-                    <label className="field-label role-name-field"><span>Role name</span><input value={roleName} onChange={(event) => setRoleName(event.target.value)} required /></label>
+                    <p className="eyebrow">{t('roles.roleKind', { kind: roleKindLabel(selectedRole, t) })}</p>
+                    <label className="field-label role-name-field"><span>{t('roles.roleName')}</span><input value={roleName} onChange={(event) => setRoleName(event.target.value)} required /></label>
                   </div>
-                  <button className="text-button" type="submit" disabled={savingRole || roleName.trim() === selectedRole.name}>{savingRole ? 'Saving…' : 'Save name'}</button>
+                  <button className="text-button" type="submit" disabled={savingRole || roleName.trim() === selectedRole.name}>{savingRole ? t('common.saving') : t('roles.saveName')}</button>
                 </form>
                 <div className="role-summary-actions">
-                  <span className="role-summary-stat"><strong>{selectedRolePermissions.length}</strong><small>permission rules</small></span>
-                  {!selectedRole.admin && !selectedRole.public && <button className="danger-button" type="button" onClick={() => deleteRole(selectedRole)}>Delete role</button>}
+                  <span className="role-summary-stat"><strong>{selectedRolePermissions.length}</strong><small>{t('roles.permissionRules')}</small></span>
+                  {!selectedRole.admin && !selectedRole.public && <button className="danger-button" type="button" onClick={() => deleteRole(selectedRole)}>{t('roles.deleteRole')}</button>}
                 </div>
               </section>
 
               {selectedRole.admin ? (
-                <section className="panel empty-state"><div><h2>Full administrator access</h2><p>This role bypasses collection permission rows. No matrix configuration is required.</p></div></section>
+                <section className="panel empty-state"><div><h2>{t('roles.fullAdmin')}</h2><p>{t('roles.fullAdminDescription')}</p></div></section>
               ) : (
                 <section className="table-panel permission-matrix-panel">
                   <div className="permission-matrix-heading">
-                    <div><p className="eyebrow">Permissions</p><h2>Collection access</h2><p>Enable the basic action, then use Configure only when a field or row restriction is needed.</p></div>
-                    <span className="schema-count">{selectedRolePermissions.length} rules</span>
+                    <div><p className="eyebrow">{t('roles.permissions')}</p><h2>{t('roles.collectionAccess')}</h2><p>{t('roles.collectionAccessDescription')}</p></div>
+                    <span className="schema-count">{t('roles.ruleCount', { count: selectedRolePermissions.length })}</span>
                   </div>
                   <div className="permission-list-controls">
-                    <label className="field-label"><span>Find collection</span><input type="search" value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder="Name or description…" /></label>
-                    <label className="checkbox-label permission-filter-checkbox"><input type="checkbox" checked={configuredOnly} onChange={(event) => setConfiguredOnly(event.target.checked)} />Configured only</label>
-                    <span className="result-count">{visibleCollections.length}/{collections.length} collections</span>
-                    {(collectionSearch || configuredOnly) && <button className="text-button" type="button" onClick={() => { setCollectionSearch(''); setConfiguredOnly(false); }}>Reset</button>}
+                    <label className="field-label"><span>{t('dataModel.findCollection')}</span><input type="search" value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder={t('visibility.searchPlaceholder')} /></label>
+                    <label className="checkbox-label permission-filter-checkbox"><input type="checkbox" checked={configuredOnly} onChange={(event) => setConfiguredOnly(event.target.checked)} />{t('roles.configuredOnly')}</label>
+                    <span className="result-count">{t('roles.collectionCount', { visible: visibleCollections.length, total: collections.length })}</span>
+                    {(collectionSearch || configuredOnly) && <button className="text-button" type="button" onClick={() => { setCollectionSearch(''); setConfiguredOnly(false); }}>{t('common.reset')}</button>}
                   </div>
                   <div className="table-scroll permission-matrix-scroll">
                     <table className="permission-matrix">
-                      <thead><tr><th>Collection</th>{ACTIONS.map((action) => <th key={action}>{ACTION_LABELS[action]}</th>)}</tr></thead>
+                      <thead><tr><th>{t('roles.collection')}</th>{ACTIONS.map((action) => <th key={action}>{actionLabel(action, t)}</th>)}</tr></thead>
                       <tbody>
                         {pagedCollections.items.map((collection) => (
                           <tr key={collection.collection}>
@@ -402,10 +404,10 @@ export function RolesPermissionsScreen() {
                                 <td key={action}>
                                   <div className="permission-cell">
                                     <label className={`permission-toggle ${permission ? 'enabled' : ''}`}>
-                                      <input type="checkbox" checked={Boolean(permission)} disabled={busyKey === key} onChange={() => togglePermission(collection.collection, action)} aria-label={`${action} ${collection.collection}`} />
-                                      <span>{permission ? 'Allowed' : 'Off'}</span>
+                                      <input type="checkbox" checked={Boolean(permission)} disabled={busyKey === key} onChange={() => togglePermission(collection.collection, action)} aria-label={t('roles.actionCollection', { action: actionLabel(action, t), collection: collection.collection })} />
+                                      <span>{permission ? t('roles.allowed') : t('roles.off')}</span>
                                     </label>
-                                    {permission && <button className="text-button permission-configure" type="button" onClick={() => openAdvanced(permission)}>{advanced ? 'Restricted' : 'Configure'}</button>}
+                                    {permission && <button className="text-button permission-configure" type="button" onClick={() => openAdvanced(permission)}>{advanced ? t('roles.restricted') : t('roles.configure')}</button>}
                                   </div>
                                 </td>
                               );
@@ -416,11 +418,11 @@ export function RolesPermissionsScreen() {
                     </table>
                   </div>
                   {!loading && collections.length === 0 ? (
-                    <div className="table-footer">Create a collection before configuring permissions.</div>
+                    <div className="table-footer">{t('roles.createCollectionFirst')}</div>
                   ) : !loading && visibleCollections.length === 0 ? (
-                    <div className="table-footer">No collections match the current permission filters.</div>
+                    <div className="table-footer">{t('roles.noMatchingCollections')}</div>
                   ) : (
-                    <Pagination page={pagedCollections.page} pageSize={collectionPageSize} totalItems={visibleCollections.length} pageSizeOptions={COLLECTION_PAGE_SIZES} itemLabel="collections" onPageChange={setCollectionPage} onPageSizeChange={(size) => { setCollectionPageSize(size); setCollectionPage(1); }} />
+                    <Pagination page={pagedCollections.page} pageSize={collectionPageSize} totalItems={visibleCollections.length} pageSizeOptions={COLLECTION_PAGE_SIZES} itemLabel={t('dataModel.collectionsLower')} onPageChange={setCollectionPage} onPageSizeChange={(size) => { setCollectionPageSize(size); setCollectionPage(1); }} />
                   )}
                 </section>
               )}
@@ -431,23 +433,23 @@ export function RolesPermissionsScreen() {
 
       <Modal
         open={Boolean(advancedPermission)}
-        eyebrow="Advanced permission"
-        title={advancedPermission ? `${advancedPermission.collection} · ${ACTION_LABELS[advancedPermission.action] || advancedPermission.action}` : 'Permission'}
-        description="Limit fields or add row-level rules. Empty JSON rules mean no extra restriction."
+        eyebrow={t('roles.advancedPermission')}
+        title={advancedPermission ? `${advancedPermission.collection} · ${actionLabel(advancedPermission.action, t)}` : t('roles.permissions')}
+        description={t('roles.advancedDescription')}
         className="permission-editor-modal"
         onClose={() => !savingAdvanced && setAdvancedPermission(null)}
         actions={advancedPermission ? (
           <>
-            <button className="text-button" type="button" disabled={savingAdvanced} onClick={() => setAdvancedPermission(null)}>Cancel</button>
-            <button className="primary-button" type="submit" form="advanced-permission-form" disabled={savingAdvanced}>{savingAdvanced ? 'Saving…' : 'Save rules'}</button>
+            <button className="text-button" type="button" disabled={savingAdvanced} onClick={() => setAdvancedPermission(null)}>{t('common.cancel')}</button>
+            <button className="primary-button" type="submit" form="advanced-permission-form" disabled={savingAdvanced}>{savingAdvanced ? t('common.saving') : t('roles.saveRules')}</button>
           </>
         ) : null}
       >
         {advancedPermission && (
           <form id="advanced-permission-form" className="advanced-permission-grid" onSubmit={saveAdvancedPermission}>
             <div className="schema-create-card form-stack">
-              <div><strong>Allowed fields</strong><p>All fields is the simple default. Turn it off to explicitly choose fields.</p></div>
-              <label className="checkbox-label"><input type="checkbox" checked={advancedForm.allFields} onChange={(event) => setAdvancedForm((current) => ({ ...current, allFields: event.target.checked }))} />Allow all fields</label>
+              <div><strong>{t('roles.allowedFields')}</strong><p>{t('roles.allowedFieldsDescription')}</p></div>
+              <label className="checkbox-label"><input type="checkbox" checked={advancedForm.allFields} onChange={(event) => setAdvancedForm((current) => ({ ...current, allFields: event.target.checked }))} />{t('roles.allowAllFields')}</label>
               {!advancedForm.allFields && (
                 <div className="field-choice-grid">
                   {advancedFields.map((field) => <label className="field-choice" key={field.field}><input type="checkbox" checked={advancedForm.fields.includes(field.field)} onChange={() => toggleAdvancedField(field.field)} /><span><strong>{field.field}</strong><small>{field.type}</small></span></label>)}
@@ -455,8 +457,8 @@ export function RolesPermissionsScreen() {
               )}
             </div>
             <div className="schema-create-card form-stack">
-              <label className="field-label"><span>Row filter JSON</span><small>Only rows matching this rule are accessible for this action.</small><textarea rows="8" value={advancedForm.filter} onChange={(event) => setAdvancedForm((current) => ({ ...current, filter: event.target.value }))} placeholder='{"status":{"_eq":"active"}}' /></label>
-              <label className="field-label"><span>Write validation JSON</span><small>{supportsValidation(advancedPermission.action) ? 'For create/update, the final record must match this rule.' : 'Validation applies only to create and update permissions.'}</small><textarea rows="8" value={advancedForm.validation} disabled={!supportsValidation(advancedPermission.action)} onChange={(event) => setAdvancedForm((current) => ({ ...current, validation: event.target.value }))} placeholder='{"status":{"_in":["draft","active"]}}' /></label>
+              <label className="field-label"><span>{t('roles.rowFilter')}</span><small>{t('roles.rowFilterDescription')}</small><textarea rows="8" value={advancedForm.filter} onChange={(event) => setAdvancedForm((current) => ({ ...current, filter: event.target.value }))} placeholder='{"status":{"_eq":"active"}}' /></label>
+              <label className="field-label"><span>{t('roles.validation')}</span><small>{supportsValidation(advancedPermission.action) ? t('roles.validationWriteDescription') : t('roles.validationUnsupported')}</small><textarea rows="8" value={advancedForm.validation} disabled={!supportsValidation(advancedPermission.action)} onChange={(event) => setAdvancedForm((current) => ({ ...current, validation: event.target.value }))} placeholder='{"status":{"_in":["draft","active"]}}' /></label>
             </div>
           </form>
         )}
