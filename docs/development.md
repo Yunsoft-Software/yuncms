@@ -39,8 +39,8 @@ npm run build
 Then check:
 
 ```text
-GET http://127.0.0.1:8055/health
-GET http://127.0.0.1:8055/ready
+GET http://127.0.0.1:3008/health
+GET http://127.0.0.1:3008/ready
 ```
 
 Expected behavior:

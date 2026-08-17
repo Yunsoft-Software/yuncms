@@ -118,16 +118,14 @@ First local validation should use Node 24 and a disposable MySQL database:
 ```bash
 npm install
 npm run init
-npm run dev:api
-npm run dev:studio
+npm start
 ```
 
 For an already configured database:
 
 ```bash
 npm run bootstrap
-npm run dev:api
-npm run dev:studio
+npm start
 ```
 
 The published package-level commands are:
@@ -148,7 +146,7 @@ GET /ready
 ```
 
 API default: `http://127.0.0.1:3008`
-Studio default: `http://localhost:5173`
+Studio default: `http://localhost:3008`
 
 ## Core design rule
 
