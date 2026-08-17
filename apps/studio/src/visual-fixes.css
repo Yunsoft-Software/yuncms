@@ -90,3 +90,121 @@
 :root[data-theme="dark"] .pagination-button.active {
   background: var(--studio-accent-soft);
 }
+
+/* Branding file picker */
+.logo-file-picker {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--studio-border);
+  border-radius: 12px;
+  background: var(--studio-surface-muted);
+}
+
+.logo-file-picker-heading,
+.logo-file-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.logo-file-picker-heading p {
+  margin: 3px 0 0;
+  color: var(--studio-text-muted);
+  font-size: 11px;
+}
+
+.logo-file-search {
+  margin: 0;
+}
+
+.logo-file-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.logo-file-option {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  background: var(--studio-surface);
+  color: var(--studio-text-soft);
+  text-align: left;
+}
+
+.logo-file-option:hover,
+.logo-file-option.active {
+  border-color: var(--studio-accent-border);
+  background: var(--studio-accent-soft);
+  color: var(--studio-text);
+}
+
+.logo-file-thumb,
+.logo-file-selected-preview {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--studio-border);
+  border-radius: 9px;
+  background: var(--studio-input);
+}
+
+.logo-file-thumb {
+  width: 52px;
+  height: 42px;
+}
+
+.logo-file-selected-preview {
+  width: 72px;
+  height: 52px;
+  flex: 0 0 72px;
+}
+
+.logo-file-thumb img,
+.logo-file-selected-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.logo-file-copy,
+.logo-file-selected > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.logo-file-copy strong,
+.logo-file-selected strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logo-file-copy small,
+.logo-file-selected small {
+  color: var(--studio-text-muted);
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .logo-file-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .logo-file-picker-heading,
+  .logo-file-selected {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
