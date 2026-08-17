@@ -1,55 +1,113 @@
 # Studio Customization
 
-YunCMS keeps Studio customization intentionally small. It is not a template builder or a second design system.
+YunCMS keeps Studio customization focused: enough branding and presentation control to make the product yours without turning the CMS itself into a page builder.
 
 ## Stored settings
 
-`yuncms_studio_settings` is a single-row system table created by migration `0006-studio-settings`. Migration `0008-studio-logo-file` adds the optional Files-backed logo reference.
+`yuncms_studio_settings` is a single-row system table.
+
+Relevant migrations:
+
+- `0006-studio-settings` — brand name, logo URL fallback, accent, theme and locale;
+- `0008-studio-logo-file` — optional Files-backed logo;
+- `0010-studio-favicon-file` — optional Files-backed favicon.
 
 The administrator can change:
 
 - brand name;
-- logo selected from existing YunCMS Files;
+- logo selected from YunCMS Files;
+- favicon selected from YunCMS Files;
 - accent color;
 - theme: `system`, `light` or `dark`;
 - default locale: `en` or `tr`.
 
-`GET /studio-settings` is intentionally public because login/reset/verification screens need safe display settings before authentication. It exposes only display settings. `PATCH /studio-settings` is administrator/system-only through `StudioSettingsService`.
+`GET /studio-settings` is intentionally public because login/reset/verification surfaces need safe display settings before authentication. It exposes only display settings. `PATCH /studio-settings` is administrator/system-only through `StudioSettingsService`.
 
-Studio no longer exposes an arbitrary Logo URL field. A custom logo is selected from image files already managed by YunCMS. The selected file id is stored in `logo_file`, which is a nullable FK to `yuncms_files(id)` with `ON DELETE SET NULL`.
+---
 
-## Public branding asset
+# Logo and favicon selection
 
-Files themselves keep their normal authentication/RBAC rules. YunCMS does **not** make the Files library public to support the login logo.
+Studio does not ask the administrator to paste arbitrary external URLs.
 
-Instead, when `logo_file` is configured, the narrow public endpoint:
+Branding & Appearance shows a compact current-asset summary. Clicking **Select from Files** opens a modal that:
+
+- reads the existing YunCMS file library;
+- filters to image MIME types;
+- supports search;
+- renders a paginated 12-item grid instead of dumping every image into the settings page;
+- previews each candidate;
+- saves only the selected Files id.
+
+This keeps a project with 5 images and a project with 500 images usable through the same interaction model.
+
+Stored references:
+
+```text
+logo_file    -> yuncms_files.id
+favicon_file -> yuncms_files.id
+```
+
+Both foreign keys are nullable and use `ON DELETE SET NULL`. Deleting the selected branding file therefore returns Studio to the built-in fallback instead of leaving a broken id in settings.
+
+Only image MIME types are accepted by `StudioSettingsService`; a raw API client cannot bypass the Studio image picker and configure a PDF/video as the logo or favicon.
+
+---
+
+# Public branding asset endpoints
+
+The Files library keeps its normal authentication/RBAC behavior. YunCMS does **not** make `/files/:id/content` public for branding.
+
+Instead it exposes only the currently configured branding images:
 
 ```text
 GET /studio-settings/logo
+GET /studio-settings/favicon
 ```
 
-reads only the one configured file and only when its MIME type is an image. This lets pre-login Studio screens render branding without exposing arbitrary file ids.
+The service first reads the single selected file id from Studio settings, validates that the referenced file still exists and is an image, then reads its bytes from the configured storage driver.
 
-## Default Yunsoft branding
+Responses use revalidation and a sandbox Content-Security-Policy so an SVG branding asset cannot become a general same-origin active document surface.
 
-YunCMS keeps the official Yunsoft artwork URLs as built-in fallback assets:
+These endpoints are useful before login, including the login/reset/verification UI and the browser favicon.
+
+---
+
+# Default Yunsoft branding
+
+Built-in logo artwork:
 
 ```text
 https://yunsoft.com/light-logo.png
 https://yunsoft.com/dark-logo.png
 ```
 
-The asset names describe the artwork itself. To maintain contrast:
+The asset name describes the artwork, not the surface it belongs on:
 
-- Dark Studio surfaces use `light-logo.png`.
-- Light Studio surfaces use `dark-logo.png`.
-- System theme follows the resolved OS/browser theme using the same contrast rule.
+- Dark Studio surface → `light-logo.png`.
+- Light Studio surface → `dark-logo.png`.
+- System theme → resolved OS/browser theme, using the same contrast rule.
 
-The default brand name remains `YunCMS`. A selected Files-backed custom logo replaces the Yunsoft artwork everywhere in Studio. The small `Powered by Yunsoft` / copyright footer is independent and remains visible.
+Default favicon/icon:
 
-If no custom logo is selected, or a selected logo file is deleted and the FK becomes `NULL`, Studio returns to the default Yunsoft artwork behavior.
+```text
+https://yunsoft.com/light-icon.png
+```
 
-## Accent and theme
+`apps/studio/index.html` references this icon immediately so the browser does not wait for React/settings hydration before it has a favicon. When Studio settings load and `favicon_file` is configured, `StudioSettingsProvider` switches the favicon to the API-backed `/studio-settings/favicon` asset.
+
+A custom Files-backed logo replaces the Yunsoft logo artwork. The small `Powered by Yunsoft` / copyright footer is independent and remains visible.
+
+---
+
+# Brand name
+
+`brand_name` is human-facing copy used for accessibility/fallback presentation. It does not change collection keys, API URLs or database schema identifiers.
+
+The Data Model follows the same overall principle for collection/field labels: human-facing names and stable machine identifiers are separate concerns. See [`rest-api.md`](rest-api.md) and [`api-query-language.md`](api-query-language.md).
+
+---
+
+# Accent and theme
 
 The accent is a validated six-digit hex color. Studio maps it to shared CSS variables used for primary actions, active navigation, focus states and lightweight badges.
 
@@ -59,33 +117,54 @@ Theme values:
 - `dark`: always dark;
 - `system`: follows the browser/OS `prefers-color-scheme` value and listens for changes while Studio is open.
 
-Dark/light surfaces, including pagination and permission matrices, are expected to use Studio CSS variables rather than hard-coded white backgrounds.
+Pagination, permission matrices, permission-rule badges, Files surfaces, dialogs and Data Model panels should use Studio variables instead of hard-coded white backgrounds.
 
-## Localization
+---
 
-Studio ships English and Turkish dictionaries plus focused current-UI additions. Pure translation functions live in `localization.js`; the React hook in `i18n.js` connects them to `StudioSettingsContext`.
+# Localization
 
-Language resolution is:
+Studio ships English and Turkish dictionaries plus focused current-UI modules.
+
+Language resolution:
 
 ```text
 personal browser preference -> server default_locale -> English fallback
 ```
 
-The personal preference is stored in browser local storage. Changing it does not change the project-wide default for other users.
+The personal preference is stored in browser local storage. Changing it does not alter the project-wide default for other users.
 
-Static translation keys used by Studio source are scanned by `apps/studio/test/localization.test.js`; both locale dictionaries must contain the same key set. Dynamic field/action/Data Model tab keys are covered explicitly.
+Static translation keys used by Studio source are scanned by `apps/studio/test/localization.test.js`; EN/TR dictionaries must have identical coverage. Dynamic field/action/Data Model tab labels are also checked explicitly.
 
-## Current architecture
+---
+
+# Architecture
 
 ```text
 0006 Studio settings
   + 0008 logo_file FK
-  -> StudioSettingsService
-  -> GET/PATCH /studio-settings
-  -> GET /studio-settings/logo
-  -> StudioSettingsProvider
-  -> LogoFilePicker / StudioBrand / AppearanceScreen
-  -> useI18n / localization dictionaries
+  + 0010 favicon_file FK
+       │
+       ▼
+StudioSettingsService
+       │
+       ├─ GET/PATCH /studio-settings
+       ├─ GET /studio-settings/logo
+       └─ GET /studio-settings/favicon
+       │
+       ▼
+StudioSettingsProvider
+       │
+       ├─ theme / accent / locale
+       ├─ runtime favicon
+       └─ branding state
+       │
+       ▼
+BrandAssetPicker
+       └─ FilePickerModal
+            ├─ image filter
+            ├─ search
+            ├─ pagination
+            └─ FilePreview
 ```
 
-Screens do not read the database directly. File selection uses the normal Files API for authenticated administrators; the saved branding asset uses the bounded public endpoint above.
+Screens never read the database directly. Authenticated asset selection uses the Files API; pre-auth rendering uses only the two bounded public branding endpoints.
