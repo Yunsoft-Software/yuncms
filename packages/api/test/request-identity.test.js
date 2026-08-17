@@ -30,7 +30,7 @@ test('request identity preserves a bounded safe caller id', () => {
 });
 
 test('request identity replaces unsafe or oversized caller ids', () => {
-  for (const value of ['bad id with spaces', 'bad\nheader', 'x'.repeat(129)]) {
+  for (const value of ['bad id with spaces', 'bad\nheader', 'x'.repeat(65)]) {
     const result = runRequestIdentity(value);
     assert.match(result.req.id, /^[0-9a-f-]{36}$/i);
     assert.equal(result.headers.get('x-request-id'), result.req.id);
