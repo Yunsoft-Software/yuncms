@@ -42,6 +42,14 @@ function roleKindLabel(role, t) {
   return t('roles.custom');
 }
 
+function isRestricted(permission) {
+  return Boolean(permission && (
+    (permission.fields && permission.fields.length > 0)
+    || permission.filter
+    || permission.validation
+  ));
+}
+
 export function RolesPermissionsScreen() {
   const { t } = useI18n();
   const requestConfirmation = useConfirmDialog();
@@ -106,6 +114,10 @@ export function RolesPermissionsScreen() {
   ])), [permissions]);
   const selectedRolePermissions = useMemo(() => permissions.filter((permission) =>
     permission.role === selectedRoleId), [permissions, selectedRoleId]);
+  const restrictedRuleCount = useMemo(
+    () => selectedRolePermissions.filter(isRestricted).length,
+    [selectedRolePermissions],
+  );
   const roleRuleCounts = useMemo(() => {
     const counts = new Map();
     permissions.forEach((permission) => counts.set(permission.role, (counts.get(permission.role) || 0) + 1));
@@ -333,6 +345,7 @@ export function RolesPermissionsScreen() {
               <label className="field-label"><span>{t('common.name')}</span><input value={roleForm.name} onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))} required autoFocus /></label>
               <label className="field-label"><span>{t('dataModel.description')}</span><input value={roleForm.description} onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))} /></label>
               <label className="checkbox-label"><input type="checkbox" checked={roleForm.public} onChange={(event) => setRoleForm((current) => ({ ...current, public: event.target.checked }))} />{t('roles.publicRole')}</label>
+              {roleForm.public && <div className="inline-info public-role-create-hint">{t('roles.publicAccessDescription')}</div>}
               <button className="primary-button" type="submit">{t('roles.createRole')}</button>
             </form>
           )}
@@ -345,7 +358,10 @@ export function RolesPermissionsScreen() {
           <div className="list-stack role-list role-list-page">
             {pagedRoles.items.map((role) => (
               <button className={`list-button role-list-button ${role.id === selectedRoleId ? 'active' : ''}`} key={role.id} type="button" onClick={() => setSelectedRoleId(role.id)}>
-                <span><strong>{role.name}</strong><small>{role.admin ? t('roles.adminFullAccess') : role.public ? t('roles.publicRole') : role.description || t('roles.customRole')}</small></span>
+                <span>
+                  <strong>{role.name}</strong>
+                  <small>{role.admin ? t('roles.adminFullAccess') : role.public ? t('roles.publicRole') : role.description || t('roles.customRole')}</small>
+                </span>
                 {!role.admin && <span className="permission-count">{roleRuleCounts.get(role.id) || 0}</span>}
               </button>
             ))}
@@ -364,7 +380,11 @@ export function RolesPermissionsScreen() {
               <section className="panel role-detail-header role-summary-panel">
                 <form className="role-name-form" onSubmit={saveRoleName}>
                   <div>
-                    <p className="eyebrow">{t('roles.roleKind', { kind: roleKindLabel(selectedRole, t) })}</p>
+                    <div className="role-heading-line">
+                      <span className={`status-pill role-kind-badge ${selectedRole.public ? 'public' : selectedRole.admin ? 'admin' : 'custom'}`}>
+                        {roleKindLabel(selectedRole, t)}
+                      </span>
+                    </div>
                     <label className="field-label role-name-field"><span>{t('roles.roleName')}</span><input value={roleName} onChange={(event) => setRoleName(event.target.value)} required /></label>
                   </div>
                   <button className="text-button" type="submit" disabled={savingRole || roleName.trim() === selectedRole.name}>{savingRole ? t('common.saving') : t('roles.saveName')}</button>
@@ -375,12 +395,35 @@ export function RolesPermissionsScreen() {
                 </div>
               </section>
 
+              {selectedRole.public && (
+                <section className="panel public-role-guidance" role="note">
+                  <div>
+                    <p className="eyebrow">{t('roles.publicAccessTitle')}</p>
+                    <strong>{t('roles.publicAccessTitle')}</strong>
+                    <p>{t('roles.publicAccessDescription')}</p>
+                  </div>
+                </section>
+              )}
+
+              {!selectedRole.admin && (
+                <section className="panel permission-overview-panel">
+                  <div>
+                    <p className="eyebrow">{t('roles.accessOverview')}</p>
+                    <p>{t('roles.quickAuditHint')}</p>
+                  </div>
+                  <div className="permission-overview-stats">
+                    <span><strong>{selectedRolePermissions.length}</strong><small>{t('roles.enabledActions', { count: selectedRolePermissions.length })}</small></span>
+                    <span><strong>{restrictedRuleCount}</strong><small>{t('roles.restrictedActions', { count: restrictedRuleCount })}</small></span>
+                  </div>
+                </section>
+              )}
+
               {selectedRole.admin ? (
                 <section className="panel empty-state"><div><h2>{t('roles.fullAdmin')}</h2><p>{t('roles.fullAdminDescription')}</p></div></section>
               ) : (
                 <section className="table-panel permission-matrix-panel">
                   <div className="permission-matrix-heading">
-                    <div><p className="eyebrow">{t('roles.permissions')}</p><h2>{t('roles.collectionAccess')}</h2><p>{t('roles.collectionAccessDescription')}</p></div>
+                    <div><p className="eyebrow">{t('roles.permissions')}</p><h2>{t('roles.collectionAccess')}</h2><p>{t('roles.quickAuditHint')}</p></div>
                     <span className="schema-count">{t('roles.ruleCount', { count: selectedRolePermissions.length })}</span>
                   </div>
                   <div className="permission-list-controls">
@@ -399,7 +442,7 @@ export function RolesPermissionsScreen() {
                             {ACTIONS.map((action) => {
                               const key = permissionKey(selectedRole.id, collection.collection, action);
                               const permission = permissionIndex.get(key);
-                              const advanced = permission && ((permission.fields && permission.fields.length > 0) || permission.filter || permission.validation);
+                              const advanced = isRestricted(permission);
                               return (
                                 <td key={action}>
                                   <div className="permission-cell">
