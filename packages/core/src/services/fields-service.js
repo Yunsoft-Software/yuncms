@@ -10,7 +10,15 @@ import { BaseService } from './base-service.js';
 import { assertSchemaManager } from './schema-access.js';
 
 const FIELD_METADATA_KEYS = new Set(['readonly', 'hidden', 'sort', 'interface', 'options']);
-const FIELD_PHYSICAL_KEYS = new Set(['required', 'defaultValue', 'removeDefault', 'indexed']);
+const FIELD_PHYSICAL_KEYS = new Set([
+  'required',
+  'defaultValue',
+  'removeDefault',
+  'defaultPreset',
+  'removeDefaultPreset',
+  'autoUpdate',
+  'indexed',
+]);
 
 function assertFieldName(field) {
   assertIdentifier(field, 'field name');
@@ -18,11 +26,15 @@ function assertFieldName(field) {
   return field;
 }
 
+function invalidSchemaPayload(message) {
+  const error = new Error(message);
+  error.code = 'INVALID_SCHEMA_PAYLOAD';
+  return error;
+}
+
 function assertFieldMetadataPatch(patch) {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
-    const error = new Error('Field metadata patch must be an object');
-    error.code = 'INVALID_SCHEMA_PAYLOAD';
-    throw error;
+    throw invalidSchemaPayload('Field metadata patch must be an object');
   }
   for (const key of Object.keys(patch)) {
     if (!FIELD_METADATA_KEYS.has(key)) {
@@ -32,23 +44,17 @@ function assertFieldMetadataPatch(patch) {
     }
   }
   if (Object.keys(patch).length === 0) {
-    const error = new Error('Field metadata patch cannot be empty');
-    error.code = 'INVALID_SCHEMA_PAYLOAD';
-    throw error;
+    throw invalidSchemaPayload('Field metadata patch cannot be empty');
   }
 }
 
 function assertPhysicalPatch(patch) {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
-    const error = new Error('Physical field patch must be an object');
-    error.code = 'INVALID_SCHEMA_PAYLOAD';
-    throw error;
+    throw invalidSchemaPayload('Physical field patch must be an object');
   }
   const keys = Object.keys(patch);
   if (keys.length === 0) {
-    const error = new Error('Physical field patch cannot be empty');
-    error.code = 'INVALID_SCHEMA_PAYLOAD';
-    throw error;
+    throw invalidSchemaPayload('Physical field patch cannot be empty');
   }
   for (const key of keys) {
     if (!FIELD_PHYSICAL_KEYS.has(key)) {
@@ -58,24 +64,30 @@ function assertPhysicalPatch(patch) {
     }
   }
   if (Object.hasOwn(patch, 'required') && typeof patch.required !== 'boolean') {
-    const error = new Error('required must be boolean');
-    error.code = 'INVALID_SCHEMA_PAYLOAD';
-    throw error;
+    throw invalidSchemaPayload('required must be boolean');
   }
   if (Object.hasOwn(patch, 'indexed') && typeof patch.indexed !== 'boolean') {
-    const error = new Error('indexed must be boolean');
-    error.code = 'INVALID_SCHEMA_PAYLOAD';
-    throw error;
+    throw invalidSchemaPayload('indexed must be boolean');
   }
-  if (Object.hasOwn(patch, 'removeDefault') && patch.removeDefault !== true) {
-    const error = new Error('removeDefault must be true when provided');
-    error.code = 'INVALID_SCHEMA_PAYLOAD';
-    throw error;
+  if (Object.hasOwn(patch, 'autoUpdate') && typeof patch.autoUpdate !== 'boolean') {
+    throw invalidSchemaPayload('autoUpdate must be boolean');
+  }
+  for (const key of ['removeDefault', 'removeDefaultPreset']) {
+    if (Object.hasOwn(patch, key) && patch[key] !== true) {
+      throw invalidSchemaPayload(`${key} must be true when provided`);
+    }
+  }
+  if (Object.hasOwn(patch, 'defaultPreset') && patch.defaultPreset !== 'now') {
+    throw invalidSchemaPayload('defaultPreset currently supports only now');
+  }
+  if (Object.hasOwn(patch, 'defaultValue') && Object.hasOwn(patch, 'defaultPreset')) {
+    throw invalidSchemaPayload('defaultValue and defaultPreset cannot be used together');
   }
   if (Object.hasOwn(patch, 'defaultValue') && patch.removeDefault === true) {
-    const error = new Error('defaultValue and removeDefault cannot be used together');
-    error.code = 'INVALID_SCHEMA_PAYLOAD';
-    throw error;
+    throw invalidSchemaPayload('defaultValue and removeDefault cannot be used together');
+  }
+  if (Object.hasOwn(patch, 'defaultPreset') && patch.removeDefaultPreset === true) {
+    throw invalidSchemaPayload('defaultPreset and removeDefaultPreset cannot be used together');
   }
 }
 
@@ -89,15 +101,26 @@ function parseSchemaMetadata(value) {
   }
 }
 
+function assertFieldNotSystemManaged(field) {
+  if (parseSchemaMetadata(field?.schema_metadata).systemManaged === true) {
+    const error = new Error(`System-managed field cannot be changed directly: ${field.collection}.${field.field}`);
+    error.code = 'SYSTEM_SCHEMA_READ_ONLY';
+    throw error;
+  }
+}
+
 function fieldInputFromMetadata(field, schemaMetadata) {
   const input = {
     type: field.type,
     required: Boolean(field.required),
+    interface: field.interface ?? null,
   };
   if (schemaMetadata.length !== undefined && field.type === 'string') input.length = schemaMetadata.length;
   if (schemaMetadata.precision !== undefined && field.type === 'decimal') input.precision = schemaMetadata.precision;
   if (schemaMetadata.scale !== undefined && field.type === 'decimal') input.scale = schemaMetadata.scale;
   if (Object.hasOwn(schemaMetadata, 'defaultValue')) input.defaultValue = schemaMetadata.defaultValue;
+  if (schemaMetadata.defaultPreset !== undefined) input.defaultPreset = schemaMetadata.defaultPreset;
+  if (schemaMetadata.autoUpdate === true) input.autoUpdate = true;
   return input;
 }
 
@@ -246,6 +269,7 @@ export class FieldsService extends BaseService {
         error.code = 'FIELD_NOT_FOUND';
         throw error;
       }
+      assertFieldNotSystemManaged(existing);
 
       return withConnectionTransaction(connection, async () => {
         const updated = await metadata.updateFieldMetadata(collection, field, patch);
@@ -288,6 +312,7 @@ export class FieldsService extends BaseService {
         error.code = 'FIELD_NOT_FOUND';
         throw error;
       }
+      assertFieldNotSystemManaged(existing);
 
       const relation = relations.find((candidate) =>
         candidate.many_collection === collection && candidate.many_field === field);
@@ -301,8 +326,18 @@ export class FieldsService extends BaseService {
       const currentMetadata = parseSchemaMetadata(existing.schema_metadata);
       const currentInput = fieldInputFromMetadata(existing, currentMetadata);
       const nextInput = { ...currentInput, required: nextRequired };
+
       if (patch.removeDefault === true) delete nextInput.defaultValue;
-      else if (Object.hasOwn(patch, 'defaultValue')) nextInput.defaultValue = patch.defaultValue;
+      if (patch.removeDefaultPreset === true) delete nextInput.defaultPreset;
+      if (Object.hasOwn(patch, 'defaultValue')) {
+        nextInput.defaultValue = patch.defaultValue;
+        delete nextInput.defaultPreset;
+      }
+      if (Object.hasOwn(patch, 'defaultPreset')) {
+        nextInput.defaultPreset = patch.defaultPreset;
+        delete nextInput.defaultValue;
+      }
+      if (Object.hasOwn(patch, 'autoUpdate')) nextInput.autoUpdate = patch.autoUpdate;
 
       const currentCompiled = compileFieldColumn(currentInput);
       const nextCompiled = compileFieldColumn(nextInput);
@@ -410,6 +445,7 @@ export class FieldsService extends BaseService {
         error.code = 'FIELD_NOT_FOUND';
         throw error;
       }
+      assertFieldNotSystemManaged(existing);
 
       const blockingRelation = relations.find((relation) =>
         (relation.many_collection === collection && relation.many_field === field) ||
