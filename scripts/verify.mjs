@@ -4,6 +4,8 @@ import { spawnSync } from 'node:child_process';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const MODE = process.argv[2] || 'full';
+const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const MAX_BUFFER = 16 * 1024 * 1024;
 const TEST_ROOTS = [
   'packages/core/test',
   'packages/api/test',
@@ -15,6 +17,7 @@ const TEST_ROOTS = [
 const FAST_TESTS = [
   'packages/core/test/core.test.js',
   'packages/core/test/bootstrap.test.js',
+  'packages/core/test/production-config.test.js',
   'packages/core/test/schema-query.test.js',
   'packages/core/test/schema-access.test.js',
   'packages/core/test/collection-visibility.test.js',
@@ -25,6 +28,7 @@ const FAST_TESTS = [
   'packages/api/test/authentication.test.js',
   'packages/api/test/error-response.test.js',
   'packages/api/test/request-identity.test.js',
+  'packages/api/test/production-app-config.test.js',
   'packages/api/test/rate-limit.test.js',
   'packages/api/test/security-headers.test.js',
   'packages/api/test/studio.test.js',
@@ -48,14 +52,19 @@ function commandLabel(command, args) {
   return [command, ...args].join(' ');
 }
 
-function run(command, args, { label, env = process.env, failureArgs = null } = {}) {
-  const started = Date.now();
-  const result = spawnSync(command, args, {
+function spawn(command, args, env) {
+  return spawnSync(command, args, {
     cwd: ROOT,
     env,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: MAX_BUFFER,
   });
+}
+
+function run(command, args, { label, env = process.env, failureArgs = null } = {}) {
+  const started = Date.now();
+  const result = spawn(command, args, env);
   const elapsed = ((Date.now() - started) / 1000).toFixed(1);
 
   if (result.status === 0) {
@@ -64,14 +73,7 @@ function run(command, args, { label, env = process.env, failureArgs = null } = {
   }
 
   console.error(`✗ ${label || commandLabel(command, args)} (${elapsed}s)`);
-  const rerun = failureArgs
-    ? spawnSync(command, failureArgs, {
-      cwd: ROOT,
-      env,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    : result;
+  const rerun = failureArgs ? spawn(command, failureArgs, env) : result;
   const output = [rerun.stdout, rerun.stderr].filter(Boolean).join('\n').trim();
   if (output) console.error(output);
   process.exit(result.status || 1);
@@ -104,7 +106,7 @@ function runPackChecks() {
     '@yunsoft/yuncms-extensions-sdk',
   ];
   for (const workspace of workspaces) {
-    run('npm', ['pack', '--dry-run', '--json', `--workspace=${workspace}`], {
+    run(NPM, ['pack', '--dry-run', '--json', `--workspace=${workspace}`], {
       label: `package contract ${workspace}`,
     });
   }
@@ -126,7 +128,7 @@ const allTests = TEST_ROOTS.flatMap(collectTests).sort();
 runNodeTests(allTests, `complete source suite (${allTests.length} files)`);
 
 if (MODE === 'release') {
-  run('npm', ['run', 'build:studio'], { label: 'Studio production build' });
+  run(NPM, ['run', 'build:studio'], { label: 'Studio production build' });
   runPackChecks();
 
   if (process.env.YUNCMS_TEST_MYSQL === '1') {
