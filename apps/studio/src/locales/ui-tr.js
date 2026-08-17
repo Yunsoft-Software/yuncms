@@ -5,6 +5,9 @@ export const UI_TR = Object.freeze({
   'nav.collapseSidebar': 'Kenar çubuğunu daralt',
   'nav.studioSections': 'Studio bölümleri',
 
+  'auth.signInDescription': 'YunCMS hesabınızla giriş yapın. Kullanabileceğiniz Studio işlemleri rol ve izinleriniz tarafından belirlenir.',
+  'section.usersDescription': 'Size verilen erişim kapsamında kullanıcıları, rolleri ve hesap durumlarını yönetin.',
+
   'fieldType.string': 'Kısa metin',
   'fieldType.text': 'Uzun metin',
   'fieldType.integer': 'Tam sayı',
@@ -77,6 +80,9 @@ export const UI_TR = Object.freeze({
 
   'users.createDescription': 'Giriş bilgilerini ve isteğe bağlı rolü belirleyin. Yönetim panelinden oluşturulan kullanıcıların e-postası otomatik doğrulanmış sayılır ve hemen giriş yapabilirler.',
   'users.managedVerifiedHint': 'Buradan oluşturulan kullanıcılar yönetim tarafından güvenilen hesaplar olarak kabul edilir ve e-posta adresleri anında doğrulanmış sayılır. Doğrulama e-postası beklemeden giriş yapabilirler.',
+  'users.roleAccessUnavailable': 'Kullanıcı erişiminiz var ancak rol ayrıntılarını görme yetkiniz yok. Rol adlarını görmek veya rol atamak için bu role Roller: Okuma izni verin.',
+  'users.roleUnavailableForCreate': 'Rol ayrıntılarına erişilemediği için bu kullanıcı rol atanmadan oluşturulacak.',
+  'users.roleDetailsUnavailable': 'Rol ayrıntıları kullanılamıyor',
 
   'dataModel.fieldBuilderHint': 'Önce veri türünü seçin. Dosya ve görsel alanları bir dosya referansı tutar ve İçerik ekranında özel seçici kullanır.',
   'dataModel.fieldType': 'Alan türü',
