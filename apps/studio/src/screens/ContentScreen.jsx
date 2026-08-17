@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
+import { Pagination } from '../components/Pagination.jsx';
 
 const PAGE_SIZES = [25, 50, 100];
 
@@ -438,8 +439,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
   const filterOperators = operatorsForField(selectedFilterField, relationLookups[filterDraft.field]);
   const hasTextSearch = fields.some((field) => !field.hidden && ['string', 'text'].includes(field.type));
   const totalCount = Number(meta?.total_count ?? 0);
-  const visibleStart = totalCount === 0 ? 0 : offset + 1;
-  const visibleEnd = Math.min(offset + items.length, totalCount);
+  const currentPage = Math.floor(offset / pageSize) + 1;
   const hasActiveControls = Boolean(search || filters.length > 0 || sortField);
 
   function updateFilterField(fieldName) {
@@ -550,7 +550,7 @@ export function ContentScreen({ collection, onOpenDataModel }) {
 
       {!schemaLoading && (
         <section className="panel data-controls-panel" aria-label={`${collection} data controls`}>
-          <div className="data-controls-main">
+          <div className="data-controls-main content-data-controls-main">
             <label className="field-label control-search">
               <span>Search</span>
               <input
@@ -582,16 +582,6 @@ export function ContentScreen({ collection, onOpenDataModel }) {
               >
                 <option value="asc">Ascending</option>
                 <option value="desc">Descending</option>
-              </select>
-            </label>
-
-            <label className="field-label compact-control page-size-control">
-              <span>Rows</span>
-              <select
-                value={pageSize}
-                onChange={(event) => { setPageSize(Number(event.target.value)); setOffset(0); }}
-              >
-                {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
               </select>
             </label>
           </div>
@@ -728,27 +718,19 @@ export function ContentScreen({ collection, onOpenDataModel }) {
               </tbody>
             </table>
           </div>
-          <div className="table-footer pagination-footer">
-            <span>{itemsLoading ? 'Refreshing…' : `Showing ${visibleStart}–${visibleEnd} of ${totalCount}`}</span>
-            <div className="pagination-actions">
-              <button
-                className="text-button"
-                type="button"
-                disabled={offset === 0 || itemsLoading}
-                onClick={() => setOffset(Math.max(0, offset - pageSize))}
-              >
-                Previous
-              </button>
-              <button
-                className="text-button"
-                type="button"
-                disabled={offset + pageSize >= totalCount || itemsLoading}
-                onClick={() => setOffset(offset + pageSize)}
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <Pagination
+            page={currentPage}
+            pageSize={pageSize}
+            totalItems={totalCount}
+            pageSizeOptions={PAGE_SIZES}
+            loading={itemsLoading}
+            itemLabel="records"
+            onPageChange={(page) => setOffset((page - 1) * pageSize)}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setOffset(0);
+            }}
+          />
         </section>
       )}
     </div>
