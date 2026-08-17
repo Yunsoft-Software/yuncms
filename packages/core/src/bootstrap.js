@@ -4,6 +4,7 @@ import { systemSchemaMigration } from './migrations/0001-system-schema.js';
 import { sessionAccessTokensMigration } from './migrations/0002-session-access-tokens.js';
 import { publicRoleConstraintsMigration } from './migrations/0003-public-role-constraints.js';
 import { authActionTokensMigration } from './migrations/0004-auth-action-tokens.js';
+import { defaultPublicRoleMigration } from './migrations/0005-default-public-role.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -12,6 +13,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   sessionAccessTokensMigration,
   publicRoleConstraintsMigration,
   authActionTokensMigration,
+  defaultPublicRoleMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(
