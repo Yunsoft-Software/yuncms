@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { assertExtensibleSystemCollection } from '../src/services/system-collection-fields-service.js';
+import {
+  assertExtensibleSystemCollection,
+  assertSystemExtensionInput,
+} from '../src/services/system-collection-fields-service.js';
 
 const serviceSource = readFileSync(resolve(import.meta.dirname, '../src/services/system-collection-fields-service.js'), 'utf8');
 
@@ -23,10 +26,20 @@ test('only explicitly permission-managed system collections are extensible', () 
   );
 });
 
+test('custom system extension fields are optional-only so existing system rows remain valid', () => {
+  assert.doesNotThrow(() => assertSystemExtensionInput({ required: false }));
+  assert.doesNotThrow(() => assertSystemExtensionInput({}));
+  assert.throws(
+    () => assertSystemExtensionInput({ required: true }),
+    (error) => error.code === 'SYSTEM_EXTENSION_REQUIRED_UNSUPPORTED',
+  );
+});
+
 test('system extension creation is schema-locked, physically added and tagged in metadata', () => {
   assert.match(serviceSource, /withAdvisoryLock\(this\.database, 'yuncms:schema'/);
   assert.match(serviceSource, /ALTER TABLE \$\{table\} ADD COLUMN \$\{column\}/);
   assert.match(serviceSource, /systemExtension:\s*true/);
+  assert.match(serviceSource, /required:\s*false/);
   assert.match(serviceSource, /DROP COLUMN/);
   assert.match(serviceSource, /assertSchemaManager\(this\.accountability\)/);
 });
