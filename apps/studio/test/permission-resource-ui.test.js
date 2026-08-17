@@ -12,7 +12,7 @@ const users = {
   collection: 'yuncms_users',
   system: 1,
   metadata: {
-    permissionManaged: true,
+    permissionManaged: 1,
     permissionMode: 'action-only',
     resource: 'users',
     allowedActions: ['read', 'create', 'update', 'delete'],
