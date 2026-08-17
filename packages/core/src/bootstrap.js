@@ -5,6 +5,7 @@ import { sessionAccessTokensMigration } from './migrations/0002-session-access-t
 import { publicRoleConstraintsMigration } from './migrations/0003-public-role-constraints.js';
 import { authActionTokensMigration } from './migrations/0004-auth-action-tokens.js';
 import { defaultPublicRoleMigration } from './migrations/0005-default-public-role.js';
+import { studioSettingsMigration } from './migrations/0006-studio-settings.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -14,6 +15,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   publicRoleConstraintsMigration,
   authActionTokensMigration,
   defaultPublicRoleMigration,
+  studioSettingsMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(
