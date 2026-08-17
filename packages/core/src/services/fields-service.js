@@ -4,12 +4,13 @@ import { withAdvisoryLock } from '../advisory-lock.js';
 import { compileFieldColumn } from '../field-types.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
+import { normalizeDisplayName, resolveSchemaName } from '../schema-key.js';
 import { incrementSchemaVersion } from '../schema-version.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { assertSchemaManager } from './schema-access.js';
 
-const FIELD_METADATA_KEYS = new Set(['readonly', 'hidden', 'sort', 'interface', 'options']);
+const FIELD_METADATA_KEYS = new Set(['name', 'readonly', 'hidden', 'sort', 'interface', 'options']);
 const FIELD_PHYSICAL_KEYS = new Set([
   'required',
   'defaultValue',
@@ -46,6 +47,7 @@ function assertFieldMetadataPatch(patch) {
   if (Object.keys(patch).length === 0) {
     throw invalidSchemaPayload('Field metadata patch cannot be empty');
   }
+  if (Object.hasOwn(patch, 'name')) patch.name = normalizeDisplayName(patch.name);
 }
 
 function assertPhysicalPatch(patch) {
@@ -150,7 +152,13 @@ export class FieldsService extends BaseService {
   async createOne(collection, input = {}) {
     assertSchemaManager(this.accountability);
     assertIdentifier(collection, 'collection name');
-    const field = assertFieldName(input.field);
+    const resolvedName = resolveSchemaName({
+      displayName: input.name ?? input.field,
+      key: input.field,
+      prefix: 'field',
+    });
+    const field = assertFieldName(resolvedName.key);
+    const name = resolvedName.name;
 
     if (field === 'id') {
       const error = new Error('The id field is created with the collection and cannot be added again');
@@ -196,6 +204,7 @@ export class FieldsService extends BaseService {
           const created = await metadata.createField({
             collection,
             field,
+            name,
             type: input.type,
             required: input.required === true,
             readonly: input.readonly === true,
