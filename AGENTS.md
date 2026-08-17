@@ -49,14 +49,19 @@ Do not chase API compatibility for its own sake. If Directus behavior would add 
 
 ## Testing
 - Prefer Node's built-in test runner for backend/core unit tests unless a real need forces another framework.
-- Integration tests for schema/CRUD/auth/RBAC must run against real MySQL before those milestones are considered complete.
+- After normal source changes run `npm run test:fast`. It is the default Codex feedback loop and intentionally prints only a short stage result unless something fails.
+- Before considering a larger source pass complete run `npm test`; it discovers and runs the complete non-environment test suite.
+- Before a release candidate run `npm run test:release`; it runs the complete suite, Studio production build and npm package dry-run checks.
+- Real MySQL/API integration is opt-in inside the release runner. Use a disposable database whose name contains `test`, `ci` or `dev`, then set both `YUNCMS_TEST_MYSQL=1` and `YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1`.
+- Do not run real MySQL/S3/SMTP/browser checks after every edit. Keep those environment-dependent checks for the relevant milestone/release gate so routine Codex work stays fast and low-noise.
+- Integration tests for schema/CRUD/auth/RBAC must run against real MySQL before those milestones are considered production-verified.
 - Test SQL-injection boundaries, authorization boundaries, transaction rollback, schema concurrency, session rotation/revocation, and extension accountability.
 - Do not weaken tests to make them pass.
 
 ## Before every commit
 1. Re-read the relevant `plan.md` section.
 2. Check `git diff`/changed files and keep scope focused.
-3. Run the relevant local tests/checks available in the environment.
+3. Run `npm run test:fast` or the narrower directly relevant test when the environment supports Node 24/dependencies.
 4. Update `plan.md` if the task is genuinely complete.
 5. Add environment-only blockers to `todo.md` with exact commands/expected results where possible.
 6. Commit with a short descriptive message.
