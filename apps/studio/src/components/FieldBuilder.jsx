@@ -132,7 +132,7 @@ export function FieldBuilder({ form, setForm, onSubmit, onCancel, allowRequired 
               </label>
             </div>
           ) : (
-            <div className="inline-info">{t('fieldBuilder.systemExtensionOptional')}</div>
+            <div className="inline-info">{t('dataModel.systemFieldsHint')}</div>
           )}
 
           {(canValueDefault || canNow) && (
