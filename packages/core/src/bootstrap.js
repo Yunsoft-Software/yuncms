@@ -9,6 +9,7 @@ import { studioSettingsMigration } from './migrations/0006-studio-settings.js';
 import { systemPermissionResourcesMigration } from './migrations/0007-system-permission-resources.js';
 import { studioLogoFileMigration } from './migrations/0008-studio-logo-file.js';
 import { schemaDisplayNamesMigration } from './migrations/0009-schema-display-names.js';
+import { studioFaviconFileMigration } from './migrations/0010-studio-favicon-file.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -22,6 +23,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   systemPermissionResourcesMigration,
   studioLogoFileMigration,
   schemaDisplayNamesMigration,
+  studioFaviconFileMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(
