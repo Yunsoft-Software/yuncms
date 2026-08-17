@@ -5,6 +5,9 @@ export const UI_EN = Object.freeze({
   'nav.collapseSidebar': 'Collapse sidebar',
   'nav.studioSections': 'Studio sections',
 
+  'auth.signInDescription': 'Use your YunCMS account. Available Studio actions are enforced by your role and permissions.',
+  'section.usersDescription': 'Manage users, roles and account status within your granted access.',
+
   'fieldType.string': 'Short text',
   'fieldType.text': 'Long text',
   'fieldType.integer': 'Integer',
@@ -77,6 +80,9 @@ export const UI_EN = Object.freeze({
 
   'users.createDescription': 'Set login credentials and an optional role. Management-created users are marked email-verified automatically and can sign in immediately.',
   'users.managedVerifiedHint': 'Users created here are trusted management-created accounts and are marked email-verified immediately. They can sign in without a verification email.',
+  'users.roleAccessUnavailable': 'User access is available, but role details are not. Grant Roles: Read to this role if it should see role names or assign roles.',
+  'users.roleUnavailableForCreate': 'Role details are unavailable, so this user will be created without a role.',
+  'users.roleDetailsUnavailable': 'Role details unavailable',
 
   'dataModel.fieldBuilderHint': 'Choose the data kind first. File and image fields store a file reference and get a dedicated picker in Content.',
   'dataModel.fieldType': 'Field type',
