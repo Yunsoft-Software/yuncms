@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
 import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
+import { useI18n } from '../i18n.js';
 
 const FIELD_TYPES = [
   'string', 'text', 'integer', 'bigint', 'decimal', 'boolean',
@@ -10,15 +11,15 @@ const FIELD_TYPES = [
 ];
 
 const COLLECTION_SORT_OPTIONS = [
-  ['name-asc', 'Name A–Z'],
-  ['name-desc', 'Name Z–A'],
+  ['name-asc', 'dataModel.nameAsc'],
+  ['name-desc', 'dataModel.nameDesc'],
 ];
 
 const FIELD_SORT_OPTIONS = [
-  ['name-asc', 'Name A–Z'],
-  ['name-desc', 'Name Z–A'],
-  ['type', 'Type'],
-  ['required', 'Required first'],
+  ['name-asc', 'dataModel.nameAsc'],
+  ['name-desc', 'dataModel.nameDesc'],
+  ['type', 'common.type'],
+  ['required', 'dataModel.requiredFirst'],
 ];
 
 const COLLECTION_PAGE_SIZES = [6, 12, 24];
@@ -56,6 +57,7 @@ function compareFields(left, right, sort) {
 }
 
 export function DataModelScreen() {
+  const { t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const [collections, setCollections] = useState([]);
   const [selected, setSelected] = useState('');
@@ -78,13 +80,9 @@ export function DataModelScreen() {
   const [loading, setLoading] = useState(true);
 
   const [collectionForm, setCollectionForm] = useState({ collection: '', note: '' });
-  const [fieldForm, setFieldForm] = useState({
-    field: '', type: 'string', required: false, length: 255,
-  });
+  const [fieldForm, setFieldForm] = useState({ field: '', type: 'string', required: false, length: 255 });
   const [m2oForm, setM2oForm] = useState({ manyField: '', oneCollection: '', onDelete: 'RESTRICT' });
-  const [m2mForm, setM2mForm] = useState({
-    junctionCollection: '', leftCollection: '', rightCollection: '',
-  });
+  const [m2mForm, setM2mForm] = useState({ junctionCollection: '', leftCollection: '', rightCollection: '' });
 
   async function loadCollections(preferred = selected) {
     setLoading(true);
@@ -98,7 +96,7 @@ export function DataModelScreen() {
         : rows.find((entry) => !entry.system)?.collection || rows[0]?.collection || '';
       setSelected(candidate);
     } catch (requestError) {
-      setError(requestError.message || 'Schema could not be loaded');
+      setError(requestError.message || t('dataModel.schemaLoadError'));
     } finally {
       setLoading(false);
     }
@@ -120,7 +118,7 @@ export function DataModelScreen() {
       setFields(fieldResponse?.data ?? []);
       setRelations(relationResponse?.data ?? []);
     } catch (requestError) {
-      setError(requestError.message || 'Collection schema could not be loaded');
+      setError(requestError.message || t('dataModel.collectionLoadError'));
     } finally {
       setLoading(false);
     }
@@ -173,19 +171,22 @@ export function DataModelScreen() {
   const visibleFields = useMemo(() => {
     const query = fieldSearch.trim().toLowerCase();
     return fields
-      .filter((field) => !query || [field.field, field.type, field.required ? 'required' : 'optional']
-        .some((value) => String(value).toLowerCase().includes(query)))
+      .filter((field) => !query || [
+        field.field,
+        field.type,
+        field.required ? t('common.required') : t('common.optional'),
+      ].some((value) => String(value).toLowerCase().includes(query)))
       .slice()
       .sort((left, right) => compareFields(left, right, fieldSort));
-  }, [fieldSearch, fieldSort, fields]);
+  }, [fieldSearch, fieldSort, fields, t]);
 
   const pagedCollections = useMemo(() => paginateClientItems(visibleUserCollections, collectionPage, collectionPageSize), [collectionPage, collectionPageSize, visibleUserCollections]);
   const pagedSystemCollections = useMemo(() => paginateClientItems(visibleSystemCollections, systemPage, collectionPageSize), [collectionPageSize, systemPage, visibleSystemCollections]);
   const pagedFields = useMemo(() => paginateClientItems(visibleFields, fieldPage, fieldPageSize), [fieldPage, fieldPageSize, visibleFields]);
 
   const m2oRelations = useMemo(() => relations.filter((relation) =>
-    relationKind(relation) !== 'm2m' &&
-    (relation.many_collection === selected || relation.one_collection === selected)), [relations, selected]);
+    relationKind(relation) !== 'm2m'
+    && (relation.many_collection === selected || relation.one_collection === selected)), [relations, selected]);
   const m2mJunctions = useMemo(() => {
     const names = [...new Set(relations
       .filter((relation) => relationKind(relation) === 'm2m' && relation.one_collection === selected)
@@ -211,32 +212,30 @@ export function DataModelScreen() {
       setCollectionForm({ collection: '', note: '' });
       setShowCreateCollection(false);
       setCollectionPage(1);
-      setNotice(`Created collection ${name}`);
+      setNotice(t('dataModel.collectionCreated', { name }));
       await loadCollections(name);
     } catch (requestError) {
-      setError(requestError.message || 'Collection could not be created');
+      setError(requestError.message || t('dataModel.collectionCreateError'));
     }
   }
 
   async function deleteCollection() {
     if (!selectedCollection || selectedCollection.system) return;
     const accepted = await requestConfirmation({
-      title: 'Delete collection?',
-      description: `${selected} and every record it contains will be permanently deleted.`,
-      confirmLabel: 'Delete collection',
+      title: t('dataModel.deleteCollection'),
+      description: t('dataModel.deleteCollectionDescription', { name: selected }),
+      confirmLabel: t('dataModel.deleteCollectionAction'),
       tone: 'danger',
     });
     if (!accepted) return;
     setError('');
     setNotice('');
     try {
-      await apiRequest(`/schema/collections/${encodeURIComponent(selected)}?destructive=true`, {
-        method: 'DELETE',
-      });
-      setNotice(`Deleted collection ${selected}`);
+      await apiRequest(`/schema/collections/${encodeURIComponent(selected)}?destructive=true`, { method: 'DELETE' });
+      setNotice(t('dataModel.collectionDeleted', { name: selected }));
       await loadCollections('');
     } catch (requestError) {
-      setError(requestError.message || 'Collection could not be deleted');
+      setError(requestError.message || t('dataModel.collectionDeleteError'));
     }
   }
 
@@ -246,31 +245,25 @@ export function DataModelScreen() {
     setError('');
     setNotice('');
     try {
-      const body = {
-        field: fieldForm.field.trim(),
-        type: fieldForm.type,
-        required: fieldForm.required,
-      };
+      const body = { field: fieldForm.field.trim(), type: fieldForm.type, required: fieldForm.required };
       if (fieldForm.type === 'string') body.length = Number(fieldForm.length || 255);
-      await apiRequest(`/schema/collections/${encodeURIComponent(selected)}/fields`, {
-        method: 'POST', body,
-      });
-      setNotice(`Added field ${fieldForm.field.trim()}`);
+      await apiRequest(`/schema/collections/${encodeURIComponent(selected)}/fields`, { method: 'POST', body });
+      setNotice(t('dataModel.fieldAdded', { name: fieldForm.field.trim() }));
       setFieldForm({ field: '', type: 'string', required: false, length: 255 });
       setShowCreateField(false);
       setFieldPage(1);
       await loadSelected();
     } catch (requestError) {
-      setError(requestError.message || 'Field could not be created');
+      setError(requestError.message || t('dataModel.fieldCreateError'));
     }
   }
 
   async function deleteField(field) {
     if (field.field === 'id') return;
     const accepted = await requestConfirmation({
-      title: 'Delete field?',
-      description: `${selected}.${field.field} and all values stored in it will be permanently deleted.`,
-      confirmLabel: 'Delete field',
+      title: t('dataModel.deleteField'),
+      description: t('dataModel.deleteFieldDescription', { collection: selected, field: field.field }),
+      confirmLabel: t('dataModel.deleteFieldAction'),
       tone: 'danger',
     });
     if (!accepted) return;
@@ -281,10 +274,10 @@ export function DataModelScreen() {
         `/schema/collections/${encodeURIComponent(selected)}/fields/${encodeURIComponent(field.field)}?destructive=true`,
         { method: 'DELETE' },
       );
-      setNotice(`Deleted field ${field.field}`);
+      setNotice(t('dataModel.fieldDeleted', { name: field.field }));
       await loadSelected();
     } catch (requestError) {
-      setError(requestError.message || 'Field could not be deleted');
+      setError(requestError.message || t('dataModel.fieldDeleteError'));
     }
   }
 
@@ -297,10 +290,10 @@ export function DataModelScreen() {
         `/schema/collections/${encodeURIComponent(selected)}/fields/${encodeURIComponent(field.field)}/schema`,
         { method: 'PATCH', body: { required: !Boolean(field.required) } },
       );
-      setNotice(`Updated ${field.field}`);
+      setNotice(t('dataModel.fieldUpdated', { name: field.field }));
       await loadSelected();
     } catch (requestError) {
-      setError(requestError.message || 'Field schema could not be updated');
+      setError(requestError.message || t('dataModel.fieldUpdateError'));
     }
   }
 
@@ -318,19 +311,23 @@ export function DataModelScreen() {
           onDelete: m2oForm.onDelete,
         },
       });
-      setNotice(`Created relation ${selected}.${m2oForm.manyField}`);
+      setNotice(t('dataModel.relationCreated', { collection: selected, field: m2oForm.manyField }));
       setM2oForm({ manyField: '', oneCollection: '', onDelete: 'RESTRICT' });
       await loadSelected();
     } catch (requestError) {
-      setError(requestError.message || 'Relation could not be created');
+      setError(requestError.message || t('dataModel.relationCreateError'));
     }
   }
 
   async function deleteM2O(relation) {
     const accepted = await requestConfirmation({
-      title: 'Delete relation?',
-      description: `${relation.many_collection}.${relation.many_field} will no longer reference ${relation.one_collection}.`,
-      confirmLabel: 'Delete relation',
+      title: t('dataModel.deleteRelation'),
+      description: t('dataModel.deleteRelationDescription', {
+        collection: relation.many_collection,
+        field: relation.many_field,
+        target: relation.one_collection,
+      }),
+      confirmLabel: t('dataModel.deleteRelationAction'),
       tone: 'danger',
     });
     if (!accepted) return;
@@ -341,10 +338,10 @@ export function DataModelScreen() {
         `/schema/relations/m2o/${encodeURIComponent(relation.many_collection)}/${encodeURIComponent(relation.many_field)}`,
         { method: 'DELETE' },
       );
-      setNotice('Relation deleted');
+      setNotice(t('dataModel.relationDeleted'));
       await loadSelected();
     } catch (requestError) {
-      setError(requestError.message || 'Relation could not be deleted');
+      setError(requestError.message || t('dataModel.relationDeleteError'));
     }
   }
 
@@ -362,20 +359,20 @@ export function DataModelScreen() {
           rightCollection: m2mForm.rightCollection,
         },
       });
-      setNotice(`Created M2M junction ${junction}`);
+      setNotice(t('dataModel.junctionCreated', { name: junction }));
       setM2mForm({ junctionCollection: '', leftCollection: '', rightCollection: '' });
       await loadCollections(selected);
       await loadSelected(selected);
     } catch (requestError) {
-      setError(requestError.message || 'M2M relation could not be created');
+      setError(requestError.message || t('dataModel.m2mCreateError'));
     }
   }
 
   async function deleteM2M(junctionCollection) {
     const accepted = await requestConfirmation({
-      title: 'Delete many-to-many relation?',
-      description: `${junctionCollection} and every link record it contains will be permanently deleted.`,
-      confirmLabel: 'Delete relation',
+      title: t('dataModel.deleteM2M'),
+      description: t('dataModel.deleteM2MDescription', { name: junctionCollection }),
+      confirmLabel: t('dataModel.deleteRelationAction'),
       tone: 'danger',
     });
     if (!accepted) return;
@@ -386,11 +383,11 @@ export function DataModelScreen() {
         `/schema/relations/m2m/${encodeURIComponent(junctionCollection)}?destructive=true`,
         { method: 'DELETE' },
       );
-      setNotice(`Deleted M2M junction ${junctionCollection}`);
+      setNotice(t('dataModel.junctionDeleted', { name: junctionCollection }));
       await loadCollections(selected);
       await loadSelected(selected);
     } catch (requestError) {
-      setError(requestError.message || 'M2M relation could not be deleted');
+      setError(requestError.message || t('dataModel.m2mDeleteError'));
     }
   }
 
@@ -403,58 +400,58 @@ export function DataModelScreen() {
         <aside className="panel form-panel model-sidebar data-model-sidebar">
           <div className="panel-heading model-sidebar-heading">
             <div>
-              <p className="eyebrow">Data Model</p>
-              <h2>Collections</h2>
-              <p>{userCollections.length} project · {systemCollections.length} system</p>
+              <p className="eyebrow">{t('nav.dataModel')}</p>
+              <h2>{t('dataModel.collections')}</h2>
+              <p>{t('dataModel.collectionSummary', { project: userCollections.length, system: systemCollections.length })}</p>
             </div>
             <button className="primary-button" type="button" onClick={() => setShowCreateCollection((value) => !value)}>
-              {showCreateCollection ? 'Cancel' : 'New'}
+              {showCreateCollection ? t('common.cancel') : t('common.create')}
             </button>
           </div>
 
           {showCreateCollection && (
             <form className="schema-create-card form-stack compact" onSubmit={createCollection}>
-              <div><strong>Create collection</strong><p>Use a short machine-friendly name such as `articles`.</p></div>
-              <label className="field-label"><span>Name</span><input value={collectionForm.collection} onChange={(event) => setCollectionForm((current) => ({ ...current, collection: event.target.value }))} placeholder="articles" required autoFocus /></label>
-              <label className="field-label"><span>Description</span><input value={collectionForm.note} onChange={(event) => setCollectionForm((current) => ({ ...current, note: event.target.value }))} placeholder="Optional description" /></label>
-              <button className="primary-button" type="submit">Create</button>
+              <div><strong>{t('dataModel.createCollection')}</strong><p>{t('dataModel.createCollectionHint')}</p></div>
+              <label className="field-label"><span>{t('common.name')}</span><input value={collectionForm.collection} onChange={(event) => setCollectionForm((current) => ({ ...current, collection: event.target.value }))} placeholder="articles" required autoFocus /></label>
+              <label className="field-label"><span>{t('dataModel.description')}</span><input value={collectionForm.note} onChange={(event) => setCollectionForm((current) => ({ ...current, note: event.target.value }))} placeholder={t('dataModel.optionalDescription')} /></label>
+              <button className="primary-button" type="submit">{t('common.create')}</button>
             </form>
           )}
 
           <div className="sidebar-filter-row">
-            <label className="field-label"><span>Find collection</span><input className="sidebar-filter-input" type="search" value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder="Name or description…" /></label>
-            <label className="field-label"><span>Sort</span><select value={collectionSort} onChange={(event) => setCollectionSort(event.target.value)}>{COLLECTION_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label className="field-label"><span>{t('dataModel.findCollection')}</span><input className="sidebar-filter-input" type="search" value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder={t('visibility.searchPlaceholder')} /></label>
+            <label className="field-label"><span>{t('common.sort')}</span><select value={collectionSort} onChange={(event) => setCollectionSort(event.target.value)}>{COLLECTION_SORT_OPTIONS.map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}</select></label>
           </div>
 
           <div className="collection-group">
-            <div className="collection-group-heading"><small className="collection-group-label">Project collections</small><span>{visibleUserCollections.length}</span></div>
+            <div className="collection-group-heading"><small className="collection-group-label">{t('dataModel.projectCollections')}</small><span>{visibleUserCollections.length}</span></div>
             <div className="list-stack collection-list-page">
               {pagedCollections.items.map((entry) => (
                 <button className={`list-button collection-list-button ${entry.collection === selected ? 'active' : ''}`} key={entry.collection} type="button" onClick={() => setSelected(entry.collection)}>
                   <span><strong>{entry.collection}</strong>{entry.note && <small>{entry.note}</small>}</span>
                 </button>
               ))}
-              {userCollections.length === 0 && <p className="muted-line">No project collections yet.</p>}
-              {userCollections.length > 0 && visibleUserCollections.length === 0 && <p className="muted-line">No matching project collections.</p>}
+              {userCollections.length === 0 && <p className="muted-line">{t('dataModel.noProjectCollections')}</p>}
+              {userCollections.length > 0 && visibleUserCollections.length === 0 && <p className="muted-line">{t('dataModel.noMatchingProject')}</p>}
             </div>
             {visibleUserCollections.length > 0 && (
-              <Pagination compact page={pagedCollections.page} pageSize={collectionPageSize} totalItems={visibleUserCollections.length} pageSizeOptions={COLLECTION_PAGE_SIZES} itemLabel="collections" onPageChange={setCollectionPage} onPageSizeChange={(size) => { setCollectionPageSize(size); setCollectionPage(1); setSystemPage(1); }} />
+              <Pagination compact page={pagedCollections.page} pageSize={collectionPageSize} totalItems={visibleUserCollections.length} pageSizeOptions={COLLECTION_PAGE_SIZES} itemLabel={t('dataModel.collectionsLower')} onPageChange={setCollectionPage} onPageSizeChange={(size) => { setCollectionPageSize(size); setCollectionPage(1); setSystemPage(1); }} />
             )}
           </div>
 
           {systemCollections.length > 0 && (
             <details className="system-collections">
-              <summary>System collections ({visibleSystemCollections.length})</summary>
+              <summary>{t('dataModel.systemCollectionsCount', { count: visibleSystemCollections.length })}</summary>
               <div className="list-stack collection-list-page">
                 {pagedSystemCollections.items.map((entry) => (
                   <button className={`list-button collection-list-button ${entry.collection === selected ? 'active' : ''}`} key={entry.collection} type="button" onClick={() => setSelected(entry.collection)}>
-                    <span><strong>{entry.collection}</strong><small>system managed</small></span>
+                    <span><strong>{entry.collection}</strong><small>{t('dataModel.systemManaged')}</small></span>
                   </button>
                 ))}
-                {visibleSystemCollections.length === 0 && <p className="muted-line">No matching system collections.</p>}
+                {visibleSystemCollections.length === 0 && <p className="muted-line">{t('dataModel.noMatchingSystem')}</p>}
               </div>
               {visibleSystemCollections.length > collectionPageSize && (
-                <Pagination compact page={pagedSystemCollections.page} pageSize={collectionPageSize} totalItems={visibleSystemCollections.length} pageSizeOptions={COLLECTION_PAGE_SIZES} itemLabel="system collections" onPageChange={setSystemPage} />
+                <Pagination compact page={pagedSystemCollections.page} pageSize={collectionPageSize} totalItems={visibleSystemCollections.length} pageSizeOptions={COLLECTION_PAGE_SIZES} itemLabel={t('dataModel.systemCollectionsLower')} onPageChange={setSystemPage} />
               )}
             </details>
           )}
@@ -462,50 +459,50 @@ export function DataModelScreen() {
 
         <div className="model-detail-stack">
           {!selectedCollection ? (
-            <section className="panel empty-state"><div><h2>Select a collection</h2><p>Choose a collection on the left to inspect its fields and relations.</p></div></section>
+            <section className="panel empty-state"><div><h2>{t('dataModel.selectCollection')}</h2><p>{t('dataModel.selectCollectionDescription')}</p></div></section>
           ) : (
             <section className="panel form-panel model-detail">
               <div className="panel-heading model-detail-heading">
                 <div>
-                  <p className="eyebrow">{selectedCollection.system ? 'System collection' : 'Collection'}</p>
+                  <p className="eyebrow">{selectedCollection.system ? t('dataModel.systemCollection') : t('visibility.collection')}</p>
                   <h2>{selected}</h2>
-                  <p>{selectedCollection.note || 'No description has been added.'}</p>
+                  <p>{selectedCollection.note || t('dataModel.noDescription')}</p>
                 </div>
                 <div className="model-heading-actions">
-                  <span className="schema-count">{fields.length} fields</span>
-                  {!selectedCollection.system && <button className="danger-button" type="button" onClick={deleteCollection}>Delete collection</button>}
+                  <span className="schema-count">{t('dataModel.fieldCount', { count: fields.length })}</span>
+                  {!selectedCollection.system && <button className="danger-button" type="button" onClick={deleteCollection}>{t('dataModel.deleteCollectionAction')}</button>}
                 </div>
               </div>
 
-              <div className="segmented-control schema-tabs" aria-label="Collection settings">
-                <button className={schemaTab === 'fields' ? 'active' : ''} type="button" onClick={() => setSchemaTab('fields')}>Fields</button>
-                <button className={schemaTab === 'relations' ? 'active' : ''} type="button" onClick={() => setSchemaTab('relations')}>Relations</button>
+              <div className="segmented-control schema-tabs" aria-label={t('dataModel.collectionSettings')}>
+                <button className={schemaTab === 'fields' ? 'active' : ''} type="button" onClick={() => setSchemaTab('fields')}>{t('dataModel.fields')}</button>
+                <button className={schemaTab === 'relations' ? 'active' : ''} type="button" onClick={() => setSchemaTab('relations')}>{t('dataModel.relations')}</button>
               </div>
 
               {schemaTab === 'fields' ? (
                 <div className="schema-tab-content">
                   <div className="schema-section-heading">
-                    <div><h3>Fields</h3><p>Search and manage the fields stored on this collection.</p></div>
-                    {!selectedCollection.system && <button className="primary-button" type="button" onClick={() => setShowCreateField((value) => !value)}>{showCreateField ? 'Close form' : 'Add field'}</button>}
+                    <div><h3>{t('dataModel.fields')}</h3><p>{t('dataModel.fieldsDescription')}</p></div>
+                    {!selectedCollection.system && <button className="primary-button" type="button" onClick={() => setShowCreateField((value) => !value)}>{showCreateField ? t('users.closeForm') : t('dataModel.addField')}</button>}
                   </div>
 
                   {showCreateField && !selectedCollection.system && (
                     <form className="schema-create-card form-stack" onSubmit={createField}>
-                      <div><strong>Add field</strong><p>Choose a field name and storage type. Type conversion is intentionally not available in V1.</p></div>
+                      <div><strong>{t('dataModel.addField')}</strong><p>{t('dataModel.addFieldHint')}</p></div>
                       <div className="form-grid">
-                        <label className="field-label"><span>Field name</span><input value={fieldForm.field} onChange={(event) => setFieldForm((current) => ({ ...current, field: event.target.value }))} placeholder="title" required autoFocus /></label>
-                        <label className="field-label"><span>Type</span><select value={fieldForm.type} onChange={(event) => setFieldForm((current) => ({ ...current, type: event.target.value }))}>{FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
-                        {fieldForm.type === 'string' && <label className="field-label"><span>Max length</span><input type="number" min="1" max="4096" value={fieldForm.length} onChange={(event) => setFieldForm((current) => ({ ...current, length: event.target.value }))} /></label>}
-                        <label className="checkbox-label schema-checkbox"><input type="checkbox" checked={fieldForm.required} onChange={(event) => setFieldForm((current) => ({ ...current, required: event.target.checked }))} />Required value</label>
+                        <label className="field-label"><span>{t('dataModel.fieldName')}</span><input value={fieldForm.field} onChange={(event) => setFieldForm((current) => ({ ...current, field: event.target.value }))} placeholder="title" required autoFocus /></label>
+                        <label className="field-label"><span>{t('common.type')}</span><select value={fieldForm.type} onChange={(event) => setFieldForm((current) => ({ ...current, type: event.target.value }))}>{FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
+                        {fieldForm.type === 'string' && <label className="field-label"><span>{t('dataModel.maxLength')}</span><input type="number" min="1" max="4096" value={fieldForm.length} onChange={(event) => setFieldForm((current) => ({ ...current, length: event.target.value }))} /></label>}
+                        <label className="checkbox-label schema-checkbox"><input type="checkbox" checked={fieldForm.required} onChange={(event) => setFieldForm((current) => ({ ...current, required: event.target.checked }))} />{t('dataModel.requiredValue')}</label>
                       </div>
-                      <div className="form-actions"><button className="primary-button" type="submit">Add field</button></div>
+                      <div className="form-actions"><button className="primary-button" type="submit">{t('dataModel.addField')}</button></div>
                     </form>
                   )}
 
                   <div className="field-list-controls">
-                    <label className="field-label"><span>Find field</span><input type="search" value={fieldSearch} onChange={(event) => setFieldSearch(event.target.value)} placeholder="Name, type, required…" /></label>
-                    <label className="field-label"><span>Sort fields</span><select value={fieldSort} onChange={(event) => setFieldSort(event.target.value)}>{FIELD_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                    {(fieldSearch || fieldSort !== 'name-asc') && <button className="text-button" type="button" onClick={() => { setFieldSearch(''); setFieldSort('name-asc'); }}>Reset</button>}
+                    <label className="field-label"><span>{t('dataModel.findField')}</span><input type="search" value={fieldSearch} onChange={(event) => setFieldSearch(event.target.value)} placeholder={t('dataModel.fieldSearchPlaceholder')} /></label>
+                    <label className="field-label"><span>{t('dataModel.sortFields')}</span><select value={fieldSort} onChange={(event) => setFieldSort(event.target.value)}>{FIELD_SORT_OPTIONS.map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}</select></label>
+                    {(fieldSearch || fieldSort !== 'name-asc') && <button className="text-button" type="button" onClick={() => { setFieldSearch(''); setFieldSort('name-asc'); }}>{t('common.reset')}</button>}
                   </div>
 
                   <div className="field-list">
@@ -516,54 +513,54 @@ export function DataModelScreen() {
                           <span className="field-name-stack"><strong>{field.field}</strong><small>{field.type}</small></span>
                         </div>
                         <div className="field-row-meta">
-                          <span className={`status-pill ${field.required ? 'required' : ''}`}>{field.required ? 'Required' : 'Optional'}</span>
-                          {field.readonly && <span className="status-pill">Read only</span>}
+                          <span className={`status-pill ${field.required ? 'required' : ''}`}>{field.required ? t('common.required') : t('common.optional')}</span>
+                          {field.readonly && <span className="status-pill">{t('common.readonly')}</span>}
                           {field.field !== 'id' && !selectedCollection.system && (
                             <>
-                              <button className="text-button" type="button" onClick={() => toggleRequired(field)}>{field.required ? 'Make optional' : 'Make required'}</button>
-                              <button className="danger-button" type="button" onClick={() => deleteField(field)}>Delete</button>
+                              <button className="text-button" type="button" onClick={() => toggleRequired(field)}>{field.required ? t('dataModel.makeOptional') : t('dataModel.makeRequired')}</button>
+                              <button className="danger-button" type="button" onClick={() => deleteField(field)}>{t('common.delete')}</button>
                             </>
                           )}
                         </div>
                       </div>
                     ))}
-                    {fields.length > 0 && visibleFields.length === 0 && <div className="inline-info">No fields match this search.</div>}
+                    {fields.length > 0 && visibleFields.length === 0 && <div className="inline-info">{t('dataModel.noFields')}</div>}
                   </div>
                   {visibleFields.length > 0 && (
-                    <Pagination page={pagedFields.page} pageSize={fieldPageSize} totalItems={visibleFields.length} pageSizeOptions={FIELD_PAGE_SIZES} itemLabel="fields" onPageChange={setFieldPage} onPageSizeChange={(size) => { setFieldPageSize(size); setFieldPage(1); }} />
+                    <Pagination page={pagedFields.page} pageSize={fieldPageSize} totalItems={visibleFields.length} pageSizeOptions={FIELD_PAGE_SIZES} itemLabel={t('dataModel.fieldsLower')} onPageChange={setFieldPage} onPageSizeChange={(size) => { setFieldPageSize(size); setFieldPage(1); }} />
                   )}
                 </div>
               ) : (
                 <div className="schema-tab-content">
                   {selectedCollection.system ? (
-                    <div className="inline-info">System collection relations are visible through metadata but are not edited from this screen.</div>
+                    <div className="inline-info">{t('dataModel.systemRelationInfo')}</div>
                   ) : (
                     <div className="split-grid relation-builder-grid">
                       <article className="schema-create-card form-stack">
-                        <div><p className="eyebrow">Many to one</p><h3>Link to one record</h3><p>Use an existing field in {selected} as the foreign-key field, then choose the target collection.</p></div>
+                        <div><p className="eyebrow">{t('dataModel.manyToOne')}</p><h3>{t('dataModel.linkOneRecord')}</h3><p>{t('dataModel.m2oDescription', { collection: selected })}</p></div>
                         <div className="list-stack relation-list">
-                          {m2oRelations.length === 0 && <p className="muted-line">No direct relations for this collection.</p>}
-                          {m2oRelations.map((relation) => <div className="relation-row" key={`${relation.many_collection}.${relation.many_field}`}><div><strong>{relation.many_collection}.{relation.many_field}</strong><small>links to {relation.one_collection}.{relation.one_field}</small></div><button className="danger-button" type="button" onClick={() => deleteM2O(relation)}>Delete</button></div>)}
+                          {m2oRelations.length === 0 && <p className="muted-line">{t('dataModel.noDirectRelations')}</p>}
+                          {m2oRelations.map((relation) => <div className="relation-row" key={`${relation.many_collection}.${relation.many_field}`}><div><strong>{relation.many_collection}.{relation.many_field}</strong><small>{t('dataModel.linksTo', { collection: relation.one_collection, field: relation.one_field })}</small></div><button className="danger-button" type="button" onClick={() => deleteM2O(relation)}>{t('common.delete')}</button></div>)}
                         </div>
                         <form className="form-stack compact" onSubmit={createM2O}>
-                          <label className="field-label"><span>Field in {selected}</span><select value={m2oForm.manyField} onChange={(event) => setM2oForm((current) => ({ ...current, manyField: event.target.value }))} required><option value="">Choose field</option>{fields.filter((field) => field.field !== 'id').map((field) => <option key={field.field} value={field.field}>{field.field} ({field.type})</option>)}</select></label>
-                          <label className="field-label"><span>Target collection</span><select value={m2oForm.oneCollection} onChange={(event) => setM2oForm((current) => ({ ...current, oneCollection: event.target.value }))} required><option value="">Choose collection</option>{userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label>
-                          <label className="field-label"><span>If target is deleted</span><select value={m2oForm.onDelete} onChange={(event) => setM2oForm((current) => ({ ...current, onDelete: event.target.value }))}><option value="RESTRICT">Prevent deletion</option><option value="CASCADE">Delete linked records</option><option value="SET NULL">Clear this field</option></select></label>
-                          <button className="primary-button" type="submit">Create relation</button>
+                          <label className="field-label"><span>{t('dataModel.fieldIn', { collection: selected })}</span><select value={m2oForm.manyField} onChange={(event) => setM2oForm((current) => ({ ...current, manyField: event.target.value }))} required><option value="">{t('dataModel.chooseField')}</option>{fields.filter((field) => field.field !== 'id').map((field) => <option key={field.field} value={field.field}>{field.field} ({field.type})</option>)}</select></label>
+                          <label className="field-label"><span>{t('dataModel.targetCollection')}</span><select value={m2oForm.oneCollection} onChange={(event) => setM2oForm((current) => ({ ...current, oneCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label>
+                          <label className="field-label"><span>{t('dataModel.ifTargetDeleted')}</span><select value={m2oForm.onDelete} onChange={(event) => setM2oForm((current) => ({ ...current, onDelete: event.target.value }))}><option value="RESTRICT">{t('dataModel.preventDeletion')}</option><option value="CASCADE">{t('dataModel.deleteLinked')}</option><option value="SET NULL">{t('dataModel.clearField')}</option></select></label>
+                          <button className="primary-button" type="submit">{t('dataModel.createRelation')}</button>
                         </form>
                       </article>
 
                       <article className="schema-create-card form-stack">
-                        <div><p className="eyebrow">Many to many</p><h3>Connect two collections</h3><p>YunCMS creates a hidden junction collection that stores both links.</p></div>
+                        <div><p className="eyebrow">{t('dataModel.manyToMany')}</p><h3>{t('dataModel.connectCollections')}</h3><p>{t('dataModel.m2mDescription')}</p></div>
                         <div className="list-stack relation-list">
-                          {m2mJunctions.length === 0 && <p className="muted-line">No many-to-many junctions for this collection.</p>}
-                          {m2mJunctions.map((junction) => <div className="relation-row" key={junction.junctionCollection}><div><strong>{junction.junctionCollection}</strong><small>{junction.relations.map((relation) => relation.one_collection).join(' ↔ ')}</small></div><button className="danger-button" type="button" onClick={() => deleteM2M(junction.junctionCollection)}>Delete</button></div>)}
+                          {m2mJunctions.length === 0 && <p className="muted-line">{t('dataModel.noM2MJunctions')}</p>}
+                          {m2mJunctions.map((junction) => <div className="relation-row" key={junction.junctionCollection}><div><strong>{junction.junctionCollection}</strong><small>{junction.relations.map((relation) => relation.one_collection).join(' ↔ ')}</small></div><button className="danger-button" type="button" onClick={() => deleteM2M(junction.junctionCollection)}>{t('common.delete')}</button></div>)}
                         </div>
                         <form className="form-stack compact" onSubmit={createM2M}>
-                          <label className="field-label"><span>Junction name</span><input value={m2mForm.junctionCollection} onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: event.target.value }))} placeholder="article_tags" required /></label>
-                          <label className="field-label"><span>First collection</span><select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required><option value="">Choose collection</option>{userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label>
-                          <label className="field-label"><span>Second collection</span><select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required><option value="">Choose collection</option>{userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label>
-                          <button className="primary-button" type="submit">Create junction</button>
+                          <label className="field-label"><span>{t('dataModel.junctionName')}</span><input value={m2mForm.junctionCollection} onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: event.target.value }))} placeholder="article_tags" required /></label>
+                          <label className="field-label"><span>{t('dataModel.firstCollection')}</span><select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label>
+                          <label className="field-label"><span>{t('dataModel.secondCollection')}</span><select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label>
+                          <button className="primary-button" type="submit">{t('dataModel.createJunction')}</button>
                         </form>
                       </article>
                     </div>
@@ -575,7 +572,7 @@ export function DataModelScreen() {
         </div>
       </section>
 
-      {loading && <div className="muted-line">Loading schema…</div>}
+      {loading && <div className="muted-line">{t('dataModel.loadingSchema')}</div>}
     </div>
   );
 }
