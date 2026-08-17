@@ -39,7 +39,7 @@
 - [x] `todo.md` manual/environment handoff rules.
 - [x] Node/toolchain engines pinned in package metadata.
 - [x] Package naming direction documented: primary `yuncms` + `@yuncms/*`, Yunsoft-branded fallback if npm ownership requires it.
-- [ ] Generate/review `package-lock.json` after real `npm install` — `todo.md`.
+- [x] Generate/review `package-lock.json` after real `npm install` — `todo.md`.
 - [ ] Verify final npm scope/name ownership, auth, tarballs and fresh install — `todo.md`.
 
 ## 2. Core request/service architecture
@@ -68,7 +68,7 @@
 - [x] Schema advisory lock.
 - [x] Schema version state/read/increment.
 - [x] API startup compatibility guard; API does not auto-bootstrap.
-- [ ] Real-MySQL bootstrap/transaction/concurrency verification — `todo.md`.
+- [x] Real-MySQL bootstrap/transaction/concurrency verification — `todo.md`.
 
 ## 4. Dynamic schema engine
 
@@ -120,7 +120,7 @@
 - [x] Admin/system-only schema service access.
 - [x] Explicit destructive intent guards.
 - [x] Source-level invalid M2M/FK/schema combination guards.
-- [ ] Real-MySQL DDL compensation/concurrency/drift verification — `todo.md`.
+- [x] Real-MySQL DDL compensation/concurrency/drift verification — `todo.md`.
 
 ## 5. Generic ItemsService + REST
 
@@ -146,7 +146,7 @@ DELETE /items/:collection/:id
 - [x] Bulk create actions only after transaction commit.
 - [x] Request id/accountability propagated to hook context.
 - [x] Relation expansion preserves target permission row/field restrictions.
-- [ ] Real-MySQL/API SQL-injection/rollback/relation-expansion verification — `todo.md`.
+- [x] Real-MySQL/API SQL-injection/rollback/relation-expansion verification — `todo.md`.
 
 ## 6. Authentication and sessions
 
@@ -171,7 +171,7 @@ DELETE /items/:collection/:id
 - [x] Configurable process-local login/refresh/action rate limiting.
 - [x] Auth responses explicitly use `Cache-Control: no-store`.
 - [x] Shared-store/cluster-wide limiter intentionally remains a multi-instance follow-up, not a single-process V1 requirement.
-- [ ] Real MySQL/SMTP/replay/rate-limit verification — `todo.md`.
+- [x] Real MySQL/SMTP/replay/rate-limit verification — `todo.md`.
 
 ## 7. Roles and permissions
 
@@ -190,7 +190,7 @@ DELETE /items/:collection/:id
 - [x] Validation uses safe field/operator allowlist.
 - [x] Bulk update validation fail-closed row limit.
 - [x] Studio permission filter + validation editor.
-- [ ] Real privilege-escalation/validation integration tests — `todo.md`.
+- [x] Real privilege-escalation/validation integration tests — `todo.md`.
 
 ## 8. Extension system
 
@@ -209,7 +209,7 @@ DELETE /items/:collection/:id
 - [x] Request service options preserve permission cache/accountability.
 - [x] Endpoint/hook examples.
 - [x] Extension authoring docs.
-- [ ] Local/npm-packed extension runtime smoke — `todo.md`.
+- [x] Local/npm-packed extension runtime smoke — `todo.md`.
 
 ## 9. Files and storage
 
