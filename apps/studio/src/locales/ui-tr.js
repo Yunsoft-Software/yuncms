@@ -18,6 +18,7 @@ export const UI_TR = Object.freeze({
   'fieldType.uuid': 'UUID',
   'fieldType.file': 'Dosya',
   'fieldType.image': 'Görsel',
+  'fieldType.user': 'Kullanıcı',
 
   'fieldBuilder.title': 'Alan oluştur',
   'fieldBuilder.description': 'Önce alanın neyi temsil ettiğini seçin; ardından yalnız o veri türü için gerekli ayarları yapılandırın.',
