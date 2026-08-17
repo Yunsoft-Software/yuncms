@@ -89,6 +89,7 @@ export function fieldCreationPayload(form = {}) {
   const specialInterface = form.type === 'file' || form.type === 'image' ? form.type : null;
   const storageType = specialInterface ? 'uuid' : form.type;
   const payload = {
+    name: String(form.name || form.field || '').trim(),
     field: String(form.field || '').trim(),
     type: storageType,
     required: form.required === true,
@@ -118,7 +119,9 @@ export function fieldCreationPayload(form = {}) {
 
 export function createEmptyFieldForm() {
   return {
+    name: '',
     field: '',
+    keyTouched: false,
     type: 'string',
     required: false,
     length: 255,
