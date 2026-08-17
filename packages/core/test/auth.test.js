@@ -34,7 +34,7 @@ test('opaque tokens expose type prefixes but persist as hashes', () => {
   assert.equal(access.hash.length, 64);
 });
 
-test('refresh rotation makes the old refresh token unusable', async () => {
+test('refresh rotation makes the old refresh token unusable and preserves the role name', async () => {
   const original = createOpaqueToken('refresh', { bytes: 48 });
   let storedRefreshHash = original.hash;
   const calls = [];
@@ -50,6 +50,7 @@ test('refresh rotation makes the old refresh token unusable', async () => {
           user: 'user-1',
           email: 'user@example.com',
           role: 'role-1',
+          role_name: 'Content Editor',
           status: 'active',
           role_admin: 0,
         }], []];
@@ -75,6 +76,7 @@ test('refresh rotation makes the old refresh token unusable', async () => {
   });
   assert.equal(tokenType(rotated.access_token), 'access');
   assert.equal(tokenType(rotated.refresh_token), 'refresh');
+  assert.equal(rotated.role_name, 'Content Editor');
   assert.notEqual(rotated.refresh_token, original.token);
 
   await assert.rejects(
@@ -100,6 +102,7 @@ test('login returns generic invalid credentials for wrong password', async () =>
           email: 'user@example.com',
           password_hash: encoded,
           role: 'role-1',
+          role_name: 'Content Editor',
           status: 'active',
           email_verified_at: null,
           role_admin: 0,
