@@ -39,6 +39,17 @@ test('field creation payload supports timestamp current-time and auto-update pre
   });
 });
 
+test('fixed date-time defaults are normalized from browser input to MySQL format', () => {
+  const payload = fieldCreationPayload({
+    ...createEmptyFieldForm(),
+    field: 'published_at',
+    type: 'datetime',
+    defaultMode: 'value',
+    defaultValue: '2026-08-17T10:30',
+  });
+  assert.equal(payload.defaultValue, '2026-08-17 10:30:00');
+});
+
 test('decimal field builder sends explicit precision and scale', () => {
   const payload = fieldCreationPayload({
     ...createEmptyFieldForm(),
