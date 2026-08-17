@@ -2,6 +2,8 @@ function encodeJson(value) {
   return value == null ? null : JSON.stringify(value);
 }
 
+const FILE_INTERFACES = new Set(['file', 'image']);
+
 export class SchemaMetadataRepository {
   constructor(database) {
     if (!database) throw new Error('Database handle is required');
@@ -128,6 +130,11 @@ export class SchemaMetadataRepository {
     options = null,
     schemaMetadata = null,
   }) {
+    if (FILE_INTERFACES.has(fieldInterface) && type !== 'uuid') {
+      const error = new Error(`${fieldInterface} interface requires uuid storage`);
+      error.code = 'INVALID_FIELD_INTERFACE';
+      throw error;
+    }
     await this.database.query(
       `INSERT INTO yuncms_fields
        (collection, field, type, required, readonly, hidden, sort, interface, options, schema_metadata)
@@ -151,6 +158,16 @@ export class SchemaMetadataRepository {
   async updateFieldMetadata(collection, field, patch = {}) {
     const assignments = [];
     const params = [];
+
+    if (Object.hasOwn(patch, 'interface') && FILE_INTERFACES.has(patch.interface)) {
+      const existing = await this.readField(collection, field);
+      if (!existing) return null;
+      if (existing.type !== 'uuid') {
+        const error = new Error(`${patch.interface} interface requires uuid storage`);
+        error.code = 'INVALID_FIELD_INTERFACE';
+        throw error;
+      }
+    }
 
     if (Object.hasOwn(patch, 'readonly')) {
       assignments.push('readonly = ?');
