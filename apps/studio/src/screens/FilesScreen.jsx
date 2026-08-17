@@ -4,23 +4,24 @@ import { apiBlob, apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
 import { FilePreview } from '../components/FilePreview.jsx';
 import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
+import { useI18n } from '../i18n.js';
 
 const FILE_TYPE_OPTIONS = [
-  ['all', 'All types'],
-  ['image', 'Images'],
-  ['video', 'Video'],
-  ['audio', 'Audio'],
-  ['pdf', 'PDF'],
-  ['other', 'Other'],
+  ['all', 'files.allTypes'],
+  ['image', 'files.images'],
+  ['video', 'files.video'],
+  ['audio', 'files.audio'],
+  ['pdf', 'files.pdf'],
+  ['other', 'files.other'],
 ];
 
 const FILE_SORT_OPTIONS = [
-  ['newest', 'Newest first'],
-  ['oldest', 'Oldest first'],
-  ['name-asc', 'Name A–Z'],
-  ['name-desc', 'Name Z–A'],
-  ['size-desc', 'Largest first'],
-  ['size-asc', 'Smallest first'],
+  ['newest', 'files.newest'],
+  ['oldest', 'files.oldest'],
+  ['name-asc', 'files.nameAsc'],
+  ['name-desc', 'files.nameDesc'],
+  ['size-desc', 'files.sizeDesc'],
+  ['size-asc', 'files.sizeAsc'],
 ];
 
 const FILE_PAGE_SIZES = [12, 24, 48, 96];
@@ -39,14 +40,14 @@ function fileExtension(file) {
   return dot === -1 ? '' : filename.slice(dot + 1).toLowerCase();
 }
 
-function fileTypeLabel(file) {
+function fileTypeLabel(file, t) {
   const mimetype = file.mimetype || 'application/octet-stream';
-  if (mimetype.startsWith('image/')) return 'Image';
-  if (mimetype.startsWith('video/')) return 'Video';
-  if (mimetype.startsWith('audio/')) return 'Audio';
-  if (mimetype === 'application/pdf') return 'PDF';
+  if (mimetype.startsWith('image/')) return t('files.image');
+  if (mimetype.startsWith('video/')) return t('files.video');
+  if (mimetype.startsWith('audio/')) return t('files.audio');
+  if (mimetype === 'application/pdf') return t('files.pdf');
   const extension = fileExtension(file);
-  return extension ? extension.toUpperCase() : 'File';
+  return extension ? extension.toUpperCase() : t('files.file');
 }
 
 function fileCategory(file) {
@@ -59,11 +60,11 @@ function fileCategory(file) {
   return 'other';
 }
 
-function fileDisplayName(file) {
-  return file.title || file.filename_download || 'Untitled file';
+function fileDisplayName(file, t) {
+  return file.title || file.filename_download || t('files.untitled');
 }
 
-function compareFiles(left, right, sort) {
+function compareFiles(left, right, sort, t) {
   if (sort === 'newest' || sort === 'oldest') {
     const leftTime = left.uploaded_at ? new Date(left.uploaded_at).getTime() : 0;
     const rightTime = right.uploaded_at ? new Date(right.uploaded_at).getTime() : 0;
@@ -73,11 +74,12 @@ function compareFiles(left, right, sort) {
     const difference = Number(left.filesize || 0) - Number(right.filesize || 0);
     return sort === 'size-desc' ? -difference : difference;
   }
-  const result = fileDisplayName(left).localeCompare(fileDisplayName(right), undefined, { sensitivity: 'base' });
+  const result = fileDisplayName(left, t).localeCompare(fileDisplayName(right, t), undefined, { sensitivity: 'base' });
   return sort === 'name-desc' ? -result : result;
 }
 
 export function FilesScreen() {
+  const { locale, t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -104,7 +106,7 @@ export function FilesScreen() {
       const response = await apiRequest('/files');
       setFiles(response?.data ?? []);
     } catch (requestError) {
-      setError(requestError.message || 'Files could not be loaded');
+      setError(requestError.message || t('files.loadError'));
     } finally {
       setLoading(false);
     }
@@ -118,15 +120,12 @@ export function FilesScreen() {
     const query = search.trim().toLowerCase();
     return files
       .filter((file) => typeFilter === 'all' || fileCategory(file) === typeFilter)
-      .filter((file) => !query || [
-        file.title,
-        file.filename_download,
-        file.mimetype,
-        file.storage,
-      ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query)))
+      .filter((file) => !query || [file.title, file.filename_download, file.mimetype, file.storage]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)))
       .slice()
-      .sort((left, right) => compareFiles(left, right, sort));
-  }, [files, search, sort, typeFilter]);
+      .sort((left, right) => compareFiles(left, right, sort, t));
+  }, [files, search, sort, typeFilter, t]);
 
   const paged = useMemo(() => paginateClientItems(visibleFiles, page, pageSize), [page, pageSize, visibleFiles]);
   const pageFiles = paged.items;
@@ -157,10 +156,10 @@ export function FilesScreen() {
       form.reset();
       setShowUpload(false);
       setPage(1);
-      setNotice('File uploaded');
+      setNotice(t('files.uploadedNotice'));
       await load();
     } catch (requestError) {
-      setError(requestError.message || 'File could not be uploaded');
+      setError(requestError.message || t('files.uploadError'));
     } finally {
       setUploading(false);
     }
@@ -186,16 +185,13 @@ export function FilesScreen() {
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (requestError) {
-      setError(requestError.message || 'File could not be downloaded');
+      setError(requestError.message || t('files.downloadError'));
     }
   }
 
   function beginEdit(file) {
     setEditingFile(file);
-    setEditForm({
-      filenameDownload: file.filename_download || '',
-      title: file.title || '',
-    });
+    setEditForm({ filenameDownload: file.filename_download || '', title: file.title || '' });
     setError('');
     setNotice('');
   }
@@ -215,10 +211,10 @@ export function FilesScreen() {
         },
       });
       setEditingFile(null);
-      setNotice('File metadata updated');
+      setNotice(t('files.updatedNotice'));
       await load();
     } catch (requestError) {
-      setError(requestError.message || 'File metadata could not be updated');
+      setError(requestError.message || t('files.updateError'));
     } finally {
       setSaving(false);
     }
@@ -226,9 +222,9 @@ export function FilesScreen() {
 
   async function remove(file) {
     const accepted = await requestConfirmation({
-      title: 'Delete file?',
-      description: `${file.filename_download} and its stored content will be permanently deleted.`,
-      confirmLabel: 'Delete file',
+      title: t('files.deleteTitle'),
+      description: t('files.deleteDescription', { file: file.filename_download }),
+      confirmLabel: t('files.deleteFile'),
       tone: 'danger',
     });
     if (!accepted) return;
@@ -237,10 +233,10 @@ export function FilesScreen() {
     try {
       await apiRequest(`/files/${encodeURIComponent(file.id)}`, { method: 'DELETE' });
       if (editingFile?.id === file.id) setEditingFile(null);
-      setNotice('File deleted');
+      setNotice(t('files.deletedNotice'));
       await load();
     } catch (requestError) {
-      setError(requestError.message || 'File could not be deleted');
+      setError(requestError.message || t('files.deleteError'));
     }
   }
 
@@ -251,52 +247,54 @@ export function FilesScreen() {
     setPage(1);
   }
 
+  const dateLocale = locale === 'tr' ? 'tr-TR' : 'en-US';
+
   return (
     <div className="screen-stack">
       <section className="panel library-toolbar workspace-toolbar library-header-panel">
         <div className="workspace-toolbar-heading">
           <div>
-            <p className="eyebrow">Library</p>
-            <h2>Files</h2>
-            <p>{files.length === 0 ? 'Upload files and manage their metadata.' : `${files.length} files in the library.`}</p>
+            <p className="eyebrow">{t('nav.library')}</p>
+            <h2>{t('nav.files')}</h2>
+            <p>{files.length === 0 ? t('files.libraryEmptyDescription') : t('files.libraryCount', { count: files.length })}</p>
           </div>
           <div className="workspace-toolbar-actions">
-            <div className="segmented-control" aria-label="File view">
-              <button className={view === 'grid' ? 'active' : ''} type="button" onClick={() => setView('grid')}>Gallery</button>
-              <button className={view === 'list' ? 'active' : ''} type="button" onClick={() => setView('list')}>List</button>
+            <div className="segmented-control" aria-label={t('files.view')}>
+              <button className={view === 'grid' ? 'active' : ''} type="button" onClick={() => setView('grid')}>{t('files.gallery')}</button>
+              <button className={view === 'list' ? 'active' : ''} type="button" onClick={() => setView('list')}>{t('files.list')}</button>
             </div>
             <button className="primary-button" type="button" onClick={() => setShowUpload((value) => !value)}>
-              {showUpload ? 'Close upload' : 'Upload file'}
+              {showUpload ? t('files.closeUpload') : t('files.uploadFile')}
             </button>
           </div>
         </div>
 
         <div className="list-controls file-list-controls">
           <label className="field-label">
-            <span>Search</span>
+            <span>{t('common.search')}</span>
             <input
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Name, MIME type or storage…"
-              aria-label="Search files"
+              placeholder={t('files.searchPlaceholder')}
+              aria-label={t('files.searchFiles')}
             />
           </label>
           <label className="field-label">
-            <span>File type</span>
+            <span>{t('files.fileType')}</span>
             <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-              {FILE_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {FILE_TYPE_OPTIONS.map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}
             </select>
           </label>
           <label className="field-label">
-            <span>Sort</span>
+            <span>{t('common.sort')}</span>
             <select value={sort} onChange={(event) => setSort(event.target.value)}>
-              {FILE_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {FILE_SORT_OPTIONS.map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}
             </select>
           </label>
           <div className="list-controls-summary">
-            <span className="result-count">{visibleFiles.length} matching</span>
-            {hasActiveFilters && <button className="text-button" type="button" onClick={resetControls}>Reset</button>}
+            <span className="result-count">{t('files.matchingCount', { count: visibleFiles.length })}</span>
+            {hasActiveFilters && <button className="text-button" type="button" onClick={resetControls}>{t('common.reset')}</button>}
           </div>
         </div>
       </section>
@@ -304,9 +302,9 @@ export function FilesScreen() {
       {showUpload && (
         <form className="panel file-upload-panel file-upload-compact" onSubmit={upload}>
           <div>
-            <p className="eyebrow">Upload</p>
-            <h2>Add a file</h2>
-            <p>Drop one file here or choose it from your device.</p>
+            <p className="eyebrow">{t('files.upload')}</p>
+            <h2>{t('files.addFile')}</h2>
+            <p>{t('files.dropDescription')}</p>
           </div>
           <div
             className={`file-dropzone ${dropActive ? 'active' : ''}`}
@@ -321,11 +319,11 @@ export function FilesScreen() {
               onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
             />
             <label htmlFor="file-upload-input" className="file-picker-label">
-              <strong>{selectedFile ? selectedFile.name : 'Choose a file'}</strong>
-              <span>{selectedFile ? formatBytes(selectedFile.size) : 'or drag and drop it here'}</span>
+              <strong>{selectedFile ? selectedFile.name : t('files.chooseFile')}</strong>
+              <span>{selectedFile ? formatBytes(selectedFile.size) : t('files.dragDrop')}</span>
             </label>
             <button className="primary-button" type="submit" disabled={!selectedFile || uploading}>
-              {uploading ? 'Uploading…' : 'Upload'}
+              {uploading ? t('files.uploading') : t('files.upload')}
             </button>
           </div>
         </form>
@@ -338,23 +336,23 @@ export function FilesScreen() {
         <form className="panel form-panel file-editor" onSubmit={saveEdit}>
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">File details</p>
-              <h2>{fileDisplayName(editingFile)}</h2>
-              <p>Edit the title and download filename without changing the stored file.</p>
+              <p className="eyebrow">{t('files.fileDetails')}</p>
+              <h2>{fileDisplayName(editingFile, t)}</h2>
+              <p>{t('files.editDescription')}</p>
             </div>
-            <button className="text-button" type="button" onClick={() => setEditingFile(null)}>Close</button>
+            <button className="text-button" type="button" onClick={() => setEditingFile(null)}>{t('common.close')}</button>
           </div>
           <div className="form-grid">
             <label className="field-label">
-              <span>Title</span>
+              <span>{t('files.title')}</span>
               <input
                 value={editForm.title}
                 onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Optional display title"
+                placeholder={t('files.optionalTitle')}
               />
             </label>
             <label className="field-label">
-              <span>Download filename</span>
+              <span>{t('files.downloadFilename')}</span>
               <input
                 value={editForm.filenameDownload}
                 onChange={(event) => setEditForm((current) => ({ ...current, filenameDownload: event.target.value }))}
@@ -363,46 +361,46 @@ export function FilesScreen() {
             </label>
           </div>
           <div className="form-actions">
-            <button className="primary-button" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
+            <button className="primary-button" type="submit" disabled={saving}>{saving ? t('common.saving') : t('files.saveChanges')}</button>
           </div>
         </form>
       )}
 
       {loading ? (
-        <section className="panel"><p>Loading files…</p></section>
+        <section className="panel"><p>{t('files.loading')}</p></section>
       ) : visibleFiles.length === 0 ? (
         <section className="panel empty-state empty-state-action">
           <div>
-            <h2>{files.length === 0 ? 'No files yet' : 'No matching files'}</h2>
-            <p>{files.length === 0 ? 'Upload the first file to start building your library.' : 'Try a broader search or reset the filters.'}</p>
+            <h2>{files.length === 0 ? t('files.noFilesYet') : t('files.noMatchingFiles')}</h2>
+            <p>{files.length === 0 ? t('files.emptyDescription') : t('files.noMatchDescription')}</p>
           </div>
           {files.length === 0 ? (
-            <button className="primary-button" type="button" onClick={() => setShowUpload(true)}>Upload first file</button>
+            <button className="primary-button" type="button" onClick={() => setShowUpload(true)}>{t('files.uploadFirst')}</button>
           ) : (
-            <button className="text-button" type="button" onClick={resetControls}>Reset filters</button>
+            <button className="text-button" type="button" onClick={resetControls}>{t('common.resetFilters')}</button>
           )}
         </section>
       ) : view === 'grid' ? (
         <section className="file-library-results">
-          <div className="file-grid" aria-label="File gallery">
+          <div className="file-grid" aria-label={t('files.fileGallery')}>
             {pageFiles.map((file) => (
               <article className="file-card" key={file.id}>
                 <div className="file-preview">
-                  <FilePreview file={file} label={fileTypeLabel(file)} alt={fileDisplayName(file)} />
+                  <FilePreview file={file} label={fileTypeLabel(file, t)} alt={fileDisplayName(file, t)} />
                 </div>
                 <div className="file-card-body">
                   <div className="file-card-title">
-                    <strong title={fileDisplayName(file)}>{fileDisplayName(file)}</strong>
+                    <strong title={fileDisplayName(file, t)}>{fileDisplayName(file, t)}</strong>
                     <small title={file.filename_download}>{file.filename_download}</small>
                   </div>
                   <div className="file-meta-row">
-                    <span>{fileTypeLabel(file)}</span>
+                    <span>{fileTypeLabel(file, t)}</span>
                     <span>{formatBytes(file.filesize)}</span>
                   </div>
                   <div className="file-card-actions">
-                    <button className="text-button" type="button" onClick={() => download(file)}>Download</button>
-                    <button className="text-button" type="button" onClick={() => beginEdit(file)}>Edit</button>
-                    <button className="danger-button" type="button" onClick={() => remove(file)}>Delete</button>
+                    <button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button>
+                    <button className="text-button" type="button" onClick={() => beginEdit(file)}>{t('common.edit')}</button>
+                    <button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button>
                   </div>
                 </div>
               </article>
@@ -413,7 +411,7 @@ export function FilesScreen() {
             pageSize={pageSize}
             totalItems={visibleFiles.length}
             pageSizeOptions={FILE_PAGE_SIZES}
-            itemLabel="files"
+            itemLabel={t('files.files')}
             onPageChange={setPage}
             onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
           />
@@ -422,24 +420,24 @@ export function FilesScreen() {
         <section className="table-panel">
           <div className="table-scroll">
             <table>
-              <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Storage</th><th>Uploaded</th><th /></tr></thead>
+              <thead><tr><th>{t('common.name')}</th><th>{t('common.type')}</th><th>{t('files.size')}</th><th>{t('files.storage')}</th><th>{t('files.uploaded')}</th><th /></tr></thead>
               <tbody>
                 {pageFiles.map((file) => (
                   <tr key={file.id}>
                     <td>
                       <div className="file-list-name">
-                        <div className="file-list-thumb"><FilePreview file={file} label={fileTypeLabel(file)} /></div>
-                        <span><strong>{fileDisplayName(file)}</strong><small>{file.filename_download}</small></span>
+                        <div className="file-list-thumb"><FilePreview file={file} label={fileTypeLabel(file, t)} /></div>
+                        <span><strong>{fileDisplayName(file, t)}</strong><small>{file.filename_download}</small></span>
                       </div>
                     </td>
-                    <td>{file.mimetype || fileTypeLabel(file)}</td>
+                    <td>{file.mimetype || fileTypeLabel(file, t)}</td>
                     <td>{formatBytes(file.filesize)}</td>
                     <td>{file.storage}</td>
-                    <td>{file.uploaded_at ? new Date(file.uploaded_at).toLocaleString() : '—'}</td>
+                    <td>{file.uploaded_at ? new Date(file.uploaded_at).toLocaleString(dateLocale) : '—'}</td>
                     <td className="row-actions">
-                      <button className="text-button" type="button" onClick={() => download(file)}>Download</button>
-                      <button className="text-button" type="button" onClick={() => beginEdit(file)}>Edit</button>
-                      <button className="danger-button" type="button" onClick={() => remove(file)}>Delete</button>
+                      <button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button>
+                      <button className="text-button" type="button" onClick={() => beginEdit(file)}>{t('common.edit')}</button>
+                      <button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button>
                     </td>
                   </tr>
                 ))}
@@ -451,7 +449,7 @@ export function FilesScreen() {
             pageSize={pageSize}
             totalItems={visibleFiles.length}
             pageSizeOptions={FILE_PAGE_SIZES}
-            itemLabel="files"
+            itemLabel={t('files.files')}
             onPageChange={setPage}
             onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
           />
