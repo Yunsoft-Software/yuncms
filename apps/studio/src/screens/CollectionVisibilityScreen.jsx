@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
-import {
-  collectionVisibilityLabel,
-  isJunctionCollection,
-} from '../collection-visibility.js';
+import { isJunctionCollection } from '../collection-visibility.js';
 import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
+import { useI18n } from '../i18n.js';
 
 const PAGE_SIZES = [10, 20, 50];
 
@@ -17,6 +15,7 @@ function compareCollections(left, right) {
 }
 
 export function CollectionVisibilityScreen() {
+  const { t } = useI18n();
   const [collections, setCollections] = useState([]);
   const [search, setSearch] = useState('');
   const [visibility, setVisibility] = useState('all');
@@ -34,7 +33,7 @@ export function CollectionVisibilityScreen() {
       const response = await apiRequest('/schema/collections');
       setCollections((response?.data ?? []).filter((entry) => !entry.system));
     } catch (requestError) {
-      setError(requestError.message || 'Collection visibility settings could not be loaded');
+      setError(requestError.message || t('visibility.loadError'));
     } finally {
       setLoading(false);
     }
@@ -82,9 +81,11 @@ export function CollectionVisibilityScreen() {
       setCollections((current) => current.map((entry) => (
         entry.collection === collection.collection ? { ...entry, ...updated } : entry
       )));
-      setNotice(`${collection.collection} is now ${shouldShow ? 'visible in' : 'hidden from'} Content`);
+      setNotice(t(shouldShow ? 'visibility.noticeVisible' : 'visibility.noticeHidden', {
+        collection: collection.collection,
+      }));
     } catch (requestError) {
-      setError(requestError.message || 'Collection visibility could not be updated');
+      setError(requestError.message || t('visibility.updateError'));
     } finally {
       setBusyCollection('');
     }
@@ -99,34 +100,34 @@ export function CollectionVisibilityScreen() {
       <section className="panel workspace-toolbar">
         <div className="workspace-toolbar-heading">
           <div>
-            <p className="eyebrow">Settings</p>
-            <h2>Content visibility</h2>
-            <p>Choose which collections appear in the Content navigation. Hiding a collection never deletes its schema or records.</p>
+            <p className="eyebrow">{t('nav.settings')}</p>
+            <h2>{t('section.visibilityTitle')}</h2>
+            <p>{t('visibility.description')}</p>
           </div>
           <div className="workspace-toolbar-actions">
-            <span className="status-pill">{visibleCount} visible</span>
-            <span className="status-pill">{hiddenCount} hidden</span>
-            {junctionCount > 0 && <span className="status-pill">{junctionCount} junctions</span>}
+            <span className="status-pill">{t('visibility.visibleCount', { count: visibleCount })}</span>
+            <span className="status-pill">{t('visibility.hiddenCount', { count: hiddenCount })}</span>
+            {junctionCount > 0 && <span className="status-pill">{t('visibility.junctionCount', { count: junctionCount })}</span>}
           </div>
         </div>
 
         <div className="list-controls compact-list-controls">
           <label className="field-label">
-            <span>Search collections</span>
+            <span>{t('visibility.searchCollections')}</span>
             <input
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Name or description…"
+              placeholder={t('visibility.searchPlaceholder')}
             />
           </label>
           <label className="field-label">
-            <span>Show</span>
+            <span>{t('visibility.show')}</span>
             <select value={visibility} onChange={(event) => setVisibility(event.target.value)}>
-              <option value="all">All collections</option>
-              <option value="visible">Visible in Content</option>
-              <option value="hidden">Hidden from Content</option>
-              <option value="junction">M2M junctions</option>
+              <option value="all">{t('visibility.allCollections')}</option>
+              <option value="visible">{t('visibility.visibleInContent')}</option>
+              <option value="hidden">{t('visibility.hiddenFromContent')}</option>
+              <option value="junction">{t('visibility.m2mJunctions')}</option>
             </select>
           </label>
         </div>
@@ -136,21 +137,21 @@ export function CollectionVisibilityScreen() {
       {notice && <div className="notice-banner" role="status">{notice}</div>}
 
       {loading ? (
-        <section className="panel"><p>Loading collection settings…</p></section>
+        <section className="panel"><p>{t('visibility.loading')}</p></section>
       ) : collections.length === 0 ? (
         <section className="panel empty-state">
-          <div><h2>No project collections</h2><p>Create a collection in Data Model first.</p></div>
+          <div><h2>{t('visibility.emptyTitle')}</h2><p>{t('visibility.emptyDescription')}</p></div>
         </section>
       ) : visibleCollections.length === 0 ? (
         <section className="panel empty-state">
-          <div><h2>No matching collections</h2><p>Change the search or visibility filter.</p></div>
+          <div><h2>{t('visibility.noMatchesTitle')}</h2><p>{t('visibility.noMatchesDescription')}</p></div>
         </section>
       ) : (
         <section className="table-panel">
           <div className="table-scroll">
             <table>
               <thead>
-                <tr><th>Collection</th><th>Type</th><th>Content navigation</th></tr>
+                <tr><th>{t('visibility.collection')}</th><th>{t('common.type')}</th><th>{t('visibility.contentNavigation')}</th></tr>
               </thead>
               <tbody>
                 {paged.items.map((collection) => {
@@ -165,7 +166,7 @@ export function CollectionVisibilityScreen() {
                       </td>
                       <td>
                         <span className={`status-pill ${junction ? 'required' : ''}`}>
-                          {junction ? 'M2M junction' : 'Collection'}
+                          {junction ? t('visibility.junction') : t('visibility.collection')}
                         </span>
                       </td>
                       <td>
@@ -175,9 +176,9 @@ export function CollectionVisibilityScreen() {
                             checked={shouldShow}
                             disabled={busy}
                             onChange={(event) => setContentVisibility(collection, event.target.checked)}
-                            aria-label={`Show ${collection.collection} in Content`}
+                            aria-label={t('visibility.showCollection', { collection: collection.collection })}
                           />
-                          <span>{busy ? 'Saving…' : collectionVisibilityLabel(collection)}</span>
+                          <span>{busy ? t('common.saving') : t(collection.hidden ? 'visibility.hiddenFromContent' : 'visibility.visibleInContent')}</span>
                         </label>
                       </td>
                     </tr>
@@ -191,7 +192,7 @@ export function CollectionVisibilityScreen() {
             pageSize={pageSize}
             totalItems={visibleCollections.length}
             pageSizeOptions={PAGE_SIZES}
-            itemLabel="collections"
+            itemLabel={t('visibility.collections')}
             onPageChange={setPage}
             onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
           />
@@ -199,7 +200,7 @@ export function CollectionVisibilityScreen() {
       )}
 
       <section className="panel inline-info">
-        M2M junction collections are hidden by default because they usually store relation links rather than primary content. You can still make any junction visible here when direct record management is useful.
+        {t('visibility.hint')}
       </section>
     </div>
   );
