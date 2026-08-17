@@ -1,465 +1,193 @@
 # YunCMS Development Plan
 
-> Live status document for branch `16-08-2026`. Check an item only when source implementation exists. Runtime/install/real-MySQL/provider verification belongs in `todo.md`; source presence is not the same thing as a verified release.
+> Live source-status document for branch `16-08-2026`. Source implementation is checked here; real Node/MySQL/browser/provider verification stays in `todo.md`. Completed runtime history is intentionally not duplicated.
 
-## 0. Fixed product constraints
+## 0. Product / engineering constraints
 
-- [x] Independent Directus-inspired implementation; not a fork.
-- [x] Node.js 24 LTS baseline.
-- [x] JavaScript/ESM; no TypeScript by default.
-- [x] Express 5 HTTP layer.
-- [x] MySQL only.
-- [x] `mysql2/promise` directly; no ORM/query-builder/second DB driver.
+- [x] Independent Directus-inspired CMS/backend; interaction ideas may be borrowed, visual/product identity is not a Directus clone.
+- [x] Node.js 24 LTS, JavaScript/ESM, Express 5.
+- [x] MySQL + `mysql2/promise` only; no ORM/query builder or second database driver.
 - [x] React 19.2 + Vite 8 Studio.
-- [x] npm workspaces.
 - [x] REST only; no GraphQL.
-- [x] Directus-like extension ergonomics where useful (`defineEndpoint`, `defineHook`).
+- [x] npm workspaces.
 - [x] Internal services/extensions never self-request YunCMS over HTTP.
 - [x] No GitHub Actions.
-- [x] Small focused commits.
-- [x] Documentation changes travel with implementation.
+- [x] No new UI/i18n/icon package for the current Studio pass.
+- [x] Small focused commits; docs/tests travel with source changes.
 
-### Explicit V1 non-goals
+## 1. Runtime / CLI
 
-- [x] No GraphQL.
-- [x] No visual Flow/dashboard builder.
-- [x] No Vue.
-- [x] No multi-database abstraction.
-- [x] No AI/MCP in core.
-- [x] No SSO/SAML/LDAP/MFA in V1.
-- [x] No untrusted extension marketplace sandbox in V1.
-- [x] No full Directus-style visual ER diagram editor in V1.
-- [x] No content versioning/translations/presets/bookmarks in V1.
-
-## 1. Repository/toolchain
-
-- [x] npm workspace skeleton (`apps/*`, `packages/*`).
-- [x] Root scripts/environment/editor/git baseline.
-- [x] `AGENTS.md` working rules.
-- [x] `todo.md` manual/environment handoff rules.
-- [x] Node/toolchain engines pinned in package metadata.
-- [x] Package naming finalized under the verified `@yunsoft/*` npm organization; the executable remains `yuncms`.
-- [x] Generate/review `package-lock.json` after real `npm install` — `todo.md`.
-- [x] Verify final npm scope/name ownership, auth, tarballs and fresh install — `todo.md`.
-
-## 2. Core request/service architecture
-
-- [x] Explicit public/system/admin accountability helpers.
-- [x] Frozen request context with accountability/services/database/schema/logger/env/emitter/storage/request id.
-- [x] Request-local permission cache in context.
-- [x] Base service contract.
-- [x] Core service registry.
-- [x] Same service/accountability model exposed to trusted extension runtime.
-- [x] Dedicated auth/user/session/token/file/audit/maintenance services own special behavior.
-- [x] Dedicated `StudioSettingsService` owns safe public display settings and administrator-only branding/theme/default-locale mutation.
-
-## 3. MySQL/bootstrap foundation
-
-- [x] Single `mysql2/promise` pool factory.
-- [x] DB ping/close helpers.
-- [x] Pinned-connection transaction helpers.
-- [x] Identifier validation/quoting.
-- [x] Multi-statements disabled.
-- [x] Placeholder-bound data values throughout current services.
-- [x] MySQL duplicate/FK/deadlock/lock/connection normalization.
-- [x] Bounded retry helper for retryable lock/deadlock classes.
-- [x] Migration journal.
-- [x] Versioned core migrations (`0001`–`0006`).
-- [x] `0005-default-public-role` guarantees the protected Public role exists on new and upgraded databases without granting collection permissions.
-- [x] `0006-studio-settings` creates one bounded Studio branding/appearance/default-locale settings row.
-- [x] Bootstrap advisory lock.
-- [x] Schema advisory lock.
-- [x] Schema version state/read/increment.
-- [x] API startup compatibility guard; API does not auto-bootstrap and requires current migrations after upgrade.
-- [x] Real-MySQL bootstrap/transaction/concurrency verification — `todo.md`.
-
-## 4. Dynamic schema engine
-
-### Collections
-
-- [x] List/read/create collection.
-- [x] `id CHAR(36)` primary key + matching field metadata.
-- [x] Reserved `yuncms_` prefix protection.
-- [x] Safe metadata update.
-- [x] Collection `hidden` metadata controls Content navigation without changing physical schema or records.
-- [x] Collection visibility/singleton metadata require explicit booleans rather than ambiguous truthy values.
-- [x] Explicit destructive delete.
-- [x] Tombstone rename + metadata compensation.
-
-### Fields
-
-- [x] integer / bigint.
-- [x] decimal.
-- [x] string / text.
-- [x] boolean.
-- [x] date / datetime / timestamp.
-- [x] json.
-- [x] uuid (`CHAR(36)`).
-- [x] Create/read field.
-- [x] Metadata-only update.
-- [x] Validated required/null mutation.
-- [x] Supported default add/change/remove.
-- [x] Engine-managed index add/remove.
-- [x] Explicit destructive delete with tombstone compensation.
-- [x] Type conversion intentionally disabled in V1.
-
-### Relations
-
-- [x] M2O physical FK create with type/target/on-delete validation.
-- [x] M2O delete with FK restoration compensation.
-- [x] O2M inverse metadata read.
-- [x] M2M junction create with two FKs + unique pair + paired metadata.
-- [x] M2M junction collections are hidden from Content by default but remain independently show/hide configurable.
-- [x] High-level destructive M2M junction delete lifecycle with tombstone restore/cleanup behavior.
-- [x] M2M delete REST surface with schema audit.
-- [x] One-level direct M2O expansion in generic item responses.
-- [x] Expansion reuses target `ItemsService` RBAC and source field visibility checks.
-- [x] Studio direct-M2O relation picker/display-label UX.
-- [x] Studio M2M junction create/delete lifecycle controls.
-- [x] O2M/M2M nested expansion intentionally remains outside V1.
-
-### Schema consistency
-
-- [x] Metadata repository.
-- [x] Schema snapshot/cache keyed by schema version.
-- [x] Successful API schema mutations eagerly invalidate the shared cache to avoid TTL-stale follow-up requests.
-- [x] Metadata + schema-version transaction discipline after physical DDL.
-- [x] Admin/system-only schema service access.
-- [x] Explicit destructive intent guards.
-- [x] Source-level invalid M2M/FK/schema combination guards.
-- [x] Real-MySQL DDL compensation/concurrency/drift verification — `todo.md`.
-
-## 5. Generic ItemsService + REST
-
-```text
-GET    /items/:collection
-GET    /items/:collection/:id
-POST   /items/:collection
-PATCH  /items/:collection/:id
-DELETE /items/:collection/:id
-```
-
-- [x] Schema-aware collection/field validation.
-- [x] Query parser.
-- [x] Allowlisted SQL filter compiler.
-- [x] `fields`, `filter`, `sort`, `limit`, `offset`, count metadata.
-- [x] `expand` for direct M2O reads, max-eight guard.
-- [x] `readMany/readOne`.
-- [x] `createOne/createMany`.
-- [x] Single/bulk update.
-- [x] Single/bulk delete.
-- [x] Bulk update/delete require explicit non-empty caller filter.
-- [x] Mutation filter/action hook integration.
-- [x] Bulk create actions only after transaction commit.
-- [x] Request id/accountability propagated to hook context.
-- [x] Relation expansion preserves target permission row/field restrictions.
-- [x] Real-MySQL/API SQL-injection/rollback/relation-expansion verification — `todo.md`.
-
-## 6. Authentication and sessions
-
-- [x] Users repository/service.
-- [x] Scrypt password hashing/verification.
-- [x] Email/password login.
-- [x] Access + refresh session creation.
-- [x] Refresh rotation/replay-safe update condition.
-- [x] Logout current/all sessions.
-- [x] Password-change session revocation.
-- [x] Bearer authentication middleware.
-- [x] Explicit public-role resolution for anonymous requests.
-- [x] API token create/list/revoke/authentication.
-- [x] Password-reset one-time hashed-token lifecycle.
-- [x] Email-verification one-time hashed-token lifecycle.
-- [x] SMTP transport using Nodemailer with file/URL message access disabled.
-- [x] Non-enumerating public reset request endpoint.
-- [x] Reset confirmation endpoint.
-- [x] Authenticated verification-mail request endpoint.
-- [x] Verification confirmation endpoint.
-- [x] Raw reset/verification tokens are not returned by public request endpoints.
-- [x] Configurable process-local login/refresh/action rate limiting.
-- [x] Authentication rate-limit bucket memory is hard-bounded even under many unique client keys.
-- [x] Auth responses explicitly use `Cache-Control: no-store`.
-- [x] Shared-store/cluster-wide limiter intentionally remains a multi-instance follow-up, not a single-process V1 requirement.
-- [x] Real MySQL/SMTP/replay/rate-limit verification — `todo.md`.
-
-## 7. Roles and permissions
-
-- [x] Administrator/system-managed role CRUD.
-- [x] Protected admin/public role rules.
-- [x] Exactly one protected Public role is guaranteed by migration/bootstrap invariants.
-- [x] Public role receives no collection permissions automatically and therefore remains fail-closed by default.
-- [x] Anonymous access uses the same action/field/row-filter/write-validation permission engine as authenticated roles.
-- [x] Permission CRUD.
-- [x] Exact role + collection + action resolution.
-- [x] Field allowlists.
-- [x] Server-side row filters.
-- [x] Hidden-field filter/sort/expand inference protection.
-- [x] Fail-closed role-less/missing-permission behavior.
-- [x] Explicit admin/system bypass.
-- [x] Request-local effective-permission cache.
-- [x] Permission mutation clears current request cache.
-- [x] Create/update prospective-record validation.
-- [x] Validation uses safe field/operator allowlist.
-- [x] Bulk update validation fail-closed row limit.
-- [x] Studio permission filter + validation editor.
-- [x] Real privilege-escalation/validation integration tests — `todo.md`.
-
-## 8. Extension system
-
-- [x] `@yunsoft/yuncms-extensions-sdk`.
-- [x] `defineEndpoint`.
-- [x] `defineHook`.
-- [x] Local extension discovery.
-- [x] npm dependency extension discovery.
-- [x] Manifest validation/root-escape/duplicate-id/type checks.
-- [x] SDK/runtime marker contract aligned.
-- [x] Endpoint mount under `/extensions/<id>` after authentication.
-- [x] `filter` / `action` / `init` emitter.
-- [x] AsyncLocalStorage recursion-chain protection.
-- [x] `app.beforeStart` / `app.afterStart` lifecycle.
-- [x] Extension context exposes services/database/schema/accountability/logger/env/emitter/storage.
-- [x] Request service options preserve permission cache/accountability.
-- [x] Endpoint/hook examples.
-- [x] Extension authoring docs.
-- [x] Local/npm-packed extension runtime smoke — `todo.md`.
-
-## 9. Files and storage
-
-- [x] Storage registry/core driver contract.
-- [x] Local filesystem driver.
-- [x] Platform-aware traversal/path containment checks.
-- [x] S3-compatible driver using AWS SDK v3.
-- [x] Custom endpoint/path-style/credential-chain configuration.
-- [x] Built-in local/S3 inventory listing capability.
-- [x] `FilesService` metadata/storage coordination.
-- [x] UUID physical storage keys independent from download filename.
-- [x] Upload cleanup when metadata insert fails.
-- [x] Explicit cleanup error when storage delete fails.
-- [x] File list/read/content/update/delete.
-- [x] Upload/download/delete REST routes.
-- [x] Upload byte limit + HTTP 413 mapping.
-- [x] Unicode-safe download filename handling.
-- [x] `files.create/update/delete` hook/audit events.
-- [x] Studio file list/upload/download/edit/delete.
-- [x] Admin/system storage reconciliation service + REST endpoint.
-- [x] Reconciliation defaults to dry-run and reports missing/orphan objects.
-- [x] Destructive orphan cleanup requires explicit request + object-age guard.
-- [x] Reconciliation has a bounded V1 inventory safety limit.
-- [ ] Real local filesystem/S3-provider/reconciliation verification — `todo.md`.
-
-## 10. Audit/history
-
-- [x] `AuditService` write/read surface.
-- [x] Actor/action/collection/item/request id/timestamp.
-- [x] Recursive password/token/secret/authorization/api-key redaction.
-- [x] Item create/update/delete audit through internal hook subscriber.
-- [x] File create/update/delete audit through service events.
-- [x] Schema admin create/update/delete audit.
-- [x] Before/after metadata captured where practical.
-- [x] Admin `/audit` read API.
-- [x] Audit write failure after committed mutation is logged rather than faking a client rollback.
-- [x] Configurable retention defaults.
-- [x] Explicit bounded batch cleanup service/API; no surprise automatic purge.
-- [ ] Real cleanup/retention/load verification — `todo.md`.
-
-## 11. CLI/setup
-
-```text
-yuncms init
-yuncms bootstrap
-yuncms start
-yuncms help
-```
-
-- [x] CLI package + bin dispatcher.
+- [x] `yuncms init`, `bootstrap`, `start`, `help` CLI surface.
 - [x] Node 24 runtime guard.
-- [x] Interactive `init` DB prompts.
-- [x] Secret-safe prompt path.
-- [x] `.env` writer/reuse behavior.
-- [x] DB connection verification.
-- [x] Bootstrap command.
-- [x] Initial admin creation/reuse wired into `init`.
-- [x] Environment-driven non-interactive `bootstrap`.
-- [x] `start` wrapper resolving API server package entry and preserving caller cwd/env.
-- [x] Publishing/naming policy documented.
-- [x] Final npm ownership/auth/`npm pack`/fresh-install verification — `todo.md`.
+- [x] Single Express listener serves REST API and built Studio.
+- [x] Core/default server port is `3008`.
+- [x] Fresh `yuncms init` writes `PORT=3008`, `STUDIO_ORIGIN=http://localhost:3008` and `AUTH_PUBLIC_URL=http://localhost:3008`; legacy 8055/5173 generator values removed.
+- [x] Explicit environment values remain operator-controlled; YunCMS does not silently overwrite an existing untracked `.env`.
+- [x] Request ids, safe error normalization, security headers, structured logging and graceful shutdown.
+- [x] Explicit bounded `TRUST_PROXY_HOPS` configuration.
+- [x] Process-local authentication rate limiting with bounded bucket memory.
 
-## 12. React Studio V1
+## 2. MySQL / schema foundation
 
-- [x] React/Vite shell/sidebar.
-- [x] API health status.
-- [x] Real API client.
-- [x] Session storage + serialized refresh + retry.
-- [x] Login/logout.
-- [x] Password-reset request mode.
-- [x] Reset action-link/new-password screen.
-- [x] Email-verification action-link screen.
-- [x] Generic collection table.
-- [x] Generic create/edit record form.
-- [x] Direct M2O relation pickers/display labels.
-- [x] Data Model collection/field workflows.
-- [x] M2O/M2M creation UI.
-- [x] M2M delete UI.
-- [x] Users management UI.
-- [x] Email-verification send action.
-- [x] Roles/Permissions management UI.
-- [x] Permission validation JSON editor.
-- [x] Files management UI.
-- [x] Loading/error/empty-state basics.
-- [x] Task-oriented sidebar groups: Content / Library / Settings.
-- [x] Settings → Content Visibility can show/hide any non-system collection, including M2M junctions, without changing schema/data.
-- [x] M2M junctions are identified in visibility settings and remain hidden by default.
-- [x] Content navigation uses the shared non-system/non-hidden visibility rule.
-- [x] Non-system collections rendered directly as nested Content navigation instead of selecting a collection from a toolbar dropdown.
-- [x] Content workspace keeps collection context stable across list/create/edit states.
-- [x] Content search is server-backed across readable text fields rather than limited to the current page.
-- [x] Content supports field-aware filters, removable filter chips and one-click view reset.
-- [x] Content sorting uses REST `sort` semantics and supports clickable table headers plus explicit direction controls.
-- [x] Content pagination uses REST `limit`, `offset` and filtered `total_count`, with selectable page sizes.
-- [x] Studio data-heavy workspaces share one reusable numbered `Pagination` component with total/range, page-size and compact modes.
-- [x] Files defaults to a gallery with authenticated image previews, file placeholders, search and grid/list switching.
-- [x] Files previews load only for the visible page, fall back from MIME metadata to safe image extensions and degrade cleanly on fetch/decode failure.
-- [x] Files includes type filters, useful sort presets, client-side pagination and state-preserving Gallery/List switching.
-- [x] File metadata editing moved from `window.prompt()` into an in-page editor.
-- [x] Users is list-first with creation behind `New user`, plus search, role/status filters, sort controls, pagination and readable status/verification badges.
-- [x] Data Model uses a collection master/detail settings layout with focused `New collection` flow and Fields/Relations tabs.
-- [x] Data Model collection and field lists support search, sorting, shared pagination and clearer type/required/read-only hierarchy.
-- [x] Data Model `Add field` form stays collapsed until explicitly requested.
-- [x] Roles/Permissions uses a role-first collection/action matrix with direct simple toggles.
-- [x] Roles support search/sort/pagination; permission collections support search, configured-only auditing and shared pagination.
-- [x] Public role is visible/configurable through normal Roles & Permissions controls while its protected role semantics remain enforced server-side.
-- [x] Advanced field allowlist/filter/validation permission editing uses the existing focused modal layer and validates JSON before save.
-- [x] Permission matrix keeps the collection column/header scannable while preserving current RBAC API behavior and administrator/public protections.
-- [x] Important file/role/permission edits no longer depend on prompt-only workflows.
-- [x] Shared list-control patterns expose result counts/reset actions and stack on narrow screens without a new dependency.
-- [x] Refreshed workspaces have narrow-screen responsive rules without a new UI dependency.
-- [x] Server-backed Branding & Appearance settings cover brand name, logo URL, accent color, light/dark/system theme and default EN/TR locale.
-- [x] Official Yunsoft logo is the default Studio logo; one configured custom logo replaces it rather than rendering a second Yunsoft logo.
-- [x] Small Yunsoft powered-by/copyright footer remains independent from configurable logo branding.
-- [x] Theme implementation uses shared CSS custom properties instead of duplicated component trees or a new UI package.
-- [x] English and Turkish dictionaries cover auth, Content, Files, Users, Data Model, Roles & Permissions, Content Visibility, Branding & Appearance, dialogs and shared pagination.
-- [x] Personal browser locale override takes precedence over the server default locale and can be reset to follow the server default.
-- [x] Localization pure utilities are separated from the React hook/context for cheap Node-based testing.
-- [x] Studio API URL defaults to browser same-origin; `VITE_API_URL` remains an explicit override.
-- [x] Vite build output targets the API package runtime bundle directory.
-- [x] Relation picker V1 intentionally caps target list at 200; paginated/search picker is scale polish rather than a V1 correctness blocker.
-- [ ] Formal accessibility/keyboard/contrast review — `todo.md`.
-- [ ] Refreshed Studio branding/localization/browser/build/runtime smoke — `todo.md`.
+- [x] Single MySQL pool + pinned transactions + advisory locks.
+- [x] Identifier allowlisting / quoted identifiers / placeholder-bound values.
+- [x] Retry handling for deadlocks/lock waits.
+- [x] Migration journal and compatibility gate.
+- [x] Core migrations `0001`–`0006`.
+- [x] `0005-default-public-role` guarantees one protected Public role without granting data permissions.
+- [x] `0006-studio-settings` stores one bounded Studio branding/theme/default-locale row.
+- [x] Schema version + cache; successful API schema mutations invalidate the shared cache.
+- [x] DDL compensation/tombstone patterns for destructive dynamic-schema work.
 
-## 13. API/runtime/observability
+## 3. Dynamic collections / fields
 
-- [x] Express runtime.
-- [x] Request ids.
-- [x] Request identity is assigned before JSON parsing, caller ids are safe/64-character bounded and malformed JSON returns stable HTTP 400 `INVALID_PAYLOAD`.
-- [x] `/health`.
-- [x] `/ready`.
-- [x] Graceful HTTP + MySQL shutdown path.
-- [x] Narrow configured Studio CORS origin.
-- [x] Baseline security headers (`nosniff`, frame deny, no-referrer, restrictive permissions policy, same-origin resource policy).
-- [x] HSTS intentionally left to the TLS/reverse-proxy deployment layer.
-- [x] Explicit bounded `TRUST_PROXY_HOPS` configuration controls Express client-IP trust; default remains no proxy trust.
-- [x] Read-only migration compatibility check before listen.
-- [x] Canonical error body/status mapping.
-- [x] Raw unexpected internal messages hidden from clients.
-- [x] Known MySQL errors normalized to stable safe API errors.
-- [x] Structured line-delimited JSON logger wired into runtime.
-- [x] Runtime logger secret redaction.
-- [x] Auth rate-limit headers/HTTP 429.
-- [x] Process-local rate limiter has a hard bounded client-bucket cap.
-- [x] `GET /studio-settings` exposes only safe pre-auth branding/theme/default-locale display settings.
-- [x] `PATCH /studio-settings` reuses explicit accountability and is administrator/system-only.
-- [x] Studio settings logo URL accepts only bounded HTTP/HTTPS URLs; accent/theme/locale values use strict allowlists.
-- [x] Built Studio index and hashed assets served from the same Express listener with Node filesystem streams.
-- [x] Studio static handler is restricted to `/` and `/assets/...`; unrelated requests continue through normal API routing.
-- [x] Root `npm start` builds Studio before starting the single API/Studio listener.
-- [x] Default Studio/auth public URLs align with the API port.
-- [x] API package file list includes the generated Studio bundle for packed and public-registry installs.
-- [x] API/runtime/security-header/graceful-shutdown smoke — `todo.md`.
-- [ ] Current production-readiness/customization pass Node24/release/MySQL/browser/proxy smoke — `todo.md`.
-- [ ] Single-port built Studio HTML/assets/API browser smoke — `todo.md`.
+- [x] Collection list/read/create/update/delete.
+- [x] Collection Content visibility metadata; non-system hidden collections remain stored but leave Content navigation.
+- [x] M2M junction collections hidden by default and manually show/hide configurable.
+- [x] Primitive fields: integer, bigint, decimal, string, text, boolean, date, datetime, timestamp, JSON and UUID.
+- [x] Required/default/index mutations with validation and compensation.
+- [x] Field metadata: readonly, hidden, sort, interface and options.
+- [x] Type conversion intentionally excluded from V1.
+- [x] Studio semantic File and Image field choices map to UUID physical storage plus `file` / `image` interfaces rather than inventing new MySQL types.
+- [x] Core field compiler rejects `file` / `image` interfaces on non-UUID storage.
+- [x] Data Model field rows show semantic File/Image type instead of exposing underlying UUID implementation detail.
 
-## 14. Documentation
+## 4. Relations
 
-- [x] `README.md` project overview.
-- [x] Yunsoft attribution and active-development/use-at-own-risk notice in repository, package and deployment documentation.
-- [x] `docs/architecture.md`.
-- [x] `docs/development.md`.
-- [x] `docs/database.md`.
-- [x] `docs/rest-api.md`.
-- [x] `docs/auth.md`.
-- [x] `docs/permissions.md`.
-- [x] `docs/extensions.md`.
-- [x] `docs/setup-cli.md`.
-- [x] `docs/studio.md`.
-- [x] `docs/studio-ui-improvement-plan.md` live UI improvement checklist.
-- [x] `docs/studio-usability-pass.md` focused shared-pagination/media/settings usability checklist.
-- [x] `docs/production-readiness-test-plan.md` source implementation checklist for the production-readiness pass.
-- [x] `docs/testing.md` low-noise fast/full/release/real-MySQL test workflow.
-- [x] `docs/production-readiness.md` current source audit, fixed hazards, release gates and known V1 constraints.
-- [x] `docs/studio-customization.md` branding/theme/localization architecture and operator behavior.
-- [x] `docs/files.md`.
-- [x] `docs/security.md`.
-- [x] `docs/deployment.md`.
-- [x] `docs/publishing.md` naming/release policy.
-- [x] Convert publishing policy into final npm install guide after real npm ownership/pack verification — `todo.md`.
+- [x] M2O physical foreign key lifecycle with target/type/on-delete validation and delete compensation.
+- [x] O2M inverse metadata reads.
+- [x] M2M hidden junction lifecycle with two FKs, unique pair, paired metadata and destructive cleanup compensation.
+- [x] O2O is a real backend relation type, not a UI alias: one schema-locked `ALTER TABLE` adds FK + UNIQUE index and metadata records `kind: "o2o"`.
+- [x] O2O delete removes FK + UNIQUE in one DDL step and restores them if metadata cleanup fails.
+- [x] O2O supports RESTRICT/CASCADE and optional-field SET NULL; required fields reject SET NULL.
+- [x] O2O create/delete REST routes are audited and invalidate schema cache.
+- [x] Direct to-one Content picker logic handles M2O/O2O metadata.
+- [x] Data Model Relations UI uses explicit M2O / O2O / M2M relationship cards plus an existing-relations summary.
+- [x] File/Image UUID fields are excluded from relation-source field choices.
+- [x] Direct relation target picker remains capped at 200 records in V1; searchable/paginated relation picker is a scale follow-up.
+- [x] O2M/M2M nested expansion remains outside V1.
 
-## 15. Source-level regression coverage present
+## 5. Generic content / ItemsService
 
-- [x] DB config/identifier/error/retry.
-- [x] Bootstrap/advisory-lock.
-- [x] Required migrations `0005`/`0006` plus public-role and Studio-settings invariants.
-- [x] Schema/query/ItemsService.
-- [x] Schema service authorization/destructive/M2M preflight/lifecycle.
-- [x] Collection visibility metadata + Studio visibility rule behavior.
-- [x] Direct relation expansion + source permission guard.
-- [x] Auth/session/API-token/action-token.
-- [x] Public-role fail-closed permission resolution plus field/row restriction behavior.
-- [x] RBAC/permission cache/validation evaluator.
-- [x] Studio settings public-read/admin-write boundary and strict branding/theme/locale validation.
-- [x] Studio appearance normalization/custom-logo/theme resolution helpers.
-- [x] EN/TR dictionary key parity and static translation-key source scan.
-- [x] Hook recursion/item hooks.
-- [x] Extension manifest/discovery/runtime context.
-- [x] API malformed-JSON/request-id/error-contract/MySQL normalization.
-- [x] API schema mutations invalidate the shared schema cache before immediate follow-up requests.
-- [x] Security/auth cache-header middleware.
-- [x] Production config/trusted-proxy/rate-limit memory guards.
-- [x] CLI start dispatch.
-- [x] Local storage/FilesService security/cleanup.
-- [x] S3 driver contract.
-- [x] Guarded storage reconciliation.
-- [x] Audit redaction + bounded cleanup.
-- [x] Single-port Studio default config and static asset path/traversal resolution.
-- [x] Low-noise `test:fast`, auto-discovered complete `npm test`, and release build/package runner exist.
-- [x] Branding/localization regressions are part of the low-noise fast suite.
-- [x] Opt-in destructive-guarded real MySQL/API cross-feature integration flow exists.
-- [ ] Execute the current production-readiness/customization test commands on Node 24/real target infrastructure — `todo.md`.
+- [x] Generic read/read-one/create/update/delete REST and service paths.
+- [x] Server-backed fields/filter/sort/limit/offset/count.
+- [x] Safe filter compiler and field/operator allowlists.
+- [x] Bulk create/update/delete safeguards and transactional behavior.
+- [x] Direct relation expansion reuses target RBAC and source field visibility.
+- [x] Content Studio list/create/edit/delete, server text search, filters, sort and pagination.
+- [x] Direct relation fields use readable target labels.
+- [x] File/Image fields use file-library selectors instead of raw UUID inputs.
+- [x] Record form can upload a new file directly into a File/Image field and select it immediately.
+- [x] Optional File/Image references can be cleared; required fields preserve required semantics.
+- [x] Content tables show readable file metadata/preview instead of raw UUID when file metadata exists.
 
-## 16. Verification milestones
+## 6. Files / preview / storage
 
-The major V1 feature source implementations now exist. These milestone boxes stay open until the corresponding runtime checks are actually executed.
+- [x] Local filesystem storage driver.
+- [x] S3-compatible storage driver.
+- [x] File metadata/storage coordination, upload/list/read/content/update/delete.
+- [x] Upload size guard, safe physical keys, Unicode-safe download filenames.
+- [x] Reconciliation dry-run plus guarded orphan cleanup.
+- [x] Files Studio gallery/list, filters, sorting, pagination and metadata editing.
+- [x] Shared authenticated `FilePreview` fetches protected file bytes through `/files/:id/content`.
+- [x] Rich preview classifier supports image, PDF, video and audio with a clean unsupported-file placeholder.
+- [x] Image previews use thumbnails; PDFs embed in the preview surface; video/audio use native controls.
+- [x] File/Image record controls and Files library reuse the same preview component.
+- [x] Preview classification is isolated into pure JS for cheap Node tests.
 
-- [x] Milestone A — dependency install/lockfile + Node 24 + tests + API/Studio build/start verified for the earlier baseline.
-- [x] Milestone B — real MySQL bootstrap/schema/CRUD/query/relation lifecycle and rollback behavior verified for the earlier baseline.
-- [x] Milestone C — real auth/SMTP/replay/RBAC/validation/rate-limit behavior verified for the earlier baseline.
-- [ ] Current customization/production-readiness pass — rerun Node24 fast/full/release suites, migration `0006`, branding/theme/EN-TR behavior, public RBAC, Content Visibility, proxy and browser smoke — `todo.md`.
-- [ ] Milestone D — extension local/npm runtime + refreshed Studio end-to-end and single-port smoke verified.
-- [ ] Milestone E — local/S3 files, reconciliation, audit cleanup, logging/security headers and graceful shutdown verified.
-- [x] Release baseline — npm naming ownership, tarballs, fresh install and `yuncms init/bootstrap/start` previously verified; rerun the current release source gate before the next publish.
+## 7. Authentication / users
 
-## 17. Remaining source work excluding manual verification
+- [x] Scrypt password hashing, email/password login, access/refresh sessions and refresh rotation.
+- [x] Logout current/all sessions and password-change revocation.
+- [x] API tokens.
+- [x] Password-reset and email-verification one-time token flows.
+- [x] Optional SMTP delivery.
+- [x] Login/session/refresh/API-token identity queries include human-readable `role_name` in addition to internal role id.
+- [x] Studio account footer shows email + role name; raw role UUID is not rendered as user-facing identity copy.
 
-There is no known blocking single-instance V1 source feature left in the current roadmap after the Studio usability, collection visibility/public-role, production-readiness and lightweight customization/localization source passes.
+## 8. Roles / permissions / Public access
 
-Future/non-blocking follow-ups are deliberately outside the V1 release gate unless product requirements or deployment scale change:
+- [x] Role CRUD with protected Administrator/Public semantics.
+- [x] Public role exists after bootstrap/migration but is deny-by-default.
+- [x] Anonymous requests use normal action/field/row-filter/write-validation RBAC; no special bypass.
+- [x] Read/create/update/delete permission rows.
+- [x] Field allowlists, row filters and create/update prospective-record validation.
+- [x] Request-local permission cache and mutation invalidation.
+- [x] Studio role-first collection/action matrix with search, sorting, configured-only filter and pagination.
+- [x] Simple access remains a direct toggle; advanced field/filter/validation editing remains in a focused modal.
+- [x] Selected Public role shows explicit anonymous-access guidance.
+- [x] Selected non-admin role shows enabled/restricted-rule overview before the matrix.
+
+## 9. Studio shell / navigation UX
+
+- [x] Content / Library / Settings task-oriented navigation.
+- [x] Non-system visible collections appear directly under Content rather than a collection dropdown.
+- [x] Content, Library and Settings are independent accessible accordion groups.
+- [x] Lightweight inline SVG icons cover primary navigation without adding an icon dependency.
+- [x] Full sidebar collapse/expand produces a narrow icon rail and preserves current section/content context.
+- [x] Clicking an accordion group while collapsed expands the sidebar and opens that group.
+- [x] Logo row no longer renders redundant “YunCMS / Studio” copy beside the logo.
+- [x] Sidebar account area no longer renders raw role UUID.
+- [x] Narrow-screen rules preserve usable navigation rather than forcing the desktop icon rail.
+
+## 10. Branding / theme / localization
+
+- [x] DB-backed Branding & Appearance settings: brand name, logo URL, accent color, Light/Dark/System theme and default EN/TR locale.
+- [x] Safe pre-auth GET exposes display-only Studio settings; PATCH is admin/system-only.
+- [x] Custom logo replaces Yunsoft logo completely while Yunsoft powered-by/copyright attribution stays independent.
+- [x] Default Yunsoft branding resolves theme-specific light/dark logo URLs; custom logos remain unchanged across themes.
+- [x] System theme follows browser/OS color scheme and updates resolved theme state.
+- [x] Shared CSS custom properties drive surfaces, text, borders, inputs and accents.
+- [x] Legacy light-only Studio controls receive explicit dark-surface normalization, including Data Model, permissions, filters, pagination, file controls and preview surfaces.
+- [x] English and Turkish base dictionaries plus focused current-UI dictionary modules.
+- [x] Personal locale preference can override and later return to the server default.
+- [x] Localization core remains pure JS; React hook is a thin adapter.
+
+## 11. Extensions / audit / operations
+
+- [x] `@yunsoft/yuncms-extensions-sdk` with `defineEndpoint` / `defineHook`.
+- [x] Local and npm dependency extension discovery with manifest/root/type checks.
+- [x] Trusted extension context reuses services, accountability, DB, schema, hooks, storage and request-local permission cache.
+- [x] Audit actor/action/collection/item/request-id history with secret redaction.
+- [x] Bounded explicit audit cleanup.
+- [x] Storage reconciliation and operational docs.
+
+## 12. Source regression coverage
+
+- [x] Low-noise `npm run test:fast`, auto-discovered `npm test`, and build/package `npm run test:release` workflows.
+- [x] Port-3008 core config and fresh-init generator tests.
+- [x] Public-role / collection-visibility / production-config / request-id / rate-limit regressions.
+- [x] Studio-settings public-read/admin-write and branding validation tests.
+- [x] Theme-aware Yunsoft/default-vs-custom logo resolution tests.
+- [x] EN/TR key parity, static translation-key scan and dynamic field/action label coverage.
+- [x] File/Image field payload/storage-interface tests.
+- [x] File upload/select/clear/content-preview source contracts and rich preview-kind tests.
+- [x] Sidebar accordion/icon/collapse and role-name/no-UUID source contracts.
+- [x] Dark-mode legacy/new surface contracts.
+- [x] Roles/Public permission guidance and simple-vs-advanced UI source contracts.
+- [x] O2O deterministic unique-index and single-lock FK+UNIQUE lifecycle contracts.
+- [x] O2O API route/audit source contract.
+- [x] Auth refresh identity role-name regression.
+- [x] Opt-in real-MySQL integration suite includes O2O uniqueness and File/Image metadata checks without slowing normal fast/full source runs.
+
+## 13. Documentation / handoff
+
+- [x] README + architecture/development/database/REST/auth/permissions/extensions/setup/files/security/deployment/publishing docs.
+- [x] Studio customization/localization and production-readiness docs.
+- [x] `todo.md` contains only outstanding Codex/runtime/browser/MySQL/provider checks; completed `[x]` history removed.
+- [ ] Execute the current Node 24 / MySQL / browser / provider gates in `todo.md` before calling this exact branch deployment-verified production ready.
+
+## 14. Known non-blocking follow-ups
+
+These are not current single-instance V1 source blockers unless scale/product requirements change:
 
 - cluster-wide/shared-store rate limiting for multi-instance deployments;
-- server-side pagination/filtering for Files/Users/other administrative lists when data volume outgrows current client-side administration flows;
-- O2M/M2M nested item expansion;
-- paginated/search relation picker beyond the current 200-item Studio picker;
-- M2M multi-select content editor on top of explicit junction records;
-- additional Studio locales beyond English/Turkish;
-- uploaded/binary logo asset management if URL-based branding later proves insufficient;
-- session-management UI, MFA and SSO families;
-- extension sandbox/marketplace isolation;
-- automatic scheduled maintenance/retention jobs if operators later want them;
-- generic edge/reverse-proxy rate policy for high-traffic public content deployments.
+- shared object storage requirement for multi-instance deployments using files;
+- server-side pagination/filtering for Files/Users administrative lists once client-side admin lists outgrow current scale;
+- searchable/paginated relation picker beyond the current 200-item target list;
+- O2M/M2M nested expansion and richer M2M multi-select content editing;
+- binary/uploaded branding asset management instead of URL-only custom logos;
+- additional locales beyond English/Turkish;
+- session-management UI, MFA and SSO;
+- untrusted extension sandbox/marketplace isolation;
+- optional scheduled maintenance jobs.
