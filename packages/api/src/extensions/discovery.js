@@ -54,6 +54,15 @@ async function resolveDependencyPackageRoot(rootDir, packageName) {
       // Fall through to the original package-json resolution error below.
     }
 
+    if (/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i.test(packageName)) {
+      const installedRoot = join(resolve(rootDir), 'node_modules', ...packageName.split('/'));
+      const installedPackagePath = join(installedRoot, 'package.json');
+      if (await exists(installedPackagePath)) {
+        const installedPackage = await readJson(installedPackagePath);
+        if (installedPackage.name === packageName) return installedRoot;
+      }
+    }
+
     const error = new Error(`Unable to resolve installed extension package: ${packageName}`);
     error.code = 'EXTENSION_PACKAGE_NOT_RESOLVED';
     error.cause = packageJsonError;

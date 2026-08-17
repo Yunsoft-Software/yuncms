@@ -82,6 +82,25 @@ test('duplicate extension ids fail startup discovery', async (t) => {
   );
 });
 
+test('dependency discovery ignores installed packages without root or package-json exports', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'yuncms-ext-dependency-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  await writeFile(join(root, 'package.json'), JSON.stringify({
+    name: 'consumer',
+    dependencies: { 'non-exporting-package': '1.0.0' },
+  }), 'utf8');
+  const packageRoot = join(root, 'node_modules', 'non-exporting-package');
+  await mkdir(packageRoot, { recursive: true });
+  await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
+    name: 'non-exporting-package',
+    version: '1.0.0',
+    exports: { './feature': './feature.js' },
+  }), 'utf8');
+
+  assert.deepEqual(await discoverExtensions({ rootDir: root }), []);
+});
+
 test('runtime accepts SDK marker and exposes services directly to hooks', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'yuncms-ext-runtime-'));
   t.after(() => {

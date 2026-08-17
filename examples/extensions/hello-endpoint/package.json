@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@yuncms/extensions-sdk": "0.0.0"
+  },
   "yuncms": {
     "id": "hello",
     "type": "endpoint",
