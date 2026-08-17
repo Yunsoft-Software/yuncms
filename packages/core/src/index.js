@@ -46,6 +46,7 @@ export { RolesService } from './services/roles-service.js';
 export { PermissionsService } from './services/permissions-service.js';
 export { FilesService } from './services/files-service.js';
 export { FileReconciliationService } from './services/file-reconciliation-service.js';
+export { StudioSettingsService, STUDIO_SETTING_DEFAULTS } from './services/studio-settings-service.js';
 export { SchemaMetadataRepository } from './schema-metadata-repository.js';
 export { loadSchemaSnapshot, SchemaCache } from './schema.js';
 export { assertFieldType, compileFieldColumn } from './field-types.js';
