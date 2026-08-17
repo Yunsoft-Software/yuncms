@@ -38,8 +38,7 @@ export function YunsoftFooter({ compact = false }) {
 }
 
 export function LanguageSwitcher({ compact = false }) {
-  const { locale, setLocale } = useI18n();
-  const { t } = useI18n();
+  const { locale, setLocale, t } = useI18n();
   return (
     <div className={`language-switcher ${compact ? 'compact' : ''}`} role="group" aria-label={t('appearance.currentLanguage')}>
       <button
