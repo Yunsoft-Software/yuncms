@@ -14,6 +14,8 @@ The release checks were run on 2026-08-17 while authenticated to npm as `raichub
 
 Every `0.1.0` package was verified through unauthenticated `npm view` queries and a clean registry install. The temporary release tokens were revoked after publishing.
 
+The `0.1.1` package family was published on 2026-08-17 after the Node 24 fast/full/release gates, real-MySQL integration, Studio browser smoke and package contract checks passed. All four exact versions and internal dependency pins were then verified through unauthenticated registry queries and a clean `@yunsoft/yuncms@0.1.1` install/CLI smoke.
+
 ## Naming direction
 
 Keep the product and executable command simple:

@@ -63,7 +63,7 @@ npx yuncms bootstrap
 npx yuncms start
 ```
 
-The public `@yunsoft/yuncms` package and its dependencies were verified with `npm pack`, a clean registry install and real `init`/`bootstrap`/`start` smoke tests for `0.1.0`.
+The public `@yunsoft/yuncms` package and its dependencies were verified with `npm pack`, a clean registry install and real `init`/`bootstrap`/`start` smoke tests for the `0.1.0` baseline. The `0.1.1` update was rechecked with the release package contracts, unauthenticated registry metadata and a clean install/CLI smoke.
 
 ## Environment
 
