@@ -93,7 +93,16 @@ test('system permission resources migration is required and registers only bound
   assert.match(source, /'allowedActions', JSON_ARRAY\('read'\)/);
   assert.doesNotMatch(source, /'yuncms_permissions'.*permissionManaged/s);
   assert.doesNotMatch(source, /password_hash/);
-  assert.equal(CORE_MIGRATIONS.at(-1).id, '0007-system-permission-resources');
+});
+
+test('file-backed Studio logo migration is the latest required compatibility gate', () => {
+  const migration = CORE_MIGRATIONS.find(({ id }) => id === '0008-studio-logo-file');
+  assert.ok(migration);
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0008-studio-logo-file'));
+  const source = migration.statements.join('\n');
+  assert.match(source, /ADD COLUMN logo_file CHAR\(36\) NULL/);
+  assert.match(source, /REFERENCES yuncms_files \(id\) ON DELETE SET NULL/);
+  assert.equal(CORE_MIGRATIONS.at(-1).id, '0008-studio-logo-file');
 });
 
 test('advisory lock uses one connection and always releases it', async () => {
