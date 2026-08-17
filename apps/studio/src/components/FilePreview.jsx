@@ -48,7 +48,17 @@ export function FilePreview({ file, label = 'File', alt = '' }) {
   }, [file.id, previewable]);
 
   if (state.status === 'ready') {
-    return <img src={state.url} alt={alt} loading="lazy" />;
+    return (
+      <img
+        src={state.url}
+        alt={alt}
+        loading="lazy"
+        onError={() => {
+          if (state.url) URL.revokeObjectURL(state.url);
+          setState({ status: 'error', url: '' });
+        }}
+      />
+    );
   }
 
   if (state.status === 'loading') {
