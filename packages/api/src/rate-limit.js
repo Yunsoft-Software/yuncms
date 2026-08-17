@@ -14,24 +14,29 @@ export function createFixedWindowRateLimit({
 } = {}) {
   if (!Number.isInteger(windowMs) || windowMs < 1000) throw new Error('Rate-limit windowMs must be at least 1000');
   if (!Number.isInteger(max) || max < 1) throw new Error('Rate-limit max must be a positive integer');
+  if (!Number.isInteger(maxBuckets) || maxBuckets < 1) throw new Error('Rate-limit maxBuckets must be a positive integer');
 
   const buckets = new Map();
 
-  function prune(timestamp) {
-    if (buckets.size < maxBuckets) return;
+  function ensureCapacity(timestamp) {
     for (const [bucketKey, bucket] of buckets) {
       if (bucket.resetAt <= timestamp) buckets.delete(bucketKey);
-      if (buckets.size < maxBuckets) break;
+    }
+
+    while (buckets.size >= maxBuckets) {
+      const oldestKey = buckets.keys().next().value;
+      if (oldestKey === undefined) break;
+      buckets.delete(oldestKey);
     }
   }
 
   return (req, res, next) => {
     const timestamp = now();
-    prune(timestamp);
     const bucketKey = String(key(req));
     let bucket = buckets.get(bucketKey);
 
     if (!bucket || bucket.resetAt <= timestamp) {
+      if (!bucket) ensureCapacity(timestamp);
       bucket = { count: 0, resetAt: timestamp + windowMs };
       buckets.set(bucketKey, bucket);
     }
