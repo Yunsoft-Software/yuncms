@@ -11,7 +11,12 @@ export {
   requireAccountability,
 } from './accountability.js';
 export { createRequestContext } from './context.js';
-export { createInitialAdmin, findExistingAdmin } from './setup.js';
+export {
+  createInitialAdmin,
+  findExistingAdmin,
+  findPublicRole,
+  ensurePublicRole,
+} from './setup.js';
 export { HookEmitter } from './hooks.js';
 export { createJsonLogger, LEVELS as LOG_LEVELS } from './logger.js';
 export { deleteM2MJunction } from './m2m-lifecycle.js';
