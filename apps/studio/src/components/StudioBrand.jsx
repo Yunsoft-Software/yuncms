@@ -1,13 +1,19 @@
 import { useState } from 'react';
 
+import { API_URL } from '../api.js';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
 import { resolveStudioLogo } from '../studio-settings.js';
 
+function absoluteLogoUrl(value) {
+  if (!value || !value.startsWith('/')) return value;
+  return `${API_URL}${value}`;
+}
+
 export function StudioBrand({ compact = false, previewSettings = null }) {
   const { settings, resolvedTheme } = useStudioSettings();
   const effectiveSettings = previewSettings ?? settings;
-  const logoUrl = resolveStudioLogo(effectiveSettings, resolvedTheme);
+  const logoUrl = absoluteLogoUrl(resolveStudioLogo(effectiveSettings, resolvedTheme));
   const [failedLogo, setFailedLogo] = useState('');
   const showLogo = logoUrl && failedLogo !== logoUrl;
 
@@ -62,3 +68,5 @@ export function LanguageSwitcher({ compact = false }) {
     </div>
   );
 }
+
+export { absoluteLogoUrl };
