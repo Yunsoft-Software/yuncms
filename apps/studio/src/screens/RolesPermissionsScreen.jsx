@@ -2,34 +2,44 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 
+const ACTIONS = ['read', 'create', 'update', 'delete'];
+
 function parseJsonInput(value) {
   if (!value.trim()) return null;
   return JSON.parse(value);
-}
-
-function normalizeFieldsInput(value) {
-  const fields = value.split(',').map((field) => field.trim()).filter(Boolean);
-  return fields.length > 0 ? fields : null;
 }
 
 function supportsValidation(action) {
   return action === 'create' || action === 'update';
 }
 
+function permissionKey(role, collection, action) {
+  return `${role}:${collection}:${action}`;
+}
+
+function prettyJson(value) {
+  return value ? JSON.stringify(value, null, 2) : '';
+}
+
 export function RolesPermissionsScreen() {
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [collections, setCollections] = useState([]);
+  const [selectedRoleId, setSelectedRoleId] = useState('');
+  const [showCreateRole, setShowCreateRole] = useState(false);
+  const [roleForm, setRoleForm] = useState({ name: '', description: '', public: false });
+  const [roleName, setRoleName] = useState('');
+  const [advancedPermission, setAdvancedPermission] = useState(null);
+  const [advancedFields, setAdvancedFields] = useState([]);
+  const [advancedForm, setAdvancedForm] = useState({ allFields: true, fields: [], filter: '', validation: '' });
+  const [busyKey, setBusyKey] = useState('');
+  const [savingRole, setSavingRole] = useState(false);
+  const [savingAdvanced, setSavingAdvanced] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const [roleForm, setRoleForm] = useState({ name: '', description: '', public: false });
-  const [permissionForm, setPermissionForm] = useState({
-    role: '', collection: '', action: 'read', fields: '', filter: '', validation: '',
-  });
-
-  async function load() {
+  async function load(preferredRole = selectedRoleId) {
     setLoading(true);
     setError('');
     try {
@@ -38,9 +48,15 @@ export function RolesPermissionsScreen() {
         apiRequest('/permissions'),
         apiRequest('/schema/collections'),
       ]);
-      setRoles(rolesResponse?.data ?? []);
+      const nextRoles = rolesResponse?.data ?? [];
+      setRoles(nextRoles);
       setPermissions(permissionsResponse?.data ?? []);
       setCollections((collectionsResponse?.data ?? []).filter((entry) => !entry.system));
+      setSelectedRoleId((current) => {
+        const preferred = preferredRole || current;
+        if (nextRoles.some((role) => role.id === preferred)) return preferred;
+        return nextRoles.find((role) => !role.admin)?.id || nextRoles[0]?.id || '';
+      });
     } catch (requestError) {
       setError(requestError.message || 'Roles and permissions could not be loaded');
     } finally {
@@ -52,43 +68,59 @@ export function RolesPermissionsScreen() {
     load();
   }, []);
 
-  const roleNames = useMemo(() => new Map(roles.map((role) => [role.id, role.name])), [roles]);
+  const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? null;
+  const permissionIndex = useMemo(() => new Map(permissions.map((permission) => [
+    permissionKey(permission.role, permission.collection, permission.action),
+    permission,
+  ])), [permissions]);
+  const selectedRolePermissions = useMemo(() => permissions.filter((permission) =>
+    permission.role === selectedRoleId), [permissions, selectedRoleId]);
+
+  useEffect(() => {
+    setRoleName(selectedRole?.name || '');
+    setAdvancedPermission(null);
+  }, [selectedRole?.id, selectedRole?.name]);
 
   async function createRole(event) {
     event.preventDefault();
     setError('');
     setNotice('');
     try {
-      await apiRequest('/roles', {
+      const response = await apiRequest('/roles', {
         method: 'POST',
         body: {
-          name: roleForm.name,
-          description: roleForm.description || null,
+          name: roleForm.name.trim(),
+          description: roleForm.description.trim() || null,
           public: roleForm.public,
         },
       });
+      const createdId = response?.data?.id || '';
       setRoleForm({ name: '', description: '', public: false });
+      setShowCreateRole(false);
       setNotice('Role created');
-      await load();
+      await load(createdId);
     } catch (requestError) {
       setError(requestError.message || 'Role could not be created');
     }
   }
 
-  async function renameRole(role) {
-    const name = window.prompt('Role name', role.name);
-    if (!name || name === role.name) return;
+  async function saveRoleName(event) {
+    event.preventDefault();
+    if (!selectedRole || !roleName.trim() || roleName.trim() === selectedRole.name) return;
+    setSavingRole(true);
     setError('');
     setNotice('');
     try {
-      await apiRequest(`/roles/${encodeURIComponent(role.id)}`, {
+      await apiRequest(`/roles/${encodeURIComponent(selectedRole.id)}`, {
         method: 'PATCH',
-        body: { name },
+        body: { name: roleName.trim() },
       });
       setNotice('Role updated');
-      await load();
+      await load(selectedRole.id);
     } catch (requestError) {
       setError(requestError.message || 'Role could not be updated');
+    } finally {
+      setSavingRole(false);
     }
   }
 
@@ -99,238 +131,347 @@ export function RolesPermissionsScreen() {
     try {
       await apiRequest(`/roles/${encodeURIComponent(role.id)}`, { method: 'DELETE' });
       setNotice('Role deleted');
-      await load();
+      setAdvancedPermission(null);
+      await load('');
     } catch (requestError) {
       setError(requestError.message || 'Role could not be deleted');
     }
   }
 
-  async function createPermission(event) {
-    event.preventDefault();
+  async function togglePermission(collection, action) {
+    if (!selectedRole || selectedRole.admin) return;
+    const key = permissionKey(selectedRole.id, collection, action);
+    const existing = permissionIndex.get(key);
+    setBusyKey(key);
     setError('');
     setNotice('');
     try {
-      await apiRequest('/permissions', {
-        method: 'POST',
-        body: {
-          role: permissionForm.role,
-          collection: permissionForm.collection,
-          action: permissionForm.action,
-          fields: normalizeFieldsInput(permissionForm.fields),
-          filter: parseJsonInput(permissionForm.filter),
-          validation: supportsValidation(permissionForm.action)
-            ? parseJsonInput(permissionForm.validation)
-            : null,
-        },
-      });
-      setPermissionForm((current) => ({
-        ...current,
-        action: 'read',
-        fields: '',
-        filter: '',
-        validation: '',
-      }));
-      setNotice('Permission created');
-      await load();
-    } catch (requestError) {
-      setError(requestError.message || 'Permission could not be created');
-    }
-  }
-
-  async function editPermission(permission) {
-    const currentFields = permission.fields?.join(', ') ?? '';
-    const fields = window.prompt('Allowed fields (comma separated, empty = all)', currentFields);
-    if (fields == null) return;
-    const currentFilter = permission.filter ? JSON.stringify(permission.filter) : '';
-    const filter = window.prompt('Row filter JSON (empty = none)', currentFilter);
-    if (filter == null) return;
-
-    let validation = null;
-    if (supportsValidation(permission.action)) {
-      const currentValidation = permission.validation ? JSON.stringify(permission.validation) : '';
-      validation = window.prompt('Write validation JSON (empty = none)', currentValidation);
-      if (validation == null) return;
-    }
-
-    setError('');
-    setNotice('');
-    try {
-      await apiRequest(`/permissions/${encodeURIComponent(permission.id)}`, {
-        method: 'PATCH',
-        body: {
-          fields: normalizeFieldsInput(fields),
-          filter: parseJsonInput(filter),
-          validation: supportsValidation(permission.action) ? parseJsonInput(validation) : null,
-        },
-      });
-      setNotice('Permission updated');
-      await load();
+      if (existing) {
+        await apiRequest(`/permissions/${encodeURIComponent(existing.id)}`, { method: 'DELETE' });
+        if (advancedPermission?.id === existing.id) setAdvancedPermission(null);
+        setNotice(`${action} access removed for ${collection}`);
+      } else {
+        await apiRequest('/permissions', {
+          method: 'POST',
+          body: {
+            role: selectedRole.id,
+            collection,
+            action,
+            fields: null,
+            filter: null,
+            validation: null,
+          },
+        });
+        setNotice(`${action} access granted for ${collection}`);
+      }
+      await load(selectedRole.id);
     } catch (requestError) {
       setError(requestError.message || 'Permission could not be updated');
+    } finally {
+      setBusyKey('');
     }
   }
 
-  async function deletePermission(permission) {
-    if (!window.confirm(`Delete ${permission.action} permission for ${permission.collection}?`)) return;
+  async function openAdvanced(permission) {
     setError('');
     setNotice('');
     try {
-      await apiRequest(`/permissions/${encodeURIComponent(permission.id)}`, { method: 'DELETE' });
-      setNotice('Permission deleted');
-      await load();
+      const fieldResponse = await apiRequest(`/schema/collections/${encodeURIComponent(permission.collection)}/fields`);
+      setAdvancedFields((fieldResponse?.data ?? []).filter((field) => !field.hidden));
+      setAdvancedPermission(permission);
+      setAdvancedForm({
+        allFields: !permission.fields || permission.fields.length === 0,
+        fields: permission.fields || [],
+        filter: prettyJson(permission.filter),
+        validation: prettyJson(permission.validation),
+      });
     } catch (requestError) {
-      setError(requestError.message || 'Permission could not be deleted');
+      setError(requestError.message || 'Permission details could not be loaded');
+    }
+  }
+
+  function toggleAdvancedField(fieldName) {
+    setAdvancedForm((current) => ({
+      ...current,
+      fields: current.fields.includes(fieldName)
+        ? current.fields.filter((field) => field !== fieldName)
+        : [...current.fields, fieldName],
+    }));
+  }
+
+  async function saveAdvancedPermission(event) {
+    event.preventDefault();
+    if (!advancedPermission) return;
+    setSavingAdvanced(true);
+    setError('');
+    setNotice('');
+    try {
+      const filter = parseJsonInput(advancedForm.filter);
+      const validation = supportsValidation(advancedPermission.action)
+        ? parseJsonInput(advancedForm.validation)
+        : null;
+      if (!advancedForm.allFields && advancedForm.fields.length === 0) {
+        throw new Error('Choose at least one allowed field or enable all fields.');
+      }
+      await apiRequest(`/permissions/${encodeURIComponent(advancedPermission.id)}`, {
+        method: 'PATCH',
+        body: {
+          fields: advancedForm.allFields ? null : advancedForm.fields,
+          filter,
+          validation,
+        },
+      });
+      setNotice('Advanced permission rules saved');
+      setAdvancedPermission(null);
+      await load(selectedRoleId);
+    } catch (requestError) {
+      setError(requestError instanceof SyntaxError
+        ? 'Filter and validation rules must contain valid JSON.'
+        : requestError.message || 'Permission could not be updated');
+    } finally {
+      setSavingAdvanced(false);
     }
   }
 
   return (
     <div className="screen-stack">
-      <section className="split-grid">
-        <article className="panel form-panel">
-          <div>
-            <p className="eyebrow">Roles</p>
-            <h2>Role management</h2>
-            <p>Administrator/public flags are protected after creation; normal role metadata stays editable.</p>
-          </div>
-
-          <form className="form-stack compact" onSubmit={createRole}>
-            <label className="field-label">
-              <span>Name</span>
-              <input value={roleForm.name} onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))} required />
-            </label>
-            <label className="field-label">
-              <span>Description</span>
-              <input value={roleForm.description} onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))} />
-            </label>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={roleForm.public}
-                onChange={(event) => setRoleForm((current) => ({ ...current, public: event.target.checked }))}
-              />
-              Public role
-            </label>
-            <button className="primary-button" type="submit">Create role</button>
-          </form>
-
-          <div className="list-stack">
-            {roles.map((role) => (
-              <div className="relation-row" key={role.id}>
-                <div>
-                  <strong>{role.name}</strong>
-                  <small>{role.admin ? 'administrator' : role.public ? 'public' : 'custom role'}</small>
-                </div>
-                <div className="row-actions">
-                  <button className="text-button" type="button" onClick={() => renameRole(role)}>Rename</button>
-                  {!role.admin && !role.public && (
-                    <button className="danger-button" type="button" onClick={() => deleteRole(role)}>Delete</button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="panel form-panel">
-          <div>
-            <p className="eyebrow">Permissions</p>
-            <h2>Create permission</h2>
-            <p>Fields, row filters and create/update validation are enforced by ItemsService, including extension calls.</p>
-          </div>
-
-          <form className="form-stack compact" onSubmit={createPermission}>
-            <label className="field-label">
-              <span>Role</span>
-              <select value={permissionForm.role} onChange={(event) => setPermissionForm((current) => ({ ...current, role: event.target.value }))} required>
-                <option value="">Select role</option>
-                {roles.filter((role) => !role.admin).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-              </select>
-            </label>
-            <label className="field-label">
-              <span>Collection</span>
-              <select value={permissionForm.collection} onChange={(event) => setPermissionForm((current) => ({ ...current, collection: event.target.value }))} required>
-                <option value="">Select collection</option>
-                {collections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}
-              </select>
-            </label>
-            <label className="field-label">
-              <span>Action</span>
-              <select
-                value={permissionForm.action}
-                onChange={(event) => setPermissionForm((current) => ({
-                  ...current,
-                  action: event.target.value,
-                  validation: supportsValidation(event.target.value) ? current.validation : '',
-                }))}
-              >
-                <option value="read">read</option>
-                <option value="create">create</option>
-                <option value="update">update</option>
-                <option value="delete">delete</option>
-              </select>
-            </label>
-            <label className="field-label">
-              <span>Allowed fields</span>
-              <input
-                value={permissionForm.fields}
-                onChange={(event) => setPermissionForm((current) => ({ ...current, fields: event.target.value }))}
-                placeholder="id, title, status (empty = all)"
-              />
-            </label>
-            <label className="field-label">
-              <span>Row filter JSON</span>
-              <textarea
-                rows="4"
-                value={permissionForm.filter}
-                onChange={(event) => setPermissionForm((current) => ({ ...current, filter: event.target.value }))}
-                placeholder='{"status":{"_eq":"active"}}'
-              />
-            </label>
-            <label className="field-label">
-              <span>Write validation JSON</span>
-              <textarea
-                rows="4"
-                value={permissionForm.validation}
-                disabled={!supportsValidation(permissionForm.action)}
-                onChange={(event) => setPermissionForm((current) => ({ ...current, validation: event.target.value }))}
-                placeholder={supportsValidation(permissionForm.action) ? '{"status":{"_in":["draft","active"]}}' : 'Only create/update permissions use validation'}
-              />
-            </label>
-            <button className="primary-button" type="submit">Create permission</button>
-          </form>
-        </article>
-      </section>
-
       {error && <div className="error-banner" role="alert">{error}</div>}
       {notice && <div className="notice-banner" role="status">{notice}</div>}
 
-      <section className="table-panel">
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr><th>Role</th><th>Collection</th><th>Action</th><th>Fields</th><th>Filter</th><th>Validation</th><th /></tr>
-            </thead>
-            <tbody>
-              {permissions.map((permission) => (
-                <tr key={permission.id}>
-                  <td>{roleNames.get(permission.role) || permission.role}</td>
-                  <td>{permission.collection}</td>
-                  <td>{permission.action}</td>
-                  <td>{permission.fields?.join(', ') || 'all'}</td>
-                  <td><code>{permission.filter ? JSON.stringify(permission.filter) : '—'}</code></td>
-                  <td><code>{permission.validation ? JSON.stringify(permission.validation) : '—'}</code></td>
-                  <td className="row-actions">
-                    <button className="text-button" type="button" onClick={() => editPermission(permission)}>Edit</button>
-                    <button className="danger-button" type="button" onClick={() => deletePermission(permission)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <section className="permissions-layout">
+        <aside className="panel form-panel role-sidebar">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Access</p>
+              <h2>Roles</h2>
+              <p>Select a role, then grant collection actions from the matrix.</p>
+            </div>
+            <button className="primary-button" type="button" onClick={() => setShowCreateRole((value) => !value)}>
+              {showCreateRole ? 'Cancel' : 'New role'}
+            </button>
+          </div>
+
+          {showCreateRole && (
+            <form className="schema-create-card form-stack compact" onSubmit={createRole}>
+              <label className="field-label">
+                <span>Name</span>
+                <input
+                  value={roleForm.name}
+                  onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))}
+                  required
+                  autoFocus
+                />
+              </label>
+              <label className="field-label">
+                <span>Description</span>
+                <input
+                  value={roleForm.description}
+                  onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))}
+                />
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={roleForm.public}
+                  onChange={(event) => setRoleForm((current) => ({ ...current, public: event.target.checked }))}
+                />
+                Public role
+              </label>
+              <button className="primary-button" type="submit">Create role</button>
+            </form>
+          )}
+
+          <div className="list-stack role-list">
+            {roles.map((role) => (
+              <button
+                className={`list-button role-list-button ${role.id === selectedRoleId ? 'active' : ''}`}
+                key={role.id}
+                type="button"
+                onClick={() => setSelectedRoleId(role.id)}
+              >
+                <span>
+                  <strong>{role.name}</strong>
+                  <small>{role.admin ? 'Administrator · full access' : role.public ? 'Public role' : 'Custom role'}</small>
+                </span>
+                {!role.admin && (
+                  <span className="permission-count">{permissions.filter((permission) => permission.role === role.id).length}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <div className="permissions-detail-stack">
+          {!selectedRole ? (
+            <section className="panel empty-state"><div><h2>Select a role</h2><p>Choose a role to manage its access.</p></div></section>
+          ) : (
+            <>
+              <section className="panel role-detail-header">
+                <form className="role-name-form" onSubmit={saveRoleName}>
+                  <div>
+                    <p className="eyebrow">{selectedRole.admin ? 'Administrator role' : selectedRole.public ? 'Public role' : 'Custom role'}</p>
+                    <label className="field-label role-name-field">
+                      <span>Role name</span>
+                      <input value={roleName} onChange={(event) => setRoleName(event.target.value)} required />
+                    </label>
+                  </div>
+                  <button className="text-button" type="submit" disabled={savingRole || roleName.trim() === selectedRole.name}>
+                    {savingRole ? 'Saving…' : 'Save name'}
+                  </button>
+                </form>
+                {!selectedRole.admin && !selectedRole.public && (
+                  <button className="danger-button" type="button" onClick={() => deleteRole(selectedRole)}>Delete role</button>
+                )}
+              </section>
+
+              {selectedRole.admin ? (
+                <section className="panel empty-state">
+                  <div>
+                    <h2>Full administrator access</h2>
+                    <p>This role bypasses collection permission rows. No matrix configuration is required.</p>
+                  </div>
+                </section>
+              ) : (
+                <section className="table-panel permission-matrix-panel">
+                  <div className="permission-matrix-heading">
+                    <div>
+                      <p className="eyebrow">Permissions</p>
+                      <h2>Collection access</h2>
+                      <p>Turn actions on for simple full-field access. Use Configure only when field or row-level rules are needed.</p>
+                    </div>
+                    <span className="schema-count">{selectedRolePermissions.length} rules</span>
+                  </div>
+                  <div className="table-scroll">
+                    <table className="permission-matrix">
+                      <thead>
+                        <tr>
+                          <th>Collection</th>
+                          {ACTIONS.map((action) => <th key={action}>{action}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {collections.map((collection) => (
+                          <tr key={collection.collection}>
+                            <td>
+                              <strong>{collection.collection}</strong>
+                              {collection.note && <small className="matrix-note">{collection.note}</small>}
+                            </td>
+                            {ACTIONS.map((action) => {
+                              const key = permissionKey(selectedRole.id, collection.collection, action);
+                              const permission = permissionIndex.get(key);
+                              const advanced = permission && (
+                                (permission.fields && permission.fields.length > 0) ||
+                                permission.filter ||
+                                permission.validation
+                              );
+                              return (
+                                <td key={action}>
+                                  <div className="permission-cell">
+                                    <label className="permission-toggle">
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(permission)}
+                                        disabled={busyKey === key}
+                                        onChange={() => togglePermission(collection.collection, action)}
+                                        aria-label={`${action} ${collection.collection}`}
+                                      />
+                                      <span>{permission ? 'Allowed' : 'Off'}</span>
+                                    </label>
+                                    {permission && (
+                                      <button className="text-button permission-configure" type="button" onClick={() => openAdvanced(permission)}>
+                                        {advanced ? 'Configured' : 'Configure'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {!loading && collections.length === 0 && <div className="table-footer">Create a collection before configuring permissions.</div>}
+                </section>
+              )}
+            </>
+          )}
         </div>
-        {loading && <div className="table-footer">Loading permissions…</div>}
-        {!loading && permissions.length === 0 && <div className="table-footer">No permissions configured.</div>}
       </section>
+
+      {advancedPermission && (
+        <form className="panel form-panel advanced-permission-panel" onSubmit={saveAdvancedPermission}>
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Advanced access</p>
+              <h2>{advancedPermission.collection} · {advancedPermission.action}</h2>
+              <p>Limit visible/writable fields or add row-level rules. Empty JSON rules mean no extra restriction.</p>
+            </div>
+            <button className="text-button" type="button" onClick={() => setAdvancedPermission(null)}>Close</button>
+          </div>
+
+          <div className="advanced-permission-grid">
+            <div className="schema-create-card form-stack">
+              <div>
+                <strong>Allowed fields</strong>
+                <p>All fields is the simple default. Turn it off to explicitly choose fields.</p>
+              </div>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={advancedForm.allFields}
+                  onChange={(event) => setAdvancedForm((current) => ({ ...current, allFields: event.target.checked }))}
+                />
+                Allow all fields
+              </label>
+              {!advancedForm.allFields && (
+                <div className="field-choice-grid">
+                  {advancedFields.map((field) => (
+                    <label className="field-choice" key={field.field}>
+                      <input
+                        type="checkbox"
+                        checked={advancedForm.fields.includes(field.field)}
+                        onChange={() => toggleAdvancedField(field.field)}
+                      />
+                      <span><strong>{field.field}</strong><small>{field.type}</small></span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="schema-create-card form-stack">
+              <label className="field-label">
+                <span>Row filter JSON</span>
+                <small>Only rows matching this rule are accessible for this action.</small>
+                <textarea
+                  rows="8"
+                  value={advancedForm.filter}
+                  onChange={(event) => setAdvancedForm((current) => ({ ...current, filter: event.target.value }))}
+                  placeholder='{"status":{"_eq":"active"}}'
+                />
+              </label>
+              <label className="field-label">
+                <span>Write validation JSON</span>
+                <small>{supportsValidation(advancedPermission.action)
+                  ? 'For create/update, the final record must match this rule.'
+                  : 'Validation applies only to create and update permissions.'}</small>
+                <textarea
+                  rows="8"
+                  value={advancedForm.validation}
+                  disabled={!supportsValidation(advancedPermission.action)}
+                  onChange={(event) => setAdvancedForm((current) => ({ ...current, validation: event.target.value }))}
+                  placeholder='{"status":{"_in":["draft","active"]}}'
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button className="primary-button" type="submit" disabled={savingAdvanced}>{savingAdvanced ? 'Saving…' : 'Save advanced rules'}</button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
