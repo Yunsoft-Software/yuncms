@@ -31,12 +31,21 @@ function assertExtensibleSystemCollection(collection) {
   }
 }
 
+function assertSystemExtensionInput(input = {}) {
+  if (input.required === true) {
+    const error = new Error('Custom system collection fields must be optional in V1');
+    error.code = 'SYSTEM_EXTENSION_REQUIRED_UNSUPPORTED';
+    throw error;
+  }
+}
+
 export class SystemCollectionFieldsService extends BaseService {
   async createOne(collectionName, input = {}) {
     assertSchemaManager(this.accountability);
     assertIdentifier(collectionName, 'collection name');
+    assertSystemExtensionInput(input);
     const field = fieldName(input.field);
-    const compiled = compileFieldColumn(input);
+    const compiled = compileFieldColumn({ ...input, required: false });
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
       const metadata = new SchemaMetadataRepository(connection);
@@ -68,7 +77,7 @@ export class SystemCollectionFieldsService extends BaseService {
             collection: collectionName,
             field,
             type: input.type,
-            required: input.required === true,
+            required: false,
             readonly: input.readonly === true,
             hidden: input.hidden === true,
             sort: input.sort ?? null,
@@ -102,4 +111,4 @@ export class SystemCollectionFieldsService extends BaseService {
   }
 }
 
-export { assertExtensibleSystemCollection };
+export { assertExtensibleSystemCollection, assertSystemExtensionInput };
