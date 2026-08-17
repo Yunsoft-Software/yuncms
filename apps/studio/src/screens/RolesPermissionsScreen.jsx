@@ -5,6 +5,12 @@ import { useConfirmDialog } from '../components/DialogProvider.jsx';
 import { Modal } from '../components/Modal.jsx';
 import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
 import { useI18n } from '../i18n.js';
+import {
+  canConfigurePermission,
+  canUseAdvancedPermission,
+  isPermissionCollection,
+  permissionResourcePolicy,
+} from '../permission-resource-ui.js';
 
 const ACTIONS = ['read', 'create', 'update', 'delete'];
 const ROLE_SORT_OPTIONS = [
@@ -90,7 +96,7 @@ export function RolesPermissionsScreen() {
       const nextRoles = rolesResponse?.data ?? [];
       setRoles(nextRoles);
       setPermissions(permissionsResponse?.data ?? []);
-      setCollections((collectionsResponse?.data ?? []).filter((entry) => !entry.system));
+      setCollections((collectionsResponse?.data ?? []).filter(isPermissionCollection));
       setSelectedRoleId((current) => {
         const preferred = preferredRole || current;
         if (nextRoles.some((role) => role.id === preferred)) return preferred;
@@ -144,14 +150,20 @@ export function RolesPermissionsScreen() {
   const visibleCollections = useMemo(() => {
     const query = collectionSearch.trim().toLowerCase();
     return collections
-      .filter((collection) => !query || [collection.collection, collection.note]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(query)))
+      .filter((collection) => !query || [
+        collection.collection,
+        collection.note,
+        collection.system ? t('roles.systemResource') : '',
+      ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query)))
       .filter((collection) => !configuredOnly || ACTIONS.some((action) =>
         permissionIndex.has(permissionKey(selectedRoleId, collection.collection, action))))
       .slice()
-      .sort((left, right) => String(left.collection || '').localeCompare(String(right.collection || '')));
-  }, [collectionSearch, collections, configuredOnly, permissionIndex, selectedRoleId]);
+      .sort((left, right) => {
+        const systemResult = Number(Boolean(left.system)) - Number(Boolean(right.system));
+        if (systemResult) return systemResult;
+        return String(left.collection || '').localeCompare(String(right.collection || ''));
+      });
+  }, [collectionSearch, collections, configuredOnly, permissionIndex, selectedRoleId, t]);
 
   const pagedRoles = useMemo(() => paginateClientItems(visibleRoles, rolePage, rolePageSize), [rolePage, rolePageSize, visibleRoles]);
   const pagedCollections = useMemo(() => paginateClientItems(visibleCollections, collectionPage, collectionPageSize), [collectionPage, collectionPageSize, visibleCollections]);
@@ -228,8 +240,9 @@ export function RolesPermissionsScreen() {
   }
 
   async function togglePermission(collection, action) {
-    if (!selectedRole || selectedRole.admin) return;
-    const key = permissionKey(selectedRole.id, collection, action);
+    if (!selectedRole || selectedRole.admin || !canConfigurePermission(collection, action, selectedRole)) return;
+    const collectionName = collection.collection;
+    const key = permissionKey(selectedRole.id, collectionName, action);
     const existing = permissionIndex.get(key);
     setBusyKey(key);
     setError('');
@@ -238,20 +251,20 @@ export function RolesPermissionsScreen() {
       if (existing) {
         await apiRequest(`/permissions/${encodeURIComponent(existing.id)}`, { method: 'DELETE' });
         if (advancedPermission?.id === existing.id) setAdvancedPermission(null);
-        setNotice(t('roles.accessRemoved', { action: actionLabel(action, t), collection }));
+        setNotice(t('roles.accessRemoved', { action: actionLabel(action, t), collection: collectionName }));
       } else {
         await apiRequest('/permissions', {
           method: 'POST',
           body: {
             role: selectedRole.id,
-            collection,
+            collection: collectionName,
             action,
             fields: null,
             filter: null,
             validation: null,
           },
         });
-        setNotice(t('roles.accessGranted', { action: actionLabel(action, t), collection }));
+        setNotice(t('roles.accessGranted', { action: actionLabel(action, t), collection: collectionName }));
       }
       await load(selectedRole.id);
     } catch (requestError) {
@@ -262,6 +275,8 @@ export function RolesPermissionsScreen() {
   }
 
   async function openAdvanced(permission) {
+    const collection = collections.find((entry) => entry.collection === permission.collection);
+    if (!collection || !canUseAdvancedPermission(collection)) return;
     setError('');
     setNotice('');
     try {
@@ -423,7 +438,7 @@ export function RolesPermissionsScreen() {
               ) : (
                 <section className="table-panel permission-matrix-panel">
                   <div className="permission-matrix-heading">
-                    <div><p className="eyebrow">{t('roles.permissions')}</p><h2>{t('roles.collectionAccess')}</h2><p>{t('roles.quickAuditHint')}</p></div>
+                    <div><p className="eyebrow">{t('roles.permissions')}</p><h2>{t('roles.collectionAccess')}</h2><p>{t('roles.systemAccessHint')}</p></div>
                     <span className="schema-count">{t('roles.ruleCount', { count: selectedRolePermissions.length })}</span>
                   </div>
                   <div className="permission-list-controls">
@@ -436,27 +451,42 @@ export function RolesPermissionsScreen() {
                     <table className="permission-matrix">
                       <thead><tr><th>{t('roles.collection')}</th>{ACTIONS.map((action) => <th key={action}>{actionLabel(action, t)}</th>)}</tr></thead>
                       <tbody>
-                        {pagedCollections.items.map((collection) => (
-                          <tr key={collection.collection}>
-                            <td><strong>{collection.collection}</strong>{collection.note && <small className="matrix-note">{collection.note}</small>}</td>
-                            {ACTIONS.map((action) => {
-                              const key = permissionKey(selectedRole.id, collection.collection, action);
-                              const permission = permissionIndex.get(key);
-                              const advanced = isRestricted(permission);
-                              return (
-                                <td key={action}>
-                                  <div className="permission-cell">
-                                    <label className={`permission-toggle ${permission ? 'enabled' : ''}`}>
-                                      <input type="checkbox" checked={Boolean(permission)} disabled={busyKey === key} onChange={() => togglePermission(collection.collection, action)} aria-label={t('roles.actionCollection', { action: actionLabel(action, t), collection: collection.collection })} />
-                                      <span>{permission ? t('roles.allowed') : t('roles.off')}</span>
-                                    </label>
-                                    {permission && <button className="text-button permission-configure" type="button" onClick={() => openAdvanced(permission)}>{advanced ? t('roles.restricted') : t('roles.configure')}</button>}
-                                  </div>
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
+                        {pagedCollections.items.map((collection) => {
+                          const policy = permissionResourcePolicy(collection);
+                          return (
+                            <tr key={collection.collection}>
+                              <td>
+                                <div className="permission-collection-name">
+                                  <strong>{collection.collection}</strong>
+                                  {policy.systemManaged && <span className="status-pill system-resource-pill">{t('roles.systemResource')}</span>}
+                                </div>
+                                {collection.note && <small className="matrix-note">{collection.note}</small>}
+                              </td>
+                              {ACTIONS.map((action) => {
+                                const key = permissionKey(selectedRole.id, collection.collection, action);
+                                const permission = permissionIndex.get(key);
+                                const allowed = canConfigurePermission(collection, action, selectedRole);
+                                const advanced = isRestricted(permission);
+                                if (!allowed) {
+                                  return <td key={action}><span className="status-pill protected-permission">{t('roles.protected')}</span></td>;
+                                }
+                                return (
+                                  <td key={action}>
+                                    <div className="permission-cell">
+                                      <label className={`permission-toggle ${permission ? 'enabled' : ''}`}>
+                                        <input type="checkbox" checked={Boolean(permission)} disabled={busyKey === key} onChange={() => togglePermission(collection, action)} aria-label={t('roles.actionCollection', { action: actionLabel(action, t), collection: collection.collection })} />
+                                        <span>{permission ? t('roles.allowed') : t('roles.off')}</span>
+                                      </label>
+                                      {permission && canUseAdvancedPermission(collection) && (
+                                        <button className="text-button permission-configure" type="button" onClick={() => openAdvanced(permission)}>{advanced ? t('roles.restricted') : t('roles.configure')}</button>
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
