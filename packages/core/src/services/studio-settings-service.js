@@ -43,10 +43,10 @@ function normalizeLogoUrl(value) {
   return normalized;
 }
 
-function normalizeLogoFile(value) {
+function normalizeImageFile(value, label) {
   if (value == null || value === '') return null;
   const normalized = String(value).trim();
-  if (!UUID_PATTERN.test(normalized)) throw invalid('Logo file id must be a UUID');
+  if (!UUID_PATTERN.test(normalized)) throw invalid(`${label} file id must be a UUID`);
   return normalized;
 }
 
@@ -73,6 +73,7 @@ function publicSettings(row) {
     brand_name: row.brand_name,
     logo_url: row.logo_url,
     logo_file: row.logo_file ?? null,
+    favicon_file: row.favicon_file ?? null,
     accent_color: row.accent_color,
     theme: row.theme,
     default_locale: row.default_locale,
@@ -83,7 +84,7 @@ function publicSettings(row) {
 export class StudioSettingsService extends BaseService {
   async readPublic() {
     const [rows] = await this.database.query(
-      `SELECT brand_name, logo_url, logo_file, accent_color, theme, default_locale, updated_at
+      `SELECT brand_name, logo_url, logo_file, favicon_file, accent_color, theme, default_locale, updated_at
        FROM yuncms_studio_settings
        WHERE id = 1
        LIMIT 1`,
@@ -102,22 +103,23 @@ export class StudioSettingsService extends BaseService {
     return this.readPublic();
   }
 
-  async readLogoContent() {
+  async readImageAssetContent(settingKey, label) {
     const settings = await this.readPublic();
-    if (!settings.logo_file) throw notFound('No file-backed Studio logo is configured');
-    if (!this.storage) throw new Error('StudioSettingsService requires storage to read a file-backed logo');
+    const fileId = settings[settingKey];
+    if (!fileId) throw notFound(`No file-backed Studio ${label.toLowerCase()} is configured`);
+    if (!this.storage) throw new Error(`StudioSettingsService requires storage to read a file-backed ${label.toLowerCase()}`);
 
     const [rows] = await this.database.query(
       `SELECT id, storage, filename_disk, mimetype, filesize
        FROM yuncms_files
        WHERE id = ?
        LIMIT 1`,
-      [settings.logo_file],
+      [fileId],
     );
     const file = rows[0];
-    if (!file) throw notFound('Configured Studio logo file does not exist');
+    if (!file) throw notFound(`Configured Studio ${label.toLowerCase()} file does not exist`);
     if (!String(file.mimetype || '').toLowerCase().startsWith('image/')) {
-      throw invalid('Configured Studio logo must be an image');
+      throw invalid(`Configured Studio ${label.toLowerCase()} must be an image`);
     }
 
     const driver = this.storage.get(file.storage);
@@ -125,12 +127,32 @@ export class StudioSettingsService extends BaseService {
     return { file, contents };
   }
 
+  async readLogoContent() {
+    return this.readImageAssetContent('logo_file', 'Logo');
+  }
+
+  async readFaviconContent() {
+    return this.readImageAssetContent('favicon_file', 'Favicon');
+  }
+
+  async validateSelectedImage(fileId, label) {
+    if (!fileId) return;
+    const [files] = await this.database.query(
+      'SELECT id, mimetype FROM yuncms_files WHERE id = ? LIMIT 1',
+      [fileId],
+    );
+    if (!files[0]) throw invalid(`Selected ${label.toLowerCase()} file does not exist`);
+    if (!String(files[0].mimetype || '').toLowerCase().startsWith('image/')) {
+      throw invalid(`Selected ${label.toLowerCase()} file must be an image`);
+    }
+  }
+
   async updateOne(patch = {}) {
     assertManager(this.accountability);
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw invalid('Studio settings patch must be an object');
 
     const keys = Object.keys(patch);
-    const allowed = new Set(['brand_name', 'logo_url', 'logo_file', 'accent_color', 'theme', 'default_locale']);
+    const allowed = new Set(['brand_name', 'logo_url', 'logo_file', 'favicon_file', 'accent_color', 'theme', 'default_locale']);
     if (keys.length === 0 || keys.some((key) => !allowed.has(key))) {
       throw invalid('Studio settings patch contains unsupported properties');
     }
@@ -146,19 +168,16 @@ export class StudioSettingsService extends BaseService {
       params.push(normalizeLogoUrl(patch.logo_url));
     }
     if (Object.hasOwn(patch, 'logo_file')) {
-      const logoFile = normalizeLogoFile(patch.logo_file);
-      if (logoFile) {
-        const [files] = await this.database.query(
-          'SELECT id, mimetype FROM yuncms_files WHERE id = ? LIMIT 1',
-          [logoFile],
-        );
-        if (!files[0]) throw invalid('Selected logo file does not exist');
-        if (!String(files[0].mimetype || '').toLowerCase().startsWith('image/')) {
-          throw invalid('Selected logo file must be an image');
-        }
-      }
+      const fileId = normalizeImageFile(patch.logo_file, 'Logo');
+      await this.validateSelectedImage(fileId, 'Logo');
       assignments.push('logo_file = ?');
-      params.push(logoFile);
+      params.push(fileId);
+    }
+    if (Object.hasOwn(patch, 'favicon_file')) {
+      const fileId = normalizeImageFile(patch.favicon_file, 'Favicon');
+      await this.validateSelectedImage(fileId, 'Favicon');
+      assignments.push('favicon_file = ?');
+      params.push(fileId);
     }
     if (Object.hasOwn(patch, 'accent_color')) {
       assignments.push('accent_color = ?');
@@ -186,6 +205,7 @@ export const STUDIO_SETTING_DEFAULTS = Object.freeze({
   brand_name: 'YunCMS',
   logo_url: 'https://yunsoft.com/light-logo.png',
   logo_file: null,
+  favicon_file: null,
   accent_color: '#2563eb',
   theme: 'system',
   default_locale: 'en',
