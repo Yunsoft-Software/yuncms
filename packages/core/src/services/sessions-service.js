@@ -20,6 +20,7 @@ function identityFromRow(row) {
   return {
     user: row.user,
     role: row.role ?? null,
+    role_name: row.role_name ?? null,
     admin: Boolean(row.role_admin),
     email: row.email,
     session: row.session_id,
@@ -71,7 +72,7 @@ export class SessionsService extends BaseService {
     const hash = hashToken(token);
     const [rows] = await this.database.query(
       `SELECT s.id AS session_id, s.user, u.email, u.role, u.status,
-              r.admin AS role_admin
+              r.name AS role_name, r.admin AS role_admin
        FROM yuncms_sessions s
        INNER JOIN yuncms_users u ON u.id = s.user
        LEFT JOIN yuncms_roles r ON r.id = u.role
@@ -105,7 +106,7 @@ export class SessionsService extends BaseService {
     const oldHash = hashToken(token);
     const [rows] = await this.database.query(
       `SELECT s.id AS session_id, s.user, u.email, u.role, u.status,
-              r.admin AS role_admin
+              r.name AS role_name, r.admin AS role_admin
        FROM yuncms_sessions s
        INNER JOIN yuncms_users u ON u.id = s.user
        LEFT JOIN yuncms_roles r ON r.id = u.role
@@ -164,7 +165,6 @@ export class SessionsService extends BaseService {
       error.code = 'FORBIDDEN';
       throw error;
     }
-
     const [result] = await this.database.query(
       'DELETE FROM yuncms_sessions WHERE user = ?',
       [userId],
