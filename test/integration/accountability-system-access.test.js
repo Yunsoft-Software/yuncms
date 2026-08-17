@@ -105,7 +105,7 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
     assert.ok(new Date(updated.updated_at).getTime() >= new Date(created.updated_at).getTime());
 
     const [constraints] = await pool.query(
-      `SELECT COLUMN_NAME, REFERENCED_TABLE_NAME, DELETE_RULE
+      `SELECT k.COLUMN_NAME, k.REFERENCED_TABLE_NAME, r.DELETE_RULE
        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE k
        JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS r
          ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA
@@ -117,6 +117,22 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
     assert.equal(constraints.length, 2);
     assert.equal(constraints.every((row) => row.REFERENCED_TABLE_NAME === 'yuncms_users'), true);
     assert.equal(constraints.every((row) => row.DELETE_RULE === 'SET NULL'), true);
+
+    await assert.rejects(
+      fields.updateSchema(collection, 'created_at', { required: false }),
+      (error) => error.code === 'SYSTEM_SCHEMA_READ_ONLY',
+    );
+    await assert.rejects(
+      fields.deleteOne(collection, 'created_at', { destructive: true }),
+      (error) => error.code === 'SYSTEM_SCHEMA_READ_ONLY',
+    );
+
+    await fields.updateSchema(collection, 'published_at', { indexed: true });
+    const updatedTimestamp = await fields.readOne(collection, 'published_at');
+    const updatedTimestampMetadata = parseMetadata(updatedTimestamp.schema_metadata);
+    assert.equal(updatedTimestampMetadata.defaultPreset, 'now');
+    assert.equal(updatedTimestampMetadata.autoUpdate, true);
+    assert.equal(updatedTimestampMetadata.indexed, true);
 
     const role = await roles.createOne({ name: `Content manager ${token}` });
     customRoleId = role.id;
@@ -151,6 +167,11 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
       }),
       (error) => error.code === 'SYSTEM_PERMISSION_ACTION_PROTECTED',
     );
+
+    await pool.query('DELETE FROM yuncms_users WHERE id = ?', [actorId]);
+    const preserved = await items.readOne(created.id);
+    assert.equal(preserved.created_by, null);
+    assert.equal(preserved.updated_by, null);
   } finally {
     if (userReadPermissionId) await permissions.deleteOne(userReadPermissionId).catch(() => {});
     if (customRoleId) await roles.deleteOne(customRoleId).catch(() => {});
