@@ -49,6 +49,18 @@ test('relation schema service rejects non-admin accountability before DB access'
   );
 });
 
+test('collection metadata requires real booleans for visibility flags', async () => {
+  const service = new CollectionsService(adminOptions());
+  await assert.rejects(
+    service.updateOne('articles', { hidden: 'false' }),
+    (error) => error.code === 'INVALID_SCHEMA_PAYLOAD',
+  );
+  await assert.rejects(
+    service.createOne({ collection: 'articles', hidden: 1 }),
+    (error) => error.code === 'INVALID_SCHEMA_PAYLOAD',
+  );
+});
+
 test('collection delete requires explicit destructive intent before DB access', async () => {
   await assert.rejects(
     new CollectionsService(adminOptions()).deleteOne('articles'),
