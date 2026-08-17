@@ -1,0 +1,92 @@
+/* Focused visual corrections discovered during browser smoke on 2026-08-17. */
+
+.pagination,
+.file-library-results,
+.permission-list-controls,
+.permission-matrix th:first-child,
+.permission-matrix td:first-child,
+.permission-matrix thead th:first-child,
+.table-footer {
+  border-color: var(--studio-border-soft);
+  background: var(--studio-surface);
+  color: var(--studio-text);
+}
+
+.pagination-summary,
+.pagination-size,
+.pagination-ellipsis {
+  color: var(--studio-text-muted);
+}
+
+.pagination-summary strong {
+  color: var(--studio-text-soft);
+}
+
+.pagination-button {
+  color: var(--studio-text-soft);
+}
+
+.pagination-button:hover:not(:disabled) {
+  border-color: var(--studio-border);
+  background: var(--studio-surface-hover);
+  color: var(--studio-text);
+}
+
+.pagination-button.active {
+  border-color: var(--studio-accent-border);
+  background: var(--studio-accent-soft);
+  color: var(--studio-text);
+}
+
+.pagination-size select {
+  border-color: var(--studio-border);
+  background: var(--studio-input);
+  color: var(--studio-text);
+}
+
+.file-library-results .file-grid,
+.permission-matrix-scroll,
+.permission-matrix,
+.permission-matrix tbody,
+.permission-matrix tr,
+.permission-matrix td {
+  background: var(--studio-surface);
+  color: var(--studio-text);
+}
+
+.permission-matrix th,
+.permission-matrix thead th,
+.permission-matrix thead th:first-child {
+  border-color: var(--studio-border-soft);
+  background: var(--studio-surface-muted);
+  color: var(--studio-text-soft);
+}
+
+.permission-matrix td:first-child {
+  box-shadow: 1px 0 0 var(--studio-border-soft);
+}
+
+.permission-matrix tbody tr:hover td,
+.permission-matrix tbody tr:hover td:first-child {
+  background: var(--studio-surface-hover);
+}
+
+:root[data-theme="dark"] .pagination,
+:root[data-theme="dark"] .file-library-results,
+:root[data-theme="dark"] .permission-list-controls,
+:root[data-theme="dark"] .permission-matrix th:first-child,
+:root[data-theme="dark"] .permission-matrix td:first-child,
+:root[data-theme="dark"] .permission-matrix thead th:first-child {
+  background: var(--studio-surface);
+  color: var(--studio-text);
+}
+
+:root[data-theme="dark"] .permission-matrix th,
+:root[data-theme="dark"] .permission-matrix thead th,
+:root[data-theme="dark"] .permission-matrix thead th:first-child {
+  background: var(--studio-surface-muted);
+}
+
+:root[data-theme="dark"] .pagination-button.active {
+  background: var(--studio-accent-soft);
+}
