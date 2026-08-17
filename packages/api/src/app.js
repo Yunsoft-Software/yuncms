@@ -15,6 +15,7 @@ import { createPermissionsRouter } from './routes/permissions.js';
 import { createRolesRouter } from './routes/roles.js';
 import { createSchemaRouter } from './routes/schema.js';
 import { createStudioSettingsRouter } from './routes/studio-settings.js';
+import { createSystemSchemaRouter } from './routes/system-schema.js';
 import { createUsersRouter } from './routes/users.js';
 import { createStudioMiddleware } from './studio.js';
 
@@ -111,6 +112,7 @@ export function createApp({
   app.use('/studio-settings', createStudioSettingsRouter());
   app.use('/auth', createAuthRouter({ mailer, config, logger }));
   app.use('/items', createItemsRouter());
+  app.use('/schema', createSystemSchemaRouter({ schemaCache }));
   app.use('/schema', createSchemaRouter({ schemaCache }));
   app.use('/users', createUsersRouter());
   app.use('/roles', createRolesRouter());
