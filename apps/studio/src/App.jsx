@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { API_URL, apiRequest, health, logout, readSession, subscribeSession } from './api.js';
+import { isContentCollection } from './collection-visibility.js';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
+import { CollectionVisibilityScreen } from './screens/CollectionVisibilityScreen.jsx';
 import { ContentScreen } from './screens/ContentScreen.jsx';
 import { DataModelScreen } from './screens/DataModelScreen.jsx';
 import { FilesScreen } from './screens/FilesScreen.jsx';
@@ -14,12 +16,14 @@ const librarySections = [
 ];
 
 const settingsSections = [
+  { id: 'content-visibility', label: 'Content Visibility' },
   { id: 'data-model', label: 'Data Model' },
   { id: 'users', label: 'Users' },
   { id: 'roles', label: 'Roles & Permissions' },
 ];
 
 const sectionCopy = {
+  'content-visibility': ['Content Visibility', 'Choose which collections appear in the Content navigation without changing their data.'],
   'data-model': ['Data Model', 'Create collections, fields and relations backed by MySQL.'],
   users: ['Users', 'Manage administrator-created users, roles and account status.'],
   roles: ['Roles & Permissions', 'Configure role access, field allowlists and row filters.'],
@@ -66,7 +70,7 @@ export function App() {
       try {
         const response = await apiRequest('/schema/collections');
         if (cancelled) return;
-        const visible = (response?.data ?? []).filter((entry) => !entry.system && !entry.hidden);
+        const visible = (response?.data ?? []).filter(isContentCollection);
         setContentCollections(visible);
         setContentCollection((current) => (
           visible.some((entry) => entry.collection === current)
@@ -89,6 +93,7 @@ export function App() {
     : sectionCopy[section];
 
   const activeScreen = useMemo(() => {
+    if (section === 'content-visibility') return <CollectionVisibilityScreen />;
     if (section === 'data-model') return <DataModelScreen />;
     if (section === 'users') return <UsersScreen currentUserId={session?.user?.id} />;
     if (section === 'roles') return <RolesPermissionsScreen />;
