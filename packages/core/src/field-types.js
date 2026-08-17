@@ -12,6 +12,8 @@ const TYPE_NAMES = new Set([
   'uuid',
 ]);
 
+const FILE_INTERFACES = new Set(['file', 'image']);
+
 function integerOption(value, fallback, { min, max, label }) {
   const resolved = value ?? fallback;
   if (!Number.isInteger(resolved) || resolved < min || resolved > max) {
@@ -29,8 +31,18 @@ export function assertFieldType(type) {
   return type;
 }
 
+function assertInterfaceStorage(type, fieldInterface) {
+  if (!FILE_INTERFACES.has(fieldInterface)) return;
+  if (type !== 'uuid') {
+    const error = new Error(`${fieldInterface} interface requires uuid storage`);
+    error.code = 'INVALID_FIELD_INTERFACE';
+    throw error;
+  }
+}
+
 export function compileFieldColumn(input = {}) {
   const type = assertFieldType(input.type);
+  assertInterfaceStorage(type, input.interface);
   const params = [];
   let sqlType;
 
