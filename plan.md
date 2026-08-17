@@ -295,21 +295,25 @@ yuncms help
 - [x] Files management UI.
 - [x] Loading/error/empty-state basics.
 - [x] Task-oriented sidebar groups: Content / Library / Settings.
-- [x] Non-system collections rendered directly as nested Content navigation instead of a collection toolbar dropdown.
+- [x] Non-system collections rendered directly as nested Content navigation instead of selecting a collection from a toolbar dropdown.
 - [x] Content workspace keeps collection context stable across list/create/edit states.
 - [x] Content search is server-backed across readable text fields rather than limited to the current page.
 - [x] Content supports field-aware filters, removable filter chips and one-click view reset.
 - [x] Content sorting uses REST `sort` semantics and supports clickable table headers plus explicit direction controls.
 - [x] Content pagination uses REST `limit`, `offset` and filtered `total_count`, with selectable page sizes.
+- [x] Studio data-heavy workspaces share one reusable numbered `Pagination` component with total/range, page-size and compact modes.
 - [x] Files defaults to a gallery with authenticated image previews, file placeholders, search and grid/list switching.
-- [x] Files includes type filters, useful sort presets, visible/total counts and state-preserving Gallery/List switching.
+- [x] Files previews load only for the visible page, fall back from MIME metadata to safe image extensions and degrade cleanly on fetch/decode failure.
+- [x] Files includes type filters, useful sort presets, client-side pagination and state-preserving Gallery/List switching.
 - [x] File metadata editing moved from `window.prompt()` into an in-page editor.
-- [x] Users is list-first with creation behind `New user`, plus search, role/status filters and sort controls.
+- [x] Users is list-first with creation behind `New user`, plus search, role/status filters, sort controls, pagination and readable status/verification badges.
 - [x] Data Model uses a collection master/detail settings layout with focused `New collection` flow and Fields/Relations tabs.
-- [x] Data Model collection and field lists support search, sorting and visible/total counts.
+- [x] Data Model collection and field lists support search, sorting, shared pagination and clearer type/required/read-only hierarchy.
+- [x] Data Model `Add field` form stays collapsed until explicitly requested.
 - [x] Roles/Permissions uses a role-first collection/action matrix with direct simple toggles.
-- [x] Roles support search/sort; permission collections support search and a configured-only audit view.
-- [x] Advanced field allowlist/filter/validation permission editing is in-page and validates JSON before save.
+- [x] Roles support search/sort/pagination; permission collections support search, configured-only auditing and shared pagination.
+- [x] Advanced field allowlist/filter/validation permission editing uses the existing focused modal layer and validates JSON before save.
+- [x] Permission matrix keeps the collection column/header scannable while preserving current RBAC API behavior and administrator/public protections.
 - [x] Important file/role/permission edits no longer depend on prompt-only workflows.
 - [x] Shared list-control patterns expose result counts/reset actions and stack on narrow screens without a new dependency.
 - [x] Refreshed workspaces have narrow-screen responsive rules without a new UI dependency.
@@ -339,7 +343,7 @@ yuncms help
 - [x] Built Studio index and hashed assets served from the same Express listener with Node filesystem streams.
 - [x] Studio static handler is restricted to `/` and `/assets/...`; unrelated requests continue through normal API routing.
 - [x] Root `npm start` builds Studio before starting the single API/Studio listener.
-- [x] Default Studio/auth public URLs align with the configured API port.
+- [x] Default Studio/auth public URLs align with the API port.
 - [x] API package file list includes the generated Studio bundle for packed and public-registry installs.
 - [x] API/runtime/security-header/graceful-shutdown smoke — `todo.md`.
 - [ ] Single-port built Studio HTML/assets/API browser smoke — `todo.md`.
@@ -357,6 +361,7 @@ yuncms help
 - [x] `docs/setup-cli.md`.
 - [x] `docs/studio.md`.
 - [x] `docs/studio-ui-improvement-plan.md` live UI improvement checklist.
+- [x] `docs/studio-usability-pass.md` focused shared-pagination/media/settings usability checklist.
 - [x] `docs/files.md`.
 - [x] `docs/security.md`.
 - [x] `docs/deployment.md`.
