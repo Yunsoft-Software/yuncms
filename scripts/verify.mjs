@@ -61,6 +61,7 @@ const FAST_TESTS = [
   'apps/studio/test/field-ui.test.js',
   'apps/studio/test/field-builder-ui.test.js',
   'apps/studio/test/data-model-v2.test.js',
+  'apps/studio/test/content-display-names.test.js',
   'apps/studio/test/file-field-preview.test.js',
   'apps/studio/test/files-preview-ui.test.js',
   'apps/studio/test/sidebar-ui.test.js',
