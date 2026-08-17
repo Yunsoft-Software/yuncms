@@ -10,6 +10,7 @@ import { ItemsService } from './items-service.js';
 import { PermissionsService } from './permissions-service.js';
 import { RelationsService } from './relations-service.js';
 import { RolesService } from './roles-service.js';
+import { StudioSettingsService } from './studio-settings-service.js';
 import { UsersService } from './users-service.js';
 import { createServiceRegistry } from './service-registry.js';
 
@@ -28,5 +29,6 @@ export function createCoreServiceRegistry() {
     PermissionsService,
     FilesService,
     FileReconciliationService,
+    StudioSettingsService,
   });
 }
