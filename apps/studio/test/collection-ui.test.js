@@ -5,6 +5,7 @@ import { findCollectionIcons, normalizeCollectionIcon } from '../src/collection-
 import {
   collectionMetadataPatch,
   collectionUi,
+  legacyCollectionSort,
   sortContentCollections,
 } from '../src/collection-ui.js';
 
@@ -23,6 +24,14 @@ test('content collections use metadata sort while hidden and system rows stay ou
   ];
   assert.deepEqual(sortContentCollections(rows).map((row) => row.collection), ['alpha', 'zeta']);
   assert.equal(collectionUi(rows[0]).icon, 'star');
+});
+
+test('legacy collections receive stable distinct sort values so first reorder can persist', () => {
+  const alpha = legacyCollectionSort('alpha');
+  const beta = legacyCollectionSort('beta');
+  assert.equal(alpha, legacyCollectionSort('alpha'));
+  assert.notEqual(alpha, beta);
+  assert.equal(collectionUi({ collection: 'alpha', metadata: null }).sort, alpha);
 });
 
 test('collection metadata patches preserve unrelated metadata', () => {
