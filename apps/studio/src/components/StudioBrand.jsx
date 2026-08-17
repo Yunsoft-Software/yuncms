@@ -2,27 +2,29 @@ import { useState } from 'react';
 
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
+import { resolveStudioLogo } from '../studio-settings.js';
 
 export function StudioBrand({ compact = false, previewSettings = null }) {
-  const { settings } = useStudioSettings();
+  const { settings, resolvedTheme } = useStudioSettings();
   const effectiveSettings = previewSettings ?? settings;
+  const logoUrl = resolveStudioLogo(effectiveSettings, resolvedTheme);
   const [failedLogo, setFailedLogo] = useState('');
-  const showLogo = effectiveSettings.logo_url && failedLogo !== effectiveSettings.logo_url;
+  const showLogo = logoUrl && failedLogo !== logoUrl;
 
   return (
-    <div className={`studio-brand ${compact ? 'compact' : ''}`}>
-      {showLogo && (
+    <div className={`studio-brand ${compact ? 'compact' : ''}`} aria-label={effectiveSettings.brand_name}>
+      {showLogo ? (
         <img
           className="studio-brand-logo"
-          src={effectiveSettings.logo_url}
+          src={logoUrl}
           alt={effectiveSettings.brand_name}
-          onError={() => setFailedLogo(effectiveSettings.logo_url)}
+          onError={() => setFailedLogo(logoUrl)}
         />
+      ) : (
+        <span className="studio-brand-fallback" aria-hidden="true">
+          {String(effectiveSettings.brand_name || 'Y').trim().slice(0, 1).toUpperCase()}
+        </span>
       )}
-      <div className="studio-brand-copy">
-        <strong>{effectiveSettings.brand_name}</strong>
-        {!compact && <span>Studio</span>}
-      </div>
     </div>
   );
 }
