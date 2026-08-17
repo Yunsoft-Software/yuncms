@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
+import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
 
 const FIELD_TYPES = [
   'string', 'text', 'integer', 'bigint', 'decimal', 'boolean',
@@ -19,6 +20,9 @@ const FIELD_SORT_OPTIONS = [
   ['type', 'Type'],
   ['required', 'Required first'],
 ];
+
+const COLLECTION_PAGE_SIZES = [6, 12, 24];
+const FIELD_PAGE_SIZES = [10, 20, 50];
 
 function parseJson(value) {
   if (!value) return null;
@@ -59,10 +63,16 @@ export function DataModelScreen() {
   const [relations, setRelations] = useState([]);
   const [schemaTab, setSchemaTab] = useState('fields');
   const [showCreateCollection, setShowCreateCollection] = useState(false);
+  const [showCreateField, setShowCreateField] = useState(false);
   const [collectionSearch, setCollectionSearch] = useState('');
   const [collectionSort, setCollectionSort] = useState('name-asc');
+  const [collectionPage, setCollectionPage] = useState(1);
+  const [collectionPageSize, setCollectionPageSize] = useState(12);
+  const [systemPage, setSystemPage] = useState(1);
   const [fieldSearch, setFieldSearch] = useState('');
   const [fieldSort, setFieldSort] = useState('name-asc');
+  const [fieldPage, setFieldPage] = useState(1);
+  const [fieldPageSize, setFieldPageSize] = useState(20);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
@@ -125,8 +135,19 @@ export function DataModelScreen() {
     setSchemaTab('fields');
     setFieldSearch('');
     setFieldSort('name-asc');
+    setFieldPage(1);
+    setShowCreateField(false);
     loadSelected(selected);
   }, [selected]);
+
+  useEffect(() => {
+    setCollectionPage(1);
+    setSystemPage(1);
+  }, [collectionSearch, collectionSort]);
+
+  useEffect(() => {
+    setFieldPage(1);
+  }, [fieldSearch, fieldSort]);
 
   const selectedCollection = collections.find((entry) => entry.collection === selected) ?? null;
   const userCollections = useMemo(() => collections.filter((entry) => !entry.system), [collections]);
@@ -157,6 +178,11 @@ export function DataModelScreen() {
       .slice()
       .sort((left, right) => compareFields(left, right, fieldSort));
   }, [fieldSearch, fieldSort, fields]);
+
+  const pagedCollections = useMemo(() => paginateClientItems(visibleUserCollections, collectionPage, collectionPageSize), [collectionPage, collectionPageSize, visibleUserCollections]);
+  const pagedSystemCollections = useMemo(() => paginateClientItems(visibleSystemCollections, systemPage, collectionPageSize), [collectionPageSize, systemPage, visibleSystemCollections]);
+  const pagedFields = useMemo(() => paginateClientItems(visibleFields, fieldPage, fieldPageSize), [fieldPage, fieldPageSize, visibleFields]);
+
   const m2oRelations = useMemo(() => relations.filter((relation) =>
     relationKind(relation) !== 'm2m' &&
     (relation.many_collection === selected || relation.one_collection === selected)), [relations, selected]);
@@ -184,6 +210,7 @@ export function DataModelScreen() {
       });
       setCollectionForm({ collection: '', note: '' });
       setShowCreateCollection(false);
+      setCollectionPage(1);
       setNotice(`Created collection ${name}`);
       await loadCollections(name);
     } catch (requestError) {
@@ -230,6 +257,8 @@ export function DataModelScreen() {
       });
       setNotice(`Added field ${fieldForm.field.trim()}`);
       setFieldForm({ field: '', type: 'string', required: false, length: 255 });
+      setShowCreateField(false);
+      setFieldPage(1);
       await loadSelected();
     } catch (requestError) {
       setError(requestError.message || 'Field could not be created');
@@ -371,124 +400,81 @@ export function DataModelScreen() {
       {notice && <div className="notice-banner" role="status">{notice}</div>}
 
       <section className="model-layout">
-        <aside className="panel form-panel model-sidebar">
-          <div className="panel-heading">
+        <aside className="panel form-panel model-sidebar data-model-sidebar">
+          <div className="panel-heading model-sidebar-heading">
             <div>
               <p className="eyebrow">Data Model</p>
               <h2>Collections</h2>
-              <p>Choose a collection to edit its structure.</p>
+              <p>{userCollections.length} project · {systemCollections.length} system</p>
             </div>
             <button className="primary-button" type="button" onClick={() => setShowCreateCollection((value) => !value)}>
-              {showCreateCollection ? 'Cancel' : 'New collection'}
+              {showCreateCollection ? 'Cancel' : 'New'}
             </button>
           </div>
 
           {showCreateCollection && (
             <form className="schema-create-card form-stack compact" onSubmit={createCollection}>
-              <div>
-                <strong>Create collection</strong>
-                <p>Use a short machine-friendly name such as `articles` or `customers`.</p>
-              </div>
-              <label className="field-label">
-                <span>Name</span>
-                <input
-                  value={collectionForm.collection}
-                  onChange={(event) => setCollectionForm((current) => ({ ...current, collection: event.target.value }))}
-                  placeholder="articles"
-                  required
-                  autoFocus
-                />
-              </label>
-              <label className="field-label">
-                <span>Description</span>
-                <input
-                  value={collectionForm.note}
-                  onChange={(event) => setCollectionForm((current) => ({ ...current, note: event.target.value }))}
-                  placeholder="Optional description"
-                />
-              </label>
+              <div><strong>Create collection</strong><p>Use a short machine-friendly name such as `articles`.</p></div>
+              <label className="field-label"><span>Name</span><input value={collectionForm.collection} onChange={(event) => setCollectionForm((current) => ({ ...current, collection: event.target.value }))} placeholder="articles" required autoFocus /></label>
+              <label className="field-label"><span>Description</span><input value={collectionForm.note} onChange={(event) => setCollectionForm((current) => ({ ...current, note: event.target.value }))} placeholder="Optional description" /></label>
               <button className="primary-button" type="submit">Create</button>
             </form>
           )}
 
           <div className="sidebar-filter-row">
-            <label className="field-label">
-              <span>Find collection</span>
-              <input
-                className="sidebar-filter-input"
-                type="search"
-                value={collectionSearch}
-                onChange={(event) => setCollectionSearch(event.target.value)}
-                placeholder="Name or description…"
-              />
-            </label>
-            <label className="field-label">
-              <span>Sort</span>
-              <select value={collectionSort} onChange={(event) => setCollectionSort(event.target.value)}>
-                {COLLECTION_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </label>
+            <label className="field-label"><span>Find collection</span><input className="sidebar-filter-input" type="search" value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder="Name or description…" /></label>
+            <label className="field-label"><span>Sort</span><select value={collectionSort} onChange={(event) => setCollectionSort(event.target.value)}>{COLLECTION_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
 
           <div className="collection-group">
-            <small className="collection-group-label">
-              Project collections · {visibleUserCollections.length}/{userCollections.length}
-            </small>
-            <div className="list-stack">
-              {visibleUserCollections.map((entry) => (
-                <button
-                  className={`list-button collection-list-button ${entry.collection === selected ? 'active' : ''}`}
-                  key={entry.collection}
-                  type="button"
-                  onClick={() => setSelected(entry.collection)}
-                >
-                  <span>
-                    <strong>{entry.collection}</strong>
-                    {entry.note && <small>{entry.note}</small>}
-                  </span>
+            <div className="collection-group-heading"><small className="collection-group-label">Project collections</small><span>{visibleUserCollections.length}</span></div>
+            <div className="list-stack collection-list-page">
+              {pagedCollections.items.map((entry) => (
+                <button className={`list-button collection-list-button ${entry.collection === selected ? 'active' : ''}`} key={entry.collection} type="button" onClick={() => setSelected(entry.collection)}>
+                  <span><strong>{entry.collection}</strong>{entry.note && <small>{entry.note}</small>}</span>
                 </button>
               ))}
               {userCollections.length === 0 && <p className="muted-line">No project collections yet.</p>}
               {userCollections.length > 0 && visibleUserCollections.length === 0 && <p className="muted-line">No matching project collections.</p>}
             </div>
+            {visibleUserCollections.length > 0 && (
+              <Pagination compact page={pagedCollections.page} pageSize={collectionPageSize} totalItems={visibleUserCollections.length} pageSizeOptions={COLLECTION_PAGE_SIZES} itemLabel="collections" onPageChange={setCollectionPage} onPageSizeChange={(size) => { setCollectionPageSize(size); setCollectionPage(1); setSystemPage(1); }} />
+            )}
           </div>
 
           {systemCollections.length > 0 && (
             <details className="system-collections">
-              <summary>System collections ({visibleSystemCollections.length}/{systemCollections.length})</summary>
-              <div className="list-stack">
-                {visibleSystemCollections.map((entry) => (
-                  <button
-                    className={`list-button collection-list-button ${entry.collection === selected ? 'active' : ''}`}
-                    key={entry.collection}
-                    type="button"
-                    onClick={() => setSelected(entry.collection)}
-                  >
+              <summary>System collections ({visibleSystemCollections.length})</summary>
+              <div className="list-stack collection-list-page">
+                {pagedSystemCollections.items.map((entry) => (
+                  <button className={`list-button collection-list-button ${entry.collection === selected ? 'active' : ''}`} key={entry.collection} type="button" onClick={() => setSelected(entry.collection)}>
                     <span><strong>{entry.collection}</strong><small>system managed</small></span>
                   </button>
                 ))}
                 {visibleSystemCollections.length === 0 && <p className="muted-line">No matching system collections.</p>}
               </div>
+              {visibleSystemCollections.length > collectionPageSize && (
+                <Pagination compact page={pagedSystemCollections.page} pageSize={collectionPageSize} totalItems={visibleSystemCollections.length} pageSizeOptions={COLLECTION_PAGE_SIZES} itemLabel="system collections" onPageChange={setSystemPage} />
+              )}
             </details>
           )}
         </aside>
 
         <div className="model-detail-stack">
           {!selectedCollection ? (
-            <section className="panel empty-state">
-              <div><h2>Select a collection</h2><p>Choose a collection on the left to inspect its fields and relations.</p></div>
-            </section>
+            <section className="panel empty-state"><div><h2>Select a collection</h2><p>Choose a collection on the left to inspect its fields and relations.</p></div></section>
           ) : (
             <section className="panel form-panel model-detail">
-              <div className="panel-heading">
+              <div className="panel-heading model-detail-heading">
                 <div>
                   <p className="eyebrow">{selectedCollection.system ? 'System collection' : 'Collection'}</p>
                   <h2>{selected}</h2>
                   <p>{selectedCollection.note || 'No description has been added.'}</p>
                 </div>
-                {!selectedCollection.system && (
-                  <button className="danger-button" type="button" onClick={deleteCollection}>Delete collection</button>
-                )}
+                <div className="model-heading-actions">
+                  <span className="schema-count">{fields.length} fields</span>
+                  {!selectedCollection.system && <button className="danger-button" type="button" onClick={deleteCollection}>Delete collection</button>}
+                </div>
               </div>
 
               <div className="segmented-control schema-tabs" aria-label="Collection settings">
@@ -499,110 +485,52 @@ export function DataModelScreen() {
               {schemaTab === 'fields' ? (
                 <div className="schema-tab-content">
                   <div className="schema-section-heading">
-                    <div>
-                      <h3>Fields</h3>
-                      <p>Fields define what data each record can store.</p>
-                    </div>
-                    <span className="schema-count">{visibleFields.length}/{fields.length}</span>
+                    <div><h3>Fields</h3><p>Search and manage the fields stored on this collection.</p></div>
+                    {!selectedCollection.system && <button className="primary-button" type="button" onClick={() => setShowCreateField((value) => !value)}>{showCreateField ? 'Close form' : 'Add field'}</button>}
                   </div>
 
+                  {showCreateField && !selectedCollection.system && (
+                    <form className="schema-create-card form-stack" onSubmit={createField}>
+                      <div><strong>Add field</strong><p>Choose a field name and storage type. Type conversion is intentionally not available in V1.</p></div>
+                      <div className="form-grid">
+                        <label className="field-label"><span>Field name</span><input value={fieldForm.field} onChange={(event) => setFieldForm((current) => ({ ...current, field: event.target.value }))} placeholder="title" required autoFocus /></label>
+                        <label className="field-label"><span>Type</span><select value={fieldForm.type} onChange={(event) => setFieldForm((current) => ({ ...current, type: event.target.value }))}>{FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
+                        {fieldForm.type === 'string' && <label className="field-label"><span>Max length</span><input type="number" min="1" max="4096" value={fieldForm.length} onChange={(event) => setFieldForm((current) => ({ ...current, length: event.target.value }))} /></label>}
+                        <label className="checkbox-label schema-checkbox"><input type="checkbox" checked={fieldForm.required} onChange={(event) => setFieldForm((current) => ({ ...current, required: event.target.checked }))} />Required value</label>
+                      </div>
+                      <div className="form-actions"><button className="primary-button" type="submit">Add field</button></div>
+                    </form>
+                  )}
+
                   <div className="field-list-controls">
-                    <label className="field-label">
-                      <span>Find field</span>
-                      <input
-                        type="search"
-                        value={fieldSearch}
-                        onChange={(event) => setFieldSearch(event.target.value)}
-                        placeholder="Name, type, required…"
-                      />
-                    </label>
-                    <label className="field-label">
-                      <span>Sort fields</span>
-                      <select value={fieldSort} onChange={(event) => setFieldSort(event.target.value)}>
-                        {FIELD_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                      </select>
-                    </label>
-                    {(fieldSearch || fieldSort !== 'name-asc') && (
-                      <button
-                        className="text-button"
-                        type="button"
-                        onClick={() => { setFieldSearch(''); setFieldSort('name-asc'); }}
-                      >
-                        Reset
-                      </button>
-                    )}
+                    <label className="field-label"><span>Find field</span><input type="search" value={fieldSearch} onChange={(event) => setFieldSearch(event.target.value)} placeholder="Name, type, required…" /></label>
+                    <label className="field-label"><span>Sort fields</span><select value={fieldSort} onChange={(event) => setFieldSort(event.target.value)}>{FIELD_SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                    {(fieldSearch || fieldSort !== 'name-asc') && <button className="text-button" type="button" onClick={() => { setFieldSearch(''); setFieldSort('name-asc'); }}>Reset</button>}
                   </div>
 
                   <div className="field-list">
-                    {visibleFields.map((field) => (
+                    {pagedFields.items.map((field) => (
                       <div className="field-row" key={field.field}>
                         <div className="field-row-main">
-                          <strong>{field.field}</strong>
-                          <span>{field.type}</span>
+                          <span className="field-icon" aria-hidden="true">{String(field.type || '?').slice(0, 1).toUpperCase()}</span>
+                          <span className="field-name-stack"><strong>{field.field}</strong><small>{field.type}</small></span>
                         </div>
                         <div className="field-row-meta">
                           <span className={`status-pill ${field.required ? 'required' : ''}`}>{field.required ? 'Required' : 'Optional'}</span>
+                          {field.readonly && <span className="status-pill">Read only</span>}
                           {field.field !== 'id' && !selectedCollection.system && (
                             <>
-                              <button className="text-button" type="button" onClick={() => toggleRequired(field)}>
-                                {field.required ? 'Make optional' : 'Make required'}
-                              </button>
+                              <button className="text-button" type="button" onClick={() => toggleRequired(field)}>{field.required ? 'Make optional' : 'Make required'}</button>
                               <button className="danger-button" type="button" onClick={() => deleteField(field)}>Delete</button>
                             </>
                           )}
                         </div>
                       </div>
                     ))}
-                    {fields.length > 0 && visibleFields.length === 0 && (
-                      <div className="inline-info">No fields match this search.</div>
-                    )}
+                    {fields.length > 0 && visibleFields.length === 0 && <div className="inline-info">No fields match this search.</div>}
                   </div>
-
-                  {!selectedCollection.system && (
-                    <form className="schema-create-card form-stack" onSubmit={createField}>
-                      <div>
-                        <strong>Add field</strong>
-                        <p>Choose a field name and storage type. Type conversion is intentionally not available in V1.</p>
-                      </div>
-                      <div className="form-grid">
-                        <label className="field-label">
-                          <span>Field name</span>
-                          <input
-                            value={fieldForm.field}
-                            onChange={(event) => setFieldForm((current) => ({ ...current, field: event.target.value }))}
-                            placeholder="title"
-                            required
-                          />
-                        </label>
-                        <label className="field-label">
-                          <span>Type</span>
-                          <select value={fieldForm.type} onChange={(event) => setFieldForm((current) => ({ ...current, type: event.target.value }))}>
-                            {FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-                          </select>
-                        </label>
-                        {fieldForm.type === 'string' && (
-                          <label className="field-label">
-                            <span>Max length</span>
-                            <input
-                              type="number"
-                              min="1"
-                              max="4096"
-                              value={fieldForm.length}
-                              onChange={(event) => setFieldForm((current) => ({ ...current, length: event.target.value }))}
-                            />
-                          </label>
-                        )}
-                        <label className="checkbox-label schema-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={fieldForm.required}
-                            onChange={(event) => setFieldForm((current) => ({ ...current, required: event.target.checked }))}
-                          />
-                          Required value
-                        </label>
-                      </div>
-                      <div className="form-actions"><button className="primary-button" type="submit">Add field</button></div>
-                    </form>
+                  {visibleFields.length > 0 && (
+                    <Pagination page={pagedFields.page} pageSize={fieldPageSize} totalItems={visibleFields.length} pageSizeOptions={FIELD_PAGE_SIZES} itemLabel="fields" onPageChange={setFieldPage} onPageSizeChange={(size) => { setFieldPageSize(size); setFieldPage(1); }} />
                   )}
                 </div>
               ) : (
@@ -612,106 +540,29 @@ export function DataModelScreen() {
                   ) : (
                     <div className="split-grid relation-builder-grid">
                       <article className="schema-create-card form-stack">
-                        <div>
-                          <p className="eyebrow">Many to one</p>
-                          <h3>Link to one record</h3>
-                          <p>Use an existing field in {selected} as the foreign-key field, then choose the target collection.</p>
-                        </div>
-
+                        <div><p className="eyebrow">Many to one</p><h3>Link to one record</h3><p>Use an existing field in {selected} as the foreign-key field, then choose the target collection.</p></div>
                         <div className="list-stack relation-list">
                           {m2oRelations.length === 0 && <p className="muted-line">No direct relations for this collection.</p>}
-                          {m2oRelations.map((relation) => (
-                            <div className="relation-row" key={`${relation.many_collection}.${relation.many_field}`}>
-                              <div>
-                                <strong>{relation.many_collection}.{relation.many_field}</strong>
-                                <small>links to {relation.one_collection}.{relation.one_field}</small>
-                              </div>
-                              <button className="danger-button" type="button" onClick={() => deleteM2O(relation)}>Delete</button>
-                            </div>
-                          ))}
+                          {m2oRelations.map((relation) => <div className="relation-row" key={`${relation.many_collection}.${relation.many_field}`}><div><strong>{relation.many_collection}.{relation.many_field}</strong><small>links to {relation.one_collection}.{relation.one_field}</small></div><button className="danger-button" type="button" onClick={() => deleteM2O(relation)}>Delete</button></div>)}
                         </div>
-
                         <form className="form-stack compact" onSubmit={createM2O}>
-                          <label className="field-label">
-                            <span>Field in {selected}</span>
-                            <select
-                              value={m2oForm.manyField}
-                              onChange={(event) => setM2oForm((current) => ({ ...current, manyField: event.target.value }))}
-                              required
-                            >
-                              <option value="">Choose field</option>
-                              {fields.filter((field) => field.field !== 'id').map((field) => (
-                                <option key={field.field} value={field.field}>{field.field} ({field.type})</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="field-label">
-                            <span>Target collection</span>
-                            <select
-                              value={m2oForm.oneCollection}
-                              onChange={(event) => setM2oForm((current) => ({ ...current, oneCollection: event.target.value }))}
-                              required
-                            >
-                              <option value="">Choose collection</option>
-                              {userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}
-                            </select>
-                          </label>
-                          <label className="field-label">
-                            <span>If target is deleted</span>
-                            <select value={m2oForm.onDelete} onChange={(event) => setM2oForm((current) => ({ ...current, onDelete: event.target.value }))}>
-                              <option value="RESTRICT">Prevent deletion</option>
-                              <option value="CASCADE">Delete linked records</option>
-                              <option value="SET NULL">Clear this field</option>
-                            </select>
-                          </label>
+                          <label className="field-label"><span>Field in {selected}</span><select value={m2oForm.manyField} onChange={(event) => setM2oForm((current) => ({ ...current, manyField: event.target.value }))} required><option value="">Choose field</option>{fields.filter((field) => field.field !== 'id').map((field) => <option key={field.field} value={field.field}>{field.field} ({field.type})</option>)}</select></label>
+                          <label className="field-label"><span>Target collection</span><select value={m2oForm.oneCollection} onChange={(event) => setM2oForm((current) => ({ ...current, oneCollection: event.target.value }))} required><option value="">Choose collection</option>{userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label>
+                          <label className="field-label"><span>If target is deleted</span><select value={m2oForm.onDelete} onChange={(event) => setM2oForm((current) => ({ ...current, onDelete: event.target.value }))}><option value="RESTRICT">Prevent deletion</option><option value="CASCADE">Delete linked records</option><option value="SET NULL">Clear this field</option></select></label>
                           <button className="primary-button" type="submit">Create relation</button>
                         </form>
                       </article>
 
                       <article className="schema-create-card form-stack">
-                        <div>
-                          <p className="eyebrow">Many to many</p>
-                          <h3>Connect two collections</h3>
-                          <p>YunCMS creates a hidden junction collection that stores both links.</p>
-                        </div>
-
+                        <div><p className="eyebrow">Many to many</p><h3>Connect two collections</h3><p>YunCMS creates a hidden junction collection that stores both links.</p></div>
                         <div className="list-stack relation-list">
                           {m2mJunctions.length === 0 && <p className="muted-line">No many-to-many junctions for this collection.</p>}
-                          {m2mJunctions.map((junction) => (
-                            <div className="relation-row" key={junction.junctionCollection}>
-                              <div>
-                                <strong>{junction.junctionCollection}</strong>
-                                <small>{junction.relations.map((relation) => relation.one_collection).join(' ↔ ')}</small>
-                              </div>
-                              <button className="danger-button" type="button" onClick={() => deleteM2M(junction.junctionCollection)}>Delete</button>
-                            </div>
-                          ))}
+                          {m2mJunctions.map((junction) => <div className="relation-row" key={junction.junctionCollection}><div><strong>{junction.junctionCollection}</strong><small>{junction.relations.map((relation) => relation.one_collection).join(' ↔ ')}</small></div><button className="danger-button" type="button" onClick={() => deleteM2M(junction.junctionCollection)}>Delete</button></div>)}
                         </div>
-
                         <form className="form-stack compact" onSubmit={createM2M}>
-                          <label className="field-label">
-                            <span>Junction name</span>
-                            <input
-                              value={m2mForm.junctionCollection}
-                              onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: event.target.value }))}
-                              placeholder="article_tags"
-                              required
-                            />
-                          </label>
-                          <label className="field-label">
-                            <span>First collection</span>
-                            <select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required>
-                              <option value="">Choose collection</option>
-                              {userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}
-                            </select>
-                          </label>
-                          <label className="field-label">
-                            <span>Second collection</span>
-                            <select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required>
-                              <option value="">Choose collection</option>
-                              {userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}
-                            </select>
-                          </label>
+                          <label className="field-label"><span>Junction name</span><input value={m2mForm.junctionCollection} onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: event.target.value }))} placeholder="article_tags" required /></label>
+                          <label className="field-label"><span>First collection</span><select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required><option value="">Choose collection</option>{userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label>
+                          <label className="field-label"><span>Second collection</span><select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required><option value="">Choose collection</option>{userCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.collection}</option>)}</select></label>
                           <button className="primary-button" type="submit">Create junction</button>
                         </form>
                       </article>
