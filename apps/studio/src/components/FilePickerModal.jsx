@@ -133,10 +133,8 @@ export function FilePickerModal({
             page={paged.page}
             pageSize={PAGE_SIZE}
             totalItems={filtered.length}
-            pageSizeOptions={[PAGE_SIZE]}
             itemLabel={t('files.files')}
             onPageChange={setPage}
-            onPageSizeChange={() => {}}
           />
         </>
       )}
