@@ -294,9 +294,22 @@ yuncms help
 - [x] Permission validation JSON editor.
 - [x] Files management UI.
 - [x] Loading/error/empty-state basics.
+- [x] Task-oriented sidebar groups: Content / Library / Settings.
+- [x] Non-system collections rendered directly as nested Content navigation instead of a collection toolbar dropdown.
+- [x] Content workspace keeps collection context stable across list/create/edit states.
+- [x] Content page includes lightweight search across the currently loaded records.
+- [x] Files defaults to a gallery with authenticated image previews, file placeholders, search and grid/list switching.
+- [x] File metadata editing moved from `window.prompt()` into an in-page editor.
+- [x] Data Model uses a collection master/detail settings layout with focused `New collection` flow and Fields/Relations tabs.
+- [x] Roles/Permissions uses a role-first collection/action matrix with direct simple toggles.
+- [x] Advanced field allowlist/filter/validation permission editing is in-page and validates JSON before save.
+- [x] Important file/role/permission edits no longer depend on prompt-only workflows.
+- [x] Refreshed workspaces have narrow-screen responsive rules without a new UI dependency.
+- [x] Studio API URL defaults to browser same-origin; `VITE_API_URL` remains an explicit override.
+- [x] Vite build output targets the API package runtime bundle directory.
 - [x] Relation picker V1 intentionally caps target list at 200; paginated/search picker is scale polish rather than a V1 correctness blocker.
 - [ ] Formal accessibility/keyboard review — `todo.md`.
-- [ ] Studio build/runtime smoke — `todo.md`.
+- [ ] Refreshed Studio browser/build/runtime smoke — `todo.md`.
 
 ## 13. API/runtime/observability
 
@@ -315,7 +328,13 @@ yuncms help
 - [x] Structured line-delimited JSON logger wired into runtime.
 - [x] Runtime logger secret redaction.
 - [x] Auth rate-limit headers/HTTP 429.
+- [x] Built Studio index and hashed assets served from the same Express listener with Node filesystem streams.
+- [x] Studio static handler is restricted to `/` and `/assets/...`; unrelated requests continue through normal API routing.
+- [x] Root `npm start` builds Studio before starting the single API/Studio listener.
+- [x] Default Studio/auth public URLs align with the configured API port.
+- [x] API package file list includes the generated Studio bundle for future packed installs.
 - [x] API/runtime/security-header/graceful-shutdown smoke — `todo.md`.
+- [ ] Single-port built Studio HTML/assets/API browser smoke — `todo.md`.
 
 ## 14. Documentation
 
@@ -329,6 +348,7 @@ yuncms help
 - [x] `docs/extensions.md`.
 - [x] `docs/setup-cli.md`.
 - [x] `docs/studio.md`.
+- [x] `docs/studio-ui-improvement-plan.md` live UI improvement checklist.
 - [x] `docs/files.md`.
 - [x] `docs/security.md`.
 - [x] `docs/deployment.md`.
@@ -353,6 +373,7 @@ yuncms help
 - [x] S3 driver contract.
 - [x] Guarded storage reconciliation.
 - [x] Audit redaction + bounded cleanup.
+- [x] Single-port Studio default config and static asset path/traversal resolution.
 - [x] Execute tests after dependency install — `todo.md`.
 
 ## 16. Verification milestones
@@ -362,13 +383,13 @@ The major V1 feature source implementations now exist. These milestone boxes sta
 - [x] Milestone A — dependency install/lockfile + Node 24 + tests + API/Studio build/start verified.
 - [x] Milestone B — real MySQL bootstrap/schema/CRUD/query/relation lifecycle and rollback behavior verified.
 - [x] Milestone C — real auth/SMTP/replay/RBAC/validation/rate-limit behavior verified.
-- [ ] Milestone D — extension local/npm runtime + Studio end-to-end smoke verified.
+- [ ] Milestone D — extension local/npm runtime + refreshed Studio end-to-end and single-port smoke verified.
 - [ ] Milestone E — local/S3 files, reconciliation, audit cleanup, logging/security headers and graceful shutdown verified.
 - [ ] Release — npm naming ownership, tarballs, fresh install and `yuncms init/bootstrap/start` verified.
 
 ## 17. Remaining source work excluding manual verification
 
-There is no known blocking V1 source feature left in the current roadmap.
+There is no known blocking V1 source feature left in the current roadmap after the Studio usability and single-port source pass.
 
 Future/non-blocking follow-ups are deliberately outside the V1 release gate unless product requirements change:
 
