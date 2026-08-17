@@ -32,7 +32,7 @@ export class SchemaMetadataRepository {
 
   async createCollection({
     collection,
-    name,
+    name = collection,
     primaryKey = 'id',
     note = null,
     singleton = false,
@@ -127,7 +127,7 @@ export class SchemaMetadataRepository {
   async createField({
     collection,
     field,
-    name,
+    name = field,
     type,
     required = false,
     readonly = false,
