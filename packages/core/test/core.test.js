@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { loadConfig } from '../src/config.js';
+import { pingDatabase } from '../src/database.js';
 import { quoteIdentifier } from '../src/identifier.js';
 import { normalizeDatabaseError } from '../src/errors.js';
 import { withDatabaseRetry } from '../src/retry.js';
@@ -23,6 +24,17 @@ test('loadConfig uses stable defaults and parses numeric values', () => {
   assert.equal(config.database.connectionLimit, 20);
   assert.equal(config.database.ssl, true);
   assert.equal(config.database.host, '127.0.0.1');
+});
+
+test('database ping accepts mysql2 bigNumberStrings results', async () => {
+  const pool = {
+    async query(sql) {
+      assert.equal(sql, 'SELECT 1 AS ok');
+      return [[{ ok: '1' }]];
+    },
+  };
+
+  assert.equal(await pingDatabase(pool), true);
 });
 
 test('quoteIdentifier rejects unsafe SQL identifiers', () => {

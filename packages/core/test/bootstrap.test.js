@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { validateMigration, applyMigrations, assertMigrationsApplied } from '../src/migrations.js';
 import { withAdvisoryLock } from '../src/advisory-lock.js';
+import { CORE_MIGRATIONS } from '../src/bootstrap.js';
 
 function createMigrationDatabase({ applied = [] } = {}) {
   const journal = new Set(applied);
@@ -51,6 +52,15 @@ test('compatibility check fails closed when migrations are missing', async () =>
     assertMigrationsApplied(database, ['0001', '0002']),
     (error) => error.code === 'DATABASE_MIGRATION_REQUIRED' && error.missingMigrations[0] === '0002',
   );
+});
+
+test('system schema quotes the MySQL reserved system column', () => {
+  const systemSchema = CORE_MIGRATIONS.find(({ id }) => id === '0001-system-schema');
+  const collectionsTable = systemSchema.statements.find((statement) => (
+    statement.includes('CREATE TABLE IF NOT EXISTS yuncms_collections')
+  ));
+
+  assert.match(collectionsTable, /`system` TINYINT\(1\)/);
 });
 
 test('advisory lock uses one connection and always releases it', async () => {

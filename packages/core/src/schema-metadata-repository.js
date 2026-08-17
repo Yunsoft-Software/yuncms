@@ -10,7 +10,7 @@ export class SchemaMetadataRepository {
 
   async listCollections() {
     const [rows] = await this.database.query(
-      `SELECT collection, primary_key, note, singleton, hidden, system, metadata, created_at, updated_at
+      `SELECT collection, primary_key, note, singleton, hidden, \`system\`, metadata, created_at, updated_at
        FROM yuncms_collections
        ORDER BY collection ASC`,
     );
@@ -19,7 +19,7 @@ export class SchemaMetadataRepository {
 
   async readCollection(collection) {
     const [rows] = await this.database.query(
-      `SELECT collection, primary_key, note, singleton, hidden, system, metadata, created_at, updated_at
+      `SELECT collection, primary_key, note, singleton, hidden, \`system\`, metadata, created_at, updated_at
        FROM yuncms_collections
        WHERE collection = ?
        LIMIT 1`,
@@ -39,7 +39,7 @@ export class SchemaMetadataRepository {
   }) {
     await this.database.query(
       `INSERT INTO yuncms_collections
-       (collection, primary_key, note, singleton, hidden, system, metadata)
+       (collection, primary_key, note, singleton, hidden, \`system\`, metadata)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         collection,

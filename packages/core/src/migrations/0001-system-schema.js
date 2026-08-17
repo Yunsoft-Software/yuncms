@@ -16,7 +16,7 @@ export const systemSchemaMigration = {
       note TEXT NULL,
       singleton TINYINT(1) NOT NULL DEFAULT 0,
       hidden TINYINT(1) NOT NULL DEFAULT 0,
-      system TINYINT(1) NOT NULL DEFAULT 0,
+      \`system\` TINYINT(1) NOT NULL DEFAULT 0,
       metadata JSON NULL,
       created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
       updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)

@@ -23,7 +23,7 @@ export function createDatabasePool(config) {
 
 export async function pingDatabase(pool) {
   const [rows] = await pool.query('SELECT 1 AS ok');
-  return rows?.[0]?.ok === 1;
+  return Number(rows?.[0]?.ok) === 1;
 }
 
 export async function closeDatabasePool(pool) {
