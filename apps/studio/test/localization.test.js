@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import test from 'node:test';
 
+import { FIELD_TYPE_OPTIONS } from '../src/field-ui.js';
 import {
   EN,
   TR,
@@ -44,6 +45,20 @@ test('every statically referenced Studio translation exists in English and Turki
   assert.deepEqual(missing, []);
 });
 
+test('dynamic field and permission labels are also translated in both locales', () => {
+  const dynamicKeys = [
+    ...FIELD_TYPE_OPTIONS.map((option) => option.labelKey),
+    ...['read', 'create', 'update', 'delete'].map((action) => `roles.${action}`),
+  ];
+  const missing = [];
+  for (const key of dynamicKeys) {
+    for (const locale of ['en', 'tr']) {
+      if (!hasTranslation(locale, key)) missing.push(`${locale}:${key}`);
+    }
+  }
+  assert.deepEqual(missing, []);
+});
+
 test('translations interpolate values and fall back safely for an unknown locale', () => {
   assert.equal(translate('en', 'users.summary', { total: 12, active: 8 }), '12 total · 8 active');
   assert.equal(translate('tr', 'users.summary', { total: 12, active: 8 }), 'Toplam 12 · 8 aktif');
@@ -54,4 +69,6 @@ test('Turkish locale contains real localized navigation and destructive-action c
   assert.equal(TR['nav.settings'], 'Ayarlar');
   assert.equal(TR['content.deleteRecordAction'], 'Kaydı sil');
   assert.equal(TR['appearance.logoHint'], 'Özel logo, varsayılan Yunsoft logosunun tamamen yerine geçer.');
+  assert.equal(TR['fieldType.image'], 'Görsel');
+  assert.equal(TR['dataModel.oneToOne'], 'Bire bir');
 });
