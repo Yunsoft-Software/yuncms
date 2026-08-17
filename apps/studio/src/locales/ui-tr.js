@@ -1,4 +1,6 @@
 export const UI_TR = Object.freeze({
+  'appearance.brandNameHint': 'Logo alternatif metni, yedek görünüm ve Studio marka ayarlarında kullanılır.',
+
   'nav.expandSidebar': 'Kenar çubuğunu aç',
   'nav.collapseSidebar': 'Kenar çubuğunu daralt',
   'nav.studioSections': 'Studio bölümleri',
