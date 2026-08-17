@@ -17,6 +17,15 @@ test('Data Model entry uses the collection workspace implementation', () => {
   assert.doesNotMatch(screenSource, /<Pagination/);
 });
 
+test('collection creation keeps human display name separate from stable API key', () => {
+  assert.match(screenSource, /dataModel\.displayName/);
+  assert.match(screenSource, /dataModel\.apiKey/);
+  assert.match(screenSource, /schemaKeyFromName\(value, 'collection'\)/);
+  assert.match(screenSource, /name:\s*displayName/);
+  assert.match(screenSource, /collection:\s*key/);
+  assert.match(screenSource, /displaySchemaName\(selectedCollection, 'collection'\)/);
+});
+
 test('collection visibility, icon and sidebar ordering live inside Data Model overview', () => {
   assert.match(screenSource, /showInContent/);
   assert.match(screenSource, /CollectionIconPicker/);
@@ -24,6 +33,7 @@ test('collection visibility, icon and sidebar ordering live inside Data Model ov
   assert.match(screenSource, /moveCollection\(1\)/);
   assert.match(screenSource, /collectionMetadataPatch/);
   assert.match(screenSource, /hidden:\s*!overview\.visible/);
+  assert.match(screenSource, /name:\s*overview\.name\.trim\(\)/);
 });
 
 test('collection ordering supports drag and drop and persists normalized sort slots', () => {
@@ -50,6 +60,12 @@ test('registered system collections can add bounded optional custom fields throu
   assert.match(screenSource, /\/schema\/system-collections\/\$\{encodeURIComponent\(selected\)\}\/fields/);
   assert.match(screenSource, /allowRequired=\{!selectedCollection\.system\}/);
   assert.match(screenSource, /dataModel\.customSystemField/);
+});
+
+test('field list shows human labels alongside technical keys', () => {
+  assert.match(screenSource, /displaySchemaName\(field, 'field'\)/);
+  assert.match(screenSource, /<code>\{field\.field\}<\/code>/);
+  assert.match(screenSource, /\[field\.name, field\.field, fieldDisplayType\(field\)\]/);
 });
 
 test('relation workspace preserves delete actions while simplifying layout', () => {
