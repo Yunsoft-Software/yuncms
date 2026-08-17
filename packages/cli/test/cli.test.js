@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 
 import { assertSupportedNode, runCli } from '../src/cli.js';
 import { serializeEnv } from '../src/env-file.js';
+import { runStartCommand } from '../src/start-command.js';
 
 test('node guard accepts only node 24 baseline', () => {
   assert.doesNotThrow(() => assertSupportedNode('24.8.0'));
@@ -38,6 +40,38 @@ test('start command receives current environment and working directory', async (
   assert.equal(calls.length, 1);
   assert.equal(calls[0].cwd, '/srv/yuncms-project');
   assert.equal(calls[0].env.DB_HOST, 'db.internal');
+});
+
+test('start command forwards shutdown signals and waits for a clean child exit', async () => {
+  const signalSource = new EventEmitter();
+  const child = new EventEmitter();
+  child.exitCode = null;
+  child.signalCode = null;
+  child.kill = (signal) => {
+    assert.equal(signal, 'SIGTERM');
+    child.exitCode = 0;
+    queueMicrotask(() => child.emit('exit', 0, null));
+    return true;
+  };
+  let spawnOptions;
+
+  const resultPromise = runStartCommand({
+    env: { DB_HOST: 'db.internal' },
+    cwd: '/srv/yuncms-project',
+    output: { log() {} },
+    signalSource,
+    spawnProcess(_runtime, _args, options) {
+      spawnOptions = options;
+      return child;
+    },
+  });
+  signalSource.emit('SIGTERM');
+
+  assert.deepEqual(await resultPromise, { code: 0, signal: null });
+  assert.equal(spawnOptions.cwd, '/srv/yuncms-project');
+  assert.equal(spawnOptions.detached, process.platform !== 'win32');
+  assert.equal(signalSource.listenerCount('SIGTERM'), 0);
+  assert.equal(signalSource.listenerCount('SIGINT'), 0);
 });
 
 test('env serialization quotes values and rejects multiline secrets', () => {
