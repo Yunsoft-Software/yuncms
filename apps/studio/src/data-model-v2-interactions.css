@@ -1,0 +1,49 @@
+.data-model-collection-item:not(.system) {
+  grid-template-columns: 30px minmax(0, 1fr) 18px;
+}
+
+.data-model-collection-item[draggable="true"] {
+  cursor: grab;
+}
+
+.data-model-collection-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.data-model-collection-item.dragging {
+  opacity: .5;
+  border-color: var(--studio-accent-border);
+}
+
+.collection-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--studio-text-muted);
+  font-size: 14px;
+  letter-spacing: -3px;
+  user-select: none;
+}
+
+.relation-v2-row {
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.relation-v2-row .danger-button {
+  justify-self: end;
+}
+
+@media (max-width: 760px) {
+  .data-model-collection-item:not(.system),
+  .relation-v2-row {
+    grid-template-columns: 1fr;
+  }
+
+  .data-model-collection-item:not(.system) {
+    grid-template-columns: 30px minmax(0, 1fr) 18px;
+  }
+
+  .relation-v2-row .danger-button {
+    justify-self: start;
+  }
+}
