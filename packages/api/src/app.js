@@ -15,6 +15,7 @@ import { createPermissionsRouter } from './routes/permissions.js';
 import { createRolesRouter } from './routes/roles.js';
 import { createSchemaRouter } from './routes/schema.js';
 import { createUsersRouter } from './routes/users.js';
+import { createStudioMiddleware } from './studio.js';
 
 function securityHeaders(req, res, next) {
   res.set('x-content-type-options', 'nosniff');
@@ -52,6 +53,7 @@ export function createApp({
   storage = null,
   mailer = null,
   endpointExtensions = [],
+  studioRoot = undefined,
 }) {
   if (!pool) throw new Error('Database pool is required');
   if (!config) throw new Error('Config is required');
@@ -87,6 +89,8 @@ export function createApp({
       });
     }
   });
+
+  app.use(createStudioMiddleware({ root: studioRoot }));
 
   app.use(createAuthenticationMiddleware({
     pool,
