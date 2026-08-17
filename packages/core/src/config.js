@@ -41,6 +41,7 @@ export function loadConfig(env = process.env) {
       host: readString(env.HOST, '127.0.0.1'),
       port: serverPort,
       studioOrigin,
+      trustProxyHops: readInteger(env.TRUST_PROXY_HOPS, 0, 'TRUST_PROXY_HOPS', { min: 0, max: 10 }),
     },
     logging: {
       level: readString(env.LOG_LEVEL, 'info'),
