@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   DEFAULT_STUDIO_SETTINGS,
+  STUDIO_LOGO_ASSET_PATH,
   YUNSOFT_DARK_LOGO_URL,
   YUNSOFT_LIGHT_LOGO_URL,
   normalizeStudioSettings,
@@ -14,6 +15,7 @@ test('Studio settings normalize unsafe or unsupported appearance values to defau
   const settings = normalizeStudioSettings({
     brand_name: '  ',
     logo_url: '',
+    logo_file: '',
     accent_color: 'blue',
     theme: 'neon',
     default_locale: 'de',
@@ -21,12 +23,13 @@ test('Studio settings normalize unsafe or unsupported appearance values to defau
 
   assert.equal(settings.brand_name, DEFAULT_STUDIO_SETTINGS.brand_name);
   assert.equal(settings.logo_url, DEFAULT_STUDIO_SETTINGS.logo_url);
+  assert.equal(settings.logo_file, null);
   assert.equal(settings.accent_color, DEFAULT_STUDIO_SETTINGS.accent_color);
   assert.equal(settings.theme, 'system');
   assert.equal(settings.default_locale, 'en');
 });
 
-test('custom branding remains the effective branding instead of restoring Yunsoft defaults', () => {
+test('legacy custom URL branding remains readable until replaced', () => {
   const settings = normalizeStudioSettings({
     brand_name: 'Acme CMS',
     logo_url: 'https://cdn.example.com/acme.svg',
@@ -35,11 +38,17 @@ test('custom branding remains the effective branding instead of restoring Yunsof
     default_locale: 'tr',
   });
 
-  assert.equal(settings.brand_name, 'Acme CMS');
-  assert.equal(settings.logo_url, 'https://cdn.example.com/acme.svg');
-  assert.notEqual(settings.logo_url, DEFAULT_STUDIO_SETTINGS.logo_url);
   assert.equal(resolveStudioLogo(settings, 'light'), 'https://cdn.example.com/acme.svg');
   assert.equal(resolveStudioLogo(settings, 'dark'), 'https://cdn.example.com/acme.svg');
+});
+
+test('file-backed branding resolves through the dedicated public Studio asset endpoint', () => {
+  const settings = normalizeStudioSettings({
+    ...DEFAULT_STUDIO_SETTINGS,
+    logo_file: '123e4567-e89b-42d3-a456-426614174000',
+  });
+  assert.equal(resolveStudioLogo(settings, 'light'), STUDIO_LOGO_ASSET_PATH);
+  assert.equal(resolveStudioLogo(settings, 'dark'), STUDIO_LOGO_ASSET_PATH);
 });
 
 test('default Yunsoft branding uses contrasting artwork for each surface theme', () => {
