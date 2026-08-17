@@ -1,104 +1,115 @@
 # Environment / Manual TODO
 
-Only checks that still require a real checkout, browser, MySQL instance or deployment provider belong here. This file is a **pending verification list**: completed checks are removed, never kept as `[x]` history. If covered source/test code changes after a successful run, the affected check becomes stale and is re-added.
+Only checks that still require a real Node 24 checkout, browser, MySQL instance or deployment provider belong here. This is a **pending verification list**: when a check passes it is removed, not kept as `[x]` history. If its covered source changes later, it becomes pending again.
 
 ## 1. Node 24 source gates
 
-Run on branch `16-08-2026` from a fresh Node.js 24 checkout.
+Run from a fresh checkout of the final `16-08-2026` state.
 
-- [ ] Run `npm run test:fast`. The fast suite now includes migration `0008`, file-backed branding, dark pagination/permission surfaces, simplified sidebar, collection icon/order metadata, drag ordering, Data Model V2, bounded optional-only system-collection field additions, relation cleanup, existing auth/RBAC/O2O/File/Image/accountability regressions and EN/TR coverage.
-- [ ] Run `npm test`; confirm the complete auto-discovered core/API/CLI/extensions/Studio source suite passes.
-- [ ] Run `npm run test:release`; confirm complete tests, Studio production build and every publishable `npm pack --dry-run` contract pass.
-- [ ] Confirm the Studio production build has no JSX/import errors or unresolved translation keys after `DataModelV2Screen`, `CollectionIconPicker`, `LogoFilePicker`, new CSS modules and system-schema route additions.
+- [ ] Run `npm run test:fast`; fix only real failures. The fast suite now includes migrations through `0010`, schema human-name normalization, file-backed logo/favicon, modal asset picker, full Files preview, dark permission badges, Data Model V2, bounded system fields, O2O/File/Image/accountability/auth/RBAC and EN/TR regressions.
+- [ ] Run `npm test`; confirm the complete auto-discovered core/API/CLI/extensions/Studio suite passes.
+- [ ] Run `npm run test:release`; confirm complete tests, Studio production build and every `npm pack --dry-run` contract pass.
+- [ ] Confirm Studio production build has no JSX/import errors or unresolved translation keys after `BrandAssetPicker`, `FilePickerModal`, `FilePreviewModal`, `schema-name`, new locale modules and Data Model label/key changes.
 
 ## 2. Fresh install / port 3008
 
-- [ ] In a brand-new empty project run `yuncms init`; confirm generated `.env` contains `PORT=3008`, `STUDIO_ORIGIN=http://localhost:3008`, `AUTH_PUBLIC_URL=http://localhost:3008`.
-- [ ] Start without manually supplying a port and verify API + built Studio are both served from `http://localhost:3008`.
-- [ ] Confirm fresh-install output/docs do not direct a user to legacy 8055 or Vite 5173.
-- [ ] Existing operator-owned `.env` files with legacy ports must be migrated manually; source intentionally does not overwrite them.
+- [ ] In a new empty project run `yuncms init`; generated `.env` must contain `PORT=3008`, `STUDIO_ORIGIN=http://localhost:3008`, `AUTH_PUBLIC_URL=http://localhost:3008`.
+- [ ] Start without manually setting a port and verify API + built Studio are served from `http://localhost:3008`.
+- [ ] Confirm fresh-install output/docs do not direct users to legacy 8055 or Vite 5173.
+- [ ] Migrate any existing operator-owned `.env` that still explicitly uses a legacy port; source intentionally does not overwrite it.
 
-## 3. Real MySQL migrations / branding file
+## 3. Real MySQL migration upgrade
 
 Use a disposable MySQL 8-compatible database whose name contains `test`, `ci` or `dev`.
 
-- [ ] Upgrade a DB that has `0001`–`0007`; bootstrap must apply `0008-studio-logo-file` exactly once and compatibility must then pass.
-- [ ] Inspect `yuncms_studio_settings.logo_file`: nullable `CHAR(36)`, indexed, FK to `yuncms_files(id)`, `ON DELETE SET NULL`.
-- [ ] Run `YUNCMS_TEST_MYSQL=1 YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1 npm run test:release`.
-- [ ] From Branding & Appearance select an existing image from Files, save, sign out/reload the login surface and verify `/studio-settings/logo` renders that exact image before authentication.
-- [ ] Delete the selected logo File and verify `logo_file` becomes `NULL` without deleting/corrupting Studio settings; default Yunsoft branding should render again.
-- [ ] Confirm non-image Files cannot be stored as `logo_file` and arbitrary external logo URL updates are rejected.
+- [ ] Upgrade a DB applied through `0008`; bootstrap must apply `0009-schema-display-names` and `0010-studio-favicon-file` exactly once, then compatibility must pass.
+- [ ] Verify `0009` backfills `yuncms_collections.name = collection` and `yuncms_fields.name = field` for legacy rows before making the columns NOT NULL.
+- [ ] Verify `logo_file` and `favicon_file` are nullable indexed `CHAR(36)` FKs to `yuncms_files(id)` with `ON DELETE SET NULL`.
+- [ ] Run `YUNCMS_TEST_MYSQL=1 YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1 npm run test:release` against the disposable DB.
 
-## 4. Dark-mode visual regression from supplied screenshots
+## 4. Human collection / field names
 
-Verify the exact problem areas shown in the 2026-08-17 browser screenshots.
+- [ ] In Studio create `Müşteri Talepleri`; verify the suggested machine key is `musteri_talepleri`, the display label remains exactly `Müşteri Talepleri`, and the physical/API collection key is normalized.
+- [ ] Create fields such as `Ürün Fiyatı`, `İçecek Ölçüsü`, `Çalışma Şekli / Gün`; verify Turkish characters/spaces remain in labels while API keys normalize deterministically.
+- [ ] Create a leading-number label such as `2026 Ürünleri`; verify a safe prefixed machine key is generated.
+- [ ] Change an existing collection/field **display name** after data exists; verify the MySQL table/column and REST integration key do not rename.
+- [ ] Verify sidebar, Data Model lists and relation selectors show the human label while technical key remains secondary/available.
+- [ ] Exercise the same naming behavior through raw Schema REST requests so server-side normalization is proven independently from Studio.
 
-- [ ] Content table pagination footer in Dark mode must use dark Studio surfaces; no white pagination strip.
-- [ ] Files Gallery/List pagination footer and gallery result surface must remain dark.
-- [ ] Roles & Permissions matrix search/header/sticky first column/body/footer must remain dark; no white collection column or white toolbar/footer.
-- [ ] Hover/active/focus states on permission cells and pagination controls must stay readable in Light and Dark themes.
-- [ ] Review Content, Files, Users, Data Model, Roles and Branding screens once in both themes for any remaining hard-coded light surface.
+## 5. Files preview regression
 
-## 5. Branding / theme behavior
+- [ ] In Files Gallery open a large portrait, landscape and transparent image; card preview must use `contain` instead of cropping and the Preview action must open the entire asset in the large modal.
+- [ ] Open a PDF in the large modal and verify it remains usable at normal desktop height.
+- [ ] Open video and audio files; native controls and authenticated blob loading must work.
+- [ ] Verify unsupported files show a clean placeholder rather than a broken media element.
+- [ ] Repeat in List view and confirm preview action opens the same full preview surface.
+- [ ] Test file preview after an access-token refresh to ensure authenticated `apiBlob` behavior still succeeds.
 
-- [ ] With default branding, set Dark theme and verify Yunsoft **light artwork** (`light-logo.png`) is used on the dark surface.
-- [ ] Set Light theme and verify Yunsoft **dark artwork** (`dark-logo.png`) is used on the light surface.
-- [ ] Set System theme and switch OS/browser color scheme; the resolved logo must follow the same contrast rule.
-- [ ] Verify Branding & Appearance no longer exposes a Logo URL input.
-- [ ] Verify the Files logo picker lists only image MIME types, supports search, shows preview/selected state and can return to default branding.
-- [ ] In separate-origin development with `VITE_API_URL`, verify the selected public logo asset is fetched from the API origin rather than the Vite origin.
+## 6. Dark-mode regression from supplied screenshots
 
-## 6. Sidebar / collection navigation UX
+- [ ] Content pagination footer must stay dark; no white strip.
+- [ ] Files Gallery/List result and pagination surfaces must stay dark.
+- [ ] Roles & Permissions search/header/sticky first column/body/footer must stay dark.
+- [ ] Specifically verify the `permission rules` count badge / role summary stat is readable and not white in Dark mode.
+- [ ] Check hover/focus/active states for permission cells, badges and pagination in both themes.
+- [ ] Smoke Content, Files, Users, Data Model, Roles and Branding once in Light and once in Dark for any remaining hard-coded light surface.
 
-- [ ] Confirm sidebar hierarchy is visually correct: Content/Files/Settings are primary-level destinations; collection/settings children are smaller/subordinate rather than larger than their parents.
-- [ ] Confirm Files is a direct menu item and there is no one-item Library accordion.
-- [ ] Collapse/expand the sidebar and verify current collection/section context is preserved and icons remain understandable.
-- [ ] Create several collections with different icons; verify selected icons render next to collections under Content.
-- [ ] Hide a collection in Data Model Overview; it must disappear from Content without deleting schema/data and reappear when enabled again.
-- [ ] Reorder collections both with drag-and-drop and Move up/Move down; verify Content sidebar order updates, normalized sort metadata is persisted and order survives page reload.
-- [ ] While collection search is active, verify drag ordering is disabled so filtered-list drops cannot accidentally rewrite the full order.
-- [ ] Specifically test two or more legacy collections that previously had no metadata sort value; first drag or move must persist rather than becoming a no-op.
-- [ ] Check keyboard focus/accordion behavior and narrow-screen sidebar layout.
+## 7. Logo / favicon Files modal
 
-## 7. Data Model V2 browser smoke
+- [ ] Branding & Appearance must show compact Logo and Favicon asset summaries, not an inline dump of the full Files library.
+- [ ] Clicking **Select from Files** must open a modal that lists only images, supports search and renders 12 items per page.
+- [ ] Seed at least 100 images and verify the settings page remains compact and the modal paginates rather than rendering all 100 candidates at once.
+- [ ] Select a logo, save, sign out/reload login and verify `/studio-settings/logo` renders that exact image before authentication.
+- [ ] Select a favicon, save and verify the browser tab switches to `/studio-settings/favicon` without a full application restart.
+- [ ] With no custom favicon, verify the initial HTML uses the Yunsoft `light-icon.png` default.
+- [ ] Delete selected logo/favicon Files and verify their FKs become `NULL` and Studio returns to default assets.
+- [ ] Confirm non-image Files and arbitrary external logo URLs are rejected by the service even through raw API requests.
+- [ ] In separate-origin development with `VITE_API_URL`, verify custom logo/favicon assets are fetched from the API origin rather than the Vite origin.
+- [ ] Verify public logo/favicon responses use `no-cache, must-revalidate` and CSP `sandbox` while arbitrary Files remain protected.
 
-- [ ] Verify the left side is a straightforward project/system collection list with search and no unnecessary collection pagination/sort controls.
-- [ ] Selecting a collection opens a single workspace with Overview / Fields / Relations tabs.
-- [ ] New collection flow exposes name, description, Content visibility, searchable icon selection and the four recommended accountability fields without unnecessary database jargon.
-- [ ] Overview allows description, Content visibility, icon and sidebar order changes from one place.
-- [ ] Icon search returns sensible icons and selection survives save/reload/sidebar navigation.
-- [ ] Fields tab opens the grouped visual field builder and existing fields remain readable/compact on normal desktop width.
-- [ ] Relations tab can create M2O, O2O and M2M relationships, summarize existing relations, and delete direct/O2O/M2M relationships without losing the underlying field where applicable.
-- [ ] Verify no separate Content Visibility navigation item remains necessary for normal collection visibility management.
-- [ ] Walk the new screen in English and Turkish; no raw `dataModel.*`, `appearance.*`, `fieldBuilder.*` or `collectionBuilder.*` translation keys may leak.
+## 8. Data Model / navigation browser smoke
 
-## 8. System collection custom fields
+- [ ] Verify project/system collection list remains simple, searchable and free of unnecessary pagination/sort widgets.
+- [ ] Selecting a collection opens `Overview / Fields / Relations` in one workspace.
+- [ ] New collection flow exposes Display name, API key, description, Content visibility, searchable icon and recommended accountability fields in understandable order.
+- [ ] Overview can change human display name, description, visibility, icon and sidebar order without changing collection key.
+- [ ] Fields tab shows human field labels with machine keys secondary and can add fields through the grouped builder.
+- [ ] Relations tab creates/deletes M2O, O2O and M2M and shows human labels in selectors while submitting machine identifiers.
+- [ ] Hide/show a collection and verify Content sidebar updates without schema/data deletion.
+- [ ] Reorder collections by drag-and-drop and move buttons; order must persist after reload. Drag must remain disabled while collection search is filtering the list.
+- [ ] Walk Data Model in EN/TR and ensure no raw localization keys leak.
 
-- [ ] As an Administrator/schema manager, open registered system collections `yuncms_users`, `yuncms_files`, `yuncms_roles` in Data Model and verify Add custom field is available.
-- [ ] Confirm the system collection field builder does **not** offer a Required toggle for new custom system fields.
-- [ ] Attempt raw API creation with `required: true`; it must fail with `SYSTEM_EXTENSION_REQUIRED_UNSUPPORTED` before DDL.
-- [ ] Add a harmless optional test field to each supported system collection; inspect physical MySQL column + `yuncms_fields` metadata with `systemExtension: true`.
-- [ ] Attempt the bounded system-field endpoint against internal system collections such as sessions/tokens/permissions/audit; it must fail closed with `SYSTEM_SCHEMA_READ_ONLY`.
-- [ ] Attempt the endpoint as a non-schema-manager; it must fail authorization before DDL.
-- [ ] Force/observe a metadata failure in a disposable DB and verify physical added-column compensation removes the partial field.
-- [ ] Confirm native system fields remain protected and cannot be altered/deleted through the generic dynamic schema API.
-- [ ] Note current V1 boundary: custom system columns are schema extensions, but specialized Users/Files/Roles record screens do not yet provide generic value editors for those extension fields. Do not treat value-editing support as verified until it is implemented separately.
+## 9. System collection extension fields
 
-## 9. Existing schema/content regression
+- [ ] As schema manager, add naturally named optional custom fields to `yuncms_users`, `yuncms_files`, `yuncms_roles`; verify normalized key + human name + physical column + `systemExtension: true` metadata.
+- [ ] System field builder must not expose Required for these additions; raw `required:true` must fail `SYSTEM_EXTENSION_REQUIRED_UNSUPPORTED` before DDL.
+- [ ] Internal sessions/tokens/permissions/audit system collections must reject the bounded endpoint with `SYSTEM_SCHEMA_READ_ONLY`.
+- [ ] Non-schema-manager must fail authorization before DDL.
+- [ ] Force a metadata failure in disposable DB and verify compensation removes the added physical column.
+- [ ] Native system fields must remain protected.
+- [ ] Current V1 boundary remains: specialized Users/Files/Roles screens do not yet generically edit values of newly added extension columns.
 
-- [ ] Create a project collection with default `created_at`, `updated_at`, `created_by`, `updated_by`; verify physical defaults/FKs and actor stamping on create/update.
-- [ ] Create Timestamp/Date & time fields with fixed/current-time/auto-update settings and verify MySQL definitions.
-- [ ] Create File/Image fields and verify picker/upload/preview persistence.
-- [ ] Create O2O, enforce duplicate-target rejection, then remove it and verify FK/UNIQUE cleanup.
-- [ ] Re-run Content search/filter/sort/pagination after Data Model/navigation metadata changes.
-- [ ] Re-check Users create behavior: management-created users are immediately verified and can log in without email verification.
+## 10. Existing data / relation regression
 
-## 10. Deployment-only hardening
+- [ ] Create a project collection with `created_at`, `updated_at`, `created_by`, `updated_by`; verify physical defaults/FKs and actor stamping.
+- [ ] Create timestamp/date-time fields with fixed/current-time/auto-update behavior and verify MySQL definitions.
+- [ ] Create File/Image fields and verify picker/upload/full preview persistence.
+- [ ] Create O2O, confirm duplicate-target rejection, then delete it and verify FK/UNIQUE cleanup.
+- [ ] Re-run Content search/filter/sort/pagination after name/metadata changes.
+- [ ] Re-check management-created Users remain immediately verified and can sign in without an email verification wait.
+
+## 11. Documentation smoke
+
+- [ ] Follow README quick start in a clean checkout and confirm commands/URLs match reality.
+- [ ] Run representative examples from `docs/api-query-language.md`: field selection, nested AND/OR filter, IN, NULL, text contains, multi-sort, pagination and direct expand.
+- [ ] Run representative schema examples from `docs/rest-api.md`, including natural display names and stable API keys.
+
+## 12. Deployment-only hardening
 
 - [ ] Behind the actual reverse proxy configure exact `TRUST_PROXY_HOPS` and verify client IP/rate-limit behavior.
 - [ ] Configure/verify HSTS at the real TLS/reverse-proxy layer.
-- [ ] If production uses S3-compatible storage, verify upload/list/download/delete, branding logo reads, reconciliation and redacted provider errors against the actual provider.
+- [ ] If production uses S3-compatible storage, verify upload/list/download/delete, full previews, branding logo/favicon reads, reconciliation and redacted provider errors against the actual provider.
 
-## 11. Final release decision
+## 13. Final release decision
 
-- [ ] Only after applicable checks above are removed as successfully completed should this exact branch state be called deployment-verified production ready.
+- [ ] Only after applicable checks above are removed as successfully completed should this exact source state be called deployment-verified production ready.
