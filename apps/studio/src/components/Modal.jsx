@@ -14,10 +14,12 @@ export function Modal({
   open,
   title,
   description,
+  eyebrow = 'Confirmation',
   children,
   actions,
   onClose,
   initialFocusRef,
+  className = '',
 }) {
   const titleId = useId();
   const descriptionId = useId();
@@ -82,7 +84,7 @@ export function Modal({
     >
       <section
         ref={dialogRef}
-        className="modal-card"
+        className={`modal-card ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -91,7 +93,7 @@ export function Modal({
         onKeyDown={handleKeyDown}
       >
         <div className="modal-heading">
-          <p className="eyebrow">Confirmation</p>
+          {eyebrow && <p className="eyebrow">{eyebrow}</p>}
           <h2 id={titleId}>{title}</h2>
           {description && <p id={descriptionId}>{description}</p>}
         </div>
