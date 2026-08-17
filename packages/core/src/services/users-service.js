@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { hashPassword } from '../auth/password.js';
 import { withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
+import { resolveSystemResourceAccess } from './system-resource-access.js';
 
 const USER_STATUSES = new Set(['active', 'suspended', 'disabled']);
 const USER_UPDATE_KEYS = new Set(['email', 'role', 'status']);
@@ -22,11 +23,10 @@ function normalizeEmail(email) {
   return normalized;
 }
 
-function assertUserManager(accountability) {
-  if (accountability.admin === true || accountability.system === true) return;
-  const error = new Error('User management requires administrator accountability');
+function forbidden(message) {
+  const error = new Error(message);
   error.code = 'FORBIDDEN';
-  throw error;
+  return error;
 }
 
 function assertStatus(status) {
@@ -38,19 +38,49 @@ function assertStatus(status) {
   return status;
 }
 
-async function assertRoleExists(database, role) {
+async function assertRoleAssignable(database, role, accountability) {
   if (role == null) return;
-  const [roleRows] = await database.query('SELECT id FROM yuncms_roles WHERE id = ? LIMIT 1', [role]);
-  if (!roleRows[0]) {
+  const [roleRows] = await database.query(
+    'SELECT id, admin, public FROM yuncms_roles WHERE id = ? LIMIT 1',
+    [role],
+  );
+  const targetRole = roleRows[0];
+  if (!targetRole) {
     const error = new Error(`Unknown role: ${role}`);
     error.code = 'ROLE_NOT_FOUND';
     throw error;
   }
+  if (targetRole.public) {
+    const error = new Error('The public role cannot be assigned to an authenticated user');
+    error.code = 'INVALID_ROLE';
+    throw error;
+  }
+  if (targetRole.admin && accountability.admin !== true && accountability.system !== true) {
+    throw forbidden('Only an administrator can assign the administrator role');
+  }
+}
+
+async function assertTargetManageable(database, id, accountability) {
+  if (accountability.admin === true || accountability.system === true) return;
+  const [rows] = await database.query(
+    `SELECT u.id, r.admin AS role_admin
+     FROM yuncms_users u
+     LEFT JOIN yuncms_roles r ON r.id = u.role
+     WHERE u.id = ?
+     LIMIT 1`,
+    [id],
+  );
+  if (!rows[0]) {
+    const error = new Error(`Unknown user: ${id}`);
+    error.code = 'USER_NOT_FOUND';
+    throw error;
+  }
+  if (rows[0].role_admin) throw forbidden('Delegated user managers cannot modify administrator accounts');
 }
 
 export class UsersService extends BaseService {
   async readMany() {
-    assertUserManager(this.accountability);
+    await resolveSystemResourceAccess(this, 'read', 'yuncms_users');
     const [rows] = await this.database.query(
       `SELECT id, email, role, status, email_verified_at, last_access, created_at, updated_at
        FROM yuncms_users
@@ -61,7 +91,7 @@ export class UsersService extends BaseService {
 
   async readOne(id) {
     const self = this.accountability.user === id;
-    if (!self) assertUserManager(this.accountability);
+    if (!self) await resolveSystemResourceAccess(this, 'read', 'yuncms_users');
 
     const [rows] = await this.database.query(
       `SELECT id, email, role, status, email_verified_at, last_access, created_at, updated_at
@@ -74,10 +104,10 @@ export class UsersService extends BaseService {
   }
 
   async createOne(input = {}) {
-    assertUserManager(this.accountability);
+    await resolveSystemResourceAccess(this, 'create', 'yuncms_users');
     const email = normalizeEmail(input.email);
     const status = assertStatus(input.status ?? 'active');
-    await assertRoleExists(this.database, input.role ?? null);
+    await assertRoleAssignable(this.database, input.role ?? null, this.accountability);
 
     const passwordHash = await hashPassword(input.password);
     const id = randomUUID();
@@ -98,7 +128,8 @@ export class UsersService extends BaseService {
   }
 
   async updateOne(id, patch = {}) {
-    assertUserManager(this.accountability);
+    await resolveSystemResourceAccess(this, 'update', 'yuncms_users');
+    await assertTargetManageable(this.database, id, this.accountability);
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
       const error = new Error('User patch must be an object');
       error.code = 'INVALID_PAYLOAD';
@@ -114,12 +145,14 @@ export class UsersService extends BaseService {
     if (Object.hasOwn(patch, 'status')) {
       assertStatus(patch.status);
       if (this.accountability.user === id && patch.status !== 'active') {
-        const error = new Error('An administrator cannot suspend or disable their own active session');
+        const error = new Error('A user cannot suspend or disable their own active session');
         error.code = 'SELF_ADMIN_MUTATION_FORBIDDEN';
         throw error;
       }
     }
-    if (Object.hasOwn(patch, 'role')) await assertRoleExists(this.database, patch.role);
+    if (Object.hasOwn(patch, 'role')) {
+      await assertRoleAssignable(this.database, patch.role, this.accountability);
+    }
 
     return withTransaction(this.database, async (connection) => {
       const assignments = [];
@@ -163,9 +196,10 @@ export class UsersService extends BaseService {
   }
 
   async deleteOne(id) {
-    assertUserManager(this.accountability);
+    await resolveSystemResourceAccess(this, 'delete', 'yuncms_users');
+    await assertTargetManageable(this.database, id, this.accountability);
     if (this.accountability.user === id) {
-      const error = new Error('An administrator cannot delete their own user account');
+      const error = new Error('A user cannot delete their own account from an active session');
       error.code = 'SELF_ADMIN_MUTATION_FORBIDDEN';
       throw error;
     }
@@ -177,39 +211,4 @@ export class UsersService extends BaseService {
     }
     return true;
   }
-
-  async updatePassword(id, password) {
-    const self = this.accountability.user === id;
-    if (!self) assertUserManager(this.accountability);
-
-    const passwordHash = await hashPassword(password);
-    const connection = await this.database.getConnection();
-
-    try {
-      await connection.beginTransaction();
-      const [result] = await connection.query(
-        'UPDATE yuncms_users SET password_hash = ? WHERE id = ?',
-        [passwordHash, id],
-      );
-      if (result.affectedRows !== 1) {
-        const error = new Error(`Unknown user: ${id}`);
-        error.code = 'USER_NOT_FOUND';
-        throw error;
-      }
-      await connection.query('DELETE FROM yuncms_sessions WHERE user = ?', [id]);
-      await connection.commit();
-      return true;
-    } catch (error) {
-      try {
-        await connection.rollback();
-      } catch (rollbackError) {
-        error.rollbackError = rollbackError;
-      }
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
 }
-
-export { normalizeEmail };
