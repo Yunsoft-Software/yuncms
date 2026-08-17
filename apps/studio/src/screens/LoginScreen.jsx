@@ -1,8 +1,11 @@
 import { useState } from 'react';
 
 import { apiRequest, login } from '../api.js';
+import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/StudioBrand.jsx';
+import { useI18n } from '../i18n.js';
 
 export function LoginScreen({ onAuthenticated }) {
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [resetMode, setResetMode] = useState(false);
@@ -21,14 +24,14 @@ export function LoginScreen({ onAuthenticated }) {
           method: 'POST',
           body: { email },
         }, { retryAuth: false });
-        setNotice('If an active account matches this email, a reset link will be sent.');
+        setNotice(t('auth.resetNotice'));
         return;
       }
 
       const session = await login(email, password);
       onAuthenticated(session);
     } catch (requestError) {
-      setError(requestError.message || (resetMode ? 'Request failed' : 'Sign in failed'));
+      setError(requestError.message || (resetMode ? t('auth.requestFailed') : t('auth.signInFailed')));
     } finally {
       setSubmitting(false);
     }
@@ -36,61 +39,66 @@ export function LoginScreen({ onAuthenticated }) {
 
   return (
     <main className="auth-layout">
-      <section className="auth-card" aria-labelledby="login-title">
-        <div>
-          <p className="eyebrow">YunCMS Studio</p>
-          <h1 id="login-title">{resetMode ? 'Reset password' : 'Sign in'}</h1>
-          <p className="lede">
-            {resetMode
-              ? 'Enter your account email to request a one-time reset link.'
-              : 'Use an administrator account to manage schema, content, users and permissions.'}
-          </p>
+      <div className="auth-shell">
+        <div className="auth-branding">
+          <StudioBrand />
+          <LanguageSwitcher compact />
         </div>
+        <section className="auth-card" aria-labelledby="login-title">
+          <div>
+            <p className="eyebrow">YunCMS {t('app.studio')}</p>
+            <h1 id="login-title">{resetMode ? t('auth.resetPassword') : t('auth.signIn')}</h1>
+            <p className="lede">
+              {resetMode ? t('auth.resetDescription') : t('auth.signInDescription')}
+            </p>
+          </div>
 
-        <form className="form-stack" onSubmit={handleSubmit}>
-          <label className="field-label">
-            <span>Email</span>
-            <input
-              autoComplete="username"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </label>
-
-          {!resetMode && (
+          <form className="form-stack" onSubmit={handleSubmit}>
             <label className="field-label">
-              <span>Password</span>
+              <span>{t('auth.email')}</span>
               <input
-                autoComplete="current-password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="username"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 required
               />
             </label>
-          )}
 
-          {error && <div className="error-banner" role="alert">{error}</div>}
-          {notice && <div className="notice-banner" role="status">{notice}</div>}
+            {!resetMode && (
+              <label className="field-label">
+                <span>{t('auth.password')}</span>
+                <input
+                  autoComplete="current-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+              </label>
+            )}
 
-          <button className="primary-button" type="submit" disabled={submitting}>
-            {submitting ? 'Working…' : (resetMode ? 'Send reset link' : 'Sign in')}
-          </button>
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => {
-              setResetMode((current) => !current);
-              setError('');
-              setNotice('');
-            }}
-          >
-            {resetMode ? 'Back to sign in' : 'Forgot password?'}
-          </button>
-        </form>
-      </section>
+            {error && <div className="error-banner" role="alert">{error}</div>}
+            {notice && <div className="notice-banner" role="status">{notice}</div>}
+
+            <button className="primary-button" type="submit" disabled={submitting}>
+              {submitting ? t('auth.working') : (resetMode ? t('auth.sendResetLink') : t('auth.signIn'))}
+            </button>
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => {
+                setResetMode((current) => !current);
+                setError('');
+                setNotice('');
+              }}
+            >
+              {resetMode ? t('auth.backToSignIn') : t('auth.forgotPassword')}
+            </button>
+          </form>
+        </section>
+        <div className="auth-footer"><YunsoftFooter /></div>
+      </div>
     </main>
   );
 }
