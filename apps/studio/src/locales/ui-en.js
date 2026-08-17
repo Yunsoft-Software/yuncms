@@ -18,6 +18,7 @@ export const UI_EN = Object.freeze({
   'fieldType.uuid': 'UUID',
   'fieldType.file': 'File',
   'fieldType.image': 'Image',
+  'fieldType.user': 'User',
 
   'fieldBuilder.title': 'Create a field',
   'fieldBuilder.description': 'Choose what the field represents first, then configure only the options that matter for that type.',
