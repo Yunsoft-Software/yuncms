@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { compileFieldColumn } from '../src/field-types.js';
+
+const fieldsServiceSource = readFileSync(
+  resolve(import.meta.dirname, '../src/services/fields-service.js'),
+  'utf8',
+);
 
 test('timestamp fields support current-time default and automatic update', () => {
   const compiled = compileFieldColumn({
@@ -39,4 +46,11 @@ test('current-time automation is rejected for incompatible types', () => {
     () => compileFieldColumn({ type: 'timestamp', defaultValue: 'x', defaultPreset: 'now' }),
     (error) => error.code === 'INVALID_FIELD_DEFAULT',
   );
+});
+
+test('physical field edits preserve timestamp presets and protect system-managed fields', () => {
+  assert.match(fieldsServiceSource, /schemaMetadata\.defaultPreset/);
+  assert.match(fieldsServiceSource, /schemaMetadata\.autoUpdate === true/);
+  assert.match(fieldsServiceSource, /function assertFieldNotSystemManaged/);
+  assert.match(fieldsServiceSource, /removeDefaultPreset/);
 });
