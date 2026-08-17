@@ -8,6 +8,8 @@ import {
 } from '@yunsoft/yuncms-core';
 import { createApp } from '../src/app.js';
 
+const LOGO_FILE_ID = '123e4567-e89b-42d3-a456-426614174000';
+
 class PublicAuthService {
   async resolvePublicAccountability() {
     return createPublicAccountability({ role: 'public-role' });
@@ -18,18 +20,28 @@ class PublicAuthService {
   }
 }
 
-function settingsDatabase() {
+function settingsDatabase({ logoFile = null } = {}) {
   return {
-    async query(sql) {
+    async query(sql, params = []) {
       if (sql.includes('FROM yuncms_studio_settings')) {
         return [[{
           brand_name: 'YunCMS',
           logo_url: 'https://yunsoft.com/light-logo.png',
-          logo_file: null,
+          logo_file: logoFile,
           accent_color: '#2563eb',
           theme: 'system',
           default_locale: 'en',
           updated_at: null,
+        }], []];
+      }
+      if (sql.includes('FROM yuncms_files')) {
+        assert.deepEqual(params, [LOGO_FILE_ID]);
+        return [[{
+          id: LOGO_FILE_ID,
+          storage: 'local',
+          filename_disk: 'branding-logo.svg',
+          mimetype: 'image/svg+xml',
+          filesize: 6,
         }], []];
       }
       throw new Error(`Unexpected database query: ${sql}`);
@@ -37,8 +49,8 @@ function settingsDatabase() {
   };
 }
 
-async function withServer(operation) {
-  const pool = settingsDatabase();
+async function withServer(operation, { logoFile = null, storage = null } = {}) {
+  const pool = settingsDatabase({ logoFile });
   const registry = createServiceRegistry({
     AuthService: PublicAuthService,
     StudioSettingsService,
@@ -50,6 +62,7 @@ async function withServer(operation) {
       storage: { maxUploadBytes: 1024 },
       auth: { rateLimit: {} },
     },
+    storage,
     serviceRegistry: registry,
     logger: { info() {}, warn() {}, error() {} },
   });
@@ -79,6 +92,28 @@ test('anonymous Studio can read safe display settings before login', async () =>
       updated_at: null,
     });
   });
+});
+
+test('anonymous Studio can read only the configured file-backed branding image', async () => {
+  const bytes = Buffer.from('<svg/>');
+  const storage = {
+    get(name) {
+      assert.equal(name, 'local');
+      return {
+        async get(key) {
+          assert.equal(key, 'branding-logo.svg');
+          return bytes;
+        },
+      };
+    },
+  };
+
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/studio-settings/logo`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type') || '', /image\/svg\+xml/);
+    assert.equal(Buffer.from(await response.arrayBuffer()).toString(), bytes.toString());
+  }, { logoFile: LOGO_FILE_ID, storage });
 });
 
 test('anonymous Studio cannot mutate branding settings', async () => {
