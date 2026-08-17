@@ -38,6 +38,11 @@ function assertStatus(status) {
   return status;
 }
 
+function assertCredentialManager(accountability) {
+  if (accountability.admin === true || accountability.system === true) return;
+  throw forbidden('Changing another user password requires administrator accountability');
+}
+
 async function assertRoleAssignable(database, role, accountability) {
   if (role == null) return;
   const [roleRows] = await database.query(
@@ -114,6 +119,7 @@ export class UsersService extends BaseService {
 
     const passwordHash = await hashPassword(input.password);
     const id = randomUUID();
+    const verifiedAt = new Date();
     await this.database.query(
       `INSERT INTO yuncms_users (id, email, password_hash, role, status, email_verified_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -123,7 +129,7 @@ export class UsersService extends BaseService {
         passwordHash,
         input.role ?? null,
         status,
-        input.emailVerified === true ? new Date() : null,
+        verifiedAt,
       ],
     );
 
@@ -214,4 +220,39 @@ export class UsersService extends BaseService {
     }
     return true;
   }
+
+  async updatePassword(id, password) {
+    const self = this.accountability.user === id;
+    if (!self) assertCredentialManager(this.accountability);
+
+    const passwordHash = await hashPassword(password);
+    const connection = await this.database.getConnection();
+
+    try {
+      await connection.beginTransaction();
+      const [result] = await connection.query(
+        'UPDATE yuncms_users SET password_hash = ? WHERE id = ?',
+        [passwordHash, id],
+      );
+      if (result.affectedRows !== 1) {
+        const error = new Error(`Unknown user: ${id}`);
+        error.code = 'USER_NOT_FOUND';
+        throw error;
+      }
+      await connection.query('DELETE FROM yuncms_sessions WHERE user = ?', [id]);
+      await connection.commit();
+      return true;
+    } catch (error) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        error.rollbackError = rollbackError;
+      }
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
 }
+
+export { normalizeEmail };
