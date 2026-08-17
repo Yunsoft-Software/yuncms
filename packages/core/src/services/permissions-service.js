@@ -3,6 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { assertPermissionValidationRule } from '../permission-validation.js';
 import { compileFilter } from '../query.js';
 import { SchemaCache } from '../schema.js';
+import {
+  assertActionOnlyPermissionPayload,
+  assertSystemResourceAction,
+  isPermissionManagedSystemResource,
+} from '../system-permissions.js';
 import { BaseService } from './base-service.js';
 
 const ACTIONS = new Set(['create', 'read', 'update', 'delete']);
@@ -81,6 +86,17 @@ export class PermissionsService extends BaseService {
     this.schemaCache = options.schemaCache ?? defaultSchemaCache;
   }
 
+  async #collectionSchema(collection) {
+    const snapshot = this.schema ?? await this.schemaCache.get(this.database);
+    const collectionSchema = snapshot.collections?.[collection];
+    if (!collectionSchema) {
+      const error = new Error(`Unknown permission collection: ${collection}`);
+      error.code = 'COLLECTION_NOT_FOUND';
+      throw error;
+    }
+    return collectionSchema;
+  }
+
   async resolve(action, collection) {
     assertAction(action);
     const key = cacheKey(this.accountability, action, collection);
@@ -100,6 +116,19 @@ export class PermissionsService extends BaseService {
     } else {
       if (!this.accountability.role) {
         throw forbidden(`No role is available for ${action} access to ${collection}`);
+      }
+
+      const collectionSchema = await this.#collectionSchema(collection);
+      if (collectionSchema.system) {
+        if (!isPermissionManagedSystemResource(collectionSchema)) {
+          throw forbidden(`System resource is not delegatable: ${collection}`);
+        }
+        try {
+          assertSystemResourceAction(collectionSchema, action);
+        } catch (error) {
+          if (error.code === 'SYSTEM_PERMISSION_ACTION_PROTECTED') throw forbidden(error.message);
+          throw error;
+        }
       }
 
       const [rows] = await this.database.query(
@@ -154,17 +183,6 @@ export class PermissionsService extends BaseService {
     return normalizePermissionRow(rows[0]);
   }
 
-  async #collectionSchema(collection) {
-    const snapshot = this.schema ?? await this.schemaCache.get(this.database);
-    const collectionSchema = snapshot.collections?.[collection];
-    if (!collectionSchema) {
-      const error = new Error(`Unknown permission collection: ${collection}`);
-      error.code = 'COLLECTION_NOT_FOUND';
-      throw error;
-    }
-    return collectionSchema;
-  }
-
   async createOne(input = {}) {
     assertPermissionManager(this.accountability);
     const action = assertAction(input.action);
@@ -180,6 +198,16 @@ export class PermissionsService extends BaseService {
     }
 
     const collectionSchema = await this.#collectionSchema(input.collection);
+    if (collectionSchema.system) {
+      if (!isPermissionManagedSystemResource(collectionSchema)) {
+        const error = new Error(`System resource permissions are protected: ${input.collection}`);
+        error.code = 'SYSTEM_PERMISSION_RESOURCE_PROTECTED';
+        throw error;
+      }
+      assertSystemResourceAction(collectionSchema, action);
+      assertActionOnlyPermissionPayload(collectionSchema, input);
+    }
+
     const fields = normalizePermissionFields(input.fields ?? null, collectionSchema);
     const filter = input.filter ?? null;
     const validation = input.validation ?? null;
@@ -187,12 +215,18 @@ export class PermissionsService extends BaseService {
     assertPermissionValidationRule(validation, collectionSchema);
 
     const [roleRows] = await this.database.query(
-      'SELECT id FROM yuncms_roles WHERE id = ? LIMIT 1',
+      'SELECT id, admin, public FROM yuncms_roles WHERE id = ? LIMIT 1',
       [input.role],
     );
-    if (!roleRows[0]) {
+    const role = roleRows[0];
+    if (!role) {
       const error = new Error(`Unknown permission role: ${input.role}`);
       error.code = 'ROLE_NOT_FOUND';
+      throw error;
+    }
+    if (collectionSchema.system && role.public) {
+      const error = new Error('Public role cannot be granted access to protected system resources');
+      error.code = 'PUBLIC_SYSTEM_ACCESS_FORBIDDEN';
       throw error;
     }
 
@@ -235,6 +269,7 @@ export class PermissionsService extends BaseService {
       throw error;
     }
     const collectionSchema = await this.#collectionSchema(existing.collection);
+    if (collectionSchema.system) assertActionOnlyPermissionPayload(collectionSchema, patch);
 
     const assignments = [];
     const params = [];
