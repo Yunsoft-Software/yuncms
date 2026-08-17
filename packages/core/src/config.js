@@ -33,12 +33,13 @@ export function loadEnvFileIfPresent(path = '.env') {
 }
 
 export function loadConfig(env = process.env) {
-  const studioOrigin = readString(env.STUDIO_ORIGIN, 'http://localhost:5173');
+  const serverPort = readInteger(env.PORT, 3008, 'PORT', { min: 1, max: 65535 });
+  const studioOrigin = readString(env.STUDIO_ORIGIN, `http://localhost:${serverPort}`);
 
   return {
     server: {
       host: readString(env.HOST, '127.0.0.1'),
-      port: readInteger(env.PORT, 3008, 'PORT', { min: 1, max: 65535 }),
+      port: serverPort,
       studioOrigin,
     },
     logging: {
