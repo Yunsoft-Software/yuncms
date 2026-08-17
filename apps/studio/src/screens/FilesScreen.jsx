@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiBlob, apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
 import { FilePreview } from '../components/FilePreview.jsx';
+import { FilePreviewModal } from '../components/FilePreviewModal.jsx';
 import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
 import { useI18n } from '../i18n.js';
 
@@ -83,6 +84,7 @@ export function FilesScreen() {
   const requestConfirmation = useConfirmDialog();
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [previewFile, setPreviewFile] = useState(null);
   const [view, setView] = useState('grid');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -233,6 +235,7 @@ export function FilesScreen() {
     try {
       await apiRequest(`/files/${encodeURIComponent(file.id)}`, { method: 'DELETE' });
       if (editingFile?.id === file.id) setEditingFile(null);
+      if (previewFile?.id === file.id) setPreviewFile(null);
       setNotice(t('files.deletedNotice'));
       await load();
     } catch (requestError) {
@@ -254,7 +257,7 @@ export function FilesScreen() {
       <section className="panel library-toolbar workspace-toolbar library-header-panel">
         <div className="workspace-toolbar-heading">
           <div>
-            <p className="eyebrow">{t('nav.library')}</p>
+            <p className="eyebrow">{t('nav.files')}</p>
             <h2>{t('nav.files')}</h2>
             <p>{files.length === 0 ? t('files.libraryEmptyDescription') : t('files.libraryCount', { count: files.length })}</p>
           </div>
@@ -386,7 +389,14 @@ export function FilesScreen() {
             {pageFiles.map((file) => (
               <article className="file-card" key={file.id}>
                 <div className="file-preview">
-                  <FilePreview file={file} label={fileTypeLabel(file, t)} alt={fileDisplayName(file, t)} />
+                  <button
+                    className="file-preview-open-button"
+                    type="button"
+                    onClick={() => setPreviewFile(file)}
+                    aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}
+                  >
+                    <FilePreview file={file} label={fileTypeLabel(file, t)} alt={fileDisplayName(file, t)} />
+                  </button>
                 </div>
                 <div className="file-card-body">
                   <div className="file-card-title">
@@ -398,6 +408,7 @@ export function FilesScreen() {
                     <span>{formatBytes(file.filesize)}</span>
                   </div>
                   <div className="file-card-actions">
+                    <button className="text-button" type="button" onClick={() => setPreviewFile(file)}>{t('files.preview')}</button>
                     <button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button>
                     <button className="text-button" type="button" onClick={() => beginEdit(file)}>{t('common.edit')}</button>
                     <button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button>
@@ -426,7 +437,9 @@ export function FilesScreen() {
                   <tr key={file.id}>
                     <td>
                       <div className="file-list-name">
-                        <div className="file-list-thumb"><FilePreview file={file} label={fileTypeLabel(file, t)} /></div>
+                        <button className="file-list-thumb file-preview-open-button" type="button" onClick={() => setPreviewFile(file)} aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}>
+                          <FilePreview file={file} label={fileTypeLabel(file, t)} />
+                        </button>
                         <span><strong>{fileDisplayName(file, t)}</strong><small>{file.filename_download}</small></span>
                       </div>
                     </td>
@@ -435,6 +448,7 @@ export function FilesScreen() {
                     <td>{file.storage}</td>
                     <td>{file.uploaded_at ? new Date(file.uploaded_at).toLocaleString(dateLocale) : '—'}</td>
                     <td className="row-actions">
+                      <button className="text-button" type="button" onClick={() => setPreviewFile(file)}>{t('files.preview')}</button>
                       <button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button>
                       <button className="text-button" type="button" onClick={() => beginEdit(file)}>{t('common.edit')}</button>
                       <button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button>
@@ -455,6 +469,8 @@ export function FilesScreen() {
           />
         </section>
       )}
+
+      <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
     </div>
   );
 }
