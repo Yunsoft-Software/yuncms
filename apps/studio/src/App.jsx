@@ -6,6 +6,7 @@ import { CollectionIcon } from './components/CollectionIcon.jsx';
 import { LanguageSwitcher, StudioBrand, YunsoftFooter } from './components/StudioBrand.jsx';
 import { SidebarIcon } from './components/SidebarIcon.jsx';
 import { useI18n } from './i18n.js';
+import { displaySchemaName } from './schema-name.js';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
 import { ContentScreen } from './screens/ContentScreen.jsx';
@@ -128,8 +129,12 @@ export function App() {
     return () => { cancelled = true; };
   }, [session?.user?.id, section]);
 
+  const activeContentCollection = contentCollections.find((entry) => entry.collection === contentCollection) ?? null;
+  const contentTitle = activeContentCollection
+    ? displaySchemaName(activeContentCollection, 'collection')
+    : contentCollection;
   const [title, description] = section === 'content'
-    ? [contentCollection || t('nav.content'), contentCollection
+    ? [contentTitle || t('nav.content'), contentCollection
       ? t('app.contentDescription')
       : t('app.contentEmpty')]
     : sectionCopy(section, t);
@@ -225,13 +230,14 @@ export function App() {
                 key={entry.collection}
                 className={`nav-item nav-item-child collection-nav-item ${section === 'content' && contentCollection === entry.collection ? 'active' : ''}`}
                 type="button"
+                title={entry.collection}
                 onClick={() => {
                   setContentCollection(entry.collection);
                   openSection('content', 'content');
                 }}
               >
                 <CollectionIcon name={collectionUi(entry).icon} size={16} />
-                <span className="nav-item-label">{entry.collection}</span>
+                <span className="nav-item-label">{displaySchemaName(entry, 'collection')}</span>
               </button>
             ))}
             {contentCollections.length === 0 && (
