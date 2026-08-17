@@ -48,8 +48,14 @@ test('Studio uses the shared dialog component instead of native browser dialogs'
 
   await collect(studioSource);
   const sources = await Promise.all(files.map((file) => readFile(file, 'utf8')));
+  const dataModelSource = await readFile(
+    new URL('../../../apps/studio/src/screens/DataModelV2Screen.jsx', import.meta.url),
+    'utf8',
+  );
   assert.ok(sources.some((source) => source.includes('role="dialog"')));
   assert.ok(sources.some((source) => source.includes('<DialogProvider>')));
+  assert.match(dataModelSource, /const confirmDialog = useConfirmDialog\(\);/);
+  assert.match(dataModelSource, /await confirmDialog\(\{/);
   for (const source of sources) {
     assert.doesNotMatch(source, /\b(?:window\.)?(?:alert|confirm|prompt)\s*\(/);
   }

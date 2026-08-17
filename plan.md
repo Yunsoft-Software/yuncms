@@ -139,6 +139,7 @@
 - [x] Core + Studio schema-name normalization tests.
 - [x] Human field-label/API-key payload tests.
 - [x] Data Model V2 label/key, ordering, relation and system-field source contracts.
+- [x] Shared Studio confirmation dialogs remain distinct from forbidden native browser dialogs.
 - [x] Files full-preview and contain-style UI contracts.
 - [x] File-backed logo/favicon service/API/client source contracts.
 - [x] Dark pagination/permission/badge surface contracts.
