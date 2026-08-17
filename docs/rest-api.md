@@ -56,6 +56,20 @@ DELETE /auth/tokens/:id
 
 Login, refresh and action-token endpoints use configurable process-local fixed-window rate limits. See `docs/auth.md` for token/session and SMTP behavior.
 
+## Studio settings / branding
+
+```text
+GET   /studio-settings
+GET   /studio-settings/logo
+PATCH /studio-settings
+```
+
+`GET /studio-settings` is public and returns display-only settings needed before login. `PATCH /studio-settings` is administrator/system-only.
+
+`GET /studio-settings/logo` is a deliberately narrow public asset route. It exposes only the image currently referenced by `yuncms_studio_settings.logo_file`; it is not a public arbitrary Files endpoint. If no Files-backed logo is configured the route returns not found and Studio falls back to built-in Yunsoft branding.
+
+Current Studio editing selects custom logos from existing image Files rather than accepting arbitrary external logo URLs.
+
 ## Items
 
 ```text
@@ -142,6 +156,14 @@ PATCH  /schema/collections/:collection/fields/:field/schema
 DELETE /schema/collections/:collection/fields/:field?destructive=true
 ```
 
+Bounded custom fields for registered permission-managed system collections:
+
+```text
+POST /schema/system-collections/:collection/fields
+```
+
+This dedicated endpoint currently accepts `yuncms_users`, `yuncms_files` and `yuncms_roles`, because those are the bounded system collections registered by migration `0007`. Internal sessions/tokens/permissions/audit tables remain non-extensible through this route. Native system fields remain protected; created fields are tagged as system extensions in metadata.
+
 Relations:
 
 ```text
@@ -150,6 +172,8 @@ GET    /schema/relations/:manyCollection/:manyField
 GET    /schema/collections/:collection/relations/o2m
 POST   /schema/relations/m2o
 DELETE /schema/relations/m2o/:manyCollection/:manyField
+POST   /schema/relations/o2o
+DELETE /schema/relations/o2o/:manyCollection/:manyField
 POST   /schema/relations/m2m
 DELETE /schema/relations/m2m/:junctionCollection?destructive=true
 ```
@@ -179,6 +203,8 @@ DELETE /permissions/:id
 ```
 
 Permissions support field allowlists, row filters and create/update prospective-record validation JSON. All enforcement lives in core services rather than route-only checks.
+
+Users created through the privileged UsersService management route are marked email-verified immediately. The separate verification-token flow remains available for existing/unverified accounts.
 
 ## Files
 
@@ -241,5 +267,6 @@ The API disables `X-Powered-By`, emits request ids, applies a narrow configured 
 - no GraphQL;
 - no bulk REST mutation endpoints even though bulk service methods exist;
 - no nested O2M/M2M expansion;
+- custom fields added to specialized system collections are schema extensions; specialized Users/Files/Roles record screens do not yet expose generic value editors for those extension fields;
 - no untrusted extension sandbox;
 - no automatic audit cleanup scheduler.
