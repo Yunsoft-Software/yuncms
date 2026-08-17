@@ -1,223 +1,71 @@
 # Environment / Manual TODO
 
-This file contains only work that cannot be truthfully verified from the GitHub-connector environment. Source/product roadmap work belongs in `plan.md`.
+This file intentionally contains only checks that cannot be truthfully completed from the GitHub-connector environment. Source/product status belongs in `plan.md`; completed historical verification does not need to stay duplicated here.
 
-## 0. Current production-readiness pass — re-run on branch `16-08-2026`
+## 1. Current branch verification
 
-These checks cover source added after the previously completed environment milestones.
+Run on branch `16-08-2026` with Node.js 24 LTS and installed dependencies.
 
-- [ ] On Node.js 24 with dependencies installed, run `npm run test:fast`; expect one concise successful stage line and no detailed output unless a test fails.
-- [ ] Run `npm test`; confirm the complete discovered core/API/CLI/extensions/Studio source suite passes.
-- [ ] Run `npm run test:release`; confirm the complete suite, Studio production build and all four `npm pack --dry-run` package contracts pass.
-- [ ] Against a disposable DB whose name contains `test`, `ci` or `dev`, run `YUNCMS_TEST_MYSQL=1 YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1 npm run test:release`; confirm the real MySQL/API integration flow passes and cleans up its temporary schema/data.
-- [ ] Upgrade a DB that has migrations `0001`–`0004`: confirm `yuncms start` refuses to listen until `yuncms bootstrap` applies `0005-default-public-role`.
-- [ ] After `0005`, confirm exactly one protected Public role exists and it has zero permission rows by default; rerun bootstrap and confirm idempotency.
-- [ ] In Roles & Permissions, grant Public a filtered/field-limited `Read` permission and verify anonymous reads expose only the intended rows/fields; remove it and verify anonymous access returns 403 again.
-- [ ] If public form submission is needed, grant Public only `Create` with a strict field allowlist/validation and verify anonymous create works while read/update/delete remain forbidden.
-- [ ] In Settings → Content Visibility, hide/show a normal collection and an M2M junction; confirm Content navigation updates while schema/data remain intact and junctions start hidden by default.
-- [ ] Send malformed JSON with a valid `X-Request-Id`; verify HTTP 400 `INVALID_PAYLOAD`, the same request id in response/error body, and no internal parser message leakage.
-- [ ] Verify caller request ids longer than 64 characters or containing unsafe characters are replaced with a UUID.
-- [ ] Behind the actual reverse proxy, set the exact `TRUST_PROXY_HOPS` and verify login/session IP plus auth rate-limit buckets use the intended client IP. Also confirm `TRUST_PROXY_HOPS=0` ignores forwarded client addresses when YunCMS is reached directly.
-- [ ] Repeat the refreshed Studio browser smoke after this pass, including Content Visibility, Public role configuration and narrow-screen behavior.
+- [ ] Run `npm run test:fast`; expect one concise success stage and detailed output only on failure.
+- [ ] Run `npm test`; confirm the complete discovered core/API/CLI/extensions/Studio source suite passes, including localization and Studio settings tests.
+- [ ] Run `npm run test:release`; confirm the full source suite, Studio production build and all publishable `npm pack --dry-run` contracts pass.
+- [ ] Confirm a fresh production Studio build has no unresolved translation-key text such as `content.*`, `roles.*`, `files.*` or `dataModel.*` rendered to the user.
 
-## 1. Fresh checkout / dependency graph
+## 2. Migration / real MySQL
 
-- [x] Switch to branch `16-08-2026` and confirm a clean working tree.
-- [x] Confirm Node.js 24 LTS with `node --version`.
-- [x] Run `npm install`; review `mysql2`, Express, React/Vite, AWS SDK and Nodemailer resolution.
-- [x] Review and commit the generated `package-lock.json` only after install succeeds without unintended dependency drift.
-- [x] Run `npm test`; fix real failures before checking any milestone.
-- [x] Run `npm run build --workspace=@yunsoft/yuncms-studio`.
-- [x] Run CLI help and confirm `init`, `bootstrap`, `start`, `help` only.
-- [x] Run `yuncms start`/workspace equivalent and verify child API keeps project cwd/env and shuts down cleanly.
+Use a disposable MySQL 8-compatible database only.
 
-## 2. Disposable MySQL 8 bootstrap
+- [ ] Upgrade a DB that currently has migrations `0001`–`0005`; verify `yuncms start` refuses to listen until `yuncms bootstrap` applies `0006-studio-settings`.
+- [ ] Verify `0006` creates exactly one `yuncms_studio_settings` row with YunCMS brand name, Yunsoft default logo, `#2563eb`, `system` theme and `en` locale; rerun bootstrap and confirm idempotency.
+- [ ] Run `YUNCMS_TEST_MYSQL=1 YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1 npm run test:release` against a disposable DB whose name contains `test`, `ci` or `dev`.
+- [ ] Re-check Public role fail-closed behavior, filtered/field-limited Public reads and optional validation-limited Public creates.
+- [ ] Re-check normal collection and M2M junction visibility toggles against real MySQL; schema/data must remain intact.
 
-Use disposable test data only.
-
-- [x] Create a least-privilege test DB user scoped to the YunCMS test database with required dynamic-DDL permissions.
-- [x] Copy `.env.example` to `.env`; configure test DB.
-- [x] Verify `mysql2/promise` connectivity and `SELECT 1`.
-- [x] Confirm API refuses to listen on an unbootstrapped DB with `DATABASE_MIGRATION_REQUIRED`.
-- [x] Run `yuncms bootstrap`; verify migrations `0001`–`0004` journal exactly once.
-- [x] Run bootstrap again and verify idempotent/no destructive change.
-- [x] Inspect core `yuncms_*` tables, indexes, FKs and schema-state row.
-- [x] Start API after bootstrap; verify `/health` and `/ready`.
-- [x] Confirm request ids correlate with structured JSON logs.
-
-## 3. Dynamic schema / compensation / concurrency
-
-- [x] Verify non-admin/non-system accountability cannot access schema services or `/schema` routes.
-- [x] Create collections and compare metadata with `INFORMATION_SCHEMA` including `id CHAR(36)` PK.
-- [x] Create each supported primitive field family; compare physical column and metadata.
-- [x] Verify metadata-only collection/field updates do not change physical schema.
-- [x] Verify field required/null/default/index mutations against real MySQL.
-- [x] Force field ALTER/index partial failure and verify compensation restores prior state without false schema-version increment.
-- [x] Verify `SET NULL` relation fields cannot be made required.
-- [x] Create/delete M2O; verify physical FK, metadata and restore compensation.
-- [x] Create M2M; verify junction table, two FKs, unique pair, two relation records and one schema-version increment.
-- [x] Delete M2M through `DELETE /schema/relations/m2m/:junction?destructive=true`; verify tombstone rename, metadata removal and final DROP.
-- [x] Force M2M metadata failure after tombstone rename and verify original junction table/data is restored.
-- [x] Verify collection/field delete requires explicit destructive intent and refuses system/related objects.
-- [x] Force collection/field metadata failure and verify tombstone restore with data intact.
-- [x] Force final tombstone cleanup failure and confirm explicit `SCHEMA_PARTIAL_FAILURE` drift details.
-- [x] Verify each successful schema mutation increments version exactly once and failed/compensated mutations do not.
-- [x] Verify `SchemaCache` observes only committed metadata/version pairs.
-- [x] Run concurrent schema mutations from two independent Node processes; verify `yuncms:schema` advisory serialization/timeouts.
-- [x] Exercise deadlock/lock-wait retry behavior against real MySQL.
-
-## 4. Generic CRUD / query / direct relation expansion
-
-- [x] Create/read/update/delete records through service and REST with explicit admin/system accountability.
-- [x] Verify UUID generation, required/read-only/default behavior.
-- [x] Verify fields/filter/sort/limit/offset/count against real MySQL.
-- [x] Cover `_and/_or`, `_in/_nin`, NULL and escaped LIKE cases.
-- [x] Attempt SQL injection through collection/field/sort/operator/value inputs; identifiers/operators must fail closed and values remain parameters.
-- [x] Verify `createMany()` fully rolls back when a later row fails.
-- [x] Verify bulk update/delete reject empty/missing caller filters.
-- [x] Verify `expand=<m2o_field>` replaces the FK with a readable target record.
-- [x] Verify source hidden/forbidden relation fields cannot be inferred via `expand`.
-- [x] Verify target row filters/field allowlists apply during expansion and inaccessible target rows become `null` rather than bypassing RBAC.
-- [x] Verify M2M/O2M expansion fails with the documented unsupported response rather than inventing nested data.
-- [x] Verify filter hooks run before validation/mutation and thrown filters prevent writes.
-- [x] Verify action hooks run only after successful mutation/commit; bulk-create actions run after the transaction commits.
-- [x] Verify recursive hook chains stop at `HOOK_RECURSION_LIMIT` without affecting unrelated requests.
-
-## 5. Authentication / sessions / recovery
-
-- [x] Run `yuncms init`; verify first admin creation and rerun does not silently create another admin.
-- [x] Verify valid login plus unknown-user/bad-password/inactive-user identical public credential behavior.
-- [x] Verify access/session expiry and disabled-user behavior.
-- [x] Verify refresh rotates both credentials; old refresh replay fails.
-- [x] Run concurrent refresh with the same token and verify only one succeeds.
-- [x] Verify logout-current and logout-all semantics.
-- [x] Change a password and confirm all sessions revoke transactionally.
-- [x] Create/list/revoke API tokens; verify secrets/hashes do not appear in list responses and disabled owner disables token auth.
-- [x] Verify reset token replacement, one-time consumption, sibling-token removal, session revocation and replay/expiry/wrong-prefix failure.
-- [x] Verify email verification is self/admin/system-only, consumes once and sets `email_verified_at`.
-- [x] Confirm every `/auth/*` response carries `Cache-Control: no-store`.
-
-### SMTP delivery
-
-- [x] Configure a disposable SMTP/test mailbox and verify reset mail delivery.
-- [x] Confirm reset-request response is indistinguishable for active/nonexistent email addresses.
-- [x] Confirm raw reset/verification tokens never appear in public request responses or structured logs.
-- [x] Follow Studio reset link, change password and confirm token query params are removed after completion.
-- [x] Send verification from Users UI, follow link and verify account state.
-- [x] Simulate SMTP failure; confirm unrelated API startup/traffic remains available and failure logging is redacted.
-
-### Rate limits
-
-- [x] Exceed login/refresh/action limits and verify HTTP 429, `Retry-After` and rate-limit headers.
-- [x] Confirm a new window restores access.
-- [x] Before multi-instance production, explicitly decide whether process-local limits are acceptable; if not, implement a shared limiter as a separate scale follow-up.
-
-## 6. Roles / permissions / validation
-
-- [x] Create a normal role and separate create/read/update/delete permission rows.
-- [x] Verify each missing action permission denies independently.
-- [x] Verify field allowlists block selection/filter/sort/write inference.
-- [x] Verify server row filters restrict read/update/delete including single-item-by-id paths.
-- [x] Verify prospective create/update validation rejects final records that fail the rule.
-- [x] Verify update validation evaluates current row + patch, not patch alone.
-- [x] Verify bulk validation checks every prospective row and fails closed above the 5,000-row safety cap.
-- [x] Verify request-local permission cache removes duplicate resolution inside one request without leaking across requests/processes.
-- [x] Verify permission mutation clears the current request cache.
-- [x] Verify explicit admin/system bypass, role-less public fail-closed and malformed/stale permission metadata fail safely.
-- [x] Verify protected admin/public role rules and current-admin self-protection.
-
-## 7. Studio end-to-end smoke
+## 3. Branding / appearance / localization browser smoke
 
 Run the built Studio against the disposable API/DB.
 
-- [x] Login, automatic refresh/retry and logout.
-- [x] Content primitive record create/edit/delete and loading/error/empty states.
-- [x] Direct M2O picker uses readable labels and writes the target key correctly.
-- [x] Test target collections with >200 records and confirm current picker limit is understood/documented; no claim of full search UX yet.
-- [x] Data Model collection/field create/delete, required toggle, M2O create/delete, M2M create/delete.
-- [x] Users create/role/status/self-protection/delete/verification-mail.
-- [x] Roles/Permissions CRUD plus field/filter/validation editor.
-- [x] Files upload/list/download/edit/delete.
-- [x] Narrow-screen responsive behavior.
-- [ ] Content: verify server-backed text search, multiple field filters, ascending/descending sort, header sort toggles, page-size changes and previous/next pagination against more than one page of records; confirm filtered `total_count` is accurate.
+- [ ] Before login, verify the default Yunsoft logo is visible, the login/reset/verification screens can switch between English and Turkish, and the small Yunsoft copyright/powered-by footer is visible.
+- [ ] In Settings → Branding & Appearance, set a custom brand name and custom logo URL; verify the custom logo completely replaces the Yunsoft logo everywhere, while the footer still shows the Yunsoft copyright/powered-by attribution.
+- [ ] Verify a broken custom logo URL fails gracefully to brand text without restoring a second Yunsoft logo beside it.
+- [ ] Reset branding and verify the official default Yunsoft logo returns.
+- [ ] Change the accent color and verify primary actions, active navigation/focus treatment and related accents update without reducing readable contrast.
+- [ ] Verify Light, Dark and System themes across login, Content, Files, Users, Data Model, Roles & Permissions, Content Visibility, modals and Branding & Appearance.
+- [ ] With theme set to System, change the OS/browser color-scheme preference and verify Studio follows it without reload where supported.
+- [ ] Change the server default language between `en` and `tr`; in a clean browser profile verify it controls the initial Studio language.
+- [ ] Set a personal EN/TR language override, log out/in and reload; verify the browser preference persists and overrides the server default.
+- [ ] Choose “Follow system default”; verify the personal override is removed and the server default language takes effect.
+- [ ] Walk every primary workflow in both languages: auth, Content CRUD/filter/sort/pagination, Files, Users, Data Model M2O/M2M, Roles/Public permissions, Content Visibility, Branding & Appearance and confirmation dialogs.
+- [ ] Re-check narrow-screen layout for the language switcher, custom logo, appearance form and Yunsoft footer.
+- [ ] Perform a formal keyboard/focus/labels/screen-reader and light/dark contrast review.
+
+## 4. Existing Studio data-workspace smoke
+
+- [ ] Content: verify server-backed text search, multiple field filters, ascending/descending and header sort, page-size changes, pagination and accurate filtered `total_count` with more than one page.
 - [ ] Content: rapidly change search/filter/sort controls and verify stale responses never replace the newest result set.
-- [ ] Files: verify type filters and newest/oldest/name/size sort presets in both Gallery and List; confirm switching view preserves the active controls.
-- [ ] Users: verify collapsed `New user` flow plus search, role/status filters, sorting and reset without breaking inline role/status updates.
-- [ ] Data Model: verify collection search/sort and field search/type/required sorting on a project with many collections/fields.
-- [ ] Roles/Permissions: verify role search/sort, collection search and `Configured only` against roles with mixed permission coverage.
-- [ ] Re-check the new control strips, filter chips, counters and pagination on narrow screens.
-- [ ] Formal keyboard/focus/labels/screen-reader accessibility review.
+- [ ] Files: verify type filters and newest/oldest/name/size sort presets in Gallery and List; switching view must preserve controls.
+- [ ] Users: verify collapsed New User flow, search, role/status filters, sorting and inline role/status updates.
+- [ ] Data Model: verify collection/field search and sorting with many collections/fields.
+- [ ] Roles & Permissions: verify role search/sort, collection search and Configured-only mode with mixed permission coverage.
 
-## 8. Local storage + reconciliation
+## 5. Real deployment hardening
 
-- [x] Verify `FILES_LOCAL_ROOT` ownership/permissions/persistence with the actual runtime user.
-- [x] Upload binary/Unicode filenames; confirm UUID physical keys are independent from user names.
-- [x] Verify MIME/content-length/content-disposition downloads.
-- [x] Verify over-limit upload returns 413.
-- [x] Attempt traversal/path-separator storage keys and confirm pre-filesystem rejection.
-- [x] Force metadata insert failure after storage write and verify object cleanup.
-- [x] Force storage delete failure after metadata deletion and confirm explicit cleanup error/log.
-- [x] Run `POST /files/reconcile` dry-run and verify missing/orphan reporting.
-- [x] Create a recent orphan object and confirm destructive reconciliation does not delete it before the age guard.
-- [x] Create an old orphan object and confirm `deleteOrphans:true` deletes only the eligible orphan.
-- [x] Verify missing storage objects do not cause YunCMS to auto-delete DB metadata.
+- [ ] Behind the actual reverse proxy, configure exact `TRUST_PROXY_HOPS`; verify session IP and auth rate-limit buckets use the intended client IP. Confirm `TRUST_PROXY_HOPS=0` ignores forwarded addresses for direct deployments.
+- [ ] Send malformed JSON with a valid `X-Request-Id`; verify HTTP 400 `INVALID_PAYLOAD`, correlated request id and no parser/internal-message leakage.
+- [ ] Verify unsafe or longer-than-64-character caller request ids are replaced with UUIDs.
+- [ ] Configure HSTS at the real TLS/reverse-proxy layer and verify it there.
+- [ ] Verify the production environment can reach `https://yunsoft.com/light-logo.png`; if production CSP/network policy blocks external images, explicitly host an approved logo URL and set it through Branding & Appearance.
 
-## 9. S3-compatible provider + reconciliation
+## 6. Production storage provider
 
-Use the actual provider intended for production.
+Use the actual S3-compatible provider intended for production.
 
-- [ ] Configure bucket/region/endpoint/path-style/credentials as required.
-- [ ] Upload/list/download/delete through `?storage=s3`.
+- [ ] Configure bucket/region/endpoint/path-style/credentials and verify upload/list/download/delete.
 - [ ] Verify credential-chain behavior when explicit keys are intentionally omitted.
 - [ ] Run S3 reconciliation dry-run and age-guarded orphan cleanup.
-- [ ] Exercise multi-page object inventory if possible and verify continuation handling.
-- [ ] Test provider-specific behavior instead of assuming AWS/MinIO/R2 are identical.
-- [ ] Force provider errors and confirm credentials/secrets are not leaked to clients/logs.
+- [ ] Exercise multi-page object inventory and continuation handling.
+- [ ] Force provider errors and verify credentials/secrets never reach clients or logs.
 
-## 10. Audit / retention / logging / HTTP hardening
+## 7. Final release decision
 
-- [x] Verify item/file/schema mutation audit rows contain expected actor/action/collection/item/request id/timestamp.
-- [x] Verify schema/file updates retain before/after metadata where implemented.
-- [x] Put password/token/secret/authorization/api-key-shaped values in audited/logged metadata and confirm recursive `[REDACTED]` output.
-- [x] Force audit write failure after committed mutation; confirm the committed operation still succeeds for the client while audit failure is logged.
-- [x] Verify `/audit` access/pagination/filter behavior.
-- [x] Run `/audit/cleanup` with a small batch; verify cutoff and bounded batch deletion.
-- [x] Verify `complete=false` when max-batch guard is reached and rerun can continue cleanup.
-- [x] Confirm cleanup does not run automatically merely because retention env values exist.
-- [x] Confirm runtime output is valid line-delimited JSON at configured log levels.
-- [x] Confirm `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Resource-Policy`, auth no-store and configured-origin CORS behavior.
-- [x] Verify unexpected errors/DB messages/stacks/secrets are not exposed in HTTP responses.
-- [ ] Configure HSTS at the real TLS/reverse-proxy layer and verify it there; YunCMS does not force HSTS without deployment context.
-
-## 11. Extensions
-
-- [x] Activate endpoint/hook examples and confirm local discovery/startup.
-- [x] Confirm endpoint extensions mount only under `/extensions/<id>` after authentication.
-- [x] Instantiate ItemsService/FilesService from context services + `serviceOptions(req)` and verify identical accountability/RBAC/storage behavior without self-HTTP/token forwarding.
-- [x] Confirm extension services share request-local permission cache.
-- [x] Verify `app.beforeStart` before listen and `app.afterStart` after listen.
-- [x] Verify malformed manifest/root escape/unknown type/duplicate id/invalid export/type mismatch fail startup cleanly.
-- [x] Pack/install a sample extension as an npm tarball and verify dependency discovery matches local behavior.
-
-## 12. Graceful shutdown/runtime
-
-- [x] Start active requests/DB work, send SIGTERM/SIGINT and verify graceful drain before force timeout.
-- [x] Confirm DB pool closes once and startup failure also closes it.
-- [x] Verify extension startup failure prevents a partially running API.
-- [x] Verify SMTP outage does not prevent unrelated API startup.
-
-## 13. npm/package release gate
-
-The `@yunsoft` package family and first public release are documented in `docs/publishing.md`.
-
-- [x] Check package naming availability and finalize publication under the owned `@yunsoft/*` npm organization.
-- [x] If preferred scope is unavailable, verify the documented Yunsoft fallback names.
-- [x] Confirm npm authentication/organization permissions.
-- [x] Choose and add the public license before the first npm release.
-- [x] Choose the first public package version.
-- [x] Remove/adjust `private` package flags only after final public package structure is chosen.
-- [x] Run `npm pack` for each publishable package and inspect contents/dependencies/bin.
-- [x] Install packed tarballs in a brand-new directory.
-- [x] From the packed install verify `npx yuncms init`, `npx yuncms bootstrap` and `npx yuncms start` as a real consumer.
-- [x] Convert `docs/publishing.md` into the final user-facing npm installation guide only after the packed-install flow passes.
-- [x] Publish only after all applicable release gates above pass.
+- [ ] Only after the applicable checks above pass, update the production-readiness decision for the actual deployment environment.
