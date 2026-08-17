@@ -8,7 +8,7 @@ We do not copy Directus source code and we do not preserve complexity solely for
 
 ## Package boundaries
 
-### `@yuncms/core`
+### `@yunsoft/yuncms-core`
 Owns framework-independent backend primitives:
 - environment/config parsing;
 - the single `mysql2/promise` pool;
@@ -18,7 +18,7 @@ Owns framework-independent backend primitives:
 
 Later this package will own schema metadata, services, auth/RBAC primitives, FilesService and audit behavior.
 
-### `@yuncms/api`
+### `@yunsoft/yuncms-api`
 Owns Express-specific behavior:
 - server lifecycle;
 - REST routes;
@@ -29,12 +29,12 @@ Owns Express-specific behavior:
 
 Business rules should not migrate into route handlers.
 
-### `@yuncms/extensions-sdk`
+### `@yunsoft/yuncms-extensions-sdk`
 Owns the public authoring surface for extensions. The first stable names are `defineEndpoint()` and `defineHook()`.
 
 The package currently only validates and marks extension definitions. Discovery, lifecycle registration and runtime context injection are still pending.
 
-### `@yuncms/studio`
+### `@yunsoft/yuncms-studio`
 A small React SPA. It must consume the public REST API and schema metadata rather than importing backend internals.
 
 The current Studio only provides a shell and API health indicator. Content/Data Model/users/roles/files screens stay disabled until their backend contracts exist.

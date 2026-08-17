@@ -6,10 +6,10 @@ There is no untrusted marketplace sandbox in V1.
 
 ## SDK
 
-Use `@yuncms/extensions-sdk`:
+Use `@yunsoft/yuncms-extensions-sdk`:
 
 ```js
-import { defineEndpoint, defineHook } from '@yuncms/extensions-sdk';
+import { defineEndpoint, defineHook } from '@yunsoft/yuncms-extensions-sdk';
 ```
 
 The SDK only marks/validates an extension definition. Runtime services stay in the API/core packages rather than being duplicated in the SDK.
@@ -54,7 +54,7 @@ Extension discovery/loading happens after required DB migration compatibility su
 Example:
 
 ```js
-import { defineEndpoint } from '@yuncms/extensions-sdk';
+import { defineEndpoint } from '@yunsoft/yuncms-extensions-sdk';
 
 export default defineEndpoint((router, context) => {
   router.get('/', async (req, res) => {
@@ -116,7 +116,7 @@ This preserves the request accountability, schema snapshot, hooks and DB process
 Example:
 
 ```js
-import { defineHook } from '@yuncms/extensions-sdk';
+import { defineHook } from '@yunsoft/yuncms-extensions-sdk';
 
 export default defineHook(({ filter, action, init }) => {
   init('app.beforeStart', ({ logger }) => {

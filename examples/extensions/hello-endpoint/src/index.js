@@ -1,4 +1,4 @@
-import { defineEndpoint } from '@yuncms/extensions-sdk';
+import { defineEndpoint } from '@yunsoft/yuncms-extensions-sdk';
 
 export default defineEndpoint((router, context) => {
   router.get('/', async (req, res) => {

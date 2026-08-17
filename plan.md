@@ -38,9 +38,9 @@
 - [x] `AGENTS.md` working rules.
 - [x] `todo.md` manual/environment handoff rules.
 - [x] Node/toolchain engines pinned in package metadata.
-- [x] Package naming direction documented: primary `yuncms` + `@yuncms/*`, Yunsoft-branded fallback if npm ownership requires it.
+- [x] Package naming finalized under the verified `@yunsoft/*` npm organization; the executable remains `yuncms`.
 - [x] Generate/review `package-lock.json` after real `npm install` — `todo.md`.
-- [ ] Verify final npm scope/name ownership, auth, tarballs and fresh install — `todo.md`.
+- [x] Verify final npm scope/name ownership, auth, tarballs and fresh install — `todo.md`.
 
 ## 2. Core request/service architecture
 
@@ -194,7 +194,7 @@ DELETE /items/:collection/:id
 
 ## 8. Extension system
 
-- [x] `@yuncms/extensions-sdk`.
+- [x] `@yunsoft/yuncms-extensions-sdk`.
 - [x] `defineEndpoint`.
 - [x] `defineHook`.
 - [x] Local extension discovery.
@@ -270,7 +270,7 @@ yuncms help
 - [x] Environment-driven non-interactive `bootstrap`.
 - [x] `start` wrapper resolving API server package entry and preserving caller cwd/env.
 - [x] Publishing/naming policy documented.
-- [ ] Final npm ownership/auth/`npm pack`/fresh-install verification — `todo.md`.
+- [x] Final npm ownership/auth/`npm pack`/fresh-install verification — `todo.md`.
 
 ## 12. React Studio V1
 
@@ -332,7 +332,7 @@ yuncms help
 - [x] Studio static handler is restricted to `/` and `/assets/...`; unrelated requests continue through normal API routing.
 - [x] Root `npm start` builds Studio before starting the single API/Studio listener.
 - [x] Default Studio/auth public URLs align with the configured API port.
-- [x] API package file list includes the generated Studio bundle for future packed installs.
+- [x] API package file list includes the generated Studio bundle for packed and public-registry installs.
 - [x] API/runtime/security-header/graceful-shutdown smoke — `todo.md`.
 - [ ] Single-port built Studio HTML/assets/API browser smoke — `todo.md`.
 
@@ -353,7 +353,7 @@ yuncms help
 - [x] `docs/security.md`.
 - [x] `docs/deployment.md`.
 - [x] `docs/publishing.md` naming/release policy.
-- [ ] Convert publishing policy into final npm install guide after real npm ownership/pack verification — `todo.md`.
+- [x] Convert publishing policy into final npm install guide after real npm ownership/pack verification — `todo.md`.
 
 ## 15. Source-level regression coverage present
 
@@ -385,7 +385,7 @@ The major V1 feature source implementations now exist. These milestone boxes sta
 - [x] Milestone C — real auth/SMTP/replay/RBAC/validation/rate-limit behavior verified.
 - [ ] Milestone D — extension local/npm runtime + refreshed Studio end-to-end and single-port smoke verified.
 - [ ] Milestone E — local/S3 files, reconciliation, audit cleanup, logging/security headers and graceful shutdown verified.
-- [ ] Release — npm naming ownership, tarballs, fresh install and `yuncms init/bootstrap/start` verified.
+- [x] Release — npm naming ownership, tarballs, fresh install and `yuncms init/bootstrap/start` verified.
 
 ## 17. Remaining source work excluding manual verification
 

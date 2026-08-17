@@ -45,7 +45,7 @@ It validates connectivity, obtains the bootstrap advisory lock, applies missing 
 yuncms start
 ```
 
-The CLI resolves the installed `@yuncms/api` server entry and spawns it with the caller's current working directory and environment. This keeps project `.env`, extension discovery and relative local-storage paths rooted in the user's project rather than the CLI package directory.
+The CLI resolves the installed `@yunsoft/yuncms-api` server entry and spawns it with the caller's current working directory and environment. This keeps project `.env`, extension discovery and relative local-storage paths rooted in the user's project rather than the CLI package directory.
 
 Signals are forwarded to the API child so the API can run its graceful HTTP/MySQL shutdown path.
 
@@ -63,7 +63,7 @@ npx yuncms bootstrap
 npx yuncms start
 ```
 
-Public npm ownership/package-content verification still belongs in `todo.md`; the implementation must not be called published until `npm pack` and fresh-directory install are exercised.
+The public `@yunsoft/yuncms` package and its dependencies were verified with `npm pack`, a clean registry install and real `init`/`bootstrap`/`start` smoke tests for `0.1.0`.
 
 ## Environment
 

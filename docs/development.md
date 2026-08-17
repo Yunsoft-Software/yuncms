@@ -6,7 +6,7 @@
 - npm 11+
 - MySQL 8 for integration/bootstrap work
 
-The current repository intentionally does not contain a generated lockfile yet because dependency installation cannot be verified from the GitHub connector environment. The first local/Codex session should run `npm install`, inspect the result and commit `package-lock.json` if clean.
+The repository contains the verified npm lockfile. Use Node.js 24 LTS and `npm install` to reproduce the workspace dependencies.
 
 ## Install
 
@@ -19,14 +19,13 @@ Fill the MySQL values in `.env`. Do not commit `.env`.
 
 ## Run
 
-In separate terminals:
+For the normal single-port source runtime:
 
 ```bash
-npm run dev:api
-npm run dev:studio
+npm start
 ```
 
-The API does not load `.env` by magic yet. For the current skeleton either export the variables in your shell or start Node with an environment-file option during local validation. A shared CLI/config-loading experience is a planned task rather than something this document pretends already exists.
+`npm start` builds Studio and serves the API and Studio from the configured API listener. `npm run dev` provides the watched API source workflow after an initial Studio build. Both use the project working directory, and the runtime loads a project-local `.env` when present.
 
 ## Validate current code
 
@@ -34,7 +33,7 @@ After dependencies are installed:
 
 ```bash
 npm test
-npm run build --workspace=@yuncms/studio
+npm run build
 ```
 
 Then check:

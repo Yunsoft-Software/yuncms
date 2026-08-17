@@ -861,6 +861,76 @@ td select {
   margin-left: auto;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(17, 24, 39, 0.56);
+  backdrop-filter: blur(3px);
+  animation: modal-backdrop-in 140ms ease-out;
+}
+
+.modal-card {
+  width: min(100%, 480px);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 18px;
+  outline: none;
+  background: #fff;
+  box-shadow: 0 28px 72px rgba(17, 24, 39, 0.24);
+  animation: modal-card-in 160ms ease-out;
+}
+
+.modal-heading {
+  display: grid;
+  gap: 8px;
+}
+
+.modal-heading h2,
+.modal-heading p {
+  margin: 0;
+}
+
+.modal-heading > p:last-child {
+  color: #667289;
+  line-height: 1.6;
+}
+
+.modal-body {
+  margin-top: 20px;
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+}
+
+@keyframes modal-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal-card {
+    animation: none;
+  }
+}
+
 @media (max-width: 1100px) {
   .split-grid,
   .form-grid {
@@ -982,5 +1052,26 @@ td select {
 
   .file-card-actions {
     flex-wrap: wrap;
+  }
+
+  .modal-backdrop {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    padding: 22px;
+    border-radius: 18px 18px 12px 12px;
+  }
+
+  .modal-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions button {
+    width: 100%;
   }
 }

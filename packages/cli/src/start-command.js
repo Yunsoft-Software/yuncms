@@ -8,7 +8,7 @@ export async function runStartCommand({
   spawnProcess = spawn,
   signalSource = process,
 } = {}) {
-  const serverUrl = import.meta.resolve('@yuncms/api/server');
+  const serverUrl = import.meta.resolve('@yunsoft/yuncms-api/server');
   const serverPath = fileURLToPath(serverUrl);
 
   output.log?.(`Starting YunCMS API from ${cwd}`);
@@ -21,9 +21,12 @@ export async function runStartCommand({
   });
 
   return new Promise((resolve, reject) => {
+    let forwardedSignal = null;
     const signalHandlers = new Map(
       ['SIGINT', 'SIGTERM'].map((signal) => [signal, () => {
-        if (child.exitCode == null && child.signalCode == null) child.kill(signal);
+        if (forwardedSignal || child.exitCode != null || child.signalCode != null) return;
+        forwardedSignal = signal;
+        child.kill(signal);
       }]),
     );
     const cleanup = () => {
@@ -38,7 +41,7 @@ export async function runStartCommand({
     });
     child.once('exit', (code, signal) => {
       cleanup();
-      if (code === 0) {
+      if (code === 0 || (signal && signal === forwardedSignal)) {
         resolve({ code: 0, signal });
         return;
       }

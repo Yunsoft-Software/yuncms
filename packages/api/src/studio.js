@@ -57,7 +57,7 @@ export function createStudioMiddleware({ root = DEFAULT_STUDIO_ROOT } = {}) {
       if (error?.code !== 'ENOENT') return next(error);
       if (req.path === '/') {
         return res.status(503).type('text/plain').send(
-          'YunCMS Studio build is missing. Build @yuncms/studio before starting the API.',
+          'YunCMS Studio build is missing. Build @yunsoft/yuncms-studio before starting the API.',
         );
       }
       return res.status(404).end();

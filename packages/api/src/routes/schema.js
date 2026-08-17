@@ -1,5 +1,5 @@
 import express from 'express';
-import { deleteM2MJunction } from '@yuncms/core';
+import { deleteM2MJunction } from '@yunsoft/yuncms-core';
 
 import { serviceOptionsFromRequest } from '../service-options.js';
 

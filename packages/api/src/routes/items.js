@@ -1,5 +1,5 @@
 import express from 'express';
-import { readManyWithRelations, readOneWithRelations } from '@yuncms/core';
+import { readManyWithRelations, readOneWithRelations } from '@yunsoft/yuncms-core';
 
 import { serviceOptionsFromRequest } from '../service-options.js';
 

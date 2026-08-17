@@ -91,6 +91,18 @@ docs                       architecture/operations/security/API docs
 
 Source presence is not a production-readiness claim. `todo.md` deliberately keeps real MySQL, build, SMTP, S3, browser, concurrency and package-install verification open until executed.
 
+## Install from npm
+
+YunCMS `0.1.0` is published under the `@yunsoft` organization:
+
+```bash
+npm install @yunsoft/yuncms
+npx yuncms init
+npx yuncms start
+```
+
+Node.js 24 LTS and MySQL are required. See [`docs/publishing.md`](./docs/publishing.md) for the package family and release details.
+
 ## Setup / development
 
 First local validation should use Node 24 and a disposable MySQL database:
@@ -110,7 +122,7 @@ npm run dev:api
 npm run dev:studio
 ```
 
-The package-level target is:
+The published package-level commands are:
 
 ```text
 npx yuncms init
@@ -118,7 +130,7 @@ npx yuncms bootstrap
 npx yuncms start
 ```
 
-The implementation exists; public npm ownership/tarball/fresh-install verification is still a release gate. Naming policy is documented in [`docs/publishing.md`](./docs/publishing.md).
+The public registry package, CLI bootstrap and single-port API/Studio runtime have been verified from a clean consumer directory. Release policy is documented in [`docs/publishing.md`](./docs/publishing.md).
 
 ## Runtime probes
 

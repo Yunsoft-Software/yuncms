@@ -9,7 +9,7 @@ This file contains only work that cannot be truthfully verified from the GitHub-
 - [x] Run `npm install`; review `mysql2`, Express, React/Vite, AWS SDK and Nodemailer resolution.
 - [x] Review and commit the generated `package-lock.json` only after install succeeds without unintended dependency drift.
 - [x] Run `npm test`; fix real failures before checking any milestone.
-- [x] Run `npm run build --workspace=@yuncms/studio`.
+- [x] Run `npm run build --workspace=@yunsoft/yuncms-studio`.
 - [x] Run CLI help and confirm `init`, `bootstrap`, `start`, `help` only.
 - [x] Run `yuncms start`/workspace equivalent and verify child API keeps project cwd/env and shuts down cleanly.
 
@@ -84,8 +84,8 @@ Use disposable test data only.
 - [x] Configure a disposable SMTP/test mailbox and verify reset mail delivery.
 - [x] Confirm reset-request response is indistinguishable for active/nonexistent email addresses.
 - [x] Confirm raw reset/verification tokens never appear in public request responses or structured logs.
-- [ ] Follow Studio reset link, change password and confirm token query params are removed after completion.
-- [ ] Send verification from Users UI, follow link and verify account state.
+- [x] Follow Studio reset link, change password and confirm token query params are removed after completion.
+- [x] Send verification from Users UI, follow link and verify account state.
 - [x] Simulate SMTP failure; confirm unrelated API startup/traffic remains available and failure logging is redacted.
 
 ### Rate limits
@@ -113,13 +113,13 @@ Use disposable test data only.
 Run the built Studio against the disposable API/DB.
 
 - [x] Login, automatic refresh/retry and logout.
-- [ ] Content primitive record create/edit/delete and loading/error/empty states.
+- [x] Content primitive record create/edit/delete and loading/error/empty states.
 - [x] Direct M2O picker uses readable labels and writes the target key correctly.
-- [ ] Test target collections with >200 records and confirm current picker limit is understood/documented; no claim of full search UX yet.
-- [ ] Data Model collection/field create/delete, required toggle, M2O create/delete, M2M create/delete.
-- [ ] Users create/role/status/self-protection/delete/verification-mail.
-- [ ] Roles/Permissions CRUD plus field/filter/validation editor.
-- [ ] Files upload/list/download/edit/delete.
+- [x] Test target collections with >200 records and confirm current picker limit is understood/documented; no claim of full search UX yet.
+- [x] Data Model collection/field create/delete, required toggle, M2O create/delete, M2M create/delete.
+- [x] Users create/role/status/self-protection/delete/verification-mail.
+- [x] Roles/Permissions CRUD plus field/filter/validation editor.
+- [x] Files upload/list/download/edit/delete.
 - [x] Narrow-screen responsive behavior.
 - [ ] Formal keyboard/focus/labels/screen-reader accessibility review.
 
@@ -183,14 +183,16 @@ Use the actual provider intended for production.
 
 ## 13. npm/package release gate
 
-Naming direction is already documented in `docs/publishing.md`; only real ownership/release verification remains.
+The `@yunsoft` package family and first public release are documented in `docs/publishing.md`.
 
-- [ ] Check whether `yuncms` and the preferred `@yuncms/*` scope/packages can actually be owned/published from the intended npm account/org.
-- [ ] If preferred scope is unavailable, verify the documented Yunsoft fallback names.
-- [ ] Confirm npm authentication/organization permissions.
-- [ ] Remove/adjust `private` package flags only after final public package structure is chosen.
+- [x] Check package naming availability and finalize publication under the owned `@yunsoft/*` npm organization.
+- [x] If preferred scope is unavailable, verify the documented Yunsoft fallback names.
+- [x] Confirm npm authentication/organization permissions.
+- [x] Choose and add the public license before the first npm release.
+- [x] Choose the first public package version.
+- [x] Remove/adjust `private` package flags only after final public package structure is chosen.
 - [x] Run `npm pack` for each publishable package and inspect contents/dependencies/bin.
 - [x] Install packed tarballs in a brand-new directory.
 - [x] From the packed install verify `npx yuncms init`, `npx yuncms bootstrap` and `npx yuncms start` as a real consumer.
-- [ ] Convert `docs/publishing.md` into the final user-facing npm installation guide only after the packed-install flow passes.
-- [ ] Publish only after all applicable release gates above pass.
+- [x] Convert `docs/publishing.md` into the final user-facing npm installation guide only after the packed-install flow passes.
+- [x] Publish only after all applicable release gates above pass.

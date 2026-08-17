@@ -13,7 +13,7 @@ import {
   S3StorageDriver,
   SchemaCache,
   SmtpMailer,
-} from '@yuncms/core';
+} from '@yunsoft/yuncms-core';
 import { createApp } from './app.js';
 import { loadExtensionRuntime } from './extensions/runtime.js';
 

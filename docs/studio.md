@@ -153,7 +153,7 @@ apps/studio --Vite build--> packages/api/studio-dist
 
 No new static serving package is used. The API only serves the generated index and asset paths; unrelated paths continue through the normal API/auth routing.
 
-`packages/api` includes `studio-dist` in its package file list so future packed installs can carry the prebuilt Studio bundle once package publishing is enabled.
+`packages/api` includes `studio-dist` in its package file list, so the published `@yunsoft/yuncms-api` package carries the prebuilt Studio bundle.
 
 ## Accessibility baseline
 
@@ -167,7 +167,7 @@ Run the normal one-port workspace:
 npm start
 ```
 
-This builds `@yuncms/studio` and then starts the API listener. For source development without a second HTTP server:
+This builds `@yunsoft/yuncms-studio` and then starts the API listener. For source development without a second HTTP server:
 
 ```bash
 npm run dev
@@ -175,4 +175,4 @@ npm run dev
 
 `npm run dev` builds Studio once and starts the watched API process; rerun the Studio build after frontend source changes. Direct Vite development remains possible only as an explicit separate-origin workflow with `VITE_API_URL`/`STUDIO_ORIGIN` overrides.
 
-Build/runtime verification remains in `todo.md` until it is actually executed.
+The source workspace and clean public-registry install have both been verified with the single API/Studio listener.

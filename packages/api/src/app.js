@@ -3,7 +3,7 @@ import express from 'express';
 import {
   createCoreServiceRegistry,
   pingDatabase,
-} from '@yuncms/core';
+} from '@yunsoft/yuncms-core';
 
 import { createAuthenticationMiddleware } from './authentication.js';
 import { apiErrorHandler } from './error-response.js';

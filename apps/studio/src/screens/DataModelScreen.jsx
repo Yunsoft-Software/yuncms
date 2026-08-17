@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
+import { useConfirmDialog } from '../components/DialogProvider.jsx';
 
 const FIELD_TYPES = [
   'string', 'text', 'integer', 'bigint', 'decimal', 'boolean',
@@ -21,6 +22,7 @@ function relationKind(relation) {
 }
 
 export function DataModelScreen() {
+  const requestConfirmation = useConfirmDialog();
   const [collections, setCollections] = useState([]);
   const [selected, setSelected] = useState('');
   const [fields, setFields] = useState([]);
@@ -129,7 +131,13 @@ export function DataModelScreen() {
 
   async function deleteCollection() {
     if (!selectedCollection || selectedCollection.system) return;
-    if (!window.confirm(`Permanently delete collection ${selected}? This deletes its data.`)) return;
+    const accepted = await requestConfirmation({
+      title: 'Delete collection?',
+      description: `${selected} and every record it contains will be permanently deleted.`,
+      confirmLabel: 'Delete collection',
+      tone: 'danger',
+    });
+    if (!accepted) return;
     setError('');
     setNotice('');
     try {
@@ -168,7 +176,13 @@ export function DataModelScreen() {
 
   async function deleteField(field) {
     if (field.field === 'id') return;
-    if (!window.confirm(`Permanently delete field ${selected}.${field.field}?`)) return;
+    const accepted = await requestConfirmation({
+      title: 'Delete field?',
+      description: `${selected}.${field.field} and all values stored in it will be permanently deleted.`,
+      confirmLabel: 'Delete field',
+      tone: 'danger',
+    });
+    if (!accepted) return;
     setError('');
     setNotice('');
     try {
@@ -222,7 +236,13 @@ export function DataModelScreen() {
   }
 
   async function deleteM2O(relation) {
-    if (!window.confirm(`Delete relation ${relation.many_collection}.${relation.many_field}?`)) return;
+    const accepted = await requestConfirmation({
+      title: 'Delete relation?',
+      description: `${relation.many_collection}.${relation.many_field} will no longer reference ${relation.one_collection}.`,
+      confirmLabel: 'Delete relation',
+      tone: 'danger',
+    });
+    if (!accepted) return;
     setError('');
     setNotice('');
     try {
@@ -261,7 +281,13 @@ export function DataModelScreen() {
   }
 
   async function deleteM2M(junctionCollection) {
-    if (!window.confirm(`Permanently delete M2M junction ${junctionCollection} and all of its link records?`)) return;
+    const accepted = await requestConfirmation({
+      title: 'Delete many-to-many relation?',
+      description: `${junctionCollection} and every link record it contains will be permanently deleted.`,
+      confirmLabel: 'Delete relation',
+      tone: 'danger',
+    });
+    if (!accepted) return;
     setError('');
     setNotice('');
     try {

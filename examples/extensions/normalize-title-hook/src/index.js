@@ -1,4 +1,4 @@
-import { defineHook } from '@yuncms/extensions-sdk';
+import { defineHook } from '@yunsoft/yuncms-extensions-sdk';
 
 export default defineHook(({ filter, init }) => {
   init('app.beforeStart', ({ logger }) => {

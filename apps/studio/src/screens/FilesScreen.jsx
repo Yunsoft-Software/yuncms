@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiBlob, apiRequest } from '../api.js';
+import { useConfirmDialog } from '../components/DialogProvider.jsx';
 
 function formatBytes(value) {
   const bytes = Number(value || 0);
@@ -25,6 +26,7 @@ function fileDisplayName(file) {
 }
 
 export function FilesScreen() {
+  const requestConfirmation = useConfirmDialog();
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrls, setPreviewUrls] = useState({});
@@ -145,7 +147,7 @@ export function FilesScreen() {
       document.body.append(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (requestError) {
       setError(requestError.message || 'File could not be downloaded');
     }
@@ -186,7 +188,13 @@ export function FilesScreen() {
   }
 
   async function remove(file) {
-    if (!window.confirm(`Delete ${file.filename_download}?`)) return;
+    const accepted = await requestConfirmation({
+      title: 'Delete file?',
+      description: `${file.filename_download} and its stored content will be permanently deleted.`,
+      confirmLabel: 'Delete file',
+      tone: 'danger',
+    });
+    if (!accepted) return;
     setError('');
     setNotice('');
     try {

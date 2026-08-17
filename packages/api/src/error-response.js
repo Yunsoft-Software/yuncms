@@ -1,4 +1,4 @@
-import { normalizeDatabaseError } from '@yuncms/core';
+import { normalizeDatabaseError } from '@yunsoft/yuncms-core';
 
 const STATUS_BY_CODE = new Map([
   ['INVALID_CREDENTIALS', 401],

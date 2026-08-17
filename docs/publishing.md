@@ -1,51 +1,68 @@
 # Package naming and publishing policy
 
-This document records the chosen naming direction. It does **not** claim that npm ownership/availability has already been verified.
+This document records the final npm package family and release procedure. The first public release, `0.1.0`, was published under the MIT license on 2026-08-17.
+
+## Verified npm account and registry state
+
+The release checks were run on 2026-08-17 while authenticated to npm as `raichubuilds`:
+
+- authentication succeeds and the account has read-write access to its existing packages;
+- the `yunsoft` npm organization was created on the free public-package plan;
+- `raichubuilds` is the verified owner of the `@yunsoft` organization;
+- all four public packages are owned through `@yunsoft` with read-write access;
+- the earlier `@yuncms` scope was not created and is no longer the package direction.
+
+Every `0.1.0` package was verified through unauthenticated `npm view` queries and a clean registry install. The temporary release tokens were revoked after publishing.
 
 ## Naming direction
 
-Keep the product and command name simple:
+Keep the product and executable command simple:
 
 ```text
 yuncms
 ```
 
-Preferred package family, matching the current workspace names:
+The final public package family is:
 
 ```text
-yuncms                  # CLI / top-level package
-@yuncms/core             # core services/runtime primitives
-@yuncms/api              # Express API runtime
-@yuncms/extensions-sdk   # extension authoring helpers
+@yunsoft/yuncms                   # CLI / top-level package
+@yunsoft/yuncms-core              # core services/runtime primitives
+@yunsoft/yuncms-api               # Express API runtime
+@yunsoft/yuncms-extensions-sdk    # extension authoring helpers
 ```
 
 Studio remains an application artifact rather than a public library for the first release.
+The executable bin remains `yuncms`, so a project that installs `@yunsoft/yuncms` runs the familiar `npx yuncms ...` commands.
 
-If the `@yuncms` npm scope cannot be owned/used at publish time, use the Yunsoft-branded fallback without changing product terminology:
+## Installation
 
-```text
-@yunsoft/yuncms
-@yunsoft/yuncms-core
-@yunsoft/yuncms-api
-@yunsoft/yuncms-extensions-sdk
+```bash
+npm install @yunsoft/yuncms
+npx yuncms init
+npx yuncms start
 ```
 
-The executable bin remains `yuncms` in either naming scheme.
+For a global CLI installation:
 
-## Why the repository is not renamed now
+```bash
+npm install --global @yunsoft/yuncms
+yuncms init
+yuncms start
+```
 
-The current source already consistently imports `@yuncms/core`, `@yuncms/api` and `@yuncms/extensions-sdk`. Renaming every internal package before npm ownership is checked would create churn with no product benefit.
+YunCMS requires Node.js 24 LTS and MySQL for V1. `yuncms init` writes project-local configuration, verifies the database, applies migrations and creates or reuses the first administrator.
 
-Therefore:
+## Publish order
 
-1. keep current workspace package names while developing;
-2. verify npm scope/name ownership from a real authenticated npm environment;
-3. run `npm pack` for every publishable package;
-4. inspect tarball contents and dependency references;
-5. install the tarballs in a brand-new directory;
-6. run `yuncms init`, `bootstrap` and `start` from that fresh install;
-7. only then remove `private` flags/set final versions and publish.
+Internal dependencies use exact same-release versions, so publish in dependency order:
+
+1. `@yunsoft/yuncms-core`;
+2. `@yunsoft/yuncms-api`;
+3. `@yunsoft/yuncms-extensions-sdk`;
+4. `@yunsoft/yuncms`.
+
+Run `npm pack` and the fresh-directory install/start smoke against each final version before publishing. Scoped packages must use public access.
 
 ## Release guard
 
-A package name is not considered final merely because it appears in `package.json` or this document. npm ownership/authentication and packed-install verification remain manual release gates in `todo.md`.
+A package is not considered released merely because it appears in `package.json` or this document. For subsequent releases, repeat the final pack/install smoke, publish in dependency order, verify every exact version through unauthenticated `npm view` queries, and test `npx yuncms init`, `bootstrap` and `start` from a clean registry install.

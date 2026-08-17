@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 
 import { apiRequest } from '../api.js';
+import { useConfirmDialog } from '../components/DialogProvider.jsx';
 
 export function UsersScreen({ currentUserId }) {
+  const requestConfirmation = useConfirmDialog();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [error, setError] = useState('');
@@ -83,7 +85,13 @@ export function UsersScreen({ currentUserId }) {
   }
 
   async function deleteUser(user) {
-    if (!window.confirm(`Delete user ${user.email}?`)) return;
+    const accepted = await requestConfirmation({
+      title: 'Delete user?',
+      description: `${user.email} will permanently lose access to this project.`,
+      confirmLabel: 'Delete user',
+      tone: 'danger',
+    });
+    if (!accepted) return;
     setError('');
     setNotice('');
     try {

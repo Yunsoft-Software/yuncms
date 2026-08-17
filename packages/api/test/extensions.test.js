@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { HookEmitter } from '@yuncms/core';
+import { HookEmitter } from '@yunsoft/yuncms-core';
 import { discoverExtensions } from '../src/extensions/discovery.js';
 import { validateExtensionManifest } from '../src/extensions/manifest.js';
 import { loadExtensionRuntime } from '../src/extensions/runtime.js';

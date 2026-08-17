@@ -1,7 +1,8 @@
 {
-  "name": "@yuncms/api",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@yunsoft/yuncms-api",
+  "version": "0.1.0",
+  "description": "Express API runtime and bundled Studio server for YunCMS.",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=24 <25"
@@ -10,6 +11,18 @@
     "src",
     "studio-dist"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yunsoft-Software/yuncms.git",
+    "directory": "packages/api"
+  },
+  "homepage": "https://github.com/Yunsoft-Software/yuncms#readme",
+  "bugs": {
+    "url": "https://github.com/Yunsoft-Software/yuncms/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     "./server": "./src/server.js"
   },
@@ -19,7 +32,7 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@yuncms/core": "0.0.0",
+    "@yunsoft/yuncms-core": "0.1.0",
     "express": "5.2.1"
   }
 }

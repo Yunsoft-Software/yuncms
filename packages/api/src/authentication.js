@@ -2,7 +2,7 @@ import {
   createAccountability,
   createPublicAccountability,
   createRequestContext,
-} from '@yuncms/core';
+} from '@yunsoft/yuncms-core';
 
 function bearerToken(header) {
   if (!header) return null;

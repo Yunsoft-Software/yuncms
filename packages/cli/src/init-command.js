@@ -9,7 +9,7 @@ import {
   findExistingAdmin,
   loadConfig,
   pingDatabase,
-} from '@yuncms/core';
+} from '@yunsoft/yuncms-core';
 
 import { writeEnvFile } from './env-file.js';
 import { createInteractivePrompts } from './prompts.js';

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { loadEnvFileIfPresent } from '@yuncms/core';
+import { loadEnvFileIfPresent } from '@yunsoft/yuncms-core';
 import { runCli } from '../src/cli.js';
 
 loadEnvFileIfPresent();

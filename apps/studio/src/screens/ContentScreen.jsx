@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
+import { useConfirmDialog } from '../components/DialogProvider.jsx';
 
 function inputValueForField(field, value) {
   if (value == null) return field.type === 'boolean' ? false : '';
@@ -200,6 +201,7 @@ function RecordForm({ collection, fields, relationLookups, record, onSaved, onCa
 }
 
 export function ContentScreen({ collection, onOpenDataModel }) {
+  const requestConfirmation = useConfirmDialog();
   const [fields, setFields] = useState([]);
   const [relationLookups, setRelationLookups] = useState({});
   const [items, setItems] = useState([]);
@@ -274,7 +276,14 @@ export function ContentScreen({ collection, onOpenDataModel }) {
   }, [collection]);
 
   async function removeRecord(record) {
-    if (!record?.id || !window.confirm(`Delete record ${record.id}?`)) return;
+    if (!record?.id) return;
+    const accepted = await requestConfirmation({
+      title: 'Delete record?',
+      description: `Record ${record.id} will be permanently deleted from ${collection}.`,
+      confirmLabel: 'Delete record',
+      tone: 'danger',
+    });
+    if (!accepted) return;
     setError('');
     try {
       await apiRequest(

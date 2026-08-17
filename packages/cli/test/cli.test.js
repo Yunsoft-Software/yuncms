@@ -74,6 +74,30 @@ test('start command forwards shutdown signals and waits for a clean child exit',
   assert.equal(signalSource.listenerCount('SIGINT'), 0);
 });
 
+test('start command treats an explicitly forwarded shutdown signal as a clean exit', async () => {
+  const signalSource = new EventEmitter();
+  const child = new EventEmitter();
+  child.exitCode = null;
+  child.signalCode = null;
+  child.kill = (signal) => {
+    assert.equal(signal, 'SIGINT');
+    child.signalCode = signal;
+    queueMicrotask(() => child.emit('exit', null, signal));
+    return true;
+  };
+
+  const resultPromise = runStartCommand({
+    output: { log() {} },
+    signalSource,
+    spawnProcess() { return child; },
+  });
+  signalSource.emit('SIGINT');
+
+  assert.deepEqual(await resultPromise, { code: 0, signal: 'SIGINT' });
+  assert.equal(signalSource.listenerCount('SIGTERM'), 0);
+  assert.equal(signalSource.listenerCount('SIGINT'), 0);
+});
+
 test('env serialization quotes values and rejects multiline secrets', () => {
   const serialized = serializeEnv({
     DB_HOST: '127.0.0.1',

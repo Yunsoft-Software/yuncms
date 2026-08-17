@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
+import { useConfirmDialog } from '../components/DialogProvider.jsx';
 
 const ACTIONS = ['read', 'create', 'update', 'delete'];
 
@@ -22,6 +23,7 @@ function prettyJson(value) {
 }
 
 export function RolesPermissionsScreen() {
+  const requestConfirmation = useConfirmDialog();
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [collections, setCollections] = useState([]);
@@ -125,7 +127,13 @@ export function RolesPermissionsScreen() {
   }
 
   async function deleteRole(role) {
-    if (!window.confirm(`Delete role ${role.name}?`)) return;
+    const accepted = await requestConfirmation({
+      title: 'Delete role?',
+      description: `${role.name} and all of its permission rules will be permanently deleted.`,
+      confirmLabel: 'Delete role',
+      tone: 'danger',
+    });
+    if (!accepted) return;
     setError('');
     setNotice('');
     try {

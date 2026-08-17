@@ -4,7 +4,7 @@ import {
   createDatabasePool,
   loadConfig,
   pingDatabase,
-} from '@yuncms/core';
+} from '@yunsoft/yuncms-core';
 
 export async function runBootstrapCommand({ env = process.env, output = console } = {}) {
   const config = loadConfig(env);
