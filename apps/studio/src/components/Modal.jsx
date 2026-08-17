@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useI18n } from '../i18n.js';
+
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
@@ -14,17 +16,19 @@ export function Modal({
   open,
   title,
   description,
-  eyebrow = 'Confirmation',
+  eyebrow,
   children,
   actions,
   onClose,
   initialFocusRef,
   className = '',
 }) {
+  const { t } = useI18n();
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef(null);
   const previousFocusRef = useRef(null);
+  const resolvedEyebrow = eyebrow === undefined ? t('common.confirmation') : eyebrow;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -93,7 +97,7 @@ export function Modal({
         onKeyDown={handleKeyDown}
       >
         <div className="modal-heading">
-          {eyebrow && <p className="eyebrow">{eyebrow}</p>}
+          {resolvedEyebrow && <p className="eyebrow">{resolvedEyebrow}</p>}
           <h2 id={titleId}>{title}</h2>
           {description && <p id={descriptionId}>{description}</p>}
         </div>
