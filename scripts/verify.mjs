@@ -22,6 +22,7 @@ const FAST_TESTS = [
   'packages/core/test/schema-access.test.js',
   'packages/core/test/collection-visibility.test.js',
   'packages/core/test/public-access.test.js',
+  'packages/core/test/studio-settings-service.test.js',
   'packages/core/test/items-service.test.js',
   'packages/core/test/permissions-service.test.js',
   'packages/core/test/relation-expansion.test.js',
@@ -35,6 +36,8 @@ const FAST_TESTS = [
   'packages/cli/test/cli.test.js',
   'packages/extensions-sdk/test/sdk.test.js',
   'apps/studio/test/collection-visibility.test.js',
+  'apps/studio/test/studio-settings.test.js',
+  'apps/studio/test/localization.test.js',
 ];
 
 function collectTests(path) {
