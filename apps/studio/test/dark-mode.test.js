@@ -5,6 +5,7 @@ import test from 'node:test';
 
 const appearanceCss = readFileSync(resolve(import.meta.dirname, '../src/appearance.css'), 'utf8');
 const visualCss = readFileSync(resolve(import.meta.dirname, '../src/visual-fixes.css'), 'utf8');
+const assetCss = readFileSync(resolve(import.meta.dirname, '../src/asset-picker.css'), 'utf8');
 const mainSource = readFileSync(resolve(import.meta.dirname, '../src/main.jsx'), 'utf8');
 
 test('dark theme defines shared surface, input and border variables', () => {
@@ -38,4 +39,13 @@ test('pagination and sticky permission columns never force white surfaces in dar
   assert.match(visualCss, /:root\[data-theme="dark"\][\s\S]*\.pagination/);
   assert.match(visualCss, /background:\s*var\(--studio-surface\)/);
   assert.doesNotMatch(visualCss, /background(?:-color)?:\s*(?:#fff(?:fff)?|white)\b/i);
+});
+
+test('permission-rule and schema-count badges use theme surfaces instead of white cards', () => {
+  for (const selector of ['.role-summary-stat', '.schema-count', '.permission-count']) {
+    assert.ok(assetCss.includes(selector), `missing dark badge correction: ${selector}`);
+  }
+  assert.match(assetCss, /:root\[data-theme="dark"\][\s\S]*\.role-summary-stat/);
+  assert.match(assetCss, /background:\s*var\(--studio-surface-muted\)/);
+  assert.doesNotMatch(assetCss, /background(?:-color)?:\s*(?:#fff(?:fff)?|white)\b/i);
 });
