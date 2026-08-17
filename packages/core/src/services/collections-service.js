@@ -4,6 +4,7 @@ import { withAdvisoryLock } from '../advisory-lock.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { incrementSchemaVersion } from '../schema-version.js';
+import { compileCollectionSystemFields, normalizeCollectionSystemFields } from '../system-fields.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { assertSchemaManager } from './schema-access.js';
@@ -70,6 +71,7 @@ function assertCollectionCreateMetadata(input) {
   )) {
     throw invalidSchemaPayload('Collection metadata must be an object or null');
   }
+  normalizeCollectionSystemFields(input.systemFields);
 }
 
 function temporaryDropName() {
@@ -100,6 +102,8 @@ export class CollectionsService extends BaseService {
       throw error;
     }
 
+    const systemFields = compileCollectionSystemFields(collection, input.systemFields);
+
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
       const metadata = new SchemaMetadataRepository(connection);
       const existing = await metadata.readCollection(collection);
@@ -111,11 +115,16 @@ export class CollectionsService extends BaseService {
 
       const table = quoteIdentifier(collection, 'collection name');
       let tableCreated = false;
+      const physicalDefinitions = [
+        'id CHAR(36) NOT NULL PRIMARY KEY',
+        ...systemFields.columns,
+        ...systemFields.constraints,
+      ];
 
       try {
         await connection.query(
           `CREATE TABLE ${table} (
-            id CHAR(36) NOT NULL PRIMARY KEY
+            ${physicalDefinitions.join(',\n            ')}
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
         );
         tableCreated = true;
@@ -127,7 +136,10 @@ export class CollectionsService extends BaseService {
             note: input.note ?? null,
             singleton: input.singleton === true,
             hidden: input.hidden === true,
-            metadata: input.metadata ?? null,
+            metadata: {
+              ...(input.metadata ?? {}),
+              systemFields: systemFields.fields,
+            },
           });
 
           await metadata.createField({
@@ -139,6 +151,10 @@ export class CollectionsService extends BaseService {
             interface: 'input',
             schemaMetadata: { primaryKey: true, length: 36 },
           });
+
+          for (const systemField of systemFields.metadata) {
+            await metadata.createField(systemField);
+          }
 
           const schemaVersion = await incrementSchemaVersion(connection);
           return { ...created, schemaVersion };
