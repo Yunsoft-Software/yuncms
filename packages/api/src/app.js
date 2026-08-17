@@ -17,6 +17,8 @@ import { createSchemaRouter } from './routes/schema.js';
 import { createUsersRouter } from './routes/users.js';
 import { createStudioMiddleware } from './studio.js';
 
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
+
 function securityHeaders(req, res, next) {
   res.set('x-content-type-options', 'nosniff');
   res.set('x-frame-options', 'DENY');
@@ -43,6 +45,13 @@ function studioCors(config) {
   };
 }
 
+function requestIdentity(req, res, next) {
+  const supplied = req.get('x-request-id');
+  req.id = supplied && REQUEST_ID_PATTERN.test(supplied) ? supplied : randomUUID();
+  res.set('x-request-id', req.id);
+  next();
+}
+
 export function createApp({
   pool,
   config,
@@ -64,12 +73,8 @@ export function createApp({
   app.disable('x-powered-by');
   app.use(securityHeaders);
   app.use(studioCors(config));
+  app.use(requestIdentity);
   app.use(express.json({ limit: '1mb' }));
-  app.use((req, res, next) => {
-    req.id = req.get('x-request-id') || randomUUID();
-    res.set('x-request-id', req.id);
-    next();
-  });
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', request_id: req.id });
@@ -127,4 +132,4 @@ export function createApp({
   return app;
 }
 
-export { securityHeaders, studioCors };
+export { requestIdentity, securityHeaders, studioCors };
