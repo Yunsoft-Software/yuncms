@@ -132,10 +132,8 @@ if (MODE === 'release') {
   runPackChecks();
 
   if (process.env.YUNCMS_TEST_MYSQL === '1') {
-    run(process.execPath, ['--test', '--test-reporter=dot', 'test/integration'], {
-      label: 'real MySQL/API integration suite',
-      failureArgs: ['--test', '--test-reporter=spec', 'test/integration'],
-    });
+    const integrationTests = collectTests('test/integration').sort();
+    runNodeTests(integrationTests, `real MySQL/API integration suite (${integrationTests.length} files)`);
   } else {
     console.log('○ real MySQL/API integration skipped (set YUNCMS_TEST_MYSQL=1)');
   }
