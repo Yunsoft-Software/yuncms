@@ -2,11 +2,8 @@
 
 Only checks that still require a real Node 24 checkout, browser, MySQL instance or deployment provider belong here. This is a **pending verification list**: when a check passes it is removed, not kept as `[x]` history. If its covered source changes later, it becomes pending again.
 
-## 1. Fresh install / port 3008
+## 1. Legacy port migration
 
-- [ ] In a new empty project run `yuncms init`; generated `.env` must contain `PORT=3008`, `STUDIO_ORIGIN=http://localhost:3008`, `AUTH_PUBLIC_URL=http://localhost:3008`.
-- [ ] Start without manually setting a port and verify API + built Studio are served from `http://localhost:3008`.
-- [ ] Confirm fresh-install output/docs do not direct users to legacy 8055 or Vite 5173.
 - [ ] Migrate any existing operator-owned `.env` that still explicitly uses a legacy port; source intentionally does not overwrite it.
 
 ## 2. Real MySQL migration upgrade
@@ -50,7 +47,6 @@ Use a disposable MySQL 8-compatible database whose name contains `test`, `ci` or
 - [ ] Seed at least 100 images and verify the settings page remains compact and the modal paginates rather than rendering all 100 candidates at once.
 - [ ] Select a logo, save, sign out/reload login and verify `/studio-settings/logo` renders that exact image before authentication.
 - [ ] Select a favicon, save and verify the browser tab switches to `/studio-settings/favicon` without a full application restart.
-- [ ] With no custom favicon, verify the initial HTML uses the Yunsoft `light-icon.png` default.
 - [ ] Delete selected logo/favicon Files and verify their FKs become `NULL` and Studio returns to default assets.
 - [ ] Confirm non-image Files and arbitrary external logo URLs are rejected by the service even through raw API requests.
 - [ ] In separate-origin development with `VITE_API_URL`, verify custom logo/favicon assets are fetched from the API origin rather than the Vite origin.
