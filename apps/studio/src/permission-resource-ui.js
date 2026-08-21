@@ -33,11 +33,9 @@ export function isPermissionCollection(collection) {
   return !collection?.system || permissionResourcePolicy(collection).systemManaged;
 }
 
-export function canConfigurePermission(collection, action, role) {
+export function canConfigurePermission(collection, action) {
   const policy = permissionResourcePolicy(collection);
-  if (!policy.allowedActions.includes(action)) return false;
-  if (policy.systemManaged && role?.public) return false;
-  return true;
+  return policy.allowedActions.includes(action);
 }
 
 export function canUseAdvancedPermission(collection) {

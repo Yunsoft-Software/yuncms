@@ -26,6 +26,20 @@ const schema = {
         email: { field: 'email', type: 'string' },
       },
     },
+    yuncms_files: {
+      collection: 'yuncms_files',
+      system: true,
+      metadata: {
+        permissionManaged: true,
+        permissionMode: 'action-only',
+        resource: 'files',
+        allowedActions: ['read', 'create', 'update', 'delete'],
+      },
+      fields: {
+        id: { field: 'id', type: 'uuid' },
+        title: { field: 'title', type: 'string' },
+      },
+    },
     yuncms_roles: {
       collection: 'yuncms_roles',
       system: true,
@@ -131,16 +145,34 @@ test('protected system actions and advanced system rules are rejected before mut
   );
 });
 
-test('public role cannot be granted system resource access', async () => {
-  let insertCalled = false;
+test('public role can receive an explicit permission-managed Files read grant', async () => {
+  let inserted = null;
   const database = {
-    async query(sql) {
+    async query(sql, params = []) {
       const normalized = sql.replace(/\s+/g, ' ').trim();
       if (normalized.startsWith('SELECT id, admin, public FROM yuncms_roles')) {
         return [[{ id: 'public-role', admin: 0, public: 1 }], []];
       }
-      if (normalized.startsWith('INSERT INTO yuncms_permissions')) insertCalled = true;
-      return [[], []];
+      if (normalized.startsWith('INSERT INTO yuncms_permissions')) {
+        inserted = {
+          id: params[0],
+          role: params[1],
+          collection: params[2],
+          action: params[3],
+          fields: params[4],
+          filter: params[5],
+          validation: params[6],
+        };
+        return [{ affectedRows: 1 }, []];
+      }
+      if (normalized.includes('FROM yuncms_permissions WHERE id = ?')) {
+        return [[{
+          ...inserted,
+          created_at: null,
+          updated_at: null,
+        }], []];
+      }
+      throw new Error(`Unexpected query: ${normalized}`);
     },
   };
   const service = new PermissionsService({
@@ -149,9 +181,14 @@ test('public role cannot be granted system resource access', async () => {
     accountability: createSystemAccountability(),
   });
 
-  await assert.rejects(
-    service.createOne({ role: 'public-role', collection: 'yuncms_users', action: 'read' }),
-    (error) => error.code === 'PUBLIC_SYSTEM_ACCESS_FORBIDDEN',
-  );
-  assert.equal(insertCalled, false);
+  const permission = await service.createOne({
+    role: 'public-role',
+    collection: 'yuncms_files',
+    action: 'read',
+  });
+
+  assert.equal(permission.role, 'public-role');
+  assert.equal(permission.collection, 'yuncms_files');
+  assert.equal(permission.action, 'read');
+  assert.equal(permission.fields, null);
 });

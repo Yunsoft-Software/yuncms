@@ -224,11 +224,6 @@ export class PermissionsService extends BaseService {
       error.code = 'ROLE_NOT_FOUND';
       throw error;
     }
-    if (collectionSchema.system && role.public) {
-      const error = new Error('Public role cannot be granted access to protected system resources');
-      error.code = 'PUBLIC_SYSTEM_ACCESS_FORBIDDEN';
-      throw error;
-    }
 
     const id = randomUUID();
     await this.database.query(

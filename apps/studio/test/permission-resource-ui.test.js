@@ -19,6 +19,17 @@ const users = {
   },
 };
 
+const files = {
+  collection: 'yuncms_files',
+  system: 1,
+  metadata: {
+    permissionManaged: true,
+    permissionMode: 'action-only',
+    resource: 'files',
+    allowedActions: ['read', 'create', 'update', 'delete'],
+  },
+};
+
 const roles = {
   collection: 'yuncms_roles',
   system: 1,
@@ -36,15 +47,16 @@ const project = { collection: 'articles', system: 0, metadata: null };
 test('only explicitly permission-managed system resources enter the role matrix', () => {
   assert.equal(isPermissionCollection(project), true);
   assert.equal(isPermissionCollection(users), true);
+  assert.equal(isPermissionCollection(files), true);
   assert.equal(isPermissionCollection(roles), true);
   assert.equal(isPermissionCollection(internal), false);
 });
 
-test('system resource action policy is reflected in Studio controls', () => {
+test('system resource action policy is reflected in Studio controls without a public-role blanket lock', () => {
   assert.equal(canConfigurePermission(users, 'update', { public: false }), true);
   assert.equal(canConfigurePermission(roles, 'read', { public: false }), true);
   assert.equal(canConfigurePermission(roles, 'create', { public: false }), false);
-  assert.equal(canConfigurePermission(users, 'read', { public: true }), false);
+  assert.equal(canConfigurePermission(files, 'read', { public: true }), true);
   assert.equal(canUseAdvancedPermission(users), false);
   assert.equal(canUseAdvancedPermission(project), true);
   assert.equal(permissionResourcePolicy(users).resource, 'users');
