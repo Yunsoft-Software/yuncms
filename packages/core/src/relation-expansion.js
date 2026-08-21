@@ -2,7 +2,7 @@ import { assertIdentifier } from './identifier.js';
 import { SchemaCache } from './schema.js';
 import { ItemsService } from './services/items-service.js';
 
-const MAX_EXPAND_FIELDS = 8;
+export const MAX_EXPAND_FIELDS = Number.POSITIVE_INFINITY;
 const defaultSchemaCache = new SchemaCache();
 
 function expansionError(code, message, path = null) {
@@ -18,16 +18,17 @@ function normalizeDelimited(value) {
   return values.map((entry) => String(entry).trim()).filter(Boolean);
 }
 
+function assertFieldToken(field, path) {
+  try {
+    assertIdentifier(field, 'field');
+  } catch {
+    throw expansionError('INVALID_QUERY', `Invalid field: ${field}`, path);
+  }
+  return field;
+}
+
 export function parseExpandInput(value) {
   const fields = [...new Set(normalizeDelimited(value))];
-  if (fields.length > MAX_EXPAND_FIELDS) {
-    throw expansionError(
-      'INVALID_QUERY',
-      `expand supports at most ${MAX_EXPAND_FIELDS} direct relation fields`,
-      'expand',
-    );
-  }
-
   for (const field of fields) {
     try {
       assertIdentifier(field, 'expand field');
@@ -47,73 +48,191 @@ function parseRelationMetadata(value) {
   }
 }
 
-function withExpansionFields(rawFields, expandFields) {
-  if (rawFields == null || rawFields === '') return rawFields;
-  const selected = normalizeDelimited(rawFields);
-  if (selected.includes('*')) return selected;
-  return [...new Set([...selected, ...expandFields])];
-}
-
-function withoutExpand(query = {}, expandFields = []) {
-  const base = { ...query };
-  delete base.expand;
-  if (expandFields.length > 0 && Object.hasOwn(base, 'fields')) {
-    base.fields = withExpansionFields(base.fields, expandFields);
-  }
-  return base;
-}
-
 async function schemaSnapshot(options) {
   if (options.schema) return options.schema;
   const cache = options.schemaCache ?? defaultSchemaCache;
   return cache.get(options.database);
 }
 
+function relationFromSnapshot(snapshot, collection, field) {
+  return snapshot.relationByManyField?.get(`${collection}.${field}`) ?? null;
+}
+
+function isDirectRelation(relation) {
+  if (!relation) return false;
+  const metadata = parseRelationMetadata(relation.metadata);
+  return !relation.junction_collection && metadata.kind !== 'm2m';
+}
+
 function directRelation(snapshot, collection, field) {
-  const relation = snapshot.relationByManyField?.get(`${collection}.${field}`);
+  const relation = relationFromSnapshot(snapshot, collection, field);
   if (!relation) {
     throw expansionError(
       'INVALID_QUERY',
       `Field is not a direct relation and cannot be expanded: ${collection}.${field}`,
-      `expand.${field}`,
+      `fields.${field}`,
     );
   }
 
-  const metadata = parseRelationMetadata(relation.metadata);
-  if (relation.junction_collection || metadata.kind === 'm2m') {
+  if (!isDirectRelation(relation)) {
     throw expansionError(
       'UNSUPPORTED_RELATION_EXPANSION',
-      `Only direct M2O fields can be expanded in V1: ${collection}.${field}`,
-      `expand.${field}`,
+      `Only direct M2O/O2O fields can be expanded: ${collection}.${field}`,
+      `fields.${field}`,
     );
   }
   return relation;
 }
 
-async function validateSourceExpansions({ collection, expandFields, options, service }) {
+function readableSourceField(sourceSchema, permission, field) {
+  return Boolean(sourceSchema.fields?.[field]
+    && (!permission.fields || permission.fields.includes(field)));
+}
+
+function directReadableRelationFields(snapshot, collection, sourceSchema, permission) {
+  const prefix = `${collection}.`;
+  const fields = [];
+  for (const [key, relation] of snapshot.relationByManyField?.entries?.() ?? []) {
+    if (!key.startsWith(prefix) || !isDirectRelation(relation)) continue;
+    const field = key.slice(prefix.length);
+    if (readableSourceField(sourceSchema, permission, field)) fields.push(field);
+  }
+  return [...new Set(fields)];
+}
+
+function mergeExpansionSelection(expansions, relationField, targetField) {
+  const current = expansions.get(relationField) ?? [];
+  if (current.includes('*')) return;
+  if (targetField === '*') {
+    expansions.set(relationField, ['*']);
+    return;
+  }
+  expansions.set(relationField, [...new Set([...current, targetField])]);
+}
+
+function parseFieldsPlan({ value, snapshot, collection, sourceSchema, permission }) {
+  const tokens = normalizeDelimited(value);
+  if (tokens.length === 0) {
+    return { sourceFields: null, expansions: new Map() };
+  }
+
+  let sourceAll = false;
+  const sourceFields = [];
+  const expansions = new Map();
+
+  for (const token of tokens) {
+    if (token === '*') {
+      sourceAll = true;
+      continue;
+    }
+
+    if (token === '*.*') {
+      sourceAll = true;
+      for (const relationField of directReadableRelationFields(
+        snapshot,
+        collection,
+        sourceSchema,
+        permission,
+      )) {
+        mergeExpansionSelection(expansions, relationField, '*');
+      }
+      continue;
+    }
+
+    if (!token.includes('.')) {
+      sourceFields.push(assertFieldToken(token, `fields.${token}`));
+      continue;
+    }
+
+    const parts = token.split('.');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      throw expansionError(
+        'UNSUPPORTED_RELATION_EXPANSION',
+        `Only one relation depth is supported in fields: ${token}`,
+        `fields.${token}`,
+      );
+    }
+
+    const relationField = assertFieldToken(parts[0], `fields.${token}`);
+    const targetField = parts[1] === '*'
+      ? '*'
+      : assertFieldToken(parts[1], `fields.${token}`);
+
+    if (!readableSourceField(sourceSchema, permission, relationField)) {
+      throw expansionError('INVALID_QUERY', `Unknown field: ${relationField}`, `fields.${token}`);
+    }
+    directRelation(snapshot, collection, relationField);
+    sourceFields.push(relationField);
+    mergeExpansionSelection(expansions, relationField, targetField);
+  }
+
+  return {
+    sourceFields: sourceAll ? ['*'] : [...new Set(sourceFields)],
+    expansions,
+  };
+}
+
+function addLegacyExpansions({ query, plan, snapshot, collection, sourceSchema, permission }) {
+  for (const field of parseExpandInput(query.expand)) {
+    if (!readableSourceField(sourceSchema, permission, field)) {
+      throw expansionError('INVALID_QUERY', `Unknown field: ${field}`, `expand.${field}`);
+    }
+    directRelation(snapshot, collection, field);
+    mergeExpansionSelection(plan.expansions, field, '*');
+    if (plan.sourceFields && !plan.sourceFields.includes('*') && !plan.sourceFields.includes(field)) {
+      plan.sourceFields.push(field);
+    }
+  }
+  return plan;
+}
+
+async function buildSelectionPlan({ collection, query, options, service }) {
   const snapshot = await schemaSnapshot(options);
   const sourceSchema = snapshot.collections?.[collection];
   if (!sourceSchema) {
     throw expansionError('COLLECTION_NOT_FOUND', `Unknown collection: ${collection}`);
   }
-  if (expandFields.length === 0) return snapshot;
 
   const permission = await service.resolvePermission('read');
-  for (const field of expandFields) {
-    if (!sourceSchema.fields?.[field] || (permission.fields && !permission.fields.includes(field))) {
-      throw expansionError('INVALID_QUERY', `Unknown field: ${field}`, `expand.${field}`);
-    }
-    directRelation(snapshot, collection, field);
-  }
-  return snapshot;
+  const plan = parseFieldsPlan({
+    value: query.fields,
+    snapshot,
+    collection,
+    sourceSchema,
+    permission,
+  });
+  addLegacyExpansions({ query, plan, snapshot, collection, sourceSchema, permission });
+  return { ...plan, snapshot };
 }
 
-async function expandRows({ collection, rows, expandFields, options, ItemsServiceClass, snapshot }) {
-  if (expandFields.length === 0 || rows.length === 0) return rows;
+function baseQuery(query, sourceFields) {
+  const base = { ...query };
+  delete base.expand;
+  if (sourceFields == null) delete base.fields;
+  else base.fields = sourceFields;
+  return base;
+}
+
+function targetQueryFields(selection, targetKey) {
+  if (selection.includes('*')) return ['*'];
+  return [...new Set([...selection, targetKey])];
+}
+
+function projectTarget(target, selection) {
+  if (selection.includes('*')) return target;
+  return Object.fromEntries(
+    selection
+      .filter((field) => Object.hasOwn(target, field))
+      .map((field) => [field, target[field]]),
+  );
+}
+
+async function expandRows({ collection, rows, expansions, options, ItemsServiceClass, snapshot }) {
+  if (expansions.size === 0 || rows.length === 0) return rows;
   const effectiveSnapshot = snapshot ?? await schemaSnapshot(options);
   let expandedRows = rows.map((row) => ({ ...row }));
 
-  for (const field of expandFields) {
+  for (const [field, selection] of expansions) {
     const relation = directRelation(effectiveSnapshot, collection, field);
     const targetCollection = relation.one_collection;
     const targetKey = relation.one_field
@@ -133,6 +252,7 @@ async function expandRows({ collection, rows, expandFields, options, ItemsServic
 
     const targetService = new ItemsServiceClass(targetCollection, options);
     const targetRows = await targetService.readMany({
+      fields: targetQueryFields(selection, targetKey),
       filter: { [targetKey]: { _in: values } },
       limit: Math.min(values.length, 500),
     });
@@ -143,10 +263,10 @@ async function expandRows({ collection, rows, expandFields, options, ItemsServic
         throw expansionError(
           'FORBIDDEN_FIELD',
           `Expanded relation key is not readable: ${targetCollection}.${targetKey}`,
-          `expand.${field}`,
+          `fields.${field}`,
         );
       }
-      byKey.set(String(target[targetKey]), target);
+      byKey.set(String(target[targetKey]), projectTarget(target, selection));
     }
 
     expandedRows = expandedRows.map((row) => ({
@@ -167,17 +287,16 @@ export async function readManyWithRelations({
   ItemsServiceClass = ItemsService,
 } = {}) {
   assertIdentifier(collection, 'collection name');
-  const expandFields = parseExpandInput(query.expand);
   const service = new ItemsServiceClass(collection, options);
-  const snapshot = await validateSourceExpansions({ collection, expandFields, options, service });
-  const result = await service.readManyWithMeta(withoutExpand(query, expandFields));
+  const plan = await buildSelectionPlan({ collection, query, options, service });
+  const result = await service.readManyWithMeta(baseQuery(query, plan.sourceFields));
   const data = await expandRows({
     collection,
     rows: result.data,
-    expandFields,
+    expansions: plan.expansions,
     options,
     ItemsServiceClass,
-    snapshot,
+    snapshot: plan.snapshot,
   });
   return { ...result, data };
 }
@@ -196,21 +315,17 @@ export async function readOneWithRelations({
     }
   }
 
-  const expandFields = parseExpandInput(query.expand);
   const service = new ItemsServiceClass(collection, options);
-  const snapshot = await validateSourceExpansions({ collection, expandFields, options, service });
-  const fields = withExpansionFields(query.fields ?? null, expandFields);
-  const record = await service.readOne(id, { fields });
+  const plan = await buildSelectionPlan({ collection, query, options, service });
+  const record = await service.readOne(id, { fields: plan.sourceFields });
   if (!record) return null;
   const [expanded] = await expandRows({
     collection,
     rows: [record],
-    expandFields,
+    expansions: plan.expansions,
     options,
     ItemsServiceClass,
-    snapshot,
+    snapshot: plan.snapshot,
   });
   return expanded;
 }
-
-export { MAX_EXPAND_FIELDS };

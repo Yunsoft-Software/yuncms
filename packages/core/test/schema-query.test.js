@@ -44,12 +44,14 @@ test('items query parser rejects unknown parameters and clamps shape', () => {
   assert.equal(parsed.limit, 25);
   assert.equal(parsed.offset, 10);
   assert.deepEqual(parsed.filter, { status: { _eq: 'active' } });
+  assert.deepEqual(parseItemsQuery({ fields: '*' }).fields, ['*']);
   assert.throws(() => parseItemsQuery({ raw: 'sql' }), /Unknown query parameter/);
   assert.throws(() => parseItemsQuery({ limit: 9999 }), /limit must be an integer/);
 });
 
 test('select and sort compilers resolve only schema fields', () => {
   assert.equal(compileSelectFields(['id', 'title'], schema).sql, '`id`, `title`');
+  assert.equal(compileSelectFields(['*'], schema).sql, '`id`, `status`, `amount`, `title`');
   assert.equal(compileSort(['-title', 'status'], schema), ' ORDER BY `title` DESC, `status` ASC');
   assert.throws(() => compileSelectFields(['password'], schema), /Unknown field/);
   assert.throws(() => compileSort(['created_at'], schema), /Unknown field/);
