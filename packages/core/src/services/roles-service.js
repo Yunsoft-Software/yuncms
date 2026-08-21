@@ -3,13 +3,6 @@ import { randomUUID } from 'node:crypto';
 import { BaseService } from './base-service.js';
 import { resolveSystemResourceAccess } from './system-resource-access.js';
 
-function assertRoleManager(accountability) {
-  if (accountability.admin === true || accountability.system === true) return;
-  const error = new Error('Role management requires administrator accountability');
-  error.code = 'FORBIDDEN';
-  throw error;
-}
-
 function normalizeRoleName(name) {
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     const error = new Error('Role name is required');
@@ -25,7 +18,27 @@ function normalizeRoleName(name) {
   return normalized;
 }
 
+function assertSpecialRoleCreation(accountability, { admin = false, public: publicRole = false } = {}) {
+  if (accountability.admin === true || accountability.system === true) return;
+  if (admin || publicRole) {
+    const error = new Error('Delegated role managers cannot create administrator or public roles');
+    error.code = 'FORBIDDEN';
+    throw error;
+  }
+}
+
 export class RolesService extends BaseService {
+  async #readOneUnsafe(id) {
+    const [rows] = await this.database.query(
+      `SELECT id, name, description, admin, public, created_at, updated_at
+       FROM yuncms_roles
+       WHERE id = ?
+       LIMIT 1`,
+      [id],
+    );
+    return rows[0] ?? null;
+  }
+
   async readMany() {
     await resolveSystemResourceAccess(this, 'read', 'yuncms_roles');
     const [rows] = await this.database.query(
@@ -38,18 +51,11 @@ export class RolesService extends BaseService {
 
   async readOne(id) {
     await resolveSystemResourceAccess(this, 'read', 'yuncms_roles');
-    const [rows] = await this.database.query(
-      `SELECT id, name, description, admin, public, created_at, updated_at
-       FROM yuncms_roles
-       WHERE id = ?
-       LIMIT 1`,
-      [id],
-    );
-    return rows[0] ?? null;
+    return this.#readOneUnsafe(id);
   }
 
   async createOne(input = {}) {
-    assertRoleManager(this.accountability);
+    await resolveSystemResourceAccess(this, 'create', 'yuncms_roles');
     const name = normalizeRoleName(input.name);
 
     const admin = input.admin === true;
@@ -59,6 +65,7 @@ export class RolesService extends BaseService {
       error.code = 'INVALID_ROLE';
       throw error;
     }
+    assertSpecialRoleCreation(this.accountability, { admin, public: publicRole });
 
     if (publicRole) {
       const [rows] = await this.database.query(
@@ -83,11 +90,11 @@ export class RolesService extends BaseService {
         publicRole ? 1 : 0,
       ],
     );
-    return this.readOne(id);
+    return this.#readOneUnsafe(id);
   }
 
   async updateOne(id, patch = {}) {
-    assertRoleManager(this.accountability);
+    await resolveSystemResourceAccess(this, 'update', 'yuncms_roles');
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
       const error = new Error('Role patch must be an object');
       error.code = 'INVALID_PAYLOAD';
@@ -100,7 +107,7 @@ export class RolesService extends BaseService {
       throw error;
     }
 
-    const existing = await this.readOne(id);
+    const existing = await this.#readOneUnsafe(id);
     if (!existing) {
       const error = new Error(`Unknown role: ${id}`);
       error.code = 'ROLE_NOT_FOUND';
@@ -123,12 +130,12 @@ export class RolesService extends BaseService {
       `UPDATE yuncms_roles SET ${assignments.join(', ')} WHERE id = ?`,
       params,
     );
-    return this.readOne(id);
+    return this.#readOneUnsafe(id);
   }
 
   async deleteOne(id) {
-    assertRoleManager(this.accountability);
-    const role = await this.readOne(id);
+    await resolveSystemResourceAccess(this, 'delete', 'yuncms_roles');
+    const role = await this.#readOneUnsafe(id);
     if (!role) {
       const error = new Error(`Unknown role: ${id}`);
       error.code = 'ROLE_NOT_FOUND';
