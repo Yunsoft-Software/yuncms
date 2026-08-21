@@ -144,6 +144,19 @@ test('legacy expand remains supported without an arbitrary relation-count cap', 
   assert.equal(result.data[0].author_id.name, 'Ada');
 });
 
+test('legacy expand preserves expand-specific error paths', async () => {
+  const { FakeItemsService } = createHarness();
+  await assert.rejects(
+    readManyWithRelations({
+      collection: 'articles',
+      query: { expand: 'title' },
+      options: { schema, database: {} },
+      ItemsServiceClass: FakeItemsService,
+    }),
+    (error) => error.code === 'INVALID_QUERY' && error.path === 'expand.title',
+  );
+});
+
 test('source field allowlist is checked before explicit nested expansion', async () => {
   const { FakeItemsService } = createHarness({ sourcePermission: { fields: ['id', 'title'] } });
 
