@@ -2,7 +2,7 @@
 
 YunCMS turns every project collection into a predictable REST resource. You define the schema in Studio or through the Schema API, then read and write records through `/items/<collection-key>`.
 
-This guide documents the query language implemented on branch `16-08-2026`.
+This guide documents the query language implemented on branch `21-08-2026`.
 
 > **Display names are for people. API keys are for code.** A collection displayed as `Müşteri Talepleri` may have the stable API key `musteri_talepleri`. URLs, JSON payload field names, filters, sorting and relation expansion always use the machine key.
 
@@ -27,7 +27,7 @@ curl 'http://localhost:3008/items/musteri_talepleri' \
   -H 'Authorization: Bearer YOUR_TOKEN'
 ```
 
-The Public role can also read project collections when you explicitly grant public read permission. Public access is deny-by-default.
+The Public role is deny-by-default. Administrators may explicitly grant it access to project collections and to system resources that are marked permission-managed, such as Files. Internal non-delegatable system collections remain protected.
 
 ---
 
@@ -69,12 +69,12 @@ Response:
 
 | Parameter | Purpose | Default / limit |
 | --- | --- | --- |
-| `fields` | Select returned field keys | all readable fields |
+| `fields` | Select returned fields and one-level direct relation fields | all readable fields |
 | `filter` | JSON filter object | none |
 | `sort` | Comma-separated sort keys | database/default order |
 | `limit` | Maximum number of records returned | `100`, max `500` |
 | `offset` | Number of matching rows to skip | `0` |
-| `expand` | Expand direct relation fields | max 8 fields |
+| `expand` | Legacy direct-relation expansion syntax | no arbitrary relation-count cap |
 
 Unknown query parameters fail with `INVALID_QUERY`; YunCMS does not silently ignore typos.
 
@@ -96,18 +96,47 @@ curl --get 'http://localhost:3008/items/articles' \
   --data-urlencode 'fields=id,title,status'
 ```
 
-`fields=*` selects every field that is readable under the active permission:
+YunCMS follows the Directus-style wildcard/dot field shape for the direct relation engine.
+
+`fields=*` selects every readable field at the current level. Relation fields remain their stored key value unless you request nested fields:
 
 ```http
 GET /items/articles?fields=*
+```
+
+`fields=*.*` selects every readable field at the current level and expands every readable direct to-one relation by one level:
+
+```http
+GET /items/articles?fields=*.*
+```
+
+Select all top-level fields plus all readable fields from one direct relation:
+
+```http
+GET /items/articles?fields=*,author_id.*
+```
+
+Select only specific nested fields:
+
+```http
+GET /items/articles?fields=id,title,author_id.name
+```
+
+Multiple nested fields from the same relation are merged:
+
+```http
+GET /items/articles?fields=id,author_id.name,author_id.bio
 ```
 
 Important rules:
 
 - use **field API keys**, not display names;
 - duplicate field names are de-duplicated;
-- requesting an unknown or forbidden field fails closed;
-- role field allowlists are applied before the query is compiled.
+- `*` never bypasses the active field allowlist;
+- `*.*` only expands source relation fields the current accountability may read;
+- an explicitly requested unknown or forbidden relation field fails closed;
+- target collection row filters and field allowlists are applied again while expanding;
+- the current relation engine supports one direct to-one depth; deeper relation paths and junction/M2M expansion remain unsupported for now.
 
 ---
 
@@ -384,7 +413,7 @@ curl --get 'http://localhost:3008/items/tasks' \
 ```bash
 curl --get 'http://localhost:3008/items/orders' \
   -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'fields=id,order_no,total,status,created_at' \
+  --data-urlencode 'fields=id,order_no,total,status,customer_id.name' \
   --data-urlencode 'filter={"status":{"_in":["paid","processing"]},"total":{"_gte":1000}}' \
   --data-urlencode 'sort=-created_at,order_no' \
   --data-urlencode 'limit=50' \
@@ -397,12 +426,12 @@ This is the normal production pattern for tables, dashboards and server-side lis
 
 # Direct relation expansion
 
-Use `expand` to replace a direct foreign-key field with its readable target record.
+Nested `fields` is the preferred relation-selection syntax.
 
 Suppose `articles.author_id` points to `authors.id`.
 
 ```http
-GET /items/articles?fields=id,title,author_id&expand=author_id
+GET /items/articles?fields=id,title,author_id.*
 ```
 
 Response:
@@ -427,23 +456,23 @@ Response:
 }
 ```
 
+The earlier `expand` parameter remains supported for compatibility:
+
+```http
+GET /items/articles?fields=id,title&expand=author_id
+```
+
 Rules:
 
-- at most 8 direct relation fields can be expanded in one request;
-- `expand` accepts a comma-separated list;
+- `expand` accepts a comma-separated list and no longer has the former arbitrary eight-field cap;
 - the source field must be readable;
-- only direct to-one relations are expanded in V1;
-- junction/M2M expansion is not implemented in V1;
+- nested `fields` supports `*.*`, `relation.*` and `relation.field` for the current one-level direct relation engine;
+- only direct to-one relations are expanded at this stage;
+- junction/M2M expansion is not implemented yet;
 - target records are read using the **same accountability**;
 - target row filters and target field allowlists still apply;
 - if the current user cannot see the target row, the expanded value becomes `null` rather than bypassing permissions;
-- when `fields` is explicitly provided, YunCMS internally ensures the relation key needed for expansion is selected.
-
-Example with two expansions:
-
-```http
-GET /items/orders?expand=customer_id,owner_id
-```
+- YunCMS internally includes relation/target keys needed to perform the lookup and removes internal-only target keys from a narrowed nested response.
 
 ---
 
@@ -461,13 +490,15 @@ curl --get 'http://localhost:3008/items/articles/b74cb835-d7fe-42a8-9f1a-95dc5c0
   --data-urlencode 'fields=id,title,status'
 ```
 
-Direct expansion is also supported:
+Nested fields are supported on single-record reads too:
 
 ```bash
 curl --get 'http://localhost:3008/items/articles/RECORD_ID' \
   -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'expand=author_id'
+  --data-urlencode 'fields=id,title,author_id.name'
 ```
+
+Legacy `expand=author_id` is also still accepted.
 
 If the row does not exist **or is hidden by RBAC**, the API returns a not-found response. This avoids leaking whether a forbidden row exists.
 
@@ -547,7 +578,7 @@ Successful deletion returns HTTP `204 No Content`.
 
 ```js
 const params = new URLSearchParams({
-  fields: 'id,title,status,published_at',
+  fields: 'id,title,status,author_id.name',
   filter: JSON.stringify({
     status: { _eq: 'published' },
     published_at: { _nnull: true },
@@ -597,9 +628,19 @@ AND readable field allowlist
 AND requested sorting/selection
 ```
 
-This means a user cannot widen access by sending their own `_or`, requesting `fields=*`, sorting by a hidden field or expanding a target collection they cannot read.
+This means a user cannot widen access by sending their own `_or`, requesting `fields=*`/`fields=*.*`, sorting by a hidden field or expanding a target collection they cannot read.
 
 Permission and user values are bound as SQL parameters. Dynamic field/collection identifiers are validated against the schema and quoted separately.
+
+---
+
+# Public Files example
+
+Files is a permission-managed system resource. It is still private by default, but an administrator may explicitly grant the Public role `read` access when building a public gallery or public asset library.
+
+After that explicit grant, anonymous requests use the Public role through the normal permission engine; there is no bypass or special unauthenticated Files code path. Removing the grant closes access again.
+
+Do not grant Public access to a permission-managed resource unless exposing that resource is intentional. System resources that are not permission-managed remain non-delegatable.
 
 ---
 
@@ -645,9 +686,9 @@ Correct:
 
 Use multiple pages. `limit` is intentionally capped at 500.
 
-### Expanding a junction relation
+### Expanding a junction relation or requesting deeper relation paths
 
-V1 expansion is for direct to-one relations only.
+The current expansion engine supports one direct to-one level. Junction/M2M and deeper recursive expansion are separate follow-up capabilities.
 
 ---
 
