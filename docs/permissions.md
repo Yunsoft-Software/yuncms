@@ -16,15 +16,18 @@ Important invariants:
 
 ## RolesService
 
-Role **mutation** is administrator/system-only. Reading role labels can be delegated through the explicitly registered `yuncms_roles:read` system-resource permission so a delegated user manager can resolve role names without receiving role-management privileges.
+Roles use the same explicit permission engine as other permission-managed resources. `yuncms_roles` starts with no grant for Public or ordinary roles, but an administrator may explicitly grant `read`, `create`, `update` or `delete`. Admin/system accountability bypasses the permission lookup as before.
 
-Protected invariants:
+Role mutation still keeps data-integrity and escalation invariants separate from the grant itself:
 
 - one role cannot be both admin and public;
 - only one public role may exist;
 - MySQL also enforces the one-public-role rule;
-- protected admin/public semantics cannot be silently mutated;
-- roles still referenced by users/permissions cannot be deleted through an unsafe shortcut.
+- a delegated role manager cannot mint a new Administrator or Public role as a side effect of ordinary Roles create access;
+- Administrator/Public roles cannot be deleted through the ordinary delegated role API;
+- roles still referenced by users cannot be deleted through an unsafe shortcut.
+
+These are record semantics, not role-type permission locks. Normal role CRUD becomes available whenever the exact permission row exists.
 
 ## Permission records
 
@@ -51,31 +54,32 @@ Filters and validations use the same allowlisted field/operator language as the 
 
 ## Permission-managed system resources
 
-Core migration `0007-system-permission-resources` registers a deliberately small set of system resources in schema metadata. This does **not** expose generic `/items/yuncms_*` CRUD; specialized services remain the only execution path.
+Core migration `0007-system-permission-resources` registers a deliberately small set of system resources in schema metadata. Migration `0011-role-permission-actions` expands Roles to the same explicit CRUD-grant model. This does **not** expose generic `/items/yuncms_*` CRUD; specialized services remain the execution path.
 
-| Resource | Delegatable actions | Advanced field/row rules |
+| Resource | Explicitly grantable actions | Advanced field/row rules |
 | --- | --- | --- |
 | `yuncms_users` | read, create, update, delete | No; action-level only |
 | `yuncms_files` | read, create, update, delete | No; action-level only |
-| `yuncms_roles` | read only | No; action-level only |
+| `yuncms_roles` | read, create, update, delete | No; action-level only |
 
 Everything else under the system schema stays non-delegatable unless it is explicitly registered in a future migration. In particular, permission records themselves are not a delegatable system resource.
 
-The Public role follows the same explicit-grant model. It starts with no collection access, but an administrator may grant it an action that the resource itself marks delegatable. This allows intentional cases such as a public image gallery backed by `yuncms_files:read` without adding a special unauthenticated Files bypass.
+Public and ordinary roles follow the same model: **deny by default, explicit grant to enable**. There is no separate blanket rule that says “Public can never access this permission-managed resource” or “custom roles can only read Roles.” This allows intentional cases such as a public image gallery backed by `yuncms_files:read`, or a narrowly trusted role-management client backed by explicit Roles actions.
 
 Additional safety rules:
 
-- Public is still deny-by-default; no system-resource access exists until an administrator creates the exact permission row;
-- Public grants do not override a resource's `allowedActions` contract and cannot expose non-permission-managed system collections;
-- a delegated user manager cannot assign the Administrator role;
-- a delegated user manager cannot modify/delete an Administrator account;
+- no Public/custom system-resource access exists until an administrator creates the exact permission row;
+- grants cannot expose non-permission-managed system collections;
+- a delegated user manager cannot assign the Administrator role or modify/delete Administrator accounts;
 - the Public role cannot be assigned to an authenticated user;
-- Roles create/update/delete and Permissions management remain administrator/system-only;
+- delegated Roles create cannot create Administrator/Public roles;
+- Administrator/Public roles retain protected deletion semantics;
+- Permissions management itself remains administrator/system-only;
 - generic `ItemsService` refuses system collections and requires the dedicated service.
 
-Because current system-resource permissions are action-level only, an administrator should grant Public access only when exposing the whole specialized resource action is intentional. For example, `yuncms_files:read` permits the normal Files read/list/content path; it is appropriate for an intentionally public gallery, while leaving the permission absent keeps Files private.
+Because current system-resource permissions are action-level only, grant a system-resource action only when exposing that specialized action is intentional. For example, `yuncms_files:read` permits the normal Files read/list/content path; leaving the permission absent keeps Files private.
 
-The Studio permission matrix shows only explicitly permission-managed system resources, labels them as system resources, and renders non-delegatable actions as protected. Public uses the same matrix instead of receiving an artificial blanket lock.
+The Studio permission matrix shows explicitly permission-managed system resources and every action their metadata exposes. Public uses the same matrix as other non-admin roles rather than receiving an artificial blanket lock.
 
 ## Resolution and request-local cache
 
@@ -83,7 +87,7 @@ The Studio permission matrix shows only explicitly permission-managed system res
 
 1. gives explicit admin/system accountability full access;
 2. denies non-admin accountability without a role;
-3. for system collections, requires explicit `permissionManaged` registration and an allowlisted action;
+3. for system collections, requires explicit `permissionManaged` registration and an allowed action;
 4. resolves the exact role/collection/action row, including for Public;
 5. denies missing permission rows;
 6. rejects malformed metadata;
@@ -158,8 +162,8 @@ PATCH  /permissions/:id
 DELETE /permissions/:id
 ```
 
-The Studio exposes role CRUD for administrators plus normal project permissions and the bounded system-resource action matrix described above.
+The Studio exposes administrator role/permission management plus the permission matrix used to grant ordinary/Public access to permission-managed resources.
 
 ## Remaining verification
 
-Source-level enforcement and regression coverage exist. Real MySQL/API privilege-escalation, Public Files and system-resource delegation checks are kept in the guarded release integration suite and `todo.md` until executed against the target environment.
+Source-level enforcement and regression coverage exist. Real MySQL/API privilege-escalation, Public Files, explicit Roles CRUD grants and system-resource delegation checks are kept in the guarded release integration suite and `todo.md` until executed against the target environment.

@@ -23,13 +23,14 @@
 
 - [x] MySQL pool, pinned transactions, retryable DB errors and advisory schema locks.
 - [x] Migration journal + compatibility gate.
-- [x] Core migrations `0001`–`0010` registered.
+- [x] Core migrations `0001`–`0011` registered.
 - [x] `0005`: deny-by-default Public role.
 - [x] `0006`: Studio branding/theme/locale.
 - [x] `0007`: bounded permission-managed system resources.
 - [x] `0008`: nullable Files-backed `logo_file` FK.
 - [x] `0009`: human display-name columns for collections and fields, with legacy key backfill.
 - [x] `0010`: nullable Files-backed `favicon_file` FK.
+- [x] `0011`: Roles resource CRUD actions become explicitly grantable through the normal permission engine without adding default grants.
 - [x] Dynamic schema mutations retain version/cache invalidation and compensation patterns.
 
 ## 3. Human names vs stable API keys
@@ -98,8 +99,8 @@
 - [x] Scrypt passwords, sessions, refresh rotation, logout/revocation, API tokens and reset/verification flows.
 - [x] Management-created users are immediately verified.
 - [x] Human-readable `role_name` propagates through auth identity and sidebar presentation.
-- [x] Users/Files action permissions and Roles read delegation remain bounded with escalation guards.
-- [x] Public remains deny-by-default, but administrators may explicitly grant it allowed actions on permission-managed resources such as Files; non-delegatable system collections and protected actions remain closed.
+- [x] Users/Files CRUD permissions and Roles CRUD delegation use the same explicit permission engine; service-level escalation/data-integrity invariants remain enforced.
+- [x] Public and ordinary roles are deny-by-default but are not blanket-blocked by role type: an administrator may explicitly grant any action that a permission-managed resource exposes, including Public Files read or Roles CRUD.
 - [x] Project permissions support action toggles, field allowlists, row filters and write validation.
 - [x] Dark-mode permission matrix, sticky cells, pagination and permission-rule count badges use Studio surface variables rather than white backgrounds.
 
@@ -130,6 +131,7 @@
 - [x] README is product-oriented and explains architecture, capabilities, quick start, schema naming and API examples.
 - [x] `docs/rest-api.md` is a detailed endpoint reference with auth, Items, schema, relations, Users/Roles/Files, branding and health examples.
 - [x] `docs/api-query-language.md` documents all implemented collection query parameters/operators, URL encoding, pagination, nested filters, Directus-style wildcard/direct-relation fields and legacy expansion.
+- [x] `docs/permissions.md` documents deny-by-default explicit grants for Public/custom roles and permission-managed system resources.
 - [x] Studio customization documentation covers Files-backed logo/favicon selection and public branding endpoints.
 - [x] Existing architecture/auth/permissions/files/database/security/deployment documentation remains linked from README.
 
@@ -142,6 +144,7 @@
 - [x] Data Model V2 label/key, ordering, relation and system-field source contracts.
 - [x] `fields=*`, `fields=*.*`, direct nested field selection and legacy expansion regression contracts.
 - [x] Public Files deny-without-grant / allow-with-explicit-grant core and Studio permission-matrix contracts.
+- [x] Roles create/update/delete deny-without-grant / allow-with-explicit-grant contracts, including Public-configurable action metadata and protected administrator/public role invariants.
 - [x] Files full-preview and contain-style UI contracts.
 - [x] File-backed logo/favicon service/API/client source contracts.
 - [x] Dark pagination/permission/badge surface contracts.
