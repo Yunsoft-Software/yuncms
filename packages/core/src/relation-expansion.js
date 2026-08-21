@@ -64,13 +64,13 @@ function isDirectRelation(relation) {
   return !relation.junction_collection && metadata.kind !== 'm2m';
 }
 
-function directRelation(snapshot, collection, field) {
+function directRelation(snapshot, collection, field, path = `fields.${field}`) {
   const relation = relationFromSnapshot(snapshot, collection, field);
   if (!relation) {
     throw expansionError(
       'INVALID_QUERY',
       `Field is not a direct relation and cannot be expanded: ${collection}.${field}`,
-      `fields.${field}`,
+      path,
     );
   }
 
@@ -78,7 +78,7 @@ function directRelation(snapshot, collection, field) {
     throw expansionError(
       'UNSUPPORTED_RELATION_EXPANSION',
       `Only direct M2O/O2O fields can be expanded: ${collection}.${field}`,
-      `fields.${field}`,
+      path,
     );
   }
   return relation;
@@ -161,7 +161,7 @@ function parseFieldsPlan({ value, snapshot, collection, sourceSchema, permission
     if (!readableSourceField(sourceSchema, permission, relationField)) {
       throw expansionError('INVALID_QUERY', `Unknown field: ${relationField}`, `fields.${token}`);
     }
-    directRelation(snapshot, collection, relationField);
+    directRelation(snapshot, collection, relationField, `fields.${token}`);
     sourceFields.push(relationField);
     mergeExpansionSelection(expansions, relationField, targetField);
   }
@@ -177,7 +177,7 @@ function addLegacyExpansions({ query, plan, snapshot, collection, sourceSchema, 
     if (!readableSourceField(sourceSchema, permission, field)) {
       throw expansionError('INVALID_QUERY', `Unknown field: ${field}`, `expand.${field}`);
     }
-    directRelation(snapshot, collection, field);
+    directRelation(snapshot, collection, field, `expand.${field}`);
     mergeExpansionSelection(plan.expansions, field, '*');
     if (plan.sourceFields && !plan.sourceFields.includes('*') && !plan.sourceFields.includes(field)) {
       plan.sourceFields.push(field);
