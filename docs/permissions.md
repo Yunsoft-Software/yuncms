@@ -1,6 +1,6 @@
 # Roles and Permissions
 
-This document describes RBAC behavior implemented on branch `16-08-2026`.
+This document describes RBAC behavior implemented on branch `21-08-2026`.
 
 ## Accountability
 
@@ -61,16 +61,21 @@ Core migration `0007-system-permission-resources` registers a deliberately small
 
 Everything else under the system schema stays non-delegatable unless it is explicitly registered in a future migration. In particular, permission records themselves are not a delegatable system resource.
 
+The Public role follows the same explicit-grant model. It starts with no collection access, but an administrator may grant it an action that the resource itself marks delegatable. This allows intentional cases such as a public image gallery backed by `yuncms_files:read` without adding a special unauthenticated Files bypass.
+
 Additional safety rules:
 
-- the Public role can never receive system-resource access;
+- Public is still deny-by-default; no system-resource access exists until an administrator creates the exact permission row;
+- Public grants do not override a resource's `allowedActions` contract and cannot expose non-permission-managed system collections;
 - a delegated user manager cannot assign the Administrator role;
 - a delegated user manager cannot modify/delete an Administrator account;
 - the Public role cannot be assigned to an authenticated user;
 - Roles create/update/delete and Permissions management remain administrator/system-only;
 - generic `ItemsService` refuses system collections and requires the dedicated service.
 
-The Studio permission matrix shows only explicitly permission-managed system resources, labels them as system resources, and renders non-delegatable actions as protected instead of pretending they can be configured.
+Because current system-resource permissions are action-level only, an administrator should grant Public access only when exposing the whole specialized resource action is intentional. For example, `yuncms_files:read` permits the normal Files read/list/content path; it is appropriate for an intentionally public gallery, while leaving the permission absent keeps Files private.
+
+The Studio permission matrix shows only explicitly permission-managed system resources, labels them as system resources, and renders non-delegatable actions as protected. Public uses the same matrix instead of receiving an artificial blanket lock.
 
 ## Resolution and request-local cache
 
@@ -79,7 +84,7 @@ The Studio permission matrix shows only explicitly permission-managed system res
 1. gives explicit admin/system accountability full access;
 2. denies non-admin accountability without a role;
 3. for system collections, requires explicit `permissionManaged` registration and an allowlisted action;
-4. resolves the exact role/collection/action row;
+4. resolves the exact role/collection/action row, including for Public;
 5. denies missing permission rows;
 6. rejects malformed metadata;
 7. caches the resolved result only inside the current request context.
@@ -132,6 +137,7 @@ A validation failure returns `VALIDATION_FAILED`; the bulk guard returns `VALIDA
 Direct to-one expansion also honors RBAC:
 
 - source relation field must be visible under source read permission;
+- `fields=*.*`, `relation.*` and `relation.field` use the same permission-aware direct relation engine as legacy `expand`;
 - target records are loaded through `ItemsService` with the same accountability;
 - target field allowlists/row filters remain effective;
 - inaccessible targets resolve to `null` rather than bypassing target restrictions.
@@ -156,4 +162,4 @@ The Studio exposes role CRUD for administrators plus normal project permissions 
 
 ## Remaining verification
 
-Source-level enforcement and regression coverage exist. Real MySQL/API privilege-escalation and system-resource delegation checks are kept in the guarded release integration suite and `todo.md` until executed against the target environment.
+Source-level enforcement and regression coverage exist. Real MySQL/API privilege-escalation, Public Files and system-resource delegation checks are kept in the guarded release integration suite and `todo.md` until executed against the target environment.
