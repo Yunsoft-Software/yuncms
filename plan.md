@@ -1,6 +1,6 @@
 # YunCMS Development Plan
 
-> Live source-status document for branch `16-08-2026`. Checked items describe source-complete behavior only. Node 24/MySQL/browser/provider verification stays in `todo.md` until actually executed.
+> Live source-status document for branch `21-08-2026`. Checked items describe source-complete behavior only. Node 24/MySQL/browser/provider verification stays in `todo.md` until actually executed.
 
 ## 0. Permanent engineering rules
 
@@ -73,12 +73,13 @@
 ## 6. Items API / content
 
 - [x] Project collection read/read-one/create/update/delete.
-- [x] `fields`, `filter`, `sort`, `limit`, `offset`, direct `expand` query surface.
+- [x] `fields`, `filter`, `sort`, `limit`, `offset` and legacy direct `expand` query surface.
+- [x] Directus-style direct-relation field selection supports `fields=*`, `fields=*.*`, `relation.*` and `relation.field` while preserving field/row RBAC at both source and target levels.
 - [x] Filter operators include comparisons, IN/NOT IN, NULL checks, text matching and nested AND/OR.
 - [x] RBAC row filters and field allowlists remain part of every query.
-- [x] Direct relation expansion reuses target RBAC and supports up to eight fields.
+- [x] Direct to-one relation expansion reuses target RBAC, supports one relation depth and no longer has the former arbitrary eight-field cap.
 - [x] Generic ItemsService refuses system collections so specialized safeguards cannot be bypassed.
-- [x] Detailed Items query-language documentation includes operator tables, curl examples, pagination, relation expansion and JavaScript usage.
+- [x] Detailed Items query-language documentation includes operator tables, curl examples, pagination, wildcard/nested relation fields and JavaScript usage.
 
 ## 7. Files / previews / branding assets
 
@@ -98,7 +99,7 @@
 - [x] Management-created users are immediately verified.
 - [x] Human-readable `role_name` propagates through auth identity and sidebar presentation.
 - [x] Users/Files action permissions and Roles read delegation remain bounded with escalation guards.
-- [x] Public remains deny-by-default and cannot receive system-resource permissions.
+- [x] Public remains deny-by-default, but administrators may explicitly grant it allowed actions on permission-managed resources such as Files; non-delegatable system collections and protected actions remain closed.
 - [x] Project permissions support action toggles, field allowlists, row filters and write validation.
 - [x] Dark-mode permission matrix, sticky cells, pagination and permission-rule count badges use Studio surface variables rather than white backgrounds.
 
@@ -128,7 +129,7 @@
 
 - [x] README is product-oriented and explains architecture, capabilities, quick start, schema naming and API examples.
 - [x] `docs/rest-api.md` is a detailed endpoint reference with auth, Items, schema, relations, Users/Roles/Files, branding and health examples.
-- [x] `docs/api-query-language.md` documents all implemented collection query parameters/operators, URL encoding, pagination, nested filters, relation expansion and JavaScript examples.
+- [x] `docs/api-query-language.md` documents all implemented collection query parameters/operators, URL encoding, pagination, nested filters, Directus-style wildcard/direct-relation fields and legacy expansion.
 - [x] Studio customization documentation covers Files-backed logo/favicon selection and public branding endpoints.
 - [x] Existing architecture/auth/permissions/files/database/security/deployment documentation remains linked from README.
 
@@ -139,6 +140,8 @@
 - [x] Core + Studio schema-name normalization tests.
 - [x] Human field-label/API-key payload tests.
 - [x] Data Model V2 label/key, ordering, relation and system-field source contracts.
+- [x] `fields=*`, `fields=*.*`, direct nested field selection and legacy expansion regression contracts.
+- [x] Public Files deny-without-grant / allow-with-explicit-grant core and Studio permission-matrix contracts.
 - [x] Files full-preview and contain-style UI contracts.
 - [x] File-backed logo/favicon service/API/client source contracts.
 - [x] Dark pagination/permission/badge surface contracts.
@@ -148,7 +151,7 @@
 ## 13. Known follow-ups, not current source claims
 
 - Server-side search/pagination for very large Files/Users/relation-picker datasets; current branding modal only limits rendered results client-side.
-- O2M/M2M nested expansion and richer M2M editing.
+- O2M/M2M nested expansion and recursive relation depths beyond the current direct to-one field engine.
 - Generic value editors for custom extension columns inside specialized Users/Files/Roles record screens.
 - Dedicated migration workflow for adding accountability fields to pre-existing project collections.
 - Shared-store rate limiting/object storage requirements for multi-instance deployment.
