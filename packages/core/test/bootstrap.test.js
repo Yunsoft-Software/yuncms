@@ -115,14 +115,23 @@ test('schema display-name migration backfills collection and field labels', () =
   assert.match(source, /SET name = field/);
 });
 
-test('file-backed Studio favicon migration is the latest required compatibility gate', () => {
+test('file-backed Studio favicon migration remains required', () => {
   const migration = CORE_MIGRATIONS.find(({ id }) => id === '0010-studio-favicon-file');
   assert.ok(migration);
   assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0010-studio-favicon-file'));
   const source = migration.statements.join('\n');
   assert.match(source, /ADD COLUMN favicon_file CHAR\(36\) NULL/);
   assert.match(source, /REFERENCES yuncms_files \(id\) ON DELETE SET NULL/);
-  assert.equal(CORE_MIGRATIONS.at(-1).id, '0010-studio-favicon-file');
+});
+
+test('role permission actions migration is the latest compatibility gate', () => {
+  const migration = CORE_MIGRATIONS.find(({ id }) => id === '0011-role-permission-actions');
+  assert.ok(migration);
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0011-role-permission-actions'));
+  const source = migration.statements.join('\n');
+  assert.match(source, /collection = 'yuncms_roles'/);
+  assert.match(source, /JSON_ARRAY\('read', 'create', 'update', 'delete'\)/);
+  assert.equal(CORE_MIGRATIONS.at(-1).id, '0011-role-permission-actions');
 });
 
 test('advisory lock uses one connection and always releases it', async () => {

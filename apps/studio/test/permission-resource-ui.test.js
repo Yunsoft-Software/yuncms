@@ -37,7 +37,7 @@ const roles = {
     permissionManaged: true,
     permissionMode: 'action-only',
     resource: 'roles',
-    allowedActions: ['read'],
+    allowedActions: ['read', 'create', 'update', 'delete'],
   }),
 };
 
@@ -52,11 +52,12 @@ test('only explicitly permission-managed system resources enter the role matrix'
   assert.equal(isPermissionCollection(internal), false);
 });
 
-test('system resource action policy is reflected in Studio controls without a public-role blanket lock', () => {
+test('system resource actions are configurable for public and non-public roles when metadata allows them', () => {
   assert.equal(canConfigurePermission(users, 'update', { public: false }), true);
   assert.equal(canConfigurePermission(roles, 'read', { public: false }), true);
-  assert.equal(canConfigurePermission(roles, 'create', { public: false }), false);
+  assert.equal(canConfigurePermission(roles, 'create', { public: false }), true);
   assert.equal(canConfigurePermission(files, 'read', { public: true }), true);
+  assert.equal(canConfigurePermission(roles, 'create', { public: true }), true);
   assert.equal(canUseAdvancedPermission(users), false);
   assert.equal(canUseAdvancedPermission(project), true);
   assert.equal(permissionResourcePolicy(users).resource, 'users');

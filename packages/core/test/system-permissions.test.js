@@ -10,7 +10,7 @@ import {
 } from '../src/system-permissions.js';
 
 const schema = {
-  version: 7,
+  version: 11,
   collections: {
     yuncms_users: {
       collection: 'yuncms_users',
@@ -47,7 +47,7 @@ const schema = {
         permissionManaged: true,
         permissionMode: 'action-only',
         resource: 'roles',
-        allowedActions: ['read'],
+        allowedActions: ['read', 'create', 'update', 'delete'],
       },
       fields: {
         id: { field: 'id', type: 'uuid' },
@@ -69,10 +69,7 @@ test('system permission policy is explicit and action-only', () => {
   assert.equal(config.mode, 'action-only');
   assert.deepEqual(config.allowedActions, ['read', 'create', 'update', 'delete']);
   assert.doesNotThrow(() => assertSystemResourceAction(schema.collections.yuncms_users, 'update'));
-  assert.throws(
-    () => assertSystemResourceAction(schema.collections.yuncms_roles, 'create'),
-    (error) => error.code === 'SYSTEM_PERMISSION_ACTION_PROTECTED',
-  );
+  assert.doesNotThrow(() => assertSystemResourceAction(schema.collections.yuncms_roles, 'create'));
   assert.throws(
     () => assertActionOnlyPermissionPayload(schema.collections.yuncms_users, { fields: ['email'] }),
     (error) => error.code === 'SYSTEM_PERMISSION_ADVANCED_UNSUPPORTED',
@@ -122,7 +119,7 @@ test('unregistered system resources stay fail-closed', async () => {
   );
 });
 
-test('protected system actions and advanced system rules are rejected before mutation', async () => {
+test('advanced system rules are rejected before mutation', async () => {
   const database = { async query() { throw new Error('database should not be queried'); } };
   const service = new PermissionsService({
     database,
@@ -130,10 +127,6 @@ test('protected system actions and advanced system rules are rejected before mut
     accountability: createSystemAccountability(),
   });
 
-  await assert.rejects(
-    service.createOne({ role: 'role-1', collection: 'yuncms_roles', action: 'create' }),
-    (error) => error.code === 'SYSTEM_PERMISSION_ACTION_PROTECTED',
-  );
   await assert.rejects(
     service.createOne({
       role: 'role-1',
@@ -145,9 +138,9 @@ test('protected system actions and advanced system rules are rejected before mut
   );
 });
 
-test('public role can receive an explicit permission-managed Files read grant', async () => {
+function publicGrantDatabase() {
   let inserted = null;
-  const database = {
+  return {
     async query(sql, params = []) {
       const normalized = sql.replace(/\s+/g, ' ').trim();
       if (normalized.startsWith('SELECT id, admin, public FROM yuncms_roles')) {
@@ -175,8 +168,11 @@ test('public role can receive an explicit permission-managed Files read grant', 
       throw new Error(`Unexpected query: ${normalized}`);
     },
   };
+}
+
+test('public role can receive an explicit permission-managed Files read grant', async () => {
   const service = new PermissionsService({
-    database,
+    database: publicGrantDatabase(),
     schema,
     accountability: createSystemAccountability(),
   });
@@ -191,4 +187,22 @@ test('public role can receive an explicit permission-managed Files read grant', 
   assert.equal(permission.collection, 'yuncms_files');
   assert.equal(permission.action, 'read');
   assert.equal(permission.fields, null);
+});
+
+test('public role can receive an explicit permission-managed Roles create grant', async () => {
+  const service = new PermissionsService({
+    database: publicGrantDatabase(),
+    schema,
+    accountability: createSystemAccountability(),
+  });
+
+  const permission = await service.createOne({
+    role: 'public-role',
+    collection: 'yuncms_roles',
+    action: 'create',
+  });
+
+  assert.equal(permission.role, 'public-role');
+  assert.equal(permission.collection, 'yuncms_roles');
+  assert.equal(permission.action, 'create');
 });
