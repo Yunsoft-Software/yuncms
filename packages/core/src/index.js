@@ -1,4 +1,5 @@
 export { DEFAULT_SERVER_PORT, loadConfig, loadEnvFileIfPresent } from './config.js';
+export { isCacheStore, MemoryCacheStore } from './cache.js';
 export { createDatabasePool, pingDatabase, closeDatabasePool } from './database.js';
 export { withTransaction, withConnectionTransaction } from './transaction.js';
 export { assertIdentifier, quoteIdentifier } from './identifier.js';
