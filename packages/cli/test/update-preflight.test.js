@@ -34,10 +34,19 @@ test('strict option parser rejects unknown and duplicate options', () => {
   );
 });
 
-test('version comparison detects downgrade direction', () => {
+test('version comparison follows semantic version precedence including prereleases', () => {
   assert.equal(compareVersions('0.1.1', '0.1.2'), -1);
   assert.equal(compareVersions('0.2.0', '0.1.9'), 1);
   assert.equal(compareVersions('1.0.0', '1.0.0'), 0);
+  assert.equal(compareVersions('1.0.0-beta.2', '1.0.0-beta.11'), -1);
+  assert.equal(compareVersions('1.0.0-beta.11', '1.0.0-rc.1'), -1);
+  assert.equal(compareVersions('1.0.0-rc.1', '1.0.0'), -1);
+  assert.equal(compareVersions('1.0.0', '1.0.0-beta.9'), 1);
+  assert.equal(compareVersions('1.0.0+build.1', '1.0.0+build.2'), 0);
+  assert.throws(
+    () => compareVersions('1.0', '1.0.0'),
+    (error) => error.code === 'UPDATE_VERSION_INVALID',
+  );
 });
 
 test('preflight blocker set fails closed before backup/update mutation', () => {
