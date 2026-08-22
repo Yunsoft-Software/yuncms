@@ -125,6 +125,7 @@ export function createApp({
   mailer = null,
   rateLimitStore = null,
   redisClient = null,
+  externalAuthRegistry = null,
   endpointExtensions = [],
   mcpRouter = null,
   studioRoot = undefined,
@@ -188,7 +189,7 @@ export function createApp({
 
   if (mcpRouter) app.use('/mcp', mcpRouter);
   app.use('/studio-settings', createStudioSettingsRouter());
-  app.use('/auth', createAuthRouter({ mailer, config, logger, rateLimitStore }));
+  app.use('/auth', createAuthRouter({ mailer, config, logger, rateLimitStore, externalAuthRegistry }));
   app.use('/items', createItemsRouter());
   app.use('/schema', createSystemSchemaRouter({ schemaCache }));
   app.use('/schema', createSchemaRouter({ schemaCache }));

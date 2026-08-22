@@ -21,11 +21,14 @@ import {
 } from '@yunsoft/yuncms-core';
 import { createApp } from './app.js';
 import { INTERNAL_AUDIT_EVENTS } from './audit-events.js';
+import { loadExternalAuthConfig } from './external-auth/config.js';
+import { ExternalAuthProviderRegistry } from './external-auth/providers.js';
 import { loadExtensionRuntime } from './extensions/runtime.js';
 
 loadEnvFileIfPresent();
 await assertMaintenanceStartupAllowed({ cwd: process.cwd(), env: process.env });
 const config = loadConfig();
+const externalAuthConfig = loadExternalAuthConfig(process.env);
 const logger = createJsonLogger({ level: config.logging.level });
 const pool = createDatabasePool(config.database);
 const storageDrivers = { local: new LocalStorageDriver({ root: config.storage.localRoot }) };
@@ -114,6 +117,12 @@ async function start() {
   const services = serviceRegistry.toObject();
   const schemaCache = new SchemaCache();
   const emitter = new HookEmitter({ logger });
+  const externalAuthRegistry = new ExternalAuthProviderRegistry({
+    config: externalAuthConfig,
+    publicUrl: config.auth.publicUrl,
+    database: pool,
+    logger,
+  });
   mailer?.setEmitter(emitter);
   registerInternalAudit({ emitter, services });
 
@@ -139,6 +148,7 @@ async function start() {
     mailer,
     rateLimitStore,
     redisClient,
+    externalAuthRegistry,
     endpointExtensions: extensionRuntime.endpointExtensions,
   });
 
