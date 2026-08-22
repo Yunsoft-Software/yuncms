@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { readManyWithRelations } from '../src/relation-expansion.js';
+import { readManyWithRelations, readOneWithRelations } from '../src/relation-expansion.js';
 
 const collections = {
   articles: { primary_key: 'id', fields: { id: { field: 'id' }, author: { field: 'author' }, title: { field: 'title' } } },
@@ -19,12 +19,28 @@ const data = {
   companies: [{ id: 'c1', name: 'Acme' }],
 };
 
+function project(collection, row, fields) {
+  const selected = !fields || fields.includes('*') ? Object.keys(collections[collection].fields) : fields;
+  return Object.fromEntries(selected.filter((field) => Object.hasOwn(row, field)).map((field) => [field, row[field]]));
+}
+
 class FakeItemsService {
   constructor(collection) { this.collection = collection; }
   async resolvePermission() { return { fields: null }; }
-  async readManyWithMeta() { return { data: data[this.collection].map((row) => ({ ...row })), meta: {} }; }
-  async readManyForRelation({ lookupField, values }) {
-    return { data: data[this.collection].filter((row) => values.includes(String(row[lookupField]))).map((row) => ({ ...row })), visibleFields: Object.keys(collections[this.collection].fields) };
+  async readManyWithMeta(query = {}) {
+    return { data: data[this.collection].map((row) => project(this.collection, row, query.fields)), meta: {} };
+  }
+  async readOne(id, { fields = null } = {}) {
+    const row = data[this.collection].find((item) => item.id === id);
+    return row ? project(this.collection, row, fields) : null;
+  }
+  async readManyForRelation({ fields, lookupField, values }) {
+    return {
+      data: data[this.collection]
+        .filter((row) => values.includes(String(row[lookupField])))
+        .map((row) => ({ ...project(this.collection, row, fields), [lookupField]: row[lookupField] })),
+      visibleFields: Object.keys(collections[this.collection].fields),
+    };
   }
 }
 
@@ -41,7 +57,17 @@ test('fields paths expand direct relations recursively in batches', async () => 
   }]);
 });
 
-test('cyclic paths and excessive depth fail before data execution', async () => {
+test('readOne without fields preserves ordinary full-record behavior', async () => {
+  const result = await readOneWithRelations({
+    collection: 'articles',
+    id: 'a1',
+    options: { schema },
+    ItemsServiceClass: FakeItemsService,
+  });
+  assert.deepEqual(result, { id: 'a1', author: 'u1', title: 'Post' });
+});
+
+test('cyclic paths fail before data execution', async () => {
   const cyclicSchema = {
     collections: {
       nodes: { primary_key: 'id', fields: { id: { field: 'id' }, parent: { field: 'parent' } } },

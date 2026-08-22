@@ -280,7 +280,8 @@ export async function readOneWithRelations({ collection, id, query = {}, options
   }
   const service = new ItemsServiceClass(collection, options);
   const plan = await buildSelectionPlan({ collection, query, options, service });
-  const record = await service.readOne(id, { fields: selectionForNode(plan.root) });
+  const selection = selectionForNode(plan.root);
+  const record = await service.readOne(id, { fields: selection.length === 0 ? null : selection });
   if (!record) return null;
   const [expanded] = await expandRows({ collection, rows: [record], node: plan.root, options, ItemsServiceClass, snapshot: plan.snapshot });
   return expanded;
