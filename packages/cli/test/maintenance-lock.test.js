@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { access, mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { runBackupCommand } from '../src/backup-command.js';
@@ -111,7 +114,7 @@ test('unavailable database maintenance lock fails closed and cleans its connecti
   assert.equal(poolClosed, true);
 });
 
-test('backup holds project and database locks across snapshot creation and releases them in reverse order', async () => {
+test('backup holds project and database locks across snapshot creation and final revalidation', async () => {
   const events = [];
   const result = await runBackupCommand({
     args: ['--output', './backup'],
@@ -145,7 +148,49 @@ test('backup holds project and database locks across snapshot creation and relea
     'stopped',
     'db-held',
     'backup',
+    'stopped',
+    'db-held',
     'db-unlock',
     'project-unlock',
   ]);
+});
+
+test('backup is discarded if database maintenance ownership is lost before completion is returned', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'yuncms-backup-lock-loss-'));
+  const backupPath = join(cwd, 'snapshot');
+  let heldChecks = 0;
+  try {
+    await assert.rejects(
+      runBackupCommand({
+        args: ['--output', backupPath],
+        cwd,
+        env,
+        output: { log() {}, warn() {} },
+        async assertStopped() { return true; },
+        async acquireProjectLock() { return { async release() {} }; },
+        async acquireMaintenanceLock() {
+          return {
+            async assertHeld() {
+              heldChecks += 1;
+              if (heldChecks === 1) return true;
+              const error = new Error('lost');
+              error.code = 'DATABASE_MAINTENANCE_LOCK_LOST';
+              throw error;
+            },
+            async release() {},
+          };
+        },
+        async createBackup() {
+          await mkdir(backupPath, { recursive: true });
+          return { backupPath };
+        },
+      }),
+      (error) => error.code === 'DATABASE_MAINTENANCE_LOCK_LOST'
+        && error.backupDiscarded === true,
+    );
+
+    await assert.rejects(access(backupPath), (error) => error.code === 'ENOENT');
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
 });
