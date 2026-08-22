@@ -32,7 +32,13 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "@node-saml/node-saml": "5.1.0",
     "@yunsoft/yuncms-core": "0.1.5",
-    "express": "5.2.1"
+    "express": "5.2.1",
+    "ldapts": "9.0.0",
+    "openid-client": "6.8.7",
+    "zod": "4.4.3"
   }
 }
