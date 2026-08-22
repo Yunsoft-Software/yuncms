@@ -13,7 +13,11 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { loadConfig } from '@yunsoft/yuncms-core';
 
-import { dumpDatabase, restoreDatabase } from './database-backup.js';
+import {
+  dumpDatabase,
+  restoreDatabase,
+  verifyDatabaseDump,
+} from './database-backup.js';
 import { resetDatabaseObjects } from './database-reset.js';
 
 export const BACKUP_FORMAT_VERSION = 1;
@@ -118,6 +122,7 @@ export async function createProjectBackup({
   backupPath = null,
   now = new Date(),
   dumpDatabaseFn = dumpDatabase,
+  verifyDatabaseFn = verifyDatabaseDump,
   output = console,
 } = {}) {
   const config = loadConfig(env);
@@ -144,12 +149,14 @@ export async function createProjectBackup({
   }
 
   try {
+    const databaseDumpPath = join(destination, 'database.sql.gz');
     output.log?.(`Creating database backup: ${config.database.database}`);
     await dumpDatabaseFn({
       config: config.database,
-      outputPath: join(destination, 'database.sql.gz'),
+      outputPath: databaseDumpPath,
       env,
     });
+    const databaseVerification = await verifyDatabaseFn({ inputPath: databaseDumpPath });
 
     const envCopied = await copyOptionalFile(resolve(cwd, '.env'), join(destination, 'project', '.env'));
     const packageJsonCopied = await copyOptionalFile(
@@ -173,6 +180,7 @@ export async function createProjectBackup({
         database: config.database.database,
         user: config.database.user,
         ssl: config.database.ssl,
+        verifiedDecompressedBytes: Number(databaseVerification?.decompressedBytes ?? 0),
       },
       project: {
         env: envCopied,
