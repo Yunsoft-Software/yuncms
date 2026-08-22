@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { loadConfig } from '@yunsoft/yuncms-core';
@@ -43,13 +44,27 @@ export async function runBackupCommand({
 
   const projectLock = await acquireProjectLock({ cwd });
   let maintenanceLock = null;
+  let backup = null;
   try {
     maintenanceLock = assertLockContract(await acquireMaintenanceLock({ env }));
     await assertServiceStopped();
     await maintenanceLock.assertHeld();
 
     const backupPath = values['--output'] ? resolve(cwd, values['--output']) : null;
-    return await createBackup({ cwd, env, output, backupPath });
+    backup = await createBackup({ cwd, env, output, backupPath });
+
+    try {
+      await assertServiceStopped();
+      await maintenanceLock.assertHeld();
+    } catch (error) {
+      if (backup?.backupPath) {
+        await rm(backup.backupPath, { recursive: true, force: true }).catch(() => {});
+        error.backupDiscarded = true;
+      }
+      throw error;
+    }
+
+    return backup;
   } finally {
     if (maintenanceLock) await maintenanceLock.release();
     await projectLock.release();
