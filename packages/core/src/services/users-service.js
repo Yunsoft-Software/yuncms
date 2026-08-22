@@ -91,6 +91,15 @@ async function assertTargetManageable(database, id, accountability) {
 }
 
 export class UsersService extends BaseService {
+  async action(event, payload) {
+    if (!this.emitter) return;
+    await this.emitter.action(event, payload, {
+      accountability: this.accountability,
+      requestId: this.requestId,
+      collection: 'yuncms_users',
+    });
+  }
+
   async #readOneUnsafe(id) {
     const [rows] = await this.database.query(
       `SELECT id, email, role, status, email_verified_at, last_access, created_at, updated_at
@@ -140,7 +149,9 @@ export class UsersService extends BaseService {
       ],
     );
 
-    return this.#readOneUnsafe(id);
+    const user = await this.#readOneUnsafe(id);
+    await this.action('users.create', { key: id, item: user });
+    return user;
   }
 
   async updateOne(id, patch = {}) {
@@ -170,7 +181,7 @@ export class UsersService extends BaseService {
       await assertRoleAssignable(this.database, patch.role, this.accountability);
     }
 
-    return withTransaction(this.database, async (connection) => {
+    const user = await withTransaction(this.database, async (connection) => {
       const assignments = [];
       const params = [];
 
@@ -209,6 +220,8 @@ export class UsersService extends BaseService {
       );
       return rows[0] ?? null;
     });
+    await this.action('users.update', { key: id, item: user, changes: patch });
+    return user;
   }
 
   async deleteOne(id) {
@@ -219,12 +232,14 @@ export class UsersService extends BaseService {
       error.code = 'SELF_ADMIN_MUTATION_FORBIDDEN';
       throw error;
     }
+    const before = await this.#readOneUnsafe(id);
     const [result] = await this.database.query('DELETE FROM yuncms_users WHERE id = ?', [id]);
     if (result.affectedRows !== 1) {
       const error = new Error(`Unknown user: ${id}`);
       error.code = 'USER_NOT_FOUND';
       throw error;
     }
+    await this.action('users.delete', { key: id, before });
     return true;
   }
 
@@ -248,7 +263,6 @@ export class UsersService extends BaseService {
       }
       await connection.query('DELETE FROM yuncms_sessions WHERE user = ?', [id]);
       await connection.commit();
-      return true;
     } catch (error) {
       try {
         await connection.rollback();
@@ -259,6 +273,9 @@ export class UsersService extends BaseService {
     } finally {
       connection.release();
     }
+
+    await this.action('users.password.update', { key: id });
+    return true;
   }
 }
 

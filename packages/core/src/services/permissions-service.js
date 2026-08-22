@@ -86,6 +86,15 @@ export class PermissionsService extends BaseService {
     this.schemaCache = options.schemaCache ?? defaultSchemaCache;
   }
 
+  async action(event, payload) {
+    if (!this.emitter) return;
+    await this.emitter.action(event, payload, {
+      accountability: this.accountability,
+      requestId: this.requestId,
+      collection: 'yuncms_permissions',
+    });
+  }
+
   async #collectionSchema(collection) {
     const snapshot = this.schema ?? await this.schemaCache.get(this.database);
     const collectionSchema = snapshot.collections?.[collection];
@@ -243,7 +252,9 @@ export class PermissionsService extends BaseService {
       ],
     );
     if (this.permissionCache) await this.permissionCache.clear();
-    return this.readOne(id);
+    const permission = await this.readOne(id);
+    await this.action('permissions.create', { key: id, item: permission });
+    return permission;
   }
 
   async updateOne(id, patch = {}) {
@@ -295,11 +306,19 @@ export class PermissionsService extends BaseService {
       params,
     );
     if (this.permissionCache) await this.permissionCache.clear();
-    return this.readOne(id);
+    const permission = await this.readOne(id);
+    await this.action('permissions.update', {
+      key: id,
+      before: existing,
+      item: permission,
+      changes: patch,
+    });
+    return permission;
   }
 
   async deleteOne(id) {
     assertPermissionManager(this.accountability);
+    const before = this.emitter ? await this.readOne(id) : null;
     const [result] = await this.database.query(
       'DELETE FROM yuncms_permissions WHERE id = ?',
       [id],
@@ -310,6 +329,7 @@ export class PermissionsService extends BaseService {
       throw error;
     }
     if (this.permissionCache) await this.permissionCache.clear();
+    await this.action('permissions.delete', { key: id, before });
     return true;
   }
 }

@@ -16,6 +16,7 @@ import {
   SmtpMailer,
 } from '@yunsoft/yuncms-core';
 import { createApp } from './app.js';
+import { INTERNAL_AUDIT_EVENTS } from './audit-events.js';
 import { loadExtensionRuntime } from './extensions/runtime.js';
 
 loadEnvFileIfPresent();
@@ -66,16 +67,8 @@ let shuttingDown = false;
 function registerInternalAudit({ emitter, services }) {
   const AuditService = services.AuditService;
   const systemAccountability = createSystemAccountability();
-  const events = [
-    'items.create',
-    'items.update',
-    'items.delete',
-    'files.create',
-    'files.update',
-    'files.delete',
-  ];
 
-  for (const event of events) {
+  for (const event of INTERNAL_AUDIT_EVENTS) {
     emitter.registerAction(event, async (payload, context) => {
       try {
         const audit = new AuditService({

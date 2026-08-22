@@ -28,6 +28,15 @@ function assertSpecialRoleCreation(accountability, { admin = false, public: publ
 }
 
 export class RolesService extends BaseService {
+  async action(event, payload) {
+    if (!this.emitter) return;
+    await this.emitter.action(event, payload, {
+      accountability: this.accountability,
+      requestId: this.requestId,
+      collection: 'yuncms_roles',
+    });
+  }
+
   async #readOneUnsafe(id) {
     const [rows] = await this.database.query(
       `SELECT id, name, description, admin, public, created_at, updated_at
@@ -90,7 +99,9 @@ export class RolesService extends BaseService {
         publicRole ? 1 : 0,
       ],
     );
-    return this.#readOneUnsafe(id);
+    const role = await this.#readOneUnsafe(id);
+    await this.action('roles.create', { key: id, item: role });
+    return role;
   }
 
   async updateOne(id, patch = {}) {
@@ -130,7 +141,9 @@ export class RolesService extends BaseService {
       `UPDATE yuncms_roles SET ${assignments.join(', ')} WHERE id = ?`,
       params,
     );
-    return this.#readOneUnsafe(id);
+    const role = await this.#readOneUnsafe(id);
+    await this.action('roles.update', { key: id, item: role, before: existing, changes: patch });
+    return role;
   }
 
   async deleteOne(id) {
@@ -163,6 +176,7 @@ export class RolesService extends BaseService {
       error.code = 'ROLE_NOT_FOUND';
       throw error;
     }
+    await this.action('roles.delete', { key: id, before: role });
     return true;
   }
 }

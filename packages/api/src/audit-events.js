@@ -1,0 +1,18 @@
+export const INTERNAL_AUDIT_EVENTS = Object.freeze([
+  'items.create',
+  'items.update',
+  'items.delete',
+  'files.create',
+  'files.update',
+  'files.delete',
+  'users.create',
+  'users.update',
+  'users.delete',
+  'users.password.update',
+  'roles.create',
+  'roles.update',
+  'roles.delete',
+  'permissions.create',
+  'permissions.update',
+  'permissions.delete',
+]);
