@@ -33,6 +33,21 @@ function booleanClaim(value) {
   return false;
 }
 
+function normalizeLdapSubject(value) {
+  const scalar = scalarClaim(value);
+  if (Buffer.isBuffer(scalar)) {
+    if (scalar.byteLength === 0) return null;
+    return `hex:${scalar.toString('hex')}`;
+  }
+  if (scalar instanceof Uint8Array) {
+    if (scalar.byteLength === 0) return null;
+    return `hex:${Buffer.from(scalar).toString('hex')}`;
+  }
+  if (typeof scalar !== 'string') return null;
+  const normalized = scalar.trim();
+  return normalized || null;
+}
+
 function mappedIdentity(provider, profile, { defaultEmailVerified = false } = {}) {
   const subject = scalarClaim(profile?.[provider.claims?.subject ?? 'sub']);
   const email = scalarClaim(profile?.[provider.claims?.email ?? 'email']);
@@ -358,18 +373,28 @@ export class ExternalAuthProviderRegistry {
         filter,
         sizeLimit: 2,
         timeLimit: 10,
-        attributes: [provider.emailAttribute],
+        attributes: [...new Set([provider.subjectAttribute, provider.emailAttribute])],
       });
       if (searchEntries.length !== 1) throw authError('INVALID_CREDENTIALS', 'Invalid username or password');
       const entry = searchEntries[0];
+      const subject = normalizeLdapSubject(entry[provider.subjectAttribute]);
+      if (!subject) {
+        throw authError(
+          'EXTERNAL_IDENTITY_INVALID',
+          `LDAP entry did not return configured stable subject attribute: ${provider.subjectAttribute}`,
+        );
+      }
       await client.bind(entry.dn, secret);
       const rawEmail = scalarClaim(entry[provider.emailAttribute]);
       return service.completeLogin({
         provider: provider.id,
-        subject: String(entry.dn),
+        subject,
         email: typeof rawEmail === 'string' ? rawEmail : null,
         emailVerified: true,
-        profile: { preferred_username: login },
+        profile: {
+          preferred_username: login,
+          subject_attribute: provider.subjectAttribute,
+        },
         policy: provider.policy,
         ip,
         userAgent,
@@ -410,5 +435,6 @@ export {
   BROWSER_HANDOFF_PROVIDER,
   BROWSER_HANDOFF_TTL_MS,
   MysqlSamlCacheProvider,
+  normalizeLdapSubject,
   SAML_REQUEST_TTL_MS,
 };
