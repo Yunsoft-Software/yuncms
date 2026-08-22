@@ -19,6 +19,10 @@ function silentOutput() {
   return { log() {}, warn() {}, error() {} };
 }
 
+async function fakeMaintenanceLock() {
+  return { async release() {} };
+}
+
 async function createInstalledProject(cwd, section) {
   await mkdir(join(cwd, 'node_modules', '@yunsoft', 'yuncms'), { recursive: true });
   await writeFile(
@@ -119,6 +123,7 @@ test('managed update passes the matching npm save mode for dev and optional depe
         async acquireLock() {
           return { async release() {} };
         },
+        acquireMaintenanceLock: fakeMaintenanceLock,
         async assertStopped() { return true; },
         async collectPreflight() {
           return {
