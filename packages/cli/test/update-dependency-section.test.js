@@ -75,6 +75,33 @@ test('preflight package state preserves the existing YunCMS dependency section',
   }
 });
 
+test('preflight rejects YunCMS declared in multiple dependency sections', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'yuncms-section-ambiguous-'));
+  try {
+    await mkdir(join(cwd, 'node_modules', '@yunsoft', 'yuncms'), { recursive: true });
+    await writeFile(
+      join(cwd, 'package.json'),
+      `${JSON.stringify({
+        dependencies: { '@yunsoft/yuncms': '0.1.0' },
+        devDependencies: { '@yunsoft/yuncms': '0.1.0' },
+      }, null, 2)}\n`,
+    );
+    await writeFile(
+      join(cwd, 'node_modules', '@yunsoft', 'yuncms', 'package.json'),
+      '{"name":"@yunsoft/yuncms","version":"0.1.0"}\n',
+    );
+
+    await assert.rejects(
+      readProjectPackageState(cwd),
+      (error) => error.code === 'UPDATE_PROJECT_DEPENDENCY_AMBIGUOUS'
+        && error.dependencySections.includes('dependencies')
+        && error.dependencySections.includes('devDependencies'),
+    );
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test('managed update passes the matching npm save mode for dev and optional dependencies', async () => {
   for (const [section, expectedFlag] of [
     ['devDependencies', '--save-dev'],
