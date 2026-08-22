@@ -88,6 +88,27 @@ async function assertDirectory(path, code) {
   }
 }
 
+function missingBackupAsset(path) {
+  const error = new Error(`Backup is missing an asset declared by its manifest: ${path}`);
+  error.code = 'BACKUP_ASSET_MISSING';
+  error.assetPath = path;
+  return error;
+}
+
+async function assertExpectedBackupAssets(backupPath, manifest) {
+  const expected = [
+    [manifest.project?.env, join(backupPath, 'project', '.env')],
+    [manifest.project?.packageJson, join(backupPath, 'project', 'package.json')],
+    [manifest.project?.packageLock, join(backupPath, 'project', 'package-lock.json')],
+    [manifest.project?.extensions, join(backupPath, 'extensions')],
+    [manifest.project?.localFiles, join(backupPath, 'files')],
+  ];
+
+  for (const [required, path] of expected) {
+    if (required && !(await exists(path))) throw missingBackupAsset(path);
+  }
+}
+
 export async function readBackupManifest(backupPath) {
   const resolved = resolve(backupPath);
   await assertDirectory(resolved, 'BACKUP_NOT_FOUND');
@@ -236,11 +257,6 @@ async function restoreOptionalFile({ backupPath, existed, sourceName, target }) 
     await rm(target, { force: true });
     return;
   }
-  if (!(await exists(source))) {
-    const error = new Error(`Backup is missing expected project file: ${sourceName}`);
-    error.code = 'BACKUP_ASSET_MISSING';
-    throw error;
-  }
   await mkdir(dirname(target), { recursive: true });
   await copyFile(source, target);
 }
@@ -249,11 +265,6 @@ async function restoreOptionalDirectory({ backupPath, existed, sourceName, targe
   const source = join(backupPath, sourceName);
   await rm(target, { recursive: true, force: true });
   if (!existed) return;
-  if (!(await exists(source))) {
-    const error = new Error(`Backup is missing expected directory: ${sourceName}`);
-    error.code = 'BACKUP_ASSET_MISSING';
-    throw error;
-  }
   await mkdir(dirname(target), { recursive: true });
   await cp(source, target, { recursive: true, force: false, errorOnExist: true });
 }
@@ -265,6 +276,7 @@ export async function restoreProjectBackup({
   allowDifferentDatabaseTarget = false,
   restoreDatabaseFn = restoreDatabase,
   resetDatabaseFn = resetDatabaseObjects,
+  verifyDatabaseFn = verifyDatabaseDump,
   output = console,
 } = {}) {
   if (!backupPath) {
@@ -277,12 +289,17 @@ export async function restoreProjectBackup({
   const config = loadConfig(env);
   assertRestoreDatabaseMatches(manifest, config, allowDifferentDatabaseTarget);
 
+  const databaseDumpPath = join(resolvedBackupPath, 'database.sql.gz');
+  output.log?.(`Validating backup before destructive restore: ${resolvedBackupPath}`);
+  await verifyDatabaseFn({ inputPath: databaseDumpPath });
+  await assertExpectedBackupAssets(resolvedBackupPath, manifest);
+
   output.log?.(`Resetting database before restore: ${config.database.database}`);
   await resetDatabaseFn({ config: config.database });
   output.log?.(`Restoring database backup: ${resolvedBackupPath}`);
   await restoreDatabaseFn({
     config: config.database,
-    inputPath: join(resolvedBackupPath, 'database.sql.gz'),
+    inputPath: databaseDumpPath,
     env,
   });
 
