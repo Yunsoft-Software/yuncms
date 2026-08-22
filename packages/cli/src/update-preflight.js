@@ -20,6 +20,7 @@ import {
 } from '@yunsoft/yuncms-core';
 
 import { runCapturedProcess } from './process-runner.js';
+import { isLocalYunCmsReachable } from './service-state.js';
 
 const MIN_FREE_HEADROOM_BYTES = 256 * 1024 * 1024;
 
@@ -181,17 +182,6 @@ async function collectDatabaseState(config, {
   }
 }
 
-async function detectRunningApi(config, fetchFn = globalThis.fetch) {
-  if (typeof fetchFn !== 'function') return false;
-  const url = `http://127.0.0.1:${config.server.port}/health`;
-  try {
-    const response = await fetchFn(url, { signal: AbortSignal.timeout(1200) });
-    return response.status >= 100 && response.status < 600;
-  } catch {
-    return false;
-  }
-}
-
 async function diskState(cwd) {
   const info = await statfs(cwd);
   return {
@@ -260,7 +250,11 @@ export async function collectUpdatePreflight({
   const targetVersion = await resolveTargetVersion(target, { cwd, env, runProcess });
   const database = await collectDatabaseState(config);
   const targetMigrations = await inspectMigrations(targetVersion, { env, runProcess });
-  const running = await detectRunningApi(config, fetchFn);
+  const running = await isLocalYunCmsReachable({
+    host: config.server.host,
+    port: config.server.port,
+    fetchFn,
+  });
   const [disk, localBackupBytes] = await Promise.all([
     diskState(cwd),
     collectLocalBackupBytes(cwd, config),
