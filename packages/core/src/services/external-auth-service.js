@@ -64,6 +64,10 @@ function publicUser(user) {
   };
 }
 
+function isDuplicateEntry(error) {
+  return error?.code === 'ER_DUP_ENTRY' || error?.errno === 1062;
+}
+
 export class ExternalAuthService extends BaseService {
   constructor(options = {}) {
     super(options);
@@ -159,7 +163,7 @@ export class ExternalAuthService extends BaseService {
   async readIdentity(provider, subject, database = this.database) {
     const [rows] = await database.query(
       `SELECT i.id AS identity_id, i.provider, i.subject, i.user, i.email AS identity_email,
-              u.email, u.role, u.status, u.email_verified_at,
+              u.id, u.email, u.role, u.status, u.email_verified_at,
               r.name AS role_name, r.admin AS role_admin, r.public AS role_public
        FROM yuncms_auth_identities i
        INNER JOIN yuncms_users u ON u.id = i.user
@@ -184,33 +188,13 @@ export class ExternalAuthService extends BaseService {
     return role;
   }
 
-  async completeLogin({
-    provider,
-    subject,
-    email = null,
-    emailVerified = false,
-    profile = null,
-    policy = {},
-    ip = null,
-    userAgent = null,
-  } = {}) {
-    const providerId = normalizeProvider(provider);
-    const subjectId = normalizeSubject(subject);
-    const normalizedEmail = normalizeEmail(email);
-    const sanitizedProfile = safeProfile(profile);
-    let user = await this.readIdentity(providerId, subjectId);
+  async #createOrLinkIdentity({ providerId, subjectId, normalizedEmail, emailVerified, sanitizedProfile, policy }) {
+    if (!normalizedEmail || emailVerified !== true) {
+      throw externalAuthError('VERIFIED_EXTERNAL_EMAIL_REQUIRED', 'A verified external email is required to create or link a YunCMS user');
+    }
 
-    if (!user) {
-      const allowJit = policy.jit === true;
-      const allowVerifiedEmailLink = policy.linkByVerifiedEmail === true;
-      if (!allowJit && !allowVerifiedEmailLink) {
-        throw externalAuthError('EXTERNAL_IDENTITY_NOT_LINKED', 'External identity is not linked to a YunCMS user');
-      }
-      if (!normalizedEmail || emailVerified !== true) {
-        throw externalAuthError('VERIFIED_EXTERNAL_EMAIL_REQUIRED', 'A verified external email is required to create or link a YunCMS user');
-      }
-
-      const userId = await withTransaction(this.database, async (connection) => {
+    try {
+      return await withTransaction(this.database, async (connection) => {
         const existingIdentity = await this.readIdentity(providerId, subjectId, connection);
         if (existingIdentity) return existingIdentity.user;
 
@@ -226,13 +210,16 @@ export class ExternalAuthService extends BaseService {
         let localUserId;
 
         if (existingUser) {
-          if (!allowVerifiedEmailLink) {
+          if (policy.linkByVerifiedEmail !== true) {
             throw externalAuthError('EXTERNAL_EMAIL_CONFLICT', 'A YunCMS user already exists for this email and automatic linking is disabled');
           }
           if (existingUser.status !== 'active') throw externalAuthError('EXTERNAL_USER_INACTIVE', 'Linked YunCMS user is not active');
+          if (existingUser.role_admin && policy.allowAdminLink !== true) {
+            throw externalAuthError('EXTERNAL_ADMIN_LINK_FORBIDDEN', 'Automatic external identity linking to administrator users is disabled');
+          }
           localUserId = existingUser.id;
         } else {
-          if (!allowJit) throw externalAuthError('EXTERNAL_IDENTITY_NOT_LINKED', 'External identity is not linked to a YunCMS user');
+          if (policy.jit !== true) throw externalAuthError('EXTERNAL_IDENTITY_NOT_LINKED', 'External identity is not linked to a YunCMS user');
           const role = await this.resolveJitRole(policy.defaultRole, connection);
           localUserId = randomUUID();
           await connection.query(
@@ -251,7 +238,42 @@ export class ExternalAuthService extends BaseService {
         );
         return localUserId;
       });
+    } catch (error) {
+      if (!isDuplicateEntry(error)) throw error;
+      const identity = await this.readIdentity(providerId, subjectId);
+      if (!identity) throw error;
+      return identity.user;
+    }
+  }
 
+  async completeLogin({
+    provider,
+    subject,
+    email = null,
+    emailVerified = false,
+    profile = null,
+    policy = {},
+    ip = null,
+    userAgent = null,
+  } = {}) {
+    const providerId = normalizeProvider(provider);
+    const subjectId = normalizeSubject(subject);
+    const normalizedEmail = normalizeEmail(email);
+    const sanitizedProfile = safeProfile(profile);
+    let user = await this.readIdentity(providerId, subjectId);
+
+    if (!user) {
+      if (policy.jit !== true && policy.linkByVerifiedEmail !== true) {
+        throw externalAuthError('EXTERNAL_IDENTITY_NOT_LINKED', 'External identity is not linked to a YunCMS user');
+      }
+      const userId = await this.#createOrLinkIdentity({
+        providerId,
+        subjectId,
+        normalizedEmail,
+        emailVerified,
+        sanitizedProfile,
+        policy,
+      });
       const [userRows] = await this.database.query(
         `SELECT u.id, u.email, u.role, u.status, u.email_verified_at,
                 r.name AS role_name, r.admin AS role_admin, r.public AS role_public
@@ -264,17 +286,10 @@ export class ExternalAuthService extends BaseService {
     } else {
       await this.database.query(
         `UPDATE yuncms_auth_identities
-         SET email = ?, profile = ?, last_login_at = CURRENT_TIMESTAMP(3)
-         WHERE identity_id = ?`,
+         SET email = COALESCE(?, email), profile = COALESCE(?, profile), last_login_at = CURRENT_TIMESTAMP(3)
+         WHERE id = ?`,
         [normalizedEmail, sanitizedProfile == null ? null : JSON.stringify(sanitizedProfile), user.identity_id],
-      ).catch(async () => {
-        await this.database.query(
-          `UPDATE yuncms_auth_identities
-           SET email = ?, profile = ?, last_login_at = CURRENT_TIMESTAMP(3)
-           WHERE id = ?`,
-          [normalizedEmail, sanitizedProfile == null ? null : JSON.stringify(sanitizedProfile), user.identity_id],
-        );
-      });
+      );
     }
 
     if (!user || user.status !== 'active') throw externalAuthError('EXTERNAL_USER_INACTIVE', 'Linked YunCMS user is not active');

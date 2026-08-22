@@ -31,7 +31,20 @@ export { HookEmitter, HOOK_EVENTS } from './hooks.js';
 export { createJsonLogger, LEVELS as LOG_LEVELS } from './logger.js';
 export { deleteM2MJunction } from './m2m-lifecycle.js';
 export { createO2ORelation, deleteO2ORelation, o2oUniqueIndexName } from './o2o-relation.js';
-export { MAX_EXPAND_FIELDS, parseExpandInput, readManyWithRelations, readOneWithRelations } from './relation-expansion.js';
+export {
+  MAX_EXPAND_FIELDS,
+  MAX_RELATION_DEPTH,
+  parseExpandInput,
+  readManyWithRelations,
+  readOneWithRelations,
+} from './relation-expansion.js';
+export {
+  assertLocalRedirectTarget,
+  createExternalAuthState,
+  hashExternalAuthState,
+  encryptExternalAuthSecret,
+  decryptExternalAuthSecret,
+} from './auth/external-state.js';
 export { SmtpMailer } from './mail/smtp-mailer.js';
 export { LocalStorageDriver, assertStorageKey } from './storage/local-storage-driver.js';
 export { S3StorageDriver } from './storage/s3-storage-driver.js';
@@ -41,6 +54,7 @@ export { createServiceRegistry } from './services/service-registry.js';
 export { createCoreServiceRegistry } from './services/core-services.js';
 export { AuthService } from './services/auth-service.js';
 export { AuthTokensService } from './services/auth-tokens-service.js';
+export { ExternalAuthService, AUTH_TRANSACTION_TTL_MS } from './services/external-auth-service.js';
 export { ApiTokensService } from './services/api-tokens-service.js';
 export { AuditService, redactAuditValue } from './services/audit-service.js';
 export { ItemsService } from './services/items-service.js';
