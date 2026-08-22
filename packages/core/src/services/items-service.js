@@ -3,7 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { enforcePermissionValidation } from '../permission-validation.js';
 import {
+  assertQueryCost,
+  compileAggregate,
   compileFilter,
+  compileSearch,
   compileSelectFields,
   compileSort,
   parseItemsQuery,
@@ -176,10 +179,37 @@ export class ItemsService extends BaseService {
     return entries;
   }
 
-  compileActionFilters(userFilter, permissionFilter, userSchema, fullSchema) {
+  compileActionFilters(userFilter, permissionFilter, userSchema, fullSchema, search = null) {
     const permissionSql = compileFilter(permissionFilter, fullSchema);
     const userSql = compileFilter(userFilter, userSchema);
-    return combineCompiledFilters(permissionSql, userSql);
+    const searchSql = compileSearch(search, userSchema);
+    return combineCompiledFilters(permissionSql, userSql, searchSql);
+  }
+
+  async normalizeReadQuery(rawQuery) {
+    const parsed = parseItemsQuery(rawQuery);
+    const filtered = this.emitter
+      ? await this.emitter.filter('items.query', parsed, this.hookContext({ operation: 'read' }))
+      : parsed;
+    const query = parseItemsQuery(filtered);
+    assertQueryCost(query);
+    return query;
+  }
+
+  async emitReadAction(query, rows, schema, { single = false } = {}) {
+    if (!this.emitter) return;
+    const primaryKey = schema.primary_key;
+    const keys = rows
+      .filter((row) => row && Object.hasOwn(row, primaryKey))
+      .map((row) => row[primaryKey])
+      .slice(0, QUERY_LIMITS.maxLimit);
+    await this.emitter.action('items.read', {
+      collection: this.collection,
+      query,
+      keys,
+      count: rows.length,
+      single,
+    }, this.hookContext({ operation: 'read' }));
   }
 
   async readMany(rawQuery = {}) {
@@ -188,15 +218,34 @@ export class ItemsService extends BaseService {
 
   async readManyWithMeta(rawQuery = {}) {
     const schema = await this.getCollectionSchema();
+    const query = await this.normalizeReadQuery(rawQuery);
     const permission = await this.resolvePermission('read');
     const accessSchema = schemaForFields(schema, permission.fields);
-    const query = parseItemsQuery(rawQuery);
+    const filter = this.compileActionFilters(query.filter, permission.filter, accessSchema, schema, query.search);
+    const table = quoteIdentifier(this.collection, 'collection name');
+    const aggregate = compileAggregate(query.aggregate, query.groupBy, accessSchema);
+
+    if (aggregate) {
+      const sortSql = compileSort(query.sort, accessSchema);
+      const [rows] = await this.database.query(
+        `SELECT ${aggregate.sql} FROM ${table}${filter.sql}${aggregate.groupSql}${sortSql} LIMIT ? OFFSET ?`,
+        [...filter.params, query.limit, query.offset],
+      );
+      await this.emitReadAction(query, rows, schema);
+      return {
+        data: rows,
+        meta: {
+          total_count: rows.length,
+          limit: query.limit,
+          offset: query.offset,
+          aggregate: true,
+        },
+      };
+    }
+
     const requestedFields = normalizeFields(query.fields);
     const selected = compileSelectFields(requestedFields, accessSchema);
-    const filter = this.compileActionFilters(query.filter, permission.filter, accessSchema, schema);
     const sortSql = compileSort(query.sort, accessSchema);
-    const table = quoteIdentifier(this.collection, 'collection name');
-
     const [rows] = await this.database.query(
       `SELECT ${selected.sql} FROM ${table}${filter.sql}${sortSql} LIMIT ? OFFSET ?`,
       [...filter.params, query.limit, query.offset],
@@ -205,6 +254,7 @@ export class ItemsService extends BaseService {
       `SELECT COUNT(*) AS total_count FROM ${table}${filter.sql}`,
       filter.params,
     );
+    await this.emitReadAction(query, rows, schema);
 
     return {
       data: rows,
@@ -220,11 +270,7 @@ export class ItemsService extends BaseService {
     const schema = await this.getCollectionSchema();
     const trustedLookupField = assertIdentifier(lookupField, 'relation lookup field');
     if (!schema.fields[trustedLookupField]) {
-      throw serviceError(
-        'INVALID_QUERY',
-        `Unknown relation lookup field: ${trustedLookupField}`,
-        trustedLookupField,
-      );
+      throw serviceError('INVALID_QUERY', `Unknown relation lookup field: ${trustedLookupField}`, trustedLookupField);
     }
     if (!Array.isArray(values) || values.length === 0 || values.length > QUERY_LIMITS.maxLimit) {
       throw serviceError(
@@ -239,15 +285,9 @@ export class ItemsService extends BaseService {
     const visibleSelection = compileSelectFields(normalizeFields(fields), accessSchema);
     const internalSchema = {
       ...accessSchema,
-      fields: {
-        ...accessSchema.fields,
-        [trustedLookupField]: schema.fields[trustedLookupField],
-      },
+      fields: { ...accessSchema.fields, [trustedLookupField]: schema.fields[trustedLookupField] },
     };
-    const internalSelection = compileSelectFields(
-      [...visibleSelection.fields, trustedLookupField],
-      internalSchema,
-    );
+    const internalSelection = compileSelectFields([...visibleSelection.fields, trustedLookupField], internalSchema);
     const permissionFilter = compileFilter(permission.filter, schema);
     const table = quoteIdentifier(this.collection, 'collection name');
     const data = [];
@@ -283,7 +323,9 @@ export class ItemsService extends BaseService {
       `SELECT ${selected.sql} FROM ${table}${filter.sql} LIMIT 1`,
       filter.params,
     );
-    return rows[0] ?? null;
+    const record = rows[0] ?? null;
+    if (record) await this.emitReadAction({ fields: normalizeFields(fields) }, [record], schema, { single: true });
+    return record;
   }
 
   async returnCreatedOrUpdated(id, schema) {
@@ -308,10 +350,8 @@ export class ItemsService extends BaseService {
     const values = { [schema.primary_key]: id, ...Object.fromEntries(entries) };
     const fields = Object.keys(values);
     const table = quoteIdentifier(this.collection, 'collection name');
-
     await this.database.query(
-      `INSERT INTO ${table} (${fields.map((field) => quoteIdentifier(field, 'field name')).join(', ')})
-       VALUES (${fields.map(() => '?').join(', ')})`,
+      `INSERT INTO ${table} (${fields.map((field) => quoteIdentifier(field, 'field name')).join(', ')})\n       VALUES (${fields.map(() => '?').join(', ')})`,
       fields.map((field) => values[field]),
     );
 
@@ -330,29 +370,21 @@ export class ItemsService extends BaseService {
     const staged = [];
 
     for (const payload of payloads) {
-      const filteredPayload = await this.filterMutation('items.create', payload, {
-        operation: 'create',
-        bulk: true,
-      });
+      const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create', bulk: true });
       const callerEntries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
       const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create');
       const id = randomUUID();
       const candidate = createCandidateRecord(schema, id, entries);
       enforcePermissionValidation(candidate, permission.validation, schema);
-      staged.push({
-        id,
-        values: { [schema.primary_key]: id, ...Object.fromEntries(entries) },
-      });
+      staged.push({ id, values: { [schema.primary_key]: id, ...Object.fromEntries(entries) } });
     }
 
     await withTransaction(this.database, async (connection) => {
       const table = quoteIdentifier(this.collection, 'collection name');
-
       for (const entry of staged) {
         const fields = Object.keys(entry.values);
         await connection.query(
-          `INSERT INTO ${table} (${fields.map((field) => quoteIdentifier(field, 'field name')).join(', ')})
-           VALUES (${fields.map(() => '?').join(', ')})`,
+          `INSERT INTO ${table} (${fields.map((field) => quoteIdentifier(field, 'field name')).join(', ')})\n           VALUES (${fields.map(() => '?').join(', ')})`,
           fields.map((field) => entry.values[field]),
         );
       }
@@ -362,10 +394,7 @@ export class ItemsService extends BaseService {
     for (const entry of staged) {
       const record = await this.returnCreatedOrUpdated(entry.id, schema);
       records.push(record);
-      await this.actionMutation('items.create', { key: entry.id, item: record }, {
-        operation: 'create',
-        bulk: true,
-      });
+      await this.actionMutation('items.create', { key: entry.id, item: record }, { operation: 'create', bulk: true });
     }
     return records;
   }
@@ -373,15 +402,11 @@ export class ItemsService extends BaseService {
   async updateOne(id, payload = {}) {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('update');
-    const filteredPayload = await this.filterMutation('items.update', payload, {
-      operation: 'update',
-      key: id,
-    });
+    const filteredPayload = await this.filterMutation('items.update', payload, { operation: 'update', key: id });
     const callerEntries = this.validatePayload(filteredPayload, schema, permission);
     if (callerEntries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
     const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'update');
     const effectiveChanges = Object.fromEntries(entries);
-
     const table = quoteIdentifier(this.collection, 'collection name');
     const filter = combineCompiledFilters(
       compileFilter(permission.filter, schema),
@@ -389,10 +414,7 @@ export class ItemsService extends BaseService {
     );
 
     if (permission.validation) {
-      const [currentRows] = await this.database.query(
-        `SELECT * FROM ${table}${filter.sql} LIMIT 1`,
-        filter.params,
-      );
+      const [currentRows] = await this.database.query(`SELECT * FROM ${table}${filter.sql} LIMIT 1`, filter.params);
       const current = currentRows[0];
       if (!current) return null;
       enforcePermissionValidation({ ...current, ...effectiveChanges }, permission.validation, schema);
@@ -403,14 +425,9 @@ export class ItemsService extends BaseService {
       `UPDATE ${table} SET ${setSql}${filter.sql}`,
       [...entries.map(([, value]) => value), ...filter.params],
     );
-
     if (result.affectedRows === 0) return null;
     const record = await this.returnCreatedOrUpdated(id, schema);
-    await this.actionMutation('items.update', {
-      key: id,
-      item: record,
-      changes: effectiveChanges,
-    }, { operation: 'update' });
+    await this.actionMutation('items.update', { key: id, item: record, changes: effectiveChanges }, { operation: 'update' });
     return record;
   }
 
@@ -422,11 +439,7 @@ export class ItemsService extends BaseService {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('update');
     const accessSchema = schemaForFields(schema, permission.fields);
-    const filteredPayload = await this.filterMutation('items.update', payload, {
-      operation: 'update',
-      bulk: true,
-      filter: filterInput,
-    });
+    const filteredPayload = await this.filterMutation('items.update', payload, { operation: 'update', bulk: true, filter: filterInput });
     const callerEntries = this.validatePayload(filteredPayload, schema, permission);
     if (callerEntries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
     const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'update');
@@ -440,14 +453,9 @@ export class ItemsService extends BaseService {
         [...filter.params, MAX_BULK_VALIDATION_ROWS + 1],
       );
       if (rows.length > MAX_BULK_VALIDATION_ROWS) {
-        throw serviceError(
-          'VALIDATION_BULK_LIMIT',
-          `Permission validation can inspect at most ${MAX_BULK_VALIDATION_ROWS} rows per bulk update`,
-        );
+        throw serviceError('VALIDATION_BULK_LIMIT', `Permission validation can inspect at most ${MAX_BULK_VALIDATION_ROWS} rows per bulk update`);
       }
-      for (const row of rows) {
-        enforcePermissionValidation({ ...row, ...effectiveChanges }, permission.validation, schema);
-      }
+      for (const row of rows) enforcePermissionValidation({ ...row, ...effectiveChanges }, permission.validation, schema);
     }
 
     const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
@@ -455,35 +463,23 @@ export class ItemsService extends BaseService {
       `UPDATE ${table} SET ${setSql}${filter.sql}`,
       [...entries.map(([, value]) => value), ...filter.params],
     );
-    await this.actionMutation('items.update', {
-      filter: filterInput,
-      changes: effectiveChanges,
-      affected: result.affectedRows,
-    }, { operation: 'update', bulk: true });
+    await this.actionMutation('items.update', { filter: filterInput, changes: effectiveChanges, affected: result.affectedRows }, { operation: 'update', bulk: true });
     return result.affectedRows;
   }
 
   async deleteOne(id) {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('delete');
-    const filtered = await this.filterMutation('items.delete', { key: id }, {
-      operation: 'delete',
-      key: id,
-    });
+    const filtered = await this.filterMutation('items.delete', { key: id }, { operation: 'delete', key: id });
     const key = filtered?.key ?? id;
     const table = quoteIdentifier(this.collection, 'collection name');
     const filter = combineCompiledFilters(
       compileFilter(permission.filter, schema),
       compileFilter({ [schema.primary_key]: { _eq: key } }, schema),
     );
-    const [result] = await this.database.query(
-      `DELETE FROM ${table}${filter.sql}`,
-      filter.params,
-    );
+    const [result] = await this.database.query(`DELETE FROM ${table}${filter.sql}`, filter.params);
     const deleted = result.affectedRows > 0;
-    if (deleted) {
-      await this.actionMutation('items.delete', { key }, { operation: 'delete' });
-    }
+    if (deleted) await this.actionMutation('items.delete', { key }, { operation: 'delete' });
     return deleted;
   }
 
@@ -495,24 +491,15 @@ export class ItemsService extends BaseService {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('delete');
     const accessSchema = schemaForFields(schema, permission.fields);
-    const filtered = await this.filterMutation('items.delete', { filter: filterInput }, {
-      operation: 'delete',
-      bulk: true,
-    });
+    const filtered = await this.filterMutation('items.delete', { filter: filterInput }, { operation: 'delete', bulk: true });
     const effectiveFilter = filtered?.filter ?? filterInput;
     if (!effectiveFilter || typeof effectiveFilter !== 'object' || Array.isArray(effectiveFilter) || Object.keys(effectiveFilter).length === 0) {
       throw serviceError('FILTER_REQUIRED', 'deleteMany hook result must preserve a non-empty filter');
     }
     const filter = this.compileActionFilters(effectiveFilter, permission.filter, accessSchema, schema);
     const table = quoteIdentifier(this.collection, 'collection name');
-    const [result] = await this.database.query(
-      `DELETE FROM ${table}${filter.sql}`,
-      filter.params,
-    );
-    await this.actionMutation('items.delete', {
-      filter: effectiveFilter,
-      affected: result.affectedRows,
-    }, { operation: 'delete', bulk: true });
+    const [result] = await this.database.query(`DELETE FROM ${table}${filter.sql}`, filter.params);
+    await this.actionMutation('items.delete', { filter: effectiveFilter, affected: result.affectedRows }, { operation: 'delete', bulk: true });
     return result.affectedRows;
   }
 }
