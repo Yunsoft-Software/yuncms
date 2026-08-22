@@ -43,6 +43,17 @@ function timeoutError(command, args, timeoutMs, stdout, stderr) {
   return error;
 }
 
+function spawnCapturedProcess(spawnProcess, command, args, options) {
+  try {
+    return spawnProcess(command, args, options);
+  } catch (error) {
+    error.code ||= 'COMMAND_START_FAILED';
+    error.command = command;
+    error.args = [...args];
+    throw error;
+  }
+}
+
 export async function runCapturedProcess(command, args = [], {
   cwd = process.cwd(),
   env = process.env,
@@ -65,11 +76,16 @@ export async function runCapturedProcess(command, args = [], {
     { max: 16 * 1024 * 1024 },
   );
 
-  const child = spawnProcess(command, args, {
-    cwd,
-    env: { ...env },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const child = spawnCapturedProcess(
+    spawnProcess,
+    command,
+    args,
+    {
+      cwd,
+      env: { ...env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
 
   let stdout = '';
   let stderr = '';
