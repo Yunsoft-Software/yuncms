@@ -19,6 +19,7 @@ import {
 const MYSQL_ENABLED = process.env.YUNCMS_TEST_MYSQL === '1';
 const UPGRADE_ENABLED = process.env.YUNCMS_TEST_UPGRADE === '1';
 const DESTRUCTIVE = process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE === '1';
+const ENABLED = MYSQL_ENABLED && UPGRADE_ENABLED;
 
 function requireDisposableDatabase(databaseName) {
   if (!DESTRUCTIVE) {
@@ -30,8 +31,10 @@ function requireDisposableDatabase(databaseName) {
 }
 
 function baseUpgradeEnv() {
-  const database = process.env.YUNCMS_UPGRADE_TEST_DB_DATABASE || process.env.DB_DATABASE;
-  if (!database) throw new Error('YUNCMS_UPGRADE_TEST_DB_DATABASE or DB_DATABASE is required');
+  const database = process.env.YUNCMS_UPGRADE_TEST_DB_DATABASE;
+  if (!database) {
+    throw new Error('YUNCMS_UPGRADE_TEST_DB_DATABASE is required and must name a dedicated disposable database');
+  }
   requireDisposableDatabase(database);
   return {
     ...process.env,
@@ -52,7 +55,7 @@ async function tableExists(pool, database, table) {
 }
 
 test('real MySQL partial DDL failure is journaled and fails closed on retry', {
-  skip: !MYSQL_ENABLED,
+  skip: !ENABLED,
   timeout: 45_000,
 }, async () => {
   const env = baseUpgradeEnv();
@@ -105,14 +108,13 @@ test('real MySQL partial DDL failure is journaled and fails closed on retry', {
 });
 
 test('real mysqldump backup and destructive restore reproduce exact DB and local project snapshot', {
-  skip: !(MYSQL_ENABLED && UPGRADE_ENABLED),
+  skip: !ENABLED,
   timeout: 120_000,
 }, async () => {
   const env = baseUpgradeEnv();
   const config = loadConfig(env);
   const cwd = await mkdtemp(join(tmpdir(), 'yuncms-managed-upgrade-it-'));
   let pool = createDatabasePool(config.database);
-  let backupPath = null;
 
   try {
     await resetDatabaseObjects({ config: config.database });
@@ -140,11 +142,10 @@ test('real mysqldump backup and destructive restore reproduce exact DB and local
       env,
       output: { log() {}, warn() {} },
     });
-    backupPath = backup.backupPath;
     assert.ok(backup.manifest.database.verifiedDecompressedBytes > 0);
     assert.equal(backup.manifest.s3.objectsBackedUp, false);
-    const manifestText = await readFile(join(backupPath, 'manifest.json'), 'utf8');
-    assert.equal(manifestText.includes(String(env.DB_PASSWORD ?? '')), env.DB_PASSWORD ? false : manifestText.includes(''));
+    const manifestText = await readFile(join(backup.backupPath, 'manifest.json'), 'utf8');
+    if (env.DB_PASSWORD) assert.equal(manifestText.includes(env.DB_PASSWORD), false);
     if (env.S3_SECRET_ACCESS_KEY) assert.equal(manifestText.includes(env.S3_SECRET_ACCESS_KEY), false);
 
     await pool.query('UPDATE upgrade_fixture SET value = ? WHERE id = 1', ['after-update']);
@@ -159,7 +160,7 @@ test('real mysqldump backup and destructive restore reproduce exact DB and local
     pool = null;
 
     await restoreProjectBackup({
-      backupPath,
+      backupPath: backup.backupPath,
       cwd,
       env,
       output: { log() {}, warn() {} },
@@ -167,7 +168,9 @@ test('real mysqldump backup and destructive restore reproduce exact DB and local
 
     pool = createDatabasePool(config.database);
     const [fixtureRows] = await pool.query('SELECT id, value FROM upgrade_fixture ORDER BY id');
-    assert.deepEqual(fixtureRows, [{ id: 1, value: 'before-update' }]);
+    assert.equal(fixtureRows.length, 1);
+    assert.equal(Number(fixtureRows[0].id), 1);
+    assert.equal(fixtureRows[0].value, 'before-update');
     assert.equal(await tableExists(pool, config.database.database, 'upgrade_extra'), false);
     assert.equal(await tableExists(pool, config.database.database, 'upgrade_extra_view'), false);
 
@@ -179,6 +182,5 @@ test('real mysqldump backup and destructive restore reproduce exact DB and local
     if (pool) await closeDatabasePool(pool).catch(() => {});
     await resetDatabaseObjects({ config: config.database }).catch(() => {});
     await rm(cwd, { recursive: true, force: true });
-    void backupPath;
   }
 });
