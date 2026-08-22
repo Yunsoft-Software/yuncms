@@ -3,6 +3,7 @@ import { AuditService } from './audit-service.js';
 import { AuthService } from './auth-service.js';
 import { AuthTokensService } from './auth-tokens-service.js';
 import { CollectionsService } from './collections-service.js';
+import { ExternalAuthService } from './external-auth-service.js';
 import { FieldsService } from './fields-service.js';
 import { FileReconciliationService } from './file-reconciliation-service.js';
 import { FilesService } from './files-service.js';
@@ -19,6 +20,7 @@ export function createCoreServiceRegistry() {
   return createServiceRegistry({
     AuthService,
     AuthTokensService,
+    ExternalAuthService,
     ApiTokensService,
     AuditService,
     ItemsService,

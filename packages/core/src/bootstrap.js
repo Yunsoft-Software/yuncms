@@ -12,6 +12,7 @@ import { schemaDisplayNamesMigration } from './migrations/0009-schema-display-na
 import { studioFaviconFileMigration } from './migrations/0010-studio-favicon-file.js';
 import { rolePermissionActionsMigration } from './migrations/0011-role-permission-actions.js';
 import { filesReadFiltersMigration } from './migrations/0012-files-read-filters.js';
+import { externalAuthFoundationMigration } from './migrations/0013-external-auth-foundation.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -28,6 +29,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   studioFaviconFileMigration,
   rolePermissionActionsMigration,
   filesReadFiltersMigration,
+  externalAuthFoundationMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(
