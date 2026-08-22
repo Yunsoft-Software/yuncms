@@ -165,6 +165,38 @@ export async function login(email, password) {
   return body.data;
 }
 
+export async function authProviders() {
+  const { response, body } = await rawRequest('/auth/providers');
+  if (!response.ok) throw errorFromResponse(response, body);
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
+export function externalLoginUrl(providerId, redirect = '/') {
+  const url = new URL(`${API_URL}/auth/login/${encodeURIComponent(providerId)}`);
+  url.searchParams.set('redirect', redirect);
+  return url.toString();
+}
+
+export async function loginWithProvider(providerId, username, password) {
+  const { response, body } = await rawRequest(`/auth/login/${encodeURIComponent(providerId)}`, {
+    method: 'POST',
+    body: { username, password },
+  });
+  if (!response.ok) throw errorFromResponse(response, body);
+  writeSession(body.data);
+  return body.data;
+}
+
+export async function exchangeAuthCode(authCode) {
+  const { response, body } = await rawRequest('/auth/exchange', {
+    method: 'POST',
+    body: { auth_code: authCode },
+  });
+  if (!response.ok) throw errorFromResponse(response, body);
+  writeSession(body.data);
+  return body.data;
+}
+
 export async function logout() {
   const session = readSession();
   try {
