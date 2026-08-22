@@ -38,6 +38,16 @@ function publicUser(user) {
 }
 
 export class AuthService extends BaseService {
+  async action(event, payload, context = {}) {
+    if (!this.emitter) return;
+    await this.emitter.action(event, payload, {
+      accountability: this.accountability,
+      requestId: this.requestId,
+      collection: 'yuncms_users',
+      ...context,
+    });
+  }
+
   createSessionsService() {
     return new SessionsService({
       accountability: this.accountability,
@@ -78,10 +88,19 @@ export class AuthService extends BaseService {
     );
 
     if (!user || !passwordMatches || user.status !== 'active') {
+      await this.action('auth.login.failed', {
+        method: 'local',
+        reason: 'invalid_credentials',
+      }, { ip });
       throw invalidLogin();
     }
 
     const tokens = await this.createSessionsService().createForUser(user, { ip, userAgent });
+    await this.action('auth.login.success', {
+      method: 'local',
+      user: user.id,
+      role: user.role ?? null,
+    }, { ip });
     return {
       user: publicUser(user),
       ...tokens,
@@ -138,6 +157,11 @@ export class AuthService extends BaseService {
 
   async refresh(refreshToken) {
     const result = await this.createSessionsService().rotateRefreshToken(refreshToken);
+    await this.action('auth.refresh.success', {
+      method: 'session',
+      user: result.user,
+      role: result.role ?? null,
+    });
     return {
       user: {
         id: result.user,
@@ -153,7 +177,14 @@ export class AuthService extends BaseService {
   }
 
   async logout(accessToken) {
-    return this.createSessionsService().revokeByAccessToken(accessToken);
+    const revoked = await this.createSessionsService().revokeByAccessToken(accessToken);
+    await this.action('auth.logout', {
+      method: 'session',
+      user: this.accountability.user ?? null,
+      all: false,
+      revoked: Boolean(revoked),
+    });
+    return revoked;
   }
 
   async logoutAll() {
@@ -162,6 +193,13 @@ export class AuthService extends BaseService {
       error.code = 'UNAUTHORIZED';
       throw error;
     }
-    return this.createSessionsService().revokeAllForUser(this.accountability.user);
+    const revoked = await this.createSessionsService().revokeAllForUser(this.accountability.user);
+    await this.action('auth.logout', {
+      method: 'session',
+      user: this.accountability.user,
+      all: true,
+      revoked: Number(revoked ?? 0),
+    });
+    return revoked;
   }
 }
