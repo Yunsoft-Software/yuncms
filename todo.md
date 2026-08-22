@@ -2,6 +2,8 @@
 
 Only checks that still require a real Node 24 checkout, browser, MySQL instance or deployment provider belong here. This is a **pending verification list**: when a check passes it is removed, not kept as `[x]` history. If its covered source changes later, it becomes pending again.
 
+Current assistant environment cannot execute the release gates: it has Node `22.16.0`, npm `10.9.2`, and the container cannot resolve `github.com`. Do not treat source inspection as executed verification. For the managed-upgrade work, Codex should follow `docs/codex-managed-upgrade-verification.md` and leave command/evidence notes without secrets.
+
 ## 1. Directus-style fields / relation query smoke
 
 - [ ] Create a direct M2O relation such as `articles.author_id -> authors.id` and verify `GET /items/articles?fields=*` returns all readable source fields without expanding `author_id`.
@@ -148,16 +150,40 @@ Use a disposable MySQL 8-compatible database whose name contains `test`, `ci` or
 
 ## 15. Backup / restore / managed update release gate
 
-These checks were added for the `22-08-2026` managed upgrade implementation and require a real Node 24/npm/MySQL/process environment. Do not mark the upgrade path production-verified from source tests alone.
+These checks were added for the `22-08-2026` managed upgrade implementation and require a real Node 24/npm/MySQL/process environment. Do not mark the upgrade path production-verified from source tests alone. Follow the exact runbook in `docs/codex-managed-upgrade-verification.md`.
 
 ### Source and CLI gates
 
-- [ ] On a real Node.js 24 checkout run `npm run test:fast`, `npm test` and `npm run test:release`; the new migration-attempt, backup/restore, update preflight, operation-lock and rollback regression tests must all pass.
+- [ ] On a real Node.js 24 checkout run `npm run test:fast`, `npm test` and `npm run test:release`; the migration-attempt, backup/restore, SemVer, dependency-section, update preflight, operation-lock and rollback regression tests must all pass.
+- [ ] Verify `npm run test:fast` actually includes every managed-upgrade CLI regression file, including `update-dependency-section.test.js`; do not accept only full-suite coverage.
 - [ ] Pack/install the publishable `@yunsoft/yuncms` artifacts into a clean npm project that declares `@yunsoft/yuncms` in `package.json`; verify `yuncms help` exposes `backup`, `restore`, `update` and `update --dry-run` without regressing `init/bootstrap/start`.
 - [ ] Verify a project with no `@yunsoft/yuncms` dependency and a project with no installed `node_modules/@yunsoft/yuncms` fail managed update before mutation with the documented project/package errors.
+- [ ] Verify an invalid installed package version fails with `UPDATE_INSTALLED_VERSION_INVALID` before backup/mutation.
 - [ ] Run `yuncms update --dry-run` against a real published target and confirm npm target resolution plus loading `REQUIRED_CORE_MIGRATION_IDS` from the staged target package works with lifecycle scripts disabled during inspection.
-- [ ] Verify a target version lower than the installed version is rejected with the downgrade blocker and no package/database mutation occurs.
+- [ ] Verify SemVer prerelease precedence with real/published targets when available: stable -> prerelease must be treated as downgrade; prerelease -> stable must be allowed.
+- [ ] Verify a target version lower than the installed version is rejected with `UPDATE_DOWNGRADE_FORBIDDEN` and no package/database mutation occurs.
 - [ ] Verify unknown applied migration IDs not present in the target package produce `UPDATE_MIGRATION_HISTORY_INCOMPATIBLE` and prevent update.
+- [ ] Verify a project that stores `@yunsoft/yuncms` under `devDependencies` remains there after update (`--save-dev`), and one under `optionalDependencies` remains optional (`--save-optional`).
+
+### Dedicated automated MySQL upgrade gate
+
+Use a **separate disposable database** that is not the normal integration DB. Its name must contain `test`, `ci` or `dev`.
+
+Set:
+
+```text
+YUNCMS_TEST_MYSQL=1
+YUNCMS_TEST_UPGRADE=1
+YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1
+YUNCMS_UPGRADE_TEST_DB_DATABASE=<dedicated_test_database>
+```
+
+plus the normal `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_SSL` values.
+
+- [ ] Run `npm run test:upgrade:mysql`; both tests in `test/integration/managed-upgrade.test.js` must pass.
+- [ ] Confirm the partial-DDL test records `status=failed`, `statement_index=1`, and retry fails with `DATABASE_MIGRATION_RECOVERY_REQUIRED` before re-executing statement 1.
+- [ ] Confirm the real `mysqldump` round-trip restores the pre-backup DB row, removes post-backup table/view objects, restores local Files/extensions/package/env bytes, and leaves no DB password/S3 secret in the manifest.
+- [ ] Confirm the dedicated test DB is cleaned afterward; a failed test must not leave synthetic failed migration attempts that poison later bootstrap runs.
 
 ### Real MySQL backup / restore
 
@@ -170,7 +196,8 @@ Use a disposable dedicated MySQL 8-compatible database with representative custo
 - [ ] Remove an asset that `manifest.json` declares (for example `project/package.json` or `files/`) and verify restore fails with `BACKUP_ASSET_MISSING` before destructive DB reset.
 - [ ] Add an extra table and view after taking the backup, then run restore into the disposable DB; verify reset drops both, the dump recreates only backup-state objects, FK checks are restored, and schema/data matches the snapshot.
 - [ ] Compare representative row counts/data checksums and schema definitions before backup vs after restore rather than only checking that commands exit zero.
-- [ ] Verify restore refuses a different DB host/port/name by default and succeeds against an intentional disposable alternate target only with `--allow-different-database-target`.
+- [ ] Verify restore refuses a different DB host/port/name by default with `BACKUP_DATABASE_TARGET_MISMATCH` and does not even start destructive validation/reset.
+- [ ] Restore an intentional source backup into a different disposable recovery DB with `--allow-different-database-target`; verify the recovery DB receives the data **and the current recovery `.env` is preserved**, so the app does not reconnect to the source DB afterward.
 - [ ] Exercise DB SSL/TLS with the actual production-compatible MySQL client and verify `--ssl-mode=REQUIRED` works in that environment.
 - [ ] Run backup/restore with a realistically large DB and local Files tree to confirm streaming behavior stays memory-bounded and preflight disk estimates include DB + local Files/extensions/project metadata + headroom.
 
@@ -183,11 +210,11 @@ Use a disposable dedicated MySQL 8-compatible database with representative custo
 
 ### Running-service and concurrency guards
 
-- [ ] While YunCMS is running, verify both `yuncms backup` and real `yuncms update` refuse to mutate/snapshot state.
-- [ ] Test `HOST=127.0.0.1`, `HOST=0.0.0.0` and the actual production bind address so the service-running guard reaches the configured local process correctly.
-- [ ] With a real auto-restarting supervisor (systemd/PM2/Docker/Plesk), stop only the child process and prove the supervisor restart is caught before backup/migration; then stop the supervisor itself and confirm the update can proceed.
+- [ ] While YunCMS is running, verify `yuncms backup`, destructive `yuncms restore ... --yes`, and real `yuncms update` refuse to mutate/snapshot state with `UPDATE_APPLICATION_RUNNING`.
+- [ ] Test `HOST=127.0.0.1`, `HOST=0.0.0.0`, `HOST=::` and the actual production bind address so the service-running guard reaches the configured local process correctly.
+- [ ] With a real auto-restarting supervisor (systemd/PM2/Docker/Plesk), stop only the child process and prove the supervisor restart is caught before backup/migration/destructive restore; then stop the supervisor itself and confirm the update can proceed.
 - [ ] Start two real update/restore commands for the same project concurrently; the second must fail with `UPDATE_ALREADY_RUNNING` while the first holds the OS-temp lock.
-- [ ] Hard-kill an update process, verify the stale lock remains, then confirm the reported lock can be manually removed **only after** verifying no update/restore process remains.
+- [ ] Hard-kill an update process, verify the stale lock remains, then confirm the reported lock can be manually removed **only after** verifying no update/restore/npm/mysql/mysqldump process remains.
 - [ ] Verify two different project paths get different operation locks and do not block one another.
 
 ### Successful managed update
@@ -198,6 +225,7 @@ Use a disposable dedicated MySQL 8-compatible database with representative custo
 - [ ] Confirm target migrations apply exactly once and the target runtime reaches `/ready` in the temporary verification process.
 - [ ] Confirm the temporary verification runtime terminates cleanly and production is **not** silently left running outside the configured supervisor; start the normal supervisor manually and verify health/ready/Studio/API afterward.
 - [ ] Repeat with an extension installed and verify extension startup compatibility is exercised by the temporary runtime probe.
+- [ ] From an older release that does not yet contain the `update` command, verify first transition using `npx --yes @yunsoft/yuncms@<new> update --to <new>` after the new CLI is actually published.
 
 ### Automatic rollback
 
@@ -206,6 +234,7 @@ Use a disposable dedicated MySQL 8-compatible database with representative custo
 - [ ] Force the new runtime or an installed extension to fail during startup after successful migration; verify the same full rollback executes and the old runtime readiness probe passes.
 - [ ] After a successful rollback confirm the CLI still returns the **original update error** with `rollbackPerformed=true` and preserves the backup path for inspection.
 - [ ] Independently force rollback restore, old dependency reinstall or old runtime probe to fail; verify the final error becomes `UPDATE_ROLLBACK_FAILED`, contains both update/rollback failure context and leaves the backup directory untouched for manual recovery.
+- [ ] Force the supervisor to restart the API immediately before rollback destructive reset; verify `beforeDestructive` prevents resetting a live DB and rollback fails closed rather than modifying live state.
 
 ### S3 / external storage
 
