@@ -2,7 +2,7 @@
 
 Only checks that still require a real Node 24 checkout, browser, MySQL instance or deployment provider belong here. This is a **pending verification list**: when a check passes it is removed, not kept as `[x]` history. If its covered source changes later, it becomes pending again.
 
-For the remaining managed-upgrade checks, follow `docs/codex-managed-upgrade-verification.md` and leave command/evidence notes without secrets. Registry publication checks require an authenticated npm session; deployment/provider checks require their named external environment.
+For the remaining managed-upgrade checks, follow `docs/codex-managed-upgrade-verification.md` and leave command/evidence notes without secrets. The `0.1.4` package family is staged in npm but still requires the account's interactive 2FA setup/approval; deployment/provider checks require their named external environment.
 
 ## 1. Directus-style fields / relation query smoke
 
