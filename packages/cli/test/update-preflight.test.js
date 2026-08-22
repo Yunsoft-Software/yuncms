@@ -12,6 +12,7 @@ import {
   analyzeMigrationHistory,
   assertUpdatePreflightReady,
   compareVersions,
+  resolveTargetVersion,
 } from '../src/update-preflight.js';
 
 const env = {
@@ -47,6 +48,32 @@ test('version comparison follows semantic version precedence including prereleas
   assert.throws(
     () => compareVersions('1.0', '1.0.0'),
     (error) => error.code === 'UPDATE_VERSION_INVALID',
+  );
+});
+
+test('npm target resolution chooses the highest semantic version from a returned range list', async () => {
+  const version = await resolveTargetVersion('^1.0.0', {
+    cwd: '/srv/yuncms',
+    env,
+    async runProcess() {
+      return {
+        stdout: JSON.stringify(['1.0.0', '1.2.0-beta.1', '1.1.9', '1.2.0', '1.0.5']),
+        stderr: '',
+        code: 0,
+      };
+    },
+  });
+  assert.equal(version, '1.2.0');
+
+  await assert.rejects(
+    resolveTargetVersion('bad', {
+      cwd: '/srv/yuncms',
+      env,
+      async runProcess() {
+        return { stdout: JSON.stringify(['1.0.0', 'not-semver']), stderr: '', code: 0 };
+      },
+    }),
+    (error) => error.code === 'UPDATE_TARGET_VERSION_INVALID',
   );
 });
 
