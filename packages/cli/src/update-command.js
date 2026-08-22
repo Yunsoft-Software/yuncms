@@ -10,6 +10,7 @@ import {
 } from './project-backup.js';
 import { runCapturedProcess } from './process-runner.js';
 import { verifyInstalledRuntime } from './runtime-probe.js';
+import { assertYunCmsStopped } from './service-state.js';
 import {
   assertUpdatePreflightReady,
   collectUpdatePreflight,
@@ -43,23 +44,6 @@ function printPreflight(report, output) {
 
 function localCliPath(cwd) {
   return resolve(cwd, 'node_modules', '@yunsoft', 'yuncms', 'bin', 'yuncms.js');
-}
-
-async function assertApiStillStopped(config, fetchFn = globalThis.fetch) {
-  if (typeof fetchFn !== 'function') return true;
-  try {
-    const response = await fetchFn(`http://127.0.0.1:${config.server.port}/health`, {
-      signal: AbortSignal.timeout(1000),
-    });
-    if (response.status >= 100 && response.status < 600) {
-      const error = new Error('YunCMS became reachable during update; stop the service supervisor before retrying');
-      error.code = 'UPDATE_APPLICATION_RESTARTED';
-      throw error;
-    }
-  } catch (error) {
-    if (error?.code === 'UPDATE_APPLICATION_RESTARTED') throw error;
-  }
-  return true;
 }
 
 async function installVersion({ cwd, env, targetVersion, runProcess }) {
@@ -112,6 +96,7 @@ export async function runUpdateCommand({
   restoreBackup = restoreProjectBackup,
   verifyRuntime = verifyInstalledRuntime,
   acquireLock = acquireUpdateLock,
+  assertStopped = assertYunCmsStopped,
   fetchFn = globalThis.fetch,
 } = {}) {
   const { values } = parseCommandOptions(args, {
@@ -148,6 +133,11 @@ export async function runUpdateCommand({
     }
 
     assertUpdatePreflightReady(report);
+    await assertStopped({
+      host: config.server.host,
+      port: config.server.port,
+      fetchFn,
+    });
 
     const backupPath = values['--backup-output']
       ? resolve(cwd, values['--backup-output'])
@@ -159,7 +149,11 @@ export async function runUpdateCommand({
       output.log?.(`Installing @yunsoft/yuncms@${report.targetVersion}`);
       await installVersion({ cwd, env, targetVersion: report.targetVersion, runProcess });
 
-      await assertApiStillStopped(config, fetchFn);
+      await assertStopped({
+        host: config.server.host,
+        port: config.server.port,
+        fetchFn,
+      });
 
       output.log?.('Applying target database migrations');
       await bootstrapInstalledVersion({ cwd, env, runProcess });
