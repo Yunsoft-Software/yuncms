@@ -52,6 +52,7 @@ const FAST_TESTS = [
   'packages/cli/test/cli.test.js',
   'packages/cli/test/database-backup-options.test.js',
   'packages/cli/test/default-port.test.js',
+  'packages/cli/test/maintenance-lock.test.js',
   'packages/cli/test/restore-command.test.js',
   'packages/cli/test/restore-validation.test.js',
   'packages/cli/test/service-state.test.js',
