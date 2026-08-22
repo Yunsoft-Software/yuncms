@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createReadStream, createWriteStream } from 'node:fs';
+import { Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip, createGzip } from 'node:zlib';
 
@@ -92,6 +93,34 @@ export async function dumpDatabase({
   ]);
 
   return outputPath;
+}
+
+export async function verifyDatabaseDump({ inputPath } = {}) {
+  if (!inputPath) throw new Error('Database dump path is required');
+  let decompressedBytes = 0;
+  const sink = new Writable({
+    write(chunk, _encoding, callback) {
+      decompressedBytes += chunk.length;
+      callback();
+    },
+  });
+
+  try {
+    await pipeline(createReadStream(inputPath), createGunzip(), sink);
+  } catch (error) {
+    const invalid = new Error(`Database backup is not a valid gzip stream: ${inputPath}`);
+    invalid.code = 'BACKUP_DATABASE_INVALID';
+    invalid.cause = error;
+    throw invalid;
+  }
+
+  if (decompressedBytes === 0) {
+    const error = new Error(`Database backup decompressed to an empty dump: ${inputPath}`);
+    error.code = 'BACKUP_DATABASE_EMPTY';
+    throw error;
+  }
+
+  return { decompressedBytes };
 }
 
 export async function restoreDatabase({
