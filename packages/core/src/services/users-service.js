@@ -232,7 +232,7 @@ export class UsersService extends BaseService {
       error.code = 'SELF_ADMIN_MUTATION_FORBIDDEN';
       throw error;
     }
-    const before = await this.#readOneUnsafe(id);
+    const before = this.emitter ? await this.#readOneUnsafe(id) : null;
     const [result] = await this.database.query('DELETE FROM yuncms_users WHERE id = ?', [id]);
     if (result.affectedRows !== 1) {
       const error = new Error(`Unknown user: ${id}`);
