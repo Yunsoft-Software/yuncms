@@ -80,10 +80,10 @@ test('start command forwards shutdown signals and waits for a clean child exit',
     signalSource,
     spawnProcess(_runtime, _args, options) {
       spawnOptions = options;
+      queueMicrotask(() => signalSource.emit('SIGTERM'));
       return child;
     },
   });
-  signalSource.emit('SIGTERM');
 
   assert.deepEqual(await resultPromise, { code: 0, signal: null });
   assert.equal(spawnOptions.cwd, '/srv/yuncms-project');
@@ -107,9 +107,11 @@ test('start command treats an explicitly forwarded shutdown signal as a clean ex
   const resultPromise = runStartCommand({
     output: { log() {} },
     signalSource,
-    spawnProcess() { return child; },
+    spawnProcess() {
+      queueMicrotask(() => signalSource.emit('SIGINT'));
+      return child;
+    },
   });
-  signalSource.emit('SIGINT');
 
   assert.deepEqual(await resultPromise, { code: 0, signal: 'SIGINT' });
   assert.equal(signalSource.listenerCount('SIGTERM'), 0);
