@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { loadConfig } from '@yunsoft/yuncms-core';
 
 import { parseCommandOptions } from './command-options.js';
+import { acquireDatabaseMaintenanceLock } from './maintenance-lock.js';
 import { restoreProjectBackup } from './project-backup.js';
 import { assertYunCmsStopped } from './service-state.js';
 import { acquireUpdateLock } from './update-lock.js';
@@ -14,6 +15,7 @@ export async function runRestoreCommand({
   output = console,
   restoreBackup = restoreProjectBackup,
   acquireLock = acquireUpdateLock,
+  acquireMaintenanceLock = acquireDatabaseMaintenanceLock,
   assertStopped = assertYunCmsStopped,
   fetchFn = globalThis.fetch,
 } = {}) {
@@ -37,8 +39,12 @@ export async function runRestoreCommand({
   });
 
   const lock = await acquireLock({ cwd });
+  let maintenanceLock = null;
   try {
     await assertServiceStopped();
+    maintenanceLock = await acquireMaintenanceLock({ env });
+    await assertServiceStopped();
+
     return await restoreBackup({
       backupPath: resolve(cwd, positionals[0]),
       cwd,
@@ -48,6 +54,7 @@ export async function runRestoreCommand({
       beforeDestructive: assertServiceStopped,
     });
   } finally {
+    if (maintenanceLock) await maintenanceLock.release();
     await lock.release();
   }
 }
