@@ -8,7 +8,9 @@ The current upgrade flow is **maintenance-window based**, not zero-downtime depl
 
 Stop the YunCMS service **at the supervisor level** first (systemd, PM2, Docker/Compose, Plesk process manager, etc.). Do not only kill a child process that the supervisor will immediately restart.
 
-`yuncms backup` and `yuncms update` fail closed when the configured local YunCMS health endpoint is still reachable.
+`yuncms backup` and `yuncms update` fail closed when the configured local YunCMS health endpoint is still reachable. Managed `update` and destructive `restore` operations are also serialized by an atomic per-project lock stored under the operating-system temp directory, outside project data and backup trees.
+
+If a process is killed hard, a stale lock may remain. YunCMS intentionally does not guess whether it is safe to remove that lock. Verify that no update/restore process is active before deleting a stale lock path reported by `UPDATE_ALREADY_RUNNING`.
 
 ## Requirements
 
@@ -19,7 +21,8 @@ The project must:
 - have the package installed in project `node_modules`;
 - have `npm`, `mysqldump` and `mysql` available on `PATH`;
 - use a MySQL account that can dump the YunCMS database and perform the DDL YunCMS already requires for schema management;
-- have enough local disk for the database backup plus safety headroom.
+- use a database whose complete contents are owned/recoverable by this YunCMS deployment;
+- have enough local disk for the database dump, local Files/extensions/project metadata snapshot and safety headroom.
 
 If S3-compatible storage is configured, YunCMS does **not** download/copy the bucket during each update. Provider-side versioning/snapshots must be configured and explicitly acknowledged for the update.
 
@@ -49,7 +52,9 @@ Preflight checks include:
 - incompatible/unknown migration history;
 - accidental downgrade attempts;
 - local health endpoint still running;
-- estimated database size and local free disk;
+- estimated database size;
+- estimated local uploads/extensions/project-metadata snapshot size;
+- local free disk and safety headroom;
 - S3 backup acknowledgement requirement.
 
 Dry-run does not modify the project database/package state.
@@ -110,15 +115,17 @@ The flag name is deliberately explicit: it acknowledges that YunCMS itself has n
 
 The update sequence is:
 
-1. run preflight;
-2. create and verify the mandatory backup;
-3. install the target `@yunsoft/yuncms` version with `--save-exact`;
-4. recheck that YunCMS did not become reachable again;
-5. execute the **newly installed** CLI's `bootstrap` command;
-6. start the new runtime temporarily on the configured port;
-7. require `/ready` to return `status=ready`;
-8. gracefully stop the temporary verification runtime;
-9. leave the project ready for the normal service supervisor to be started.
+1. acquire the project update lock;
+2. run preflight;
+3. recheck that the configured YunCMS service is stopped;
+4. create and verify the mandatory backup;
+5. install the target `@yunsoft/yuncms` version with `--save-exact`;
+6. recheck that a supervisor did not restart YunCMS;
+7. execute the **newly installed** CLI's `bootstrap` command;
+8. start the new runtime temporarily on the configured port;
+9. require `/ready` to return `status=ready`;
+10. gracefully stop the temporary verification runtime;
+11. release the update lock and leave the project ready for the normal service supervisor to be started.
 
 There is intentionally no `--no-backup` update mode.
 
@@ -146,12 +153,13 @@ The expected recovery path is restoring the verified pre-update backup.
 
 If package installation, migration or new-runtime readiness verification fails after the backup exists, `yuncms update` attempts automatic rollback:
 
-1. reset the target database's current tables/views;
-2. restore `database.sql.gz`;
-3. restore local Files, extensions, `.env`, `package.json` and `package-lock.json` to their pre-update state;
-4. reinstall the old dependency graph (`npm ci` when a lockfile existed);
-5. start the restored runtime temporarily and require `/ready`;
-6. stop the temporary runtime again.
+1. revalidate the backup gzip and every asset that its manifest declares before deleting anything;
+2. reset the target database's current tables/views;
+3. restore `database.sql.gz`;
+4. restore local Files, extensions, `.env`, `package.json` and `package-lock.json` to their pre-update state;
+5. reinstall the old dependency graph (`npm ci` when a lockfile existed);
+6. start the restored runtime temporarily and require `/ready`;
+7. stop the temporary runtime again.
 
 If rollback succeeds, the original update error is still returned, with rollback marked completed. The operator should inspect the failure before restarting production.
 
@@ -179,7 +187,7 @@ For an intentional disaster-recovery restore to a different database target:
 yuncms restore /path/to/backup --yes --allow-different-database-target
 ```
 
-The restore resets current database tables/views before importing the dump. This is required because importing an old dump over a partially migrated database would otherwise leave tables created only by the failed migration.
+Before destructive reset, restore revalidates the database gzip and confirms that every manifest-declared local asset exists. Only then does it reset current database tables/views and import the dump. This prevents both corrupted backups from wiping a healthy database and tables created only by a failed migration from surviving an old dump import.
 
 ## Starting production again
 
