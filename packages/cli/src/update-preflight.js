@@ -23,6 +23,7 @@ import { runCapturedProcess } from './process-runner.js';
 import { isLocalYunCmsReachable } from './service-state.js';
 
 const MIN_FREE_HEADROOM_BYTES = 256 * 1024 * 1024;
+const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
 function updateError(code, message) {
   const error = new Error(message);
@@ -46,6 +47,17 @@ function projectDeclaresYunCms(packageJson) {
     .some((key) => packageJson?.[key]?.['@yunsoft/yuncms']);
 }
 
+function parseSemanticVersion(version) {
+  if (typeof version !== 'string') return null;
+  const match = SEMVER_PATTERN.exec(version.trim());
+  if (!match) return null;
+  return {
+    raw: version.trim(),
+    core: [Number(match[1]), Number(match[2]), Number(match[3])],
+    prerelease: match[4] ? match[4].split('.') : [],
+  };
+}
+
 export async function readProjectPackageState(cwd = process.cwd()) {
   const projectPackagePath = resolve(cwd, 'package.json');
   const project = await readJson(projectPackagePath, 'UPDATE_PROJECT_PACKAGE_REQUIRED');
@@ -61,12 +73,19 @@ export async function readProjectPackageState(cwd = process.cwd()) {
   if (!installed.version) {
     throw updateError('UPDATE_INSTALLED_PACKAGE_REQUIRED', 'Installed @yunsoft/yuncms version is missing');
   }
+  const currentVersion = String(installed.version);
+  if (!parseSemanticVersion(currentVersion)) {
+    throw updateError(
+      'UPDATE_INSTALLED_VERSION_INVALID',
+      `Installed @yunsoft/yuncms has an invalid semantic version: ${currentVersion}`,
+    );
+  }
 
   return {
     project,
     projectPackagePath,
     installedPackagePath: installedPath,
-    currentVersion: String(installed.version),
+    currentVersion,
   };
 }
 
@@ -78,7 +97,7 @@ function parseResolvedVersion(stdout) {
     parsed = stdout.replace(/^"|"$/g, '').trim();
   }
   const version = Array.isArray(parsed) ? parsed.at(-1) : parsed;
-  if (typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
+  if (typeof version !== 'string' || !parseSemanticVersion(version)) {
     throw updateError('UPDATE_TARGET_VERSION_INVALID', `npm returned an invalid YunCMS version: ${stdout}`);
   }
   return version;
@@ -97,20 +116,46 @@ export async function resolveTargetVersion(specifier = 'latest', {
   return parseResolvedVersion(result.stdout);
 }
 
-function numericVersion(version) {
-  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
-  if (!match) return null;
-  return match.slice(1).map(Number);
+function comparePrerelease(left, right) {
+  if (left.length === 0 && right.length === 0) return 0;
+  if (left.length === 0) return 1;
+  if (right.length === 0) return -1;
+
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    if (left[index] === undefined) return -1;
+    if (right[index] === undefined) return 1;
+    if (left[index] === right[index]) continue;
+
+    const leftNumeric = /^\d+$/.test(left[index]);
+    const rightNumeric = /^\d+$/.test(right[index]);
+    if (leftNumeric && rightNumeric) {
+      const leftNumber = Number(left[index]);
+      const rightNumber = Number(right[index]);
+      return leftNumber < rightNumber ? -1 : 1;
+    }
+    if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1;
+    return left[index] < right[index] ? -1 : 1;
+  }
+  return 0;
 }
 
 export function compareVersions(left, right) {
-  const a = numericVersion(left);
-  const b = numericVersion(right);
-  if (!a || !b) return 0;
-  for (let index = 0; index < 3; index += 1) {
-    if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1;
+  const a = parseSemanticVersion(left);
+  const b = parseSemanticVersion(right);
+  if (!a || !b) {
+    const error = updateError(
+      'UPDATE_VERSION_INVALID',
+      `Cannot compare invalid semantic versions: ${left} and ${right}`,
+    );
+    error.left = left;
+    error.right = right;
+    throw error;
   }
-  return 0;
+  for (let index = 0; index < 3; index += 1) {
+    if (a.core[index] !== b.core[index]) return a.core[index] < b.core[index] ? -1 : 1;
+  }
+  return comparePrerelease(a.prerelease, b.prerelease);
 }
 
 async function inspectTargetMigrations(targetVersion, {
