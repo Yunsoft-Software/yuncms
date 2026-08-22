@@ -5,6 +5,9 @@ import { pipeline } from 'node:stream/promises';
 import { createGunzip, createGzip } from 'node:zlib';
 
 const MAX_STDERR_BYTES = 64 * 1024;
+export const DEFAULT_DATABASE_TOOL_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+const MAX_DATABASE_TOOL_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_KILL_GRACE_MS = 5_000;
 
 function databaseArgs(config, { dump = false } = {}) {
   const args = [
@@ -37,6 +40,26 @@ function childEnvironment(config, env = process.env) {
   };
 }
 
+function positiveInteger(value, code, label, max) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > max) {
+    const error = new Error(`${label} must be an integer between 1 and ${max}`);
+    error.code = code;
+    throw error;
+  }
+  return parsed;
+}
+
+export function resolveDatabaseToolTimeoutMs(env = process.env, explicitTimeoutMs = null) {
+  const value = explicitTimeoutMs ?? env.YUNCMS_DB_TOOL_TIMEOUT_MS ?? DEFAULT_DATABASE_TOOL_TIMEOUT_MS;
+  return positiveInteger(
+    value,
+    'DATABASE_TOOL_TIMEOUT_INVALID',
+    'YunCMS database tool timeout',
+    MAX_DATABASE_TOOL_TIMEOUT_MS,
+  );
+}
+
 function collectStderr(stream) {
   let stderr = '';
   stream?.setEncoding?.('utf8');
@@ -47,27 +70,115 @@ function collectStderr(stream) {
   return () => stderr.trim();
 }
 
-function waitForChild(child, command, readStderr) {
+function databaseTimeoutError(command, timeoutMs, readStderr) {
+  const detail = readStderr();
+  const error = new Error(
+    `${command} exceeded the ${timeoutMs}ms YunCMS database tool timeout${detail ? `: ${detail}` : ''}`,
+  );
+  error.code = 'DATABASE_TOOL_TIMEOUT';
+  error.command = command;
+  error.timeoutMs = timeoutMs;
+  error.stderr = detail;
+  return error;
+}
+
+function waitForChild(child, command, readStderr, { timeoutMs, killGraceMs }) {
   return new Promise((resolve, reject) => {
-    child.once('error', (error) => {
-      error.code ||= 'BACKUP_PROCESS_START_FAILED';
-      reject(error);
-    });
-    child.once('exit', (code, signal) => {
-      if (code === 0) {
-        resolve();
-        return;
+    let settled = false;
+    let timedOut = false;
+    let timeoutHandle = null;
+    let forceKillHandle = null;
+    let forceRejectHandle = null;
+
+    function clearTimers() {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+      if (forceKillHandle) clearTimeout(forceKillHandle);
+      if (forceRejectHandle) clearTimeout(forceRejectHandle);
+    }
+
+    function finish(callback) {
+      if (settled) return;
+      settled = true;
+      clearTimers();
+      callback();
+    }
+
+    function requestKill(signal) {
+      try {
+        child.kill?.(signal);
+      } catch {
+        // The bounded timeout path still rejects if signalling the child handle fails.
       }
-      const detail = readStderr();
-      const error = new Error(
-        `${command} failed${signal ? ` with signal ${signal}` : ` with exit code ${code}`}${detail ? `: ${detail}` : ''}`,
-      );
-      error.code = 'BACKUP_PROCESS_FAILED';
-      error.exitCode = code;
-      error.signal = signal;
-      reject(error);
+    }
+
+    timeoutHandle = setTimeout(() => {
+      if (settled) return;
+      timedOut = true;
+      requestKill('SIGTERM');
+      forceKillHandle = setTimeout(() => {
+        if (settled) return;
+        requestKill('SIGKILL');
+        forceRejectHandle = setTimeout(() => {
+          finish(() => reject(databaseTimeoutError(command, timeoutMs, readStderr)));
+        }, killGraceMs);
+        forceRejectHandle.unref?.();
+      }, killGraceMs);
+      forceKillHandle.unref?.();
+    }, timeoutMs);
+    timeoutHandle.unref?.();
+
+    child.once('error', (error) => {
+      finish(() => {
+        if (timedOut) {
+          reject(databaseTimeoutError(command, timeoutMs, readStderr));
+          return;
+        }
+        error.code ||= 'BACKUP_PROCESS_START_FAILED';
+        error.command = command;
+        reject(error);
+      });
+    });
+
+    child.once('exit', (code, signal) => {
+      finish(() => {
+        if (timedOut) {
+          const error = databaseTimeoutError(command, timeoutMs, readStderr);
+          error.exitCode = code;
+          error.signal = signal;
+          reject(error);
+          return;
+        }
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        const detail = readStderr();
+        const error = new Error(
+          `${command} failed${signal ? ` with signal ${signal}` : ` with exit code ${code}`}${detail ? `: ${detail}` : ''}`,
+        );
+        error.code = 'BACKUP_PROCESS_FAILED';
+        error.command = command;
+        error.exitCode = code;
+        error.signal = signal;
+        error.stderr = detail;
+        reject(error);
+      });
     });
   });
+}
+
+async function runDatabasePipeline({ child, command, streamPromise, timeoutMs, killGraceMs, readStderr }) {
+  const childPromise = waitForChild(child, command, readStderr, { timeoutMs, killGraceMs });
+  try {
+    await Promise.all([childPromise, streamPromise]);
+  } catch (error) {
+    try {
+      child.kill?.('SIGTERM');
+    } catch {
+      // Preserve the original stream/process error.
+    }
+    throw error;
+  }
 }
 
 export function buildDatabaseClientArgs(config, options = {}) {
@@ -79,19 +190,37 @@ export async function dumpDatabase({
   outputPath,
   env = process.env,
   spawnProcess = spawn,
+  timeoutMs = null,
+  killGraceMs = DEFAULT_KILL_GRACE_MS,
 } = {}) {
   if (!config || !outputPath) throw new Error('Database config and output path are required');
+  const resolvedTimeoutMs = resolveDatabaseToolTimeoutMs(env, timeoutMs);
+  const resolvedKillGraceMs = positiveInteger(
+    killGraceMs,
+    'DATABASE_TOOL_KILL_GRACE_INVALID',
+    'Database tool kill grace period',
+    60_000,
+  );
 
   const child = spawnProcess('mysqldump', databaseArgs(config, { dump: true }), {
     env: childEnvironment(config, env),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const readStderr = collectStderr(child.stderr);
+  const streamPromise = pipeline(
+    child.stdout,
+    createGzip({ level: 6 }),
+    createWriteStream(outputPath, { mode: 0o600 }),
+  );
 
-  await Promise.all([
-    waitForChild(child, 'mysqldump', readStderr),
-    pipeline(child.stdout, createGzip({ level: 6 }), createWriteStream(outputPath, { mode: 0o600 })),
-  ]);
+  await runDatabasePipeline({
+    child,
+    command: 'mysqldump',
+    streamPromise,
+    timeoutMs: resolvedTimeoutMs,
+    killGraceMs: resolvedKillGraceMs,
+    readStderr,
+  });
 
   return outputPath;
 }
@@ -129,19 +258,33 @@ export async function restoreDatabase({
   inputPath,
   env = process.env,
   spawnProcess = spawn,
+  timeoutMs = null,
+  killGraceMs = DEFAULT_KILL_GRACE_MS,
 } = {}) {
   if (!config || !inputPath) throw new Error('Database config and input path are required');
+  const resolvedTimeoutMs = resolveDatabaseToolTimeoutMs(env, timeoutMs);
+  const resolvedKillGraceMs = positiveInteger(
+    killGraceMs,
+    'DATABASE_TOOL_KILL_GRACE_INVALID',
+    'Database tool kill grace period',
+    60_000,
+  );
 
   const child = spawnProcess('mysql', databaseArgs(config), {
     env: childEnvironment(config, env),
     stdio: ['pipe', 'ignore', 'pipe'],
   });
   const readStderr = collectStderr(child.stderr);
+  const streamPromise = pipeline(createReadStream(inputPath), createGunzip(), child.stdin);
 
-  await Promise.all([
-    waitForChild(child, 'mysql', readStderr),
-    pipeline(createReadStream(inputPath), createGunzip(), child.stdin),
-  ]);
+  await runDatabasePipeline({
+    child,
+    command: 'mysql',
+    streamPromise,
+    timeoutMs: resolvedTimeoutMs,
+    killGraceMs: resolvedKillGraceMs,
+    readStderr,
+  });
 
   return true;
 }
