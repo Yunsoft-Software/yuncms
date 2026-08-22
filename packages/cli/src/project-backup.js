@@ -1,0 +1,311 @@
+import {
+  constants as fsConstants,
+  access,
+  copyFile,
+  cp,
+  mkdir,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+
+import { loadConfig } from '@yunsoft/yuncms-core';
+
+import { dumpDatabase, restoreDatabase } from './database-backup.js';
+
+export const BACKUP_FORMAT_VERSION = 1;
+
+async function exists(path) {
+  try {
+    await access(path, fsConstants.F_OK);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+function pathInside(parent, candidate) {
+  const rel = relative(resolve(parent), resolve(candidate));
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
+
+function safeTimestamp(date) {
+  return date.toISOString().replace(/[:.]/g, '-');
+}
+
+export function defaultBackupPath(cwd, date = new Date()) {
+  return join(cwd, '.yuncms', 'backups', safeTimestamp(date));
+}
+
+function resolveProjectPath(cwd, value) {
+  return isAbsolute(value) ? value : resolve(cwd, value);
+}
+
+async function copyOptionalFile(source, target) {
+  const present = await exists(source);
+  if (!present) return false;
+  await mkdir(dirname(target), { recursive: true, mode: 0o700 });
+  await copyFile(source, target);
+  return true;
+}
+
+async function copyOptionalDirectory(source, target) {
+  const present = await exists(source);
+  if (!present) return false;
+  await cp(source, target, { recursive: true, force: false, errorOnExist: true });
+  return true;
+}
+
+function backupPathConflict(source, destination) {
+  const error = new Error(`Backup destination cannot be inside a snapshotted directory: ${source}`);
+  error.code = 'BACKUP_PATH_CONFLICT';
+  error.sourcePath = source;
+  error.backupPath = destination;
+  return error;
+}
+
+async function assertDirectory(path, code) {
+  const info = await stat(path).catch((error) => {
+    if (error?.code === 'ENOENT') {
+      const missing = new Error(`Backup directory does not exist: ${path}`);
+      missing.code = code;
+      throw missing;
+    }
+    throw error;
+  });
+  if (!info.isDirectory()) {
+    const error = new Error(`Expected a backup directory: ${path}`);
+    error.code = code;
+    throw error;
+  }
+}
+
+export async function readBackupManifest(backupPath) {
+  const resolved = resolve(backupPath);
+  await assertDirectory(resolved, 'BACKUP_NOT_FOUND');
+  const manifestPath = join(resolved, 'manifest.json');
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error instanceof SyntaxError) {
+      const invalid = new Error(`Backup manifest is missing or invalid: ${manifestPath}`);
+      invalid.code = 'BACKUP_MANIFEST_INVALID';
+      throw invalid;
+    }
+    throw error;
+  }
+  if (manifest?.format !== BACKUP_FORMAT_VERSION || manifest?.complete !== true) {
+    const error = new Error(`Unsupported or incomplete YunCMS backup: ${manifestPath}`);
+    error.code = 'BACKUP_MANIFEST_INVALID';
+    throw error;
+  }
+  if (!(await exists(join(resolved, 'database.sql.gz')))) {
+    const error = new Error(`Database dump is missing from backup: ${resolved}`);
+    error.code = 'BACKUP_DATABASE_MISSING';
+    throw error;
+  }
+  return { backupPath: resolved, manifest };
+}
+
+export async function createProjectBackup({
+  cwd = process.cwd(),
+  env = process.env,
+  backupPath = null,
+  now = new Date(),
+  dumpDatabaseFn = dumpDatabase,
+  output = console,
+} = {}) {
+  const config = loadConfig(env);
+  const destination = resolve(backupPath ?? defaultBackupPath(cwd, now));
+  const localFilesPath = resolveProjectPath(cwd, config.storage.localRoot);
+  const extensionsPath = resolve(cwd, 'extensions');
+
+  for (const source of [localFilesPath, extensionsPath]) {
+    if (await exists(source)) {
+      if (pathInside(source, destination)) throw backupPathConflict(source, destination);
+    }
+  }
+
+  await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
+  try {
+    await mkdir(destination, { mode: 0o700 });
+  } catch (error) {
+    if (error?.code === 'EEXIST') {
+      const conflict = new Error(`Backup destination already exists: ${destination}`);
+      conflict.code = 'BACKUP_ALREADY_EXISTS';
+      throw conflict;
+    }
+    throw error;
+  }
+
+  try {
+    output.log?.(`Creating database backup: ${config.database.database}`);
+    await dumpDatabaseFn({
+      config: config.database,
+      outputPath: join(destination, 'database.sql.gz'),
+      env,
+    });
+
+    const envCopied = await copyOptionalFile(resolve(cwd, '.env'), join(destination, 'project', '.env'));
+    const packageJsonCopied = await copyOptionalFile(
+      resolve(cwd, 'package.json'),
+      join(destination, 'project', 'package.json'),
+    );
+    const packageLockCopied = await copyOptionalFile(
+      resolve(cwd, 'package-lock.json'),
+      join(destination, 'project', 'package-lock.json'),
+    );
+    const extensionsCopied = await copyOptionalDirectory(extensionsPath, join(destination, 'extensions'));
+    const localFilesCopied = await copyOptionalDirectory(localFilesPath, join(destination, 'files'));
+
+    const manifest = {
+      format: BACKUP_FORMAT_VERSION,
+      complete: true,
+      createdAt: now.toISOString(),
+      database: {
+        host: config.database.host,
+        port: config.database.port,
+        database: config.database.database,
+        user: config.database.user,
+        ssl: config.database.ssl,
+      },
+      project: {
+        env: envCopied,
+        packageJson: packageJsonCopied,
+        packageLock: packageLockCopied,
+        extensions: extensionsCopied,
+        localFiles: localFilesCopied,
+        localFilesRoot: config.storage.localRoot,
+      },
+      s3: {
+        configured: Boolean(config.storage.s3.bucket),
+        bucket: config.storage.s3.bucket || null,
+        objectsBackedUp: false,
+      },
+    };
+
+    await writeFile(
+      join(destination, 'manifest.json'),
+      `${JSON.stringify(manifest, null, 2)}\n`,
+      { encoding: 'utf8', mode: 0o600 },
+    );
+
+    output.log?.(`Backup completed: ${destination}`);
+    if (manifest.s3.configured) {
+      output.warn?.('S3 objects are not copied by YunCMS backup; provider-side versioning/snapshots are required.');
+    }
+    return { backupPath: destination, manifest };
+  } catch (error) {
+    await rm(destination, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
+}
+
+function assertRestoreDatabaseMatches(manifest, config, allowDifferentDatabaseTarget) {
+  if (allowDifferentDatabaseTarget) return;
+  const expected = manifest.database;
+  const actual = config.database;
+  const matches = expected.database === actual.database
+    && expected.host === actual.host
+    && Number(expected.port) === Number(actual.port);
+  if (!matches) {
+    const error = new Error(
+      `Backup targets ${expected.host}:${expected.port}/${expected.database}, current environment targets ${actual.host}:${actual.port}/${actual.database}`,
+    );
+    error.code = 'BACKUP_DATABASE_TARGET_MISMATCH';
+    throw error;
+  }
+}
+
+async function restoreOptionalFile({ backupPath, existed, sourceName, target }) {
+  const source = join(backupPath, 'project', sourceName);
+  if (!existed) {
+    await rm(target, { force: true });
+    return;
+  }
+  if (!(await exists(source))) {
+    const error = new Error(`Backup is missing expected project file: ${sourceName}`);
+    error.code = 'BACKUP_ASSET_MISSING';
+    throw error;
+  }
+  await mkdir(dirname(target), { recursive: true });
+  await copyFile(source, target);
+}
+
+async function restoreOptionalDirectory({ backupPath, existed, sourceName, target }) {
+  const source = join(backupPath, sourceName);
+  await rm(target, { recursive: true, force: true });
+  if (!existed) return;
+  if (!(await exists(source))) {
+    const error = new Error(`Backup is missing expected directory: ${sourceName}`);
+    error.code = 'BACKUP_ASSET_MISSING';
+    throw error;
+  }
+  await mkdir(dirname(target), { recursive: true });
+  await cp(source, target, { recursive: true, force: false, errorOnExist: true });
+}
+
+export async function restoreProjectBackup({
+  backupPath,
+  cwd = process.cwd(),
+  env = process.env,
+  allowDifferentDatabaseTarget = false,
+  restoreDatabaseFn = restoreDatabase,
+  output = console,
+} = {}) {
+  if (!backupPath) {
+    const error = new Error('Backup path is required');
+    error.code = 'BACKUP_PATH_REQUIRED';
+    throw error;
+  }
+
+  const { backupPath: resolvedBackupPath, manifest } = await readBackupManifest(backupPath);
+  const config = loadConfig(env);
+  assertRestoreDatabaseMatches(manifest, config, allowDifferentDatabaseTarget);
+
+  output.log?.(`Restoring database backup: ${resolvedBackupPath}`);
+  await restoreDatabaseFn({
+    config: config.database,
+    inputPath: join(resolvedBackupPath, 'database.sql.gz'),
+    env,
+  });
+
+  const localFilesPath = resolveProjectPath(cwd, config.storage.localRoot);
+  await restoreOptionalDirectory({
+    backupPath: resolvedBackupPath,
+    existed: manifest.project.localFiles,
+    sourceName: 'files',
+    target: localFilesPath,
+  });
+  await restoreOptionalDirectory({
+    backupPath: resolvedBackupPath,
+    existed: manifest.project.extensions,
+    sourceName: 'extensions',
+    target: resolve(cwd, 'extensions'),
+  });
+  await restoreOptionalFile({
+    backupPath: resolvedBackupPath,
+    existed: manifest.project.packageJson,
+    sourceName: 'package.json',
+    target: resolve(cwd, 'package.json'),
+  });
+  await restoreOptionalFile({
+    backupPath: resolvedBackupPath,
+    existed: manifest.project.packageLock,
+    sourceName: 'package-lock.json',
+    target: resolve(cwd, 'package-lock.json'),
+  });
+  await restoreOptionalFile({
+    backupPath: resolvedBackupPath,
+    existed: manifest.project.env,
+    sourceName: '.env',
+    target: resolve(cwd, '.env'),
+  });
+
+  output.log?.(`Restore completed: ${resolvedBackupPath}`);
+  return { backupPath: resolvedBackupPath, manifest };
+}
