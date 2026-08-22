@@ -14,6 +14,7 @@ import {
   assertUpdatePreflightReady,
   collectUpdatePreflight,
 } from './update-preflight.js';
+import { acquireUpdateLock } from './update-lock.js';
 
 function formatBytes(value) {
   const bytes = Number(value) || 0;
@@ -32,6 +33,7 @@ function printPreflight(report, output) {
   output.log?.(`YunCMS update: ${report.currentVersion} -> ${report.targetVersion}`);
   output.log?.(`Database migrations: ${report.pendingMigrations.length > 0 ? report.pendingMigrations.join(', ') : 'none'}`);
   output.log?.(`Estimated database size: ${formatBytes(report.databaseBytes)}`);
+  if (report.localBackupBytes != null) output.log?.(`Estimated local backup assets: ${formatBytes(report.localBackupBytes)}`);
   output.log?.(`Free disk: ${formatBytes(report.freeDiskBytes)}`);
   if (report.s3Configured) {
     output.log?.(`S3 storage: ${report.s3Bucket} (provider-side object backup required)`);
@@ -109,6 +111,7 @@ export async function runUpdateCommand({
   createBackup = createProjectBackup,
   restoreBackup = restoreProjectBackup,
   verifyRuntime = verifyInstalledRuntime,
+  acquireLock = acquireUpdateLock,
   fetchFn = globalThis.fetch,
 } = {}) {
   const { values } = parseCommandOptions(args, {
@@ -121,89 +124,94 @@ export async function runUpdateCommand({
   const dryRun = values['--dry-run'] === true;
   const allowUnverifiedS3 = values['--allow-unverified-s3'] === true;
   const config = loadConfig(env);
-
-  const report = await collectPreflight({
-    cwd,
-    env,
-    target,
-    allowUnverifiedS3,
-    runProcess,
-    fetchFn,
-  });
-  printPreflight(report, output);
-
-  if (report.upToDate) {
-    output.log?.('YunCMS is already on the requested version.');
-    return { changed: false, dryRun, report, backupPath: null };
-  }
-
-  if (dryRun) {
-    output.log?.(report.blockers.length === 0 ? 'Dry run passed; no changes were made.' : 'Dry run found blockers; no changes were made.');
-    return { changed: false, dryRun: true, report, backupPath: null };
-  }
-
-  assertUpdatePreflightReady(report);
-
-  const backupPath = values['--backup-output']
-    ? resolve(cwd, values['--backup-output'])
-    : null;
-  const backup = await createBackup({ cwd, env, output, backupPath });
-  await readBackupManifest(backup.backupPath);
+  const lock = dryRun ? null : await acquireLock({ cwd });
 
   try {
-    output.log?.(`Installing @yunsoft/yuncms@${report.targetVersion}`);
-    await installVersion({ cwd, env, targetVersion: report.targetVersion, runProcess });
-
-    await assertApiStillStopped(config, fetchFn);
-
-    output.log?.('Applying target database migrations');
-    await bootstrapInstalledVersion({ cwd, env, runProcess });
-
-    output.log?.('Starting temporary readiness probe');
-    await verifyRuntime({
+    const report = await collectPreflight({
       cwd,
       env,
-      port: config.server.port,
+      target,
+      allowUnverifiedS3,
+      runProcess,
       fetchFn,
     });
+    printPreflight(report, output);
 
-    output.log?.(`YunCMS update verified: ${report.currentVersion} -> ${report.targetVersion}`);
-    output.log?.('The verification process is stopped. Restart YunCMS through your normal service supervisor.');
-    return {
-      changed: true,
-      dryRun: false,
-      report,
-      backupPath: backup.backupPath,
-      rollbackPerformed: false,
-    };
-  } catch (updateError) {
-    output.warn?.(`Update failed; restoring backup ${backup.backupPath}`);
+    if (report.upToDate) {
+      output.log?.('YunCMS is already on the requested version.');
+      return { changed: false, dryRun, report, backupPath: null };
+    }
+
+    if (dryRun) {
+      output.log?.(report.blockers.length === 0 ? 'Dry run passed; no changes were made.' : 'Dry run found blockers; no changes were made.');
+      return { changed: false, dryRun: true, report, backupPath: null };
+    }
+
+    assertUpdatePreflightReady(report);
+
+    const backupPath = values['--backup-output']
+      ? resolve(cwd, values['--backup-output'])
+      : null;
+    const backup = await createBackup({ cwd, env, output, backupPath });
+    await readBackupManifest(backup.backupPath);
+
     try {
-      const restored = await restoreBackup({
-        backupPath: backup.backupPath,
-        cwd,
-        env,
-        output,
-      });
-      await reinstallBackedUpDependencies({
-        cwd,
-        env,
-        manifest: restored.manifest,
-        runProcess,
-      });
+      output.log?.(`Installing @yunsoft/yuncms@${report.targetVersion}`);
+      await installVersion({ cwd, env, targetVersion: report.targetVersion, runProcess });
+
+      await assertApiStillStopped(config, fetchFn);
+
+      output.log?.('Applying target database migrations');
+      await bootstrapInstalledVersion({ cwd, env, runProcess });
+
+      output.log?.('Starting temporary readiness probe');
       await verifyRuntime({
         cwd,
         env,
         port: config.server.port,
         fetchFn,
       });
-      updateError.rollbackPerformed = true;
-      updateError.backupPath = backup.backupPath;
-      updateError.message = `${updateError.message} (automatic rollback completed successfully)`;
-      throw updateError;
-    } catch (rollbackError) {
-      if (rollbackError === updateError) throw updateError;
-      throw rollbackFailure(updateError, rollbackError);
+
+      output.log?.(`YunCMS update verified: ${report.currentVersion} -> ${report.targetVersion}`);
+      output.log?.('The verification process is stopped. Restart YunCMS through your normal service supervisor.');
+      return {
+        changed: true,
+        dryRun: false,
+        report,
+        backupPath: backup.backupPath,
+        rollbackPerformed: false,
+      };
+    } catch (updateError) {
+      output.warn?.(`Update failed; restoring backup ${backup.backupPath}`);
+      try {
+        const restored = await restoreBackup({
+          backupPath: backup.backupPath,
+          cwd,
+          env,
+          output,
+        });
+        await reinstallBackedUpDependencies({
+          cwd,
+          env,
+          manifest: restored.manifest,
+          runProcess,
+        });
+        await verifyRuntime({
+          cwd,
+          env,
+          port: config.server.port,
+          fetchFn,
+        });
+        updateError.rollbackPerformed = true;
+        updateError.backupPath = backup.backupPath;
+        updateError.message = `${updateError.message} (automatic rollback completed successfully)`;
+        throw updateError;
+      } catch (rollbackError) {
+        if (rollbackError === updateError) throw updateError;
+        throw rollbackFailure(updateError, rollbackError);
+      }
     }
+  } finally {
+    if (lock) await lock.release();
   }
 }
