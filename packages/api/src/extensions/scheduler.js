@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   createSystemAccountability,
   withAdvisoryLock,
@@ -106,6 +107,11 @@ function minuteKey(date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
 }
 
+export function scheduleLockName(identity) {
+  const digest = createHash('sha256').update(String(identity)).digest('hex').slice(0, 40);
+  return `yuncms:schedule:${digest}`;
+}
+
 export class ExtensionScheduler {
   constructor({
     database,
@@ -203,7 +209,7 @@ export class ExtensionScheduler {
         try {
           await this.lockRunner(
             this.database,
-            `yuncms:schedule:${job.identity}`,
+            scheduleLockName(job.identity),
             run,
             { timeoutSeconds: 0 },
           );
