@@ -12,13 +12,12 @@ const env = {
 };
 
 function fakeLock(events) {
-  return {
-    async release() { events.push('unlock'); },
-  };
+  return { async release() { events.push('unlock'); } };
 }
 
 function fakeMaintenanceLock(events) {
   return {
+    async assertHeld() { events.push('db-held'); return true; },
     async release() { events.push('db-unlock'); },
   };
 }
@@ -27,33 +26,24 @@ test('manual restore checks service state before acquiring database maintenance 
   const events = [];
   await assert.rejects(
     runRestoreCommand({
-      args: ['./backup', '--yes'],
-      cwd: '/srv/yuncms',
-      env,
-      output: { log() {} },
+      args: ['./backup', '--yes'], cwd: '/srv/yuncms', env, output: { log() {} },
       async acquireLock() { events.push('lock'); return fakeLock(events); },
       async acquireMaintenanceLock() { events.push('db-lock'); return fakeMaintenanceLock(events); },
       async assertStopped(options) {
         events.push(`stopped:${options.host}:${options.port}`);
-        const error = new Error('running');
-        error.code = 'UPDATE_APPLICATION_RUNNING';
-        throw error;
+        const error = new Error('running'); error.code = 'UPDATE_APPLICATION_RUNNING'; throw error;
       },
       async restoreBackup() { events.push('restore'); },
     }),
     (error) => error.code === 'UPDATE_APPLICATION_RUNNING',
   );
-
   assert.deepEqual(events, ['lock', 'stopped:0.0.0.0:3008', 'unlock']);
 });
 
-test('manual restore holds database lock and passes a second stopped-service guard before destructive reset', async () => {
+test('manual restore holds database lock and rechecks ownership before destructive reset', async () => {
   const events = [];
   await runRestoreCommand({
-    args: ['./backup', '--yes'],
-    cwd: '/srv/yuncms',
-    env,
-    output: { log() {} },
+    args: ['./backup', '--yes'], cwd: '/srv/yuncms', env, output: { log() {} },
     async acquireLock() { events.push('lock'); return fakeLock(events); },
     async acquireMaintenanceLock() { events.push('db-lock'); return fakeMaintenanceLock(events); },
     async assertStopped() { events.push('stopped'); return true; },
@@ -64,16 +54,8 @@ test('manual restore holds database lock and passes a second stopped-service gua
       return { ok: true };
     },
   });
-
   assert.deepEqual(events, [
-    'lock',
-    'stopped',
-    'db-lock',
-    'stopped',
-    'restore-validate',
-    'stopped',
-    'restore-reset',
-    'db-unlock',
-    'unlock',
+    'lock', 'stopped', 'db-lock', 'stopped', 'db-held', 'restore-validate',
+    'stopped', 'db-held', 'restore-reset', 'db-unlock', 'unlock',
   ]);
 });
