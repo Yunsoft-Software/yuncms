@@ -5,6 +5,7 @@ import {
   cronMatches,
   ExtensionScheduler,
   parseCronExpression,
+  scheduleLockName,
 } from '../src/extensions/scheduler.js';
 
 function runtimeOptions(overrides = {}) {
@@ -58,7 +59,7 @@ test('scheduler skips overlap and does not execute same job twice in one minute'
   await first;
 });
 
-test('singleton jobs use a zero-wait advisory lock and receive explicit system service options', async () => {
+test('singleton jobs use a bounded zero-wait advisory lock and receive explicit system service options', async () => {
   let lock = null;
   let context = null;
   const scheduler = new ExtensionScheduler(runtimeOptions({
@@ -76,10 +77,18 @@ test('singleton jobs use a zero-wait advisory lock and receive explicit system s
   });
 
   await scheduler.runDue(new Date(2026, 7, 22, 18, 45, 0));
-  assert.match(lock.name, /^yuncms:schedule:demo:singleton-job$/);
+  assert.equal(lock.name, scheduleLockName('demo:singleton-job'));
+  assert.match(lock.name, /^yuncms:schedule:[a-f0-9]{40}$/);
+  assert.ok(Buffer.byteLength(lock.name, 'utf8') <= 64);
   assert.equal(lock.options.timeoutSeconds, 0);
   assert.equal(context.accountability.system, true);
   const options = await context.serviceOptions();
   assert.equal(options.accountability.system, true);
   assert.match(options.requestId, /^schedule:demo:singleton-job:/);
+});
+
+test('scheduler lock names stay bounded even for maximum extension and job identities', () => {
+  const name = scheduleLockName(`${'extension'.repeat(20)}:${'j'.repeat(100)}`);
+  assert.ok(Buffer.byteLength(name, 'utf8') <= 64);
+  assert.equal(name, scheduleLockName(`${'extension'.repeat(20)}:${'j'.repeat(100)}`));
 });
