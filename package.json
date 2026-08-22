@@ -22,6 +22,7 @@
     "build": "npm run build --workspaces --if-present",
     "test": "node scripts/verify.mjs full",
     "test:fast": "node scripts/verify.mjs fast",
-    "test:release": "node scripts/verify.mjs release"
+    "test:release": "node scripts/verify.mjs release",
+    "test:upgrade:mysql": "node --test --test-reporter=spec test/integration/managed-upgrade.test.js"
   }
 }
