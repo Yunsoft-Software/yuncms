@@ -17,13 +17,16 @@
 - [x] `yuncms init`, bootstrap/start/help and Node 24 guard.
 - [x] API + built Studio use one Express listener.
 - [x] Default/fresh-init port contract is 3008 for server, Studio origin and public auth URL.
-- [x] Request ids, safe errors, security headers, structured logs, bounded trust-proxy and auth rate limits.
+- [x] Request ids, safe errors, structured logs and bounded trust-proxy handling.
+- [x] Browser-facing hardening includes `nosniff`, frame denial, referrer/permissions/CORP/COOP policy, CSP and HTTPS-only HSTS emission.
+- [x] Process-local auth rate limits plus a bounded global API rate limit protect API/auth/extension routes while health/readiness and already-served Studio assets stay available.
+- [x] Process-local pressure shedding rejects new API work with `503 + Retry-After` when configured concurrent-request or heap thresholds are reached.
 
 ## 2. MySQL / migrations
 
 - [x] MySQL pool, pinned transactions, retryable DB errors and advisory schema locks.
 - [x] Migration journal + compatibility gate.
-- [x] Core migrations `0001`–`0011` registered.
+- [x] Core migrations `0001`–`0012` registered.
 - [x] `0005`: deny-by-default Public role.
 - [x] `0006`: Studio branding/theme/locale.
 - [x] `0007`: bounded permission-managed system resources.
@@ -31,6 +34,7 @@
 - [x] `0009`: human display-name columns for collections and fields, with legacy key backfill.
 - [x] `0010`: nullable Files-backed `favicon_file` FK.
 - [x] `0011`: Roles resource CRUD actions become explicitly grantable through the normal permission engine without adding default grants.
+- [x] `0012`: Files permissions gain narrowly scoped row filters for `read` while create/update/delete remain action-level only.
 - [x] Dynamic schema mutations retain version/cache invalidation and compensation patterns.
 
 ## 3. Human names vs stable API keys
@@ -77,6 +81,7 @@
 - [x] `fields`, `filter`, `sort`, `limit`, `offset` and legacy direct `expand` query surface.
 - [x] Directus-style direct-relation field selection supports `fields=*`, `fields=*.*`, `relation.*` and `relation.field` while preserving field/row RBAC at both source and target levels.
 - [x] Filter operators include comparisons, IN/NOT IN, NULL checks, text matching and nested AND/OR.
+- [x] Query complexity is bounded: fields/sort counts, maximum offset, filter depth/node count and IN/NOT-IN list size fail closed before expensive SQL is generated.
 - [x] RBAC row filters and field allowlists remain part of every query.
 - [x] Direct to-one relation expansion reuses target RBAC, supports one relation depth and no longer has the former arbitrary eight-field cap.
 - [x] Generic ItemsService refuses system collections so specialized safeguards cannot be bypassed.
@@ -86,6 +91,7 @@
 
 - [x] Local and S3-compatible storage drivers.
 - [x] File upload/list/read/content/update/delete and reconciliation safeguards.
+- [x] Upload size is bounded and common declared media types (PDF/PNG/JPEG/GIF/WebP) are checked against file signatures before storage/metadata writes.
 - [x] Files gallery/list with search/filter/sort/pagination.
 - [x] Authenticated preview supports image/PDF/video/audio plus unsupported placeholder.
 - [x] Gallery media uses contain-style presentation instead of crop-style cover presentation.
@@ -99,9 +105,13 @@
 - [x] Scrypt passwords, sessions, refresh rotation, logout/revocation, API tokens and reset/verification flows.
 - [x] Management-created users are immediately verified.
 - [x] Human-readable `role_name` propagates through auth identity and sidebar presentation.
+- [x] Delegated user managers cannot assign Administrator/Public roles, cannot modify Administrator accounts and cannot move themselves or other users to a different non-admin role to gain power.
 - [x] Users/Files CRUD permissions and Roles CRUD delegation use the same explicit permission engine; service-level escalation/data-integrity invariants remain enforced.
-- [x] Public and ordinary roles are deny-by-default but are not blanket-blocked by role type: an administrator may explicitly grant any action that a permission-managed resource exposes, including Public Files read or Roles CRUD.
+- [x] Public and ordinary roles are deny-by-default but are not blanket-blocked by role type: an administrator may explicitly grant any action that a permission-managed resource exposes.
+- [x] Files `read` permissions may optionally carry a server-side row filter; list, single-record and content reads enforce the same filter before storage access.
 - [x] Project permissions support action toggles, field allowlists, row filters and write validation.
+- [x] Permission decisions use a bounded process-local memory cache shared across requests; permission mutations invalidate it immediately and the async store contract is ready for a future shared adapter.
+- [x] User/role/permission create/update/delete and password-change events are covered by central audit actions without placing password material into audit payloads.
 - [x] Dark-mode permission matrix, sticky cells, pagination and permission-rule count badges use Studio surface variables rather than white backgrounds.
 
 ## 9. Studio shell / navigation
@@ -131,7 +141,7 @@
 - [x] README is product-oriented and explains architecture, capabilities, quick start, schema naming and API examples.
 - [x] `docs/rest-api.md` is a detailed endpoint reference with auth, Items, schema, relations, Users/Roles/Files, branding and health examples.
 - [x] `docs/api-query-language.md` documents all implemented collection query parameters/operators, URL encoding, pagination, nested filters, Directus-style wildcard/direct-relation fields and legacy expansion.
-- [x] `docs/permissions.md` documents deny-by-default explicit grants for Public/custom roles and permission-managed system resources.
+- [x] `docs/permissions.md` documents deny-by-default explicit grants, filtered Files reads, delegated-role escalation boundaries and process-local permission caching.
 - [x] Studio customization documentation covers Files-backed logo/favicon selection and public branding endpoints.
 - [x] Existing architecture/auth/permissions/files/database/security/deployment documentation remains linked from README.
 
@@ -139,6 +149,9 @@
 
 - [x] Low-noise `npm run test:fast`, auto-discovered `npm test`, and `npm run test:release` runner.
 - [x] Port/init/config and migration compatibility tests.
+- [x] Query-complexity, global rate-limit and server-pressure source regressions.
+- [x] Permission-cache reuse/invalidation and filtered Public Files source regressions.
+- [x] Security-sensitive audit-event regression coverage keeps password material out of audit payloads.
 - [x] Core + Studio schema-name normalization tests.
 - [x] Human field-label/API-key payload tests.
 - [x] Data Model V2 label/key, ordering, relation and system-field source contracts.
@@ -157,5 +170,8 @@
 - O2M/M2M nested expansion and recursive relation depths beyond the current direct to-one field engine.
 - Generic value editors for custom extension columns inside specialized Users/Files/Roles record screens.
 - Dedicated migration workflow for adding accountability fields to pre-existing project collections.
-- Shared-store rate limiting/object storage requirements for multi-instance deployment.
-- MFA/SSO/session-management UI and untrusted extension sandboxing.
+- Shared Redis-compatible cache/invalidation and distributed rate-limit state before multi-process/container deployment; current cache/rate/pressure stores are process-local.
+- Permission-aware API response/output caching; current cache intentionally covers authorization decisions only.
+- MFA/SSO and richer session-management UI before higher-assurance public deployments.
+- Optional malware/antivirus scanning policy for environments that accept untrusted file uploads.
+- Extensions remain trusted server-side code by design in the current product model.

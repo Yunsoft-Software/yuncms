@@ -6,7 +6,7 @@ Only checks that still require a real Node 24 checkout, browser, MySQL instance 
 
 Run from a fresh checkout of the final `21-08-2026` state.
 
-- [ ] Run `npm run test:fast`; fix only real failures. The fast suite now includes migrations through `0011`, schema human-name normalization, Directus-style `fields=*` / `fields=*.*` / nested direct-relation selection, legacy expand compatibility, Public Files grants, explicit Roles CRUD grant boundaries, file-backed logo/favicon, modal asset picker, full Files preview, dark permission badges, Data Model V2, bounded system fields, O2O/File/Image/accountability/auth/RBAC and EN/TR regressions.
+- [ ] Run `npm run test:fast`; fix only real failures. The fast suite now includes migrations through `0012`, schema human-name normalization, Directus-style `fields=*` / `fields=*.*` / nested direct-relation selection, legacy expand compatibility, query-complexity limits, Public/filtered Files grants, explicit Roles CRUD grant boundaries, delegated-role escalation checks, permission-cache reuse/invalidation, global API rate limiting, pressure shedding, media-signature validation, security-sensitive audit events, file-backed logo/favicon, modal asset picker, full Files preview, dark permission badges, Data Model V2, bounded system fields, O2O/File/Image/accountability/auth/RBAC and EN/TR regressions.
 - [ ] Run `npm test`; confirm the complete auto-discovered core/API/CLI/extensions/Studio suite passes.
 - [ ] Run `npm run test:release`; confirm complete tests, Studio production build and every `npm pack --dry-run` contract pass.
 - [ ] Confirm Studio production build has no JSX/import errors or unresolved translation keys after the permission-matrix behavior changes and the existing `BrandAssetPicker`, `FilePickerModal`, `FilePreviewModal`, `schema-name`, locale modules and Data Model label/key changes.
@@ -20,21 +20,24 @@ Run from a fresh checkout of the final `21-08-2026` state.
 - [ ] Verify source and target field allowlists plus target row filters still apply to `*.*`, `relation.*` and `relation.field` and cannot be widened by wildcards.
 - [ ] Verify legacy `expand=author_id` still works and no longer rejects a request merely because more than eight direct relations were requested.
 - [ ] Verify deeper paths and junction/M2M expansion fail closed with the documented unsupported-relation error until those capabilities are implemented.
+- [ ] Exercise the configured query limits with oversized fields/sort arrays, deep/numerous filter nodes, oversized IN lists and an offset above the configured maximum; all must fail before an expensive SQL query executes.
 
 ## 3. Explicit system-resource permission smoke
 
 - [ ] With no Public `yuncms_files:read` permission, anonymous Files list/read/content requests must remain forbidden and must not query file metadata/content after permission denial.
 - [ ] In Studio select the Public role and grant Files `read`; the control must be configurable instead of disabled.
-- [ ] After that explicit grant, anonymous Files list/read/content must work through the normal Public accountability + permission engine so a public image gallery can consume them.
-- [ ] Remove the Files grant and confirm anonymous Files access immediately returns to deny-by-default behavior.
+- [ ] After an explicit **unfiltered** Files read grant, anonymous Files list/read/content must preserve the existing all-Files behavior through Public accountability.
+- [ ] Add a Files `read` row filter (for example a controlled title/uploader/MIME predicate); anonymous list/read/content must expose only matching rows and a non-matching content request must not read the storage object.
+- [ ] Verify a Files permission rejects field allowlists/validation and rejects row filters on create/update/delete; only `read` row filters are supported by the system-resource mode.
+- [ ] Remove the Files grant and confirm anonymous Files access immediately returns to deny-by-default behavior and the process-local permission cache does not retain the old grant.
 - [ ] For a normal custom role, verify Roles create/update/delete all fail without their exact permission rows.
 - [ ] Grant only `yuncms_roles:create`; verify ordinary role creation works but Roles read/update/delete remain denied.
 - [ ] Grant Roles update/delete separately and verify each becomes available without requiring an unrelated Roles read grant.
 - [ ] Select Public in Studio and verify Roles create/update/delete toggles are configurable too; leave them disabled unless intentionally needed.
+- [ ] Even with Users update granted, verify a delegated non-admin caller cannot move itself or another user to a different non-admin role, cannot assign Administrator/Public, and cannot modify an Administrator account.
 - [ ] Even with Roles create granted, verify a non-admin caller cannot create a new Administrator/Public role as a side effect; protected role semantics remain enforced independently from action permission.
 - [ ] Verify Administrator/Public roles cannot be deleted through delegated Roles delete and roles assigned to users remain protected from deletion.
 - [ ] Verify non-permission-managed system collections such as permissions/sessions/tokens/audit remain non-delegatable.
-- [ ] Review intentionally public deployments before granting action-only system-resource access; current system grants expose the specialized action as documented and do not support per-field/per-row narrowing.
 
 ## 4. Fresh install / port 3008
 
@@ -47,10 +50,11 @@ Run from a fresh checkout of the final `21-08-2026` state.
 
 Use a disposable MySQL 8-compatible database whose name contains `test`, `ci` or `dev`.
 
-- [ ] Upgrade a DB applied through `0008`; bootstrap must apply `0009-schema-display-names`, `0010-studio-favicon-file` and `0011-role-permission-actions` exactly once, then compatibility must pass.
+- [ ] Upgrade a DB applied through `0008`; bootstrap must apply `0009-schema-display-names`, `0010-studio-favicon-file`, `0011-role-permission-actions` and `0012-files-read-filters` exactly once, then compatibility must pass.
 - [ ] Verify `0009` backfills `yuncms_collections.name = collection` and `yuncms_fields.name = field` for legacy rows before making the columns NOT NULL.
 - [ ] Verify `logo_file` and `favicon_file` are nullable indexed `CHAR(36)` FKs to `yuncms_files(id)` with `ON DELETE SET NULL`.
 - [ ] Verify `0011` updates only `yuncms_roles` permission metadata so `allowedActions` is exactly `read/create/update/delete` and does not create any permission rows automatically.
+- [ ] Verify `0012` updates only `yuncms_files` permission metadata to `permissionMode=filter-read`, increments schema state and does not create/expand any permission row automatically.
 - [ ] Run `YUNCMS_TEST_MYSQL=1 YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1 npm run test:release` against the disposable DB.
 
 ## 6. Human collection / field names
@@ -62,8 +66,11 @@ Use a disposable MySQL 8-compatible database whose name contains `test`, `ci` or
 - [ ] Verify sidebar, Data Model lists and relation selectors show the human label while technical key remains secondary/available.
 - [ ] Exercise the same naming behavior through raw Schema REST requests so server-side normalization is proven independently from Studio.
 
-## 7. Files preview regression
+## 7. Files preview / upload security regression
 
+- [ ] Upload genuine PDF/PNG/JPEG/GIF/WebP samples with matching declared MIME types and confirm they succeed.
+- [ ] Upload arbitrary bytes while falsely declaring one of those known MIME types; request must fail with `FILE_MIME_MISMATCH` before storage or metadata write.
+- [ ] Verify unknown/non-signature-checked file types still follow the existing generic upload path rather than being blanket rejected.
 - [ ] In Files Gallery open a large portrait, landscape and transparent image; card preview must use `contain` instead of cropping and the Preview action must open the entire asset in the large modal.
 - [ ] Open a PDF in the large modal and verify it remains usable at normal desktop height.
 - [ ] Open video and audio files; native controls and authenticated blob loading must work.
@@ -124,20 +131,32 @@ Use a disposable MySQL 8-compatible database whose name contains `test`, `ci` or
 - [ ] Re-run Content search/filter/sort/pagination after name/metadata changes.
 - [ ] Re-check management-created Users remain immediately verified and can sign in without an email verification wait.
 
-## 13. Documentation smoke
+## 13. Security / cache / audit runtime smoke
+
+- [ ] Verify default CSP allows the built Studio to boot and function while `object-src 'none'` and `frame-ancestors 'none'` remain present.
+- [ ] Through a real TLS-aware reverse proxy, verify HTTPS requests receive HSTS while direct HTTP development does not falsely emit it.
+- [ ] Verify global API rate limiting returns `429`/rate-limit headers at the configured threshold and client IP bucketing uses the intended proxy hop configuration.
+- [ ] Lower `PRESSURE_MAX_CONCURRENT` in a disposable environment and verify excess API requests receive `503`, `SERVER_PRESSURE` and `Retry-After`, then recover after active requests finish.
+- [ ] Lower `PRESSURE_MAX_HEAP_PERCENT` only in a disposable environment and verify heap pressure sheds new API work without making `/health`, `/ready` or already-served Studio assets unavailable.
+- [ ] With cache enabled, repeat the same role/collection/action request and verify permission resolution reuses the process-local cache; modify/delete that permission and verify the next authorization decision reflects the change immediately.
+- [ ] With `CACHE_ENABLED=false`, verify authorization still works correctly without relying on cache state.
+- [ ] Confirm user/role/permission mutations appear in audit history with actor/request id and that `users.password.update` contains no plaintext password or password hash material.
+
+## 14. Documentation smoke
 
 - [ ] Follow README quick start in a clean checkout and confirm commands/URLs match reality.
 - [ ] Run representative examples from `docs/api-query-language.md`: `fields=*`, `fields=*.*`, `relation.*`, `relation.field`, nested AND/OR filter, IN, NULL, text contains, multi-sort, pagination and legacy direct expand.
-- [ ] Run the Public Files example from `docs/api-query-language.md` / `docs/permissions.md`: deny before grant, allow after explicit read grant, deny again after removal.
+- [ ] Run the Public Files example from `docs/permissions.md`: deny before grant, allow all after an explicit unfiltered read grant, restrict results/content after adding a read filter, deny again after removal.
 - [ ] Run the Roles explicit-grant examples from `docs/permissions.md`: no grant = deny, exact create/update/delete grant = enable that action, protected Administrator/Public role semantics remain intact.
 - [ ] Run representative schema examples from `docs/rest-api.md`, including natural display names and stable API keys.
 
-## 14. Deployment-only hardening
+## 15. Deployment-only hardening
 
 - [ ] Behind the actual reverse proxy configure exact `TRUST_PROXY_HOPS` and verify client IP/rate-limit behavior.
-- [ ] Configure/verify HSTS at the real TLS/reverse-proxy layer.
+- [ ] Configure/verify HSTS at the real TLS/reverse-proxy layer in addition to application-side secure-request handling.
+- [ ] If more than one API process/container is deployed, do **not** assume the current memory cache/rate-limit state is shared; add/verify a shared Redis-compatible store before relying on cross-instance cache invalidation or distributed limiting.
 - [ ] If production uses S3-compatible storage, verify upload/list/download/delete, full previews, branding logo/favicon reads, reconciliation and redacted provider errors against the actual provider.
 
-## 15. Final release decision
+## 16. Final release decision
 
 - [ ] Only after applicable checks above are removed as successfully completed should this exact source state be called deployment-verified production ready.
