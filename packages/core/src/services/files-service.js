@@ -27,6 +27,38 @@ function normalizeMimeType(value) {
   return mimetype;
 }
 
+function startsWithBytes(buffer, bytes, offset = 0) {
+  if (buffer.byteLength < offset + bytes.length) return false;
+  return bytes.every((byte, index) => buffer[offset + index] === byte);
+}
+
+function hasKnownMimeSignature(contents, mimetype) {
+  const buffer = Buffer.isBuffer(contents) ? contents : Buffer.from(contents);
+  switch (mimetype) {
+    case 'application/pdf':
+      return startsWithBytes(buffer, [0x25, 0x50, 0x44, 0x46, 0x2d]);
+    case 'image/png':
+      return startsWithBytes(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    case 'image/jpeg':
+      return startsWithBytes(buffer, [0xff, 0xd8, 0xff]);
+    case 'image/gif':
+      return buffer.subarray(0, 6).toString('ascii') === 'GIF87a'
+        || buffer.subarray(0, 6).toString('ascii') === 'GIF89a';
+    case 'image/webp':
+      return buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+        && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+    default:
+      return null;
+  }
+}
+
+function assertMimeSignature(contents, mimetype) {
+  const matches = hasKnownMimeSignature(contents, mimetype);
+  if (matches === false) {
+    throw fileError('FILE_MIME_MISMATCH', `File contents do not match declared MIME type: ${mimetype}`);
+  }
+}
+
 function decodeJson(value) {
   if (value == null || typeof value === 'object') return value ?? null;
   try {
@@ -100,6 +132,7 @@ export class FilesService extends BaseService {
 
     const filename = normalizeFilename(filenameDownload);
     const normalizedMime = normalizeMimeType(mimetype);
+    assertMimeSignature(contents, normalizedMime);
     const driver = this.storage.get(storage);
     const id = randomUUID();
     const filenameDisk = id;
@@ -225,4 +258,9 @@ export class FilesService extends BaseService {
   }
 }
 
-export { normalizeFilename, normalizeMimeType };
+export {
+  assertMimeSignature,
+  hasKnownMimeSignature,
+  normalizeFilename,
+  normalizeMimeType,
+};
