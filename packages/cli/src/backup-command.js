@@ -21,7 +21,7 @@ export async function runBackupCommand({
   });
 
   const config = loadConfig(env);
-  await assertStopped({ port: config.server.port, fetchFn });
+  await assertStopped({ host: config.server.host, port: config.server.port, fetchFn });
 
   const backupPath = values['--output'] ? resolve(cwd, values['--output']) : null;
   return createBackup({ cwd, env, output, backupPath });
