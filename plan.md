@@ -1,6 +1,6 @@
 # YunCMS Development Plan
 
-> Live source-status document for branch `21-08-2026`. Checked items describe source-complete behavior only. Node 24/MySQL/browser/provider verification stays in `todo.md` until actually executed.
+> Live source-status document for branch `22-08-2026`. Checked items describe source-complete behavior only. Node 24/MySQL/browser/provider verification stays in `todo.md` until actually executed.
 
 ## 0. Permanent engineering rules
 
@@ -15,6 +15,7 @@
 ## 1. Runtime / install
 
 - [x] `yuncms init`, bootstrap/start/help and Node 24 guard.
+- [x] Managed CLI commands now include `backup`, guarded `restore`, `update` and non-mutating `update --dry-run` for npm-installed projects.
 - [x] API + built Studio use one Express listener.
 - [x] Default/fresh-init port contract is 3008 for server, Studio origin and public auth URL.
 - [x] Request ids, safe errors, structured logs and bounded trust-proxy handling.
@@ -25,7 +26,9 @@
 ## 2. MySQL / migrations
 
 - [x] MySQL pool, pinned transactions, retryable DB errors and advisory schema locks.
-- [x] Migration journal + compatibility gate.
+- [x] Successful migration journal + compatibility gate.
+- [x] Migration-attempt journal records applying/applied/failed state and completed statement index so partially committed MySQL DDL is never blindly retried.
+- [x] An incomplete attempt whose migration is absent from the successful journal fails with `DATABASE_MIGRATION_RECOVERY_REQUIRED` and requires operator recovery/backup restore.
 - [x] Core migrations `0001`–`0012` registered.
 - [x] `0005`: deny-by-default Public role.
 - [x] `0006`: Studio branding/theme/locale.
@@ -142,6 +145,7 @@
 - [x] `docs/rest-api.md` is a detailed endpoint reference with auth, Items, schema, relations, Users/Roles/Files, branding and health examples.
 - [x] `docs/api-query-language.md` documents all implemented collection query parameters/operators, URL encoding, pagination, nested filters, Directus-style wildcard/direct-relation fields and legacy expansion.
 - [x] `docs/permissions.md` documents deny-by-default explicit grants, filtered Files reads, delegated-role escalation boundaries and process-local permission caching.
+- [x] `docs/upgrades.md` documents maintenance-window backup/update/restore behavior, migration recovery, S3 boundaries and rollback.
 - [x] Studio customization documentation covers Files-backed logo/favicon selection and public branding endpoints.
 - [x] Existing architecture/auth/permissions/files/database/security/deployment documentation remains linked from README.
 
@@ -162,11 +166,30 @@
 - [x] Files full-preview and contain-style UI contracts.
 - [x] File-backed logo/favicon service/API/client source contracts.
 - [x] Dark pagination/permission/badge surface contracts.
+- [x] Backup/restore source coverage includes dump arguments, snapshot contents, pre-destructive validation, DB reset order and exact project-state restoration.
+- [x] Managed-update source coverage includes dry-run/no-mutation, preflight barriers, operation locking, successful install/bootstrap/readiness order and automatic rollback behavior.
+- [x] Migration-attempt source coverage proves a simulated partial DDL failure is recorded and refuses a blind retry.
 - [x] EN/TR parity/static key scan remains in the complete suite.
 - [ ] Execute Node 24, real MySQL and browser gates in `todo.md` before calling this exact source state deployment-verified.
 
-## 13. Known follow-ups, not current source claims
+## 13. Production upgrade / recovery
 
+- [x] Preflight resolves the actual npm target, loads that target package's required migration IDs and rejects incompatible migration histories/downgrades before mutation.
+- [x] Preflight requires npm/MySQL client tools, DB connectivity and sufficient disk for estimated DB + local uploads/extensions/project metadata + safety headroom.
+- [x] Backup is mandatory for managed updates and snapshots a streamed+verified gzip DB dump plus `.env`, package metadata, local extensions and local Files when present.
+- [x] S3 object data is never falsely reported as locally backed up; managed update requires explicit operator acknowledgement after provider-side recovery is verified.
+- [x] Backup/update refuse a reachable configured YunCMS process; managed update rechecks after package install to catch supervisor auto-restart races.
+- [x] Real update/restore operations are serialized with an atomic per-project lock outside project/backup data; stale locks fail closed for operator inspection.
+- [x] Target package is installed exactly, then migrations run through the newly installed CLI rather than stale global/npx code.
+- [x] New runtime is started temporarily and must pass `/ready`; the verification process is then gracefully stopped for supervisor handoff.
+- [x] Restore validates the dump and manifest-declared assets before destructive reset, then removes current DB tables/views and imports the exact DB snapshot.
+- [x] Automatic rollback restores DB/project files, reconstructs the old dependency graph and verifies the restored runtime; rollback failure surfaces `UPDATE_ROLLBACK_FAILED` and preserves backup evidence.
+- [x] Restore requires explicit `--yes`; cross-database-target restore requires an additional explicit override.
+- [x] Current V1 is deliberately maintenance-window based; source does not execute arbitrary systemd/PM2/Docker/Plesk restart commands.
+
+## 14. Known follow-ups, not current source claims
+
+- Atomic release-directory/symlink deployment and zero/near-zero-downtime rolling handoff; the current managed updater intentionally operates on the existing npm project during a maintenance window.
 - Server-side search/pagination for very large Files/Users/relation-picker datasets; current branding modal only limits rendered results client-side.
 - O2M/M2M nested expansion and recursive relation depths beyond the current direct to-one field engine.
 - Generic value editors for custom extension columns inside specialized Users/Files/Roles record screens.
