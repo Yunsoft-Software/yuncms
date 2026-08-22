@@ -20,9 +20,7 @@ function databaseArgs(config, { dump = false } = {}) {
       '--single-transaction',
       '--quick',
       '--hex-blob',
-      '--routines',
       '--triggers',
-      '--events',
     );
   }
 
