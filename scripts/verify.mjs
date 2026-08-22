@@ -65,6 +65,7 @@ const FAST_TESTS = [
   'packages/cli/test/restore-validation.test.js',
   'packages/cli/test/runtime-probe-maintenance.test.js',
   'packages/cli/test/service-state.test.js',
+  'packages/cli/test/start-maintenance.test.js',
   'packages/cli/test/update-dependency-section.test.js',
   'packages/cli/test/update-lock.test.js',
   'packages/cli/test/update-preflight.test.js',
