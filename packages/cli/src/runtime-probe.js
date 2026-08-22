@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 
+import { MAINTENANCE_BYPASS_ENV } from '@yunsoft/yuncms-core';
+
 function delay(ms) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 }
@@ -16,6 +18,7 @@ export async function verifyInstalledRuntime({
   cwd = process.cwd(),
   env = process.env,
   port,
+  maintenanceBypassToken = null,
   fetchFn = globalThis.fetch,
   spawnProcess = spawn,
   timeoutMs = 15_000,
@@ -26,18 +29,24 @@ export async function verifyInstalledRuntime({
   if (typeof fetchFn !== 'function') {
     throw probeError('UPDATE_PROBE_FETCH_UNAVAILABLE', 'Runtime probe requires fetch support');
   }
+  if (maintenanceBypassToken !== null && (typeof maintenanceBypassToken !== 'string' || maintenanceBypassToken.length < 32)) {
+    throw probeError('UPDATE_PROBE_MAINTENANCE_TOKEN_INVALID', 'Runtime probe maintenance bypass token is invalid');
+  }
 
   const cliPath = resolve(cwd, 'node_modules', '@yunsoft', 'yuncms', 'bin', 'yuncms.js');
   const origin = `http://127.0.0.1:${port}`;
+  const childEnv = {
+    ...env,
+    HOST: '127.0.0.1',
+    PORT: String(port),
+    STUDIO_ORIGIN: origin,
+    AUTH_PUBLIC_URL: origin,
+  };
+  if (maintenanceBypassToken !== null) childEnv[MAINTENANCE_BYPASS_ENV] = maintenanceBypassToken;
+
   const child = spawnProcess(process.execPath, [cliPath, 'start'], {
     cwd,
-    env: {
-      ...env,
-      HOST: '127.0.0.1',
-      PORT: String(port),
-      STUDIO_ORIGIN: origin,
-      AUTH_PUBLIC_URL: origin,
-    },
+    env: childEnv,
     stdio: ['ignore', 'ignore', 'pipe'],
   });
 
