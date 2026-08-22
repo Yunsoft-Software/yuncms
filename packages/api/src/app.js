@@ -20,6 +20,20 @@ import { createUsersRouter } from './routes/users.js';
 import { createStudioMiddleware } from './studio.js';
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "media-src 'self' blob:",
+  "worker-src 'self' blob:",
+  "form-action 'self'",
+].join('; ');
 
 function securityHeaders(req, res, next) {
   res.set('x-content-type-options', 'nosniff');
@@ -27,6 +41,12 @@ function securityHeaders(req, res, next) {
   res.set('referrer-policy', 'no-referrer');
   res.set('permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
   res.set('cross-origin-resource-policy', 'same-origin');
+  res.set('cross-origin-opener-policy', 'same-origin');
+  res.set('x-dns-prefetch-control', 'off');
+  res.set('content-security-policy', CONTENT_SECURITY_POLICY);
+  if (req.secure === true) {
+    res.set('strict-transport-security', 'max-age=15552000; includeSubDomains');
+  }
   next();
 }
 
@@ -137,4 +157,4 @@ export function createApp({
   return app;
 }
 
-export { requestIdentity, securityHeaders, studioCors };
+export { CONTENT_SECURITY_POLICY, requestIdentity, securityHeaders, studioCors };
