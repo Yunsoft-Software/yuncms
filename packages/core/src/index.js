@@ -1,5 +1,12 @@
 export { DEFAULT_SERVER_PORT, loadConfig, loadEnvFileIfPresent } from './config.js';
 export { isCacheStore, MemoryCacheStore } from './cache.js';
+export {
+  RedisClient,
+  RedisCacheStore,
+  RedisFixedWindowStore,
+  parseRedisUrl,
+  redactRedisUrl,
+} from './redis.js';
 export { createDatabasePool, pingDatabase, closeDatabasePool } from './database.js';
 export { withTransaction, withConnectionTransaction } from './transaction.js';
 export { assertIdentifier, quoteIdentifier } from './identifier.js';
@@ -19,22 +26,12 @@ export {
   requireAccountability,
 } from './accountability.js';
 export { createRequestContext } from './context.js';
-export {
-  createInitialAdmin,
-  findExistingAdmin,
-  findPublicRole,
-  ensurePublicRole,
-} from './setup.js';
-export { HookEmitter } from './hooks.js';
+export { createInitialAdmin, findExistingAdmin, findPublicRole, ensurePublicRole } from './setup.js';
+export { HookEmitter, HOOK_EVENTS } from './hooks.js';
 export { createJsonLogger, LEVELS as LOG_LEVELS } from './logger.js';
 export { deleteM2MJunction } from './m2m-lifecycle.js';
 export { createO2ORelation, deleteO2ORelation, o2oUniqueIndexName } from './o2o-relation.js';
-export {
-  MAX_EXPAND_FIELDS,
-  parseExpandInput,
-  readManyWithRelations,
-  readOneWithRelations,
-} from './relation-expansion.js';
+export { MAX_EXPAND_FIELDS, parseExpandInput, readManyWithRelations, readOneWithRelations } from './relation-expansion.js';
 export { SmtpMailer } from './mail/smtp-mailer.js';
 export { LocalStorageDriver, assertStorageKey } from './storage/local-storage-driver.js';
 export { S3StorageDriver } from './storage/s3-storage-driver.js';
@@ -76,10 +73,15 @@ export {
   systemPermissionConfig,
 } from './system-permissions.js';
 export {
+  QUERY_LIMITS,
   parseItemsQuery,
+  queryCost,
+  assertQueryCost,
   compileSelectFields,
   compileSort,
   compileFilter,
+  compileSearch,
+  compileAggregate,
 } from './query.js';
 export { withAdvisoryLock } from './advisory-lock.js';
 export {
