@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+import { assertMaintenanceStartupAllowed } from '@yunsoft/yuncms-core';
+
 export async function runStartCommand({
   env = process.env,
   cwd = process.cwd(),
@@ -8,6 +10,8 @@ export async function runStartCommand({
   spawnProcess = spawn,
   signalSource = process,
 } = {}) {
+  await assertMaintenanceStartupAllowed({ cwd, env });
+
   const serverUrl = import.meta.resolve('@yunsoft/yuncms-api/server');
   const serverPath = fileURLToPath(serverUrl);
 
