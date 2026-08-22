@@ -9,6 +9,13 @@ export const DEFAULT_DATABASE_TOOL_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 const MAX_DATABASE_TOOL_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_KILL_GRACE_MS = 5_000;
 
+function delay(ms) {
+  return new Promise((resolveDelay) => {
+    const handle = setTimeout(resolveDelay, ms);
+    handle.unref?.();
+  });
+}
+
 function databaseArgs(config, { dump = false } = {}) {
   const args = [
     '--protocol=TCP',
@@ -167,16 +174,51 @@ function waitForChild(child, command, readStderr, { timeoutMs, killGraceMs }) {
   });
 }
 
+async function terminateChild(child, childPromise, killGraceMs) {
+  let settled = false;
+  const observedChild = childPromise.then(
+    () => { settled = true; },
+    () => { settled = true; },
+  );
+
+  try {
+    child.kill?.('SIGTERM');
+  } catch {
+    // Continue to bounded wait/SIGKILL.
+  }
+  await Promise.race([observedChild, delay(killGraceMs)]);
+  if (settled) return;
+
+  try {
+    child.kill?.('SIGKILL');
+  } catch {
+    // The caller will still receive the original pipeline error.
+  }
+  await Promise.race([observedChild, delay(killGraceMs)]);
+}
+
 async function runDatabasePipeline({ child, command, streamPromise, timeoutMs, killGraceMs, readStderr }) {
   const childPromise = waitForChild(child, command, readStderr, { timeoutMs, killGraceMs });
+  let streamFailed = false;
+  const observedStream = streamPromise.catch((error) => {
+    streamFailed = true;
+    throw error;
+  });
+
   try {
-    await Promise.all([childPromise, streamPromise]);
+    await Promise.all([childPromise, observedStream]);
   } catch (error) {
-    try {
-      child.kill?.('SIGTERM');
-    } catch {
-      // Preserve the original stream/process error.
-    }
+    if (streamFailed) await terminateChild(child, childPromise, killGraceMs);
+    throw error;
+  }
+}
+
+function spawnDatabaseProcess(spawnProcess, command, args, options) {
+  try {
+    return spawnProcess(command, args, options);
+  } catch (error) {
+    error.code ||= 'BACKUP_PROCESS_START_FAILED';
+    error.command = command;
     throw error;
   }
 }
@@ -202,10 +244,15 @@ export async function dumpDatabase({
     60_000,
   );
 
-  const child = spawnProcess('mysqldump', databaseArgs(config, { dump: true }), {
-    env: childEnvironment(config, env),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const child = spawnDatabaseProcess(
+    spawnProcess,
+    'mysqldump',
+    databaseArgs(config, { dump: true }),
+    {
+      env: childEnvironment(config, env),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
   const readStderr = collectStderr(child.stderr);
   const streamPromise = pipeline(
     child.stdout,
@@ -270,10 +317,15 @@ export async function restoreDatabase({
     60_000,
   );
 
-  const child = spawnProcess('mysql', databaseArgs(config), {
-    env: childEnvironment(config, env),
-    stdio: ['pipe', 'ignore', 'pipe'],
-  });
+  const child = spawnDatabaseProcess(
+    spawnProcess,
+    'mysql',
+    databaseArgs(config),
+    {
+      env: childEnvironment(config, env),
+      stdio: ['pipe', 'ignore', 'pipe'],
+    },
+  );
   const readStderr = collectStderr(child.stderr);
   const streamPromise = pipeline(createReadStream(inputPath), createGunzip(), child.stdin);
 
