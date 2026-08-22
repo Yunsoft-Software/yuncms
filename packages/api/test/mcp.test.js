@@ -39,6 +39,27 @@ function fakeRequest(ItemsService = class {}) {
   };
 }
 
+function response() {
+  return {
+    statusCode: 200,
+    body: null,
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+  };
+}
+
+function guardRequest({ authMethod = 'api_token', host = 'api.example.test', origin = null, id = 'r1' } = {}) {
+  return {
+    authMethod,
+    id,
+    get(name) {
+      if (name === 'host') return host;
+      if (name === 'origin') return origin;
+      return null;
+    },
+  };
+}
+
 test('MCP registers read tools without write tools by default', () => {
   const server = fakeServer();
   registerMcpTools(server, fakeRequest(), { writesEnabled: false });
@@ -78,27 +99,43 @@ test('MCP result size cap returns a bounded tool error', () => {
   assert.match(result.content[0].text, /MCP_RESULT_TOO_LARGE/);
 });
 
-test('MCP access guard rejects unauthenticated and untrusted browser origins', () => {
+test('MCP access guard rejects untrusted hosts, origins and unauthenticated access', () => {
   const guard = createMcpAccessGuard({
     requireAuthentication: true,
+    allowedHosts: ['api.example.test'],
     allowedOrigins: ['https://studio.example.test'],
   });
-  const response = () => ({
-    statusCode: 200,
-    body: null,
-    status(code) { this.statusCode = code; return this; },
-    json(body) { this.body = body; return this; },
-  });
 
-  const publicRes = response();
-  guard({ authMethod: 'public', id: 'r1', get: () => null }, publicRes, () => assert.fail('must not continue'));
-  assert.equal(publicRes.statusCode, 401);
+  const hostRes = response();
+  guard(guardRequest({ host: 'evil.example.test' }), hostRes, () => assert.fail('must not continue'));
+  assert.equal(hostRes.statusCode, 403);
+  assert.equal(hostRes.body.errors[0].code, 'MCP_HOST_FORBIDDEN');
+
+  const missingHostRes = response();
+  guard(guardRequest({ host: '' }), missingHostRes, () => assert.fail('must not continue'));
+  assert.equal(missingHostRes.statusCode, 403);
 
   const originRes = response();
-  guard({ authMethod: 'api_token', id: 'r2', get: (name) => name === 'origin' ? 'https://evil.example.test' : null }, originRes, () => assert.fail('must not continue'));
+  guard(guardRequest({ origin: 'https://evil.example.test' }), originRes, () => assert.fail('must not continue'));
   assert.equal(originRes.statusCode, 403);
+  assert.equal(originRes.body.errors[0].code, 'MCP_ORIGIN_FORBIDDEN');
+
+  const publicRes = response();
+  guard(guardRequest({ authMethod: 'public', origin: 'https://studio.example.test' }), publicRes, () => assert.fail('must not continue'));
+  assert.equal(publicRes.statusCode, 401);
 
   let continued = false;
-  guard({ authMethod: 'api_token', id: 'r3', get: (name) => name === 'origin' ? 'https://studio.example.test' : null }, response(), () => { continued = true; });
+  guard(guardRequest({ origin: 'https://studio.example.test' }), response(), () => { continued = true; });
+  assert.equal(continued, true);
+});
+
+test('MCP non-browser requests are accepted only when the Host header is trusted', () => {
+  const guard = createMcpAccessGuard({
+    requireAuthentication: true,
+    allowedHosts: ['api.example.test:3008'],
+    allowedOrigins: ['https://studio.example.test'],
+  });
+  let continued = false;
+  guard(guardRequest({ host: 'API.EXAMPLE.TEST:3008', origin: null }), response(), () => { continued = true; });
   assert.equal(continued, true);
 });
