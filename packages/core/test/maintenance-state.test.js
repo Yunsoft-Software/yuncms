@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -27,6 +27,28 @@ test('maintenance lock path is deterministic per project and outside the project
   } finally {
     await rm(maintenanceLockPath(cwd), { force: true }).catch(() => {});
     await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('symlink aliases for the same physical project share one maintenance lock identity', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'yuncms-maintenance-alias-'));
+  const project = join(root, 'project');
+  const alias = join(root, 'alias');
+  await mkdir(project);
+  try {
+    try {
+      await symlink(project, alias, 'dir');
+    } catch (error) {
+      if (error?.code === 'EPERM' || error?.code === 'EACCES') {
+        t.skip(`directory symlink unavailable: ${error.code}`);
+        return;
+      }
+      throw error;
+    }
+    assert.equal(maintenanceLockPath(project), maintenanceLockPath(alias));
+  } finally {
+    await rm(maintenanceLockPath(project), { force: true }).catch(() => {});
+    await rm(root, { recursive: true, force: true });
   }
 });
 
