@@ -22,6 +22,7 @@ function databaseArgs(config, { dump = false } = {}) {
       '--quick',
       '--hex-blob',
       '--triggers',
+      '--no-tablespaces',
     );
   }
 
