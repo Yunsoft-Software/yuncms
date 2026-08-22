@@ -4,7 +4,7 @@
 
 YunCMS is an independent, Directus-inspired backend project from **Yunsoft**. The goal is not to reproduce every feature of a giant headless CMS. The goal is to make the high-value parts — dynamic collections, fields, relations, permissions, Files, authentication and extensions — clean enough to build real products on top of them.
 
-> YunCMS is currently pre-stable (`0.1.x`). The API and Studio are moving quickly. Use the documented migration/bootstrap flow and verify the current release checklist before production deployment.
+> YunCMS is currently pre-stable (`0.1.x`). The API and Studio are moving quickly. Use the documented migration/bootstrap and managed upgrade flow, and verify the current release checklist before production deployment.
 
 ---
 
@@ -158,10 +158,10 @@ The Public role exists but is **deny-by-default**.
 
 Selected system resources also have bounded delegation:
 
-- Users: action-level delegation;
-- Files: action-level delegation;
-- Roles: read-only delegation;
-- internal sessions/tokens/permissions stay closed.
+- Users: explicit action-level delegation with protected-account/role invariants;
+- Files: explicit CRUD delegation, with an optional server-side row filter on `read`;
+- Roles: explicit CRUD delegation while Administrator/Public invariants remain service-enforced;
+- internal sessions/tokens/permissions/audit stay closed.
 
 ## Files that behave like a real library
 
@@ -263,10 +263,16 @@ Package-level commands:
 yuncms init
 yuncms bootstrap
 yuncms start
+yuncms backup
+yuncms restore /path/to/backup --yes
+yuncms update --dry-run
+yuncms update --to <version>
 yuncms help
 ```
 
 Fresh init uses port **3008** consistently for the server, Studio origin and public auth URL.
+
+Production updates are maintenance-window based in the current V1. Stop the service supervisor first; managed update performs preflight, a mandatory verified backup, exact npm package install, target migrations, a temporary `/ready` probe and automatic rollback when a post-backup step fails. S3 object backup remains the deployment provider's responsibility.
 
 Development/source validation:
 
@@ -279,7 +285,7 @@ npm run test:release
 
 `test:release` also builds Studio and verifies publishable package contracts. Real MySQL integration checks are opt-in so ordinary source tests remain fast.
 
-Read: [Setup CLI](docs/setup-cli.md)
+Read: [Setup CLI](docs/setup-cli.md) · [Production upgrades](docs/upgrades.md)
 
 ---
 
@@ -441,7 +447,7 @@ Internal code does not make HTTP requests back into YunCMS to reuse functionalit
 
 ### Explicit dynamic DDL
 
-Schema changes are serialized with an advisory lock. MySQL DDL failures and metadata failures use explicit compensation strategies.
+Schema changes are serialized with an advisory lock. MySQL DDL failures and metadata failures use explicit compensation strategies. Core upgrade migrations additionally record in-progress/failed attempts so partially committed DDL is never blindly retried.
 
 ### Stable API identifiers
 
@@ -470,6 +476,7 @@ Unknown fields, query parameters, filter operators and internal system resources
 - [Development](docs/development.md)
 - [Extensions](docs/extensions.md)
 - [Setup CLI](docs/setup-cli.md)
+- [Production upgrades / backup / restore](docs/upgrades.md)
 - [Security](docs/security.md)
 - [Deployment](docs/deployment.md)
 - [Production readiness](docs/production-readiness.md)
