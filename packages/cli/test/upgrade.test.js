@@ -43,6 +43,7 @@ async function createBackupFixture(cwd) {
       database: 'yuncms_test',
       user: 'yuncms',
       ssl: false,
+      verifiedDecompressedBytes: 1,
     },
     project: {
       env: true,
@@ -98,9 +99,13 @@ test('project backup snapshots database marker, env, package metadata, extension
       async dumpDatabaseFn({ outputPath }) {
         await writeFile(outputPath, 'fake-gzip');
       },
+      async verifyDatabaseFn() {
+        return { decompressedBytes: 1234 };
+      },
     });
 
     assert.equal(result.manifest.complete, true);
+    assert.equal(result.manifest.database.verifiedDecompressedBytes, 1234);
     assert.equal(result.manifest.project.env, true);
     assert.equal(result.manifest.project.packageJson, true);
     assert.equal(result.manifest.project.packageLock, true);
@@ -130,6 +135,9 @@ test('restore resets database first and restores the exact project snapshot', as
       output: silentOutput(),
       async dumpDatabaseFn({ outputPath }) {
         await writeFile(outputPath, 'fake-gzip');
+      },
+      async verifyDatabaseFn() {
+        return { decompressedBytes: 1234 };
       },
     });
 
