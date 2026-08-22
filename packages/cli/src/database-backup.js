@@ -10,10 +10,7 @@ const MAX_DATABASE_TOOL_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_KILL_GRACE_MS = 5_000;
 
 function delay(ms) {
-  return new Promise((resolveDelay) => {
-    const handle = setTimeout(resolveDelay, ms);
-    handle.unref?.();
-  });
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 }
 
 function databaseArgs(config, { dump = false } = {}) {
@@ -128,11 +125,8 @@ function waitForChild(child, command, readStderr, { timeoutMs, killGraceMs }) {
         forceRejectHandle = setTimeout(() => {
           finish(() => reject(databaseTimeoutError(command, timeoutMs, readStderr)));
         }, killGraceMs);
-        forceRejectHandle.unref?.();
       }, killGraceMs);
-      forceKillHandle.unref?.();
     }, timeoutMs);
-    timeoutHandle.unref?.();
 
     child.once('error', (error) => {
       finish(() => {
