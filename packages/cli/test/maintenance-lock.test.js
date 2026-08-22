@@ -28,14 +28,15 @@ test('database maintenance lock name is stable per database without exposing the
   assert.equal(first.includes('customer-production-db'), false);
 });
 
-test('database maintenance lock holds one MySQL connection until explicit release', async () => {
+test('database maintenance lock verifies ownership until explicit release', async () => {
   const calls = [];
   let connectionReleased = false;
   let poolClosed = false;
   const connection = {
     async query(sql, params) {
       calls.push({ sql, params });
-      if (sql.startsWith('SELECT GET_LOCK')) return [[{ acquired: 1 }], []];
+      if (sql.startsWith('SELECT GET_LOCK')) return [[{ acquired: 1, connection_id: 42 }], []];
+      if (sql.startsWith('SELECT IS_USED_LOCK')) return [[{ connection_id: 42 }], []];
       if (sql.startsWith('SELECT RELEASE_LOCK')) return [[{ released: 1 }], []];
       throw new Error(`Unexpected query: ${sql}`);
     },
@@ -53,14 +54,35 @@ test('database maintenance lock holds one MySQL connection until explicit releas
   assert.equal(poolClosed, false);
   assert.match(lock.name, /^yuncms:maintenance:/);
   assert.equal(calls[0].params[1], 0);
+  assert.equal(await lock.assertHeld(), true);
 
   await lock.release();
   assert.equal(connectionReleased, true);
   assert.equal(poolClosed, true);
   assert.equal(calls.at(-1).sql, 'SELECT RELEASE_LOCK(?) AS released');
+  await assert.rejects(lock.assertHeld(), (error) => error.code === 'DATABASE_MAINTENANCE_LOCK_LOST');
 
   await lock.release();
   assert.equal(calls.filter(({ sql }) => sql.startsWith('SELECT RELEASE_LOCK')).length, 1);
+});
+
+test('database maintenance lock fails closed when ownership is lost', async () => {
+  const connection = {
+    async query(sql) {
+      if (sql.startsWith('SELECT GET_LOCK')) return [[{ acquired: 1, connection_id: 42 }], []];
+      if (sql.startsWith('SELECT IS_USED_LOCK')) return [[{ connection_id: 99 }], []];
+      if (sql.startsWith('SELECT RELEASE_LOCK')) return [[{ released: 0 }], []];
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+    release() {},
+  };
+  const pool = { async getConnection() { return connection; } };
+  const lock = await acquireDatabaseMaintenanceLock({ env, createPool: () => pool, async closePool() {} });
+  try {
+    await assert.rejects(lock.assertHeld(), (error) => error.code === 'DATABASE_MAINTENANCE_LOCK_LOST');
+  } finally {
+    await lock.release();
+  }
 });
 
 test('unavailable database maintenance lock fails closed and cleans its connection', async () => {
@@ -68,7 +90,7 @@ test('unavailable database maintenance lock fails closed and cleans its connecti
   let poolClosed = false;
   const connection = {
     async query(sql) {
-      if (sql.startsWith('SELECT GET_LOCK')) return [[{ acquired: 0 }], []];
+      if (sql.startsWith('SELECT GET_LOCK')) return [[{ acquired: 0, connection_id: 43 }], []];
       throw new Error(`Unexpected query: ${sql}`);
     },
     release() { connectionReleased = true; },
@@ -103,7 +125,10 @@ test('backup holds project and database locks across snapshot creation and relea
     },
     async acquireMaintenanceLock() {
       events.push('db-lock');
-      return { async release() { events.push('db-unlock'); } };
+      return {
+        async assertHeld() { events.push('db-held'); return true; },
+        async release() { events.push('db-unlock'); },
+      };
     },
     async createBackup(options) {
       events.push('backup');
@@ -118,6 +143,7 @@ test('backup holds project and database locks across snapshot creation and relea
     'project-lock',
     'db-lock',
     'stopped',
+    'db-held',
     'backup',
     'db-unlock',
     'project-unlock',
