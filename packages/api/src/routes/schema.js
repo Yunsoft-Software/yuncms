@@ -17,7 +17,39 @@ function destructiveRequested(req) {
   return String(req.query?.destructive ?? '').toLowerCase() === 'true';
 }
 
+function stableSchemaEvent(action) {
+  if (action.startsWith('schema.relation.')) {
+    return action.endsWith('.delete') ? 'schema.relation.delete' : 'schema.relation.create';
+  }
+  if (action === 'schema.field.alter') return 'schema.field.update';
+  return action;
+}
+
+async function emitSchemaLifecycle(req, { action, collection = null, itemKey = null, payload = null }) {
+  const emitter = req.context.emitter;
+  if (!emitter) return;
+  const event = stableSchemaEvent(action);
+  const context = {
+    accountability: req.accountability,
+    requestId: req.id,
+    collection,
+    operation: event,
+  };
+  await emitter.action(event, {
+    key: itemKey,
+    collection,
+    ...payload,
+  }, context);
+  await emitter.action('schema.changed', {
+    event,
+    key: itemKey,
+    collection,
+    schemaVersion: payload?.after?.schemaVersion ?? payload?.result?.schemaVersion ?? null,
+  }, context);
+}
+
 async function auditSchema(req, { action, collection = null, itemKey = null, payload = null }) {
+  await emitSchemaLifecycle(req, { action, collection, itemKey, payload });
   try {
     await service(req, 'AuditService').record({
       action,
@@ -88,7 +120,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
   router.delete('/collections/:collection', async (req, res) => {
     const collections = service(req, 'CollectionsService');
     const before = await collections.readOne(req.params.collection);
-    await collections.deleteOne(req.params.collection, {
+    const result = await collections.deleteOne(req.params.collection, {
       destructive: destructiveRequested(req),
     });
     clearSchemaCache();
@@ -96,7 +128,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
       action: 'schema.collection.delete',
       collection: req.params.collection,
       itemKey: req.params.collection,
-      payload: { before },
+      payload: { before, result },
     });
     res.status(204).end();
   });
@@ -172,7 +204,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
   router.delete('/collections/:collection/fields/:field', async (req, res) => {
     const fields = service(req, 'FieldsService');
     const before = await fields.readOne(req.params.collection, req.params.field);
-    await fields.deleteOne(
+    const result = await fields.deleteOne(
       req.params.collection,
       req.params.field,
       { destructive: destructiveRequested(req) },
@@ -182,7 +214,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
       action: 'schema.field.delete',
       collection: req.params.collection,
       itemKey: req.params.field,
-      payload: { before },
+      payload: { before, result },
     });
     res.status(204).end();
   });
@@ -225,7 +257,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
   router.delete('/relations/m2o/:manyCollection/:manyField', async (req, res) => {
     const relations = service(req, 'RelationsService');
     const before = await relations.readOne(req.params.manyCollection, req.params.manyField);
-    await relations.deleteM2O(
+    const result = await relations.deleteM2O(
       req.params.manyCollection,
       req.params.manyField,
     );
@@ -234,7 +266,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
       action: 'schema.relation.delete',
       collection: req.params.manyCollection,
       itemKey: req.params.manyField,
-      payload: { before },
+      payload: { before, result },
     });
     res.status(204).end();
   });
@@ -258,7 +290,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
   router.delete('/relations/o2o/:manyCollection/:manyField', async (req, res) => {
     const relations = service(req, 'RelationsService');
     const before = await relations.readOne(req.params.manyCollection, req.params.manyField);
-    await deleteO2ORelation({
+    const result = await deleteO2ORelation({
       database: req.context.database,
       accountability: req.accountability,
       manyCollection: req.params.manyCollection,
@@ -269,7 +301,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
       action: 'schema.relation.o2o.delete',
       collection: req.params.manyCollection,
       itemKey: req.params.manyField,
-      payload: { before },
+      payload: { before, result },
     });
     res.status(204).end();
   });
@@ -310,4 +342,9 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
   return router;
 }
 
-export { auditSchema, destructiveRequested };
+export {
+  auditSchema,
+  destructiveRequested,
+  emitSchemaLifecycle,
+  stableSchemaEvent,
+};
