@@ -1,6 +1,15 @@
-import { access, mkdtemp, readFile, rm, statfs, writeFile } from 'node:fs/promises';
+import {
+  access,
+  lstat,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  statfs,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 
 import {
   closeDatabasePool,
@@ -190,6 +199,43 @@ async function diskState(cwd) {
   };
 }
 
+async function pathSize(path) {
+  let info;
+  try {
+    info = await lstat(path);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return 0;
+    throw error;
+  }
+
+  if (info.isSymbolicLink()) return info.size;
+  if (info.isFile()) return info.size;
+  if (!info.isDirectory()) return 0;
+
+  const entries = await readdir(path, { withFileTypes: true });
+  let bytes = 0;
+  for (const entry of entries) {
+    bytes += await pathSize(join(path, entry.name));
+  }
+  return bytes;
+}
+
+async function collectLocalBackupBytes(cwd, config) {
+  const localFilesPath = isAbsolute(config.storage.localRoot)
+    ? config.storage.localRoot
+    : resolve(cwd, config.storage.localRoot);
+  const paths = [
+    localFilesPath,
+    resolve(cwd, 'extensions'),
+    resolve(cwd, '.env'),
+    resolve(cwd, 'package.json'),
+    resolve(cwd, 'package-lock.json'),
+  ];
+  let bytes = 0;
+  for (const path of paths) bytes += await pathSize(path);
+  return bytes;
+}
+
 async function assertRequiredTools({ cwd, env, runProcess }) {
   await Promise.all([
     runProcess('npm', ['--version'], { cwd, env }),
@@ -215,13 +261,16 @@ export async function collectUpdatePreflight({
   const database = await collectDatabaseState(config);
   const targetMigrations = await inspectMigrations(targetVersion, { env, runProcess });
   const running = await detectRunningApi(config, fetchFn);
-  const disk = await diskState(cwd);
+  const [disk, localBackupBytes] = await Promise.all([
+    diskState(cwd),
+    collectLocalBackupBytes(cwd, config),
+  ]);
 
   const appliedSet = new Set(database.appliedMigrations);
   const targetSet = new Set(targetMigrations);
   const pendingMigrations = targetMigrations.filter((id) => !appliedSet.has(id));
   const unknownAppliedMigrations = database.appliedMigrations.filter((id) => !targetSet.has(id));
-  const minimumFreeBytes = database.estimatedBytes + MIN_FREE_HEADROOM_BYTES;
+  const minimumFreeBytes = database.estimatedBytes + localBackupBytes + MIN_FREE_HEADROOM_BYTES;
   const blockers = [];
 
   if (running) blockers.push('UPDATE_APPLICATION_RUNNING');
@@ -236,6 +285,7 @@ export async function collectUpdatePreflight({
     upToDate: targetVersion === packageState.currentVersion,
     running,
     databaseBytes: database.estimatedBytes,
+    localBackupBytes,
     freeDiskBytes: disk.freeBytes,
     minimumFreeBytes,
     appliedMigrations: database.appliedMigrations,
