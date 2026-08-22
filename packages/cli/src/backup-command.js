@@ -8,6 +8,15 @@ import { createProjectBackup } from './project-backup.js';
 import { assertYunCmsStopped } from './service-state.js';
 import { acquireUpdateLock } from './update-lock.js';
 
+function assertLockContract(lock) {
+  if (!lock || typeof lock.assertHeld !== 'function' || typeof lock.release !== 'function') {
+    const error = new Error('Database maintenance lock implementation is invalid');
+    error.code = 'DATABASE_MAINTENANCE_LOCK_INVALID';
+    throw error;
+  }
+  return lock;
+}
+
 export async function runBackupCommand({
   args = [],
   cwd = process.cwd(),
@@ -35,8 +44,9 @@ export async function runBackupCommand({
   const projectLock = await acquireProjectLock({ cwd });
   let maintenanceLock = null;
   try {
-    maintenanceLock = await acquireMaintenanceLock({ env });
+    maintenanceLock = assertLockContract(await acquireMaintenanceLock({ env }));
     await assertServiceStopped();
+    await maintenanceLock.assertHeld();
 
     const backupPath = values['--output'] ? resolve(cwd, values['--output']) : null;
     return await createBackup({ cwd, env, output, backupPath });
