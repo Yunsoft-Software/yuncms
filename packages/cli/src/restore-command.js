@@ -8,6 +8,15 @@ import { restoreProjectBackup } from './project-backup.js';
 import { assertYunCmsStopped } from './service-state.js';
 import { acquireUpdateLock } from './update-lock.js';
 
+function assertLockContract(lock) {
+  if (!lock || typeof lock.assertHeld !== 'function' || typeof lock.release !== 'function') {
+    const error = new Error('Database maintenance lock implementation is invalid');
+    error.code = 'DATABASE_MAINTENANCE_LOCK_INVALID';
+    throw error;
+  }
+  return lock;
+}
+
 export async function runRestoreCommand({
   args = [],
   cwd = process.cwd(),
@@ -42,8 +51,14 @@ export async function runRestoreCommand({
   let maintenanceLock = null;
   try {
     await assertServiceStopped();
-    maintenanceLock = await acquireMaintenanceLock({ env });
+    maintenanceLock = assertLockContract(await acquireMaintenanceLock({ env }));
     await assertServiceStopped();
+    await maintenanceLock.assertHeld();
+
+    const beforeDestructive = async () => {
+      await assertServiceStopped();
+      await maintenanceLock.assertHeld();
+    };
 
     return await restoreBackup({
       backupPath: resolve(cwd, positionals[0]),
@@ -51,7 +66,7 @@ export async function runRestoreCommand({
       env,
       output,
       allowDifferentDatabaseTarget: values['--allow-different-database-target'] === true,
-      beforeDestructive: assertServiceStopped,
+      beforeDestructive,
     });
   } finally {
     if (maintenanceLock) await maintenanceLock.release();
