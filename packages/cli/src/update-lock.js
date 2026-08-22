@@ -1,8 +1,11 @@
+import { createHash } from 'node:crypto';
 import { mkdir, open, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
 export function updateLockPath(cwd = process.cwd()) {
-  return join(resolve(cwd), '.yuncms', 'update.lock');
+  const projectKey = createHash('sha256').update(resolve(cwd)).digest('hex').slice(0, 32);
+  return join(tmpdir(), 'yuncms-update-locks', `${projectKey}.lock`);
 }
 
 export async function acquireUpdateLock({
@@ -29,7 +32,7 @@ export async function acquireUpdateLock({
   }
 
   try {
-    await handle.writeFile(`${JSON.stringify({ pid, startedAt: now.toISOString() }, null, 2)}\n`, 'utf8');
+    await handle.writeFile(`${JSON.stringify({ pid, startedAt: now.toISOString(), cwd: resolve(cwd) }, null, 2)}\n`, 'utf8');
   } catch (error) {
     await handle.close().catch(() => {});
     await rm(path, { force: true }).catch(() => {});
