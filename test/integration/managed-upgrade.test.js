@@ -11,6 +11,7 @@ import {
   loadConfig,
 } from '@yunsoft/yuncms-core';
 import { resetDatabaseObjects } from '../../packages/cli/src/database-reset.js';
+import { acquireDatabaseMaintenanceLock } from '../../packages/cli/src/maintenance-lock.js';
 import {
   createProjectBackup,
   restoreProjectBackup,
@@ -53,6 +54,25 @@ async function tableExists(pool, database, table) {
   );
   return Number(rows[0]?.count ?? 0) === 1;
 }
+
+test('real MySQL maintenance lock serializes separate maintenance clients for the same database', {
+  skip: !ENABLED,
+  timeout: 30_000,
+}, async () => {
+  const env = baseUpgradeEnv();
+  const first = await acquireDatabaseMaintenanceLock({ env });
+  try {
+    await assert.rejects(
+      acquireDatabaseMaintenanceLock({ env }),
+      (error) => error.code === 'DATABASE_MAINTENANCE_LOCK_UNAVAILABLE',
+    );
+  } finally {
+    await first.release();
+  }
+
+  const afterRelease = await acquireDatabaseMaintenanceLock({ env });
+  await afterRelease.release();
+});
 
 test('real MySQL partial DDL failure is journaled and fails closed on retry', {
   skip: !ENABLED,
@@ -115,6 +135,7 @@ test('real mysqldump backup and destructive restore reproduce exact DB and local
   const config = loadConfig(env);
   const cwd = await mkdtemp(join(tmpdir(), 'yuncms-managed-upgrade-it-'));
   let pool = createDatabasePool(config.database);
+  const snapshotEnv = `DB_DATABASE="${config.database.database}"\nSNAPSHOT="before"\n`;
 
   try {
     await resetDatabaseObjects({ config: config.database });
@@ -131,7 +152,7 @@ test('real mysqldump backup and destructive restore reproduce exact DB and local
 
     await mkdir(join(cwd, '.yuncms', 'uploads'), { recursive: true });
     await mkdir(join(cwd, 'extensions'), { recursive: true });
-    await writeFile(join(cwd, '.env'), 'DB_DATABASE="snapshot-source"\nSNAPSHOT="before"\n');
+    await writeFile(join(cwd, '.env'), snapshotEnv);
     await writeFile(join(cwd, 'package.json'), '{"dependencies":{"@yunsoft/yuncms":"0.1.0"}}\n');
     await writeFile(join(cwd, 'package-lock.json'), '{"lockfileVersion":3,"packages":{}}\n');
     await writeFile(join(cwd, '.yuncms', 'uploads', 'asset.txt'), 'before-file\n');
@@ -177,7 +198,7 @@ test('real mysqldump backup and destructive restore reproduce exact DB and local
     assert.equal(await readFile(join(cwd, '.yuncms', 'uploads', 'asset.txt'), 'utf8'), 'before-file\n');
     assert.equal(await readFile(join(cwd, 'extensions', 'fixture.js'), 'utf8'), 'export const state = "before";\n');
     assert.match(await readFile(join(cwd, 'package.json'), 'utf8'), /0\.1\.0/);
-    assert.equal(await readFile(join(cwd, '.env'), 'utf8'), 'DB_DATABASE="snapshot-source"\nSNAPSHOT="before"\n');
+    assert.equal(await readFile(join(cwd, '.env'), 'utf8'), snapshotEnv);
   } finally {
     if (pool) await closeDatabasePool(pool).catch(() => {});
     await resetDatabaseObjects({ config: config.database }).catch(() => {});
