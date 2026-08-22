@@ -44,7 +44,16 @@ async function readJson(path, code) {
 }
 
 function projectDependencySection(packageJson) {
-  return DEPENDENCY_SECTIONS.find((key) => packageJson?.[key]?.['@yunsoft/yuncms']) ?? null;
+  const matches = DEPENDENCY_SECTIONS.filter((key) => packageJson?.[key]?.['@yunsoft/yuncms']);
+  if (matches.length > 1) {
+    const error = updateError(
+      'UPDATE_PROJECT_DEPENDENCY_AMBIGUOUS',
+      `@yunsoft/yuncms is declared in multiple dependency sections: ${matches.join(', ')}`,
+    );
+    error.dependencySections = matches;
+    throw error;
+  }
+  return matches[0] ?? null;
 }
 
 function parseSemanticVersion(version) {
@@ -98,11 +107,18 @@ function parseResolvedVersion(stdout) {
   } catch {
     parsed = stdout.replace(/^"|"$/g, '').trim();
   }
-  const version = Array.isArray(parsed) ? parsed.at(-1) : parsed;
-  if (typeof version !== 'string' || !parseSemanticVersion(version)) {
+
+  const candidates = Array.isArray(parsed) ? parsed : [parsed];
+  if (
+    candidates.length === 0
+    || candidates.some((version) => typeof version !== 'string' || !parseSemanticVersion(version))
+  ) {
     throw updateError('UPDATE_TARGET_VERSION_INVALID', `npm returned an invalid YunCMS version: ${stdout}`);
   }
-  return version;
+
+  return candidates.reduce((best, version) => (
+    best === null || compareVersions(version, best) > 0 ? version : best
+  ), null);
 }
 
 export async function resolveTargetVersion(specifier = 'latest', {
