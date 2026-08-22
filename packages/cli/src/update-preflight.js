@@ -17,6 +17,7 @@ import {
   loadConfig,
   pingDatabase,
   readAppliedMigrations,
+  readMigrationAttempts,
 } from '@yunsoft/yuncms-core';
 
 import { runCapturedProcess } from './process-runner.js';
@@ -202,6 +203,13 @@ export function analyzeMigrationHistory(appliedMigrations, targetMigrations) {
   };
 }
 
+export function findIncompleteMigrationAttempts(appliedMigrations, attempts) {
+  const applied = new Set(Array.isArray(appliedMigrations) ? appliedMigrations : []);
+  return (Array.isArray(attempts) ? attempts : [])
+    .filter((attempt) => attempt && !applied.has(attempt.migration_id))
+    .map((attempt) => ({ ...attempt }));
+}
+
 async function inspectTargetMigrations(targetVersion, {
   env,
   runProcess,
@@ -250,6 +258,15 @@ async function inspectTargetMigrations(targetVersion, {
   }
 }
 
+async function readExistingMigrationAttempts(pool) {
+  try {
+    return await readMigrationAttempts(pool);
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') return [];
+    throw error;
+  }
+}
+
 async function collectDatabaseState(config, {
   createPool = createDatabasePool,
   closePool = closeDatabasePool,
@@ -260,6 +277,7 @@ async function collectDatabaseState(config, {
       throw updateError('DATABASE_UNAVAILABLE', 'Database connectivity check failed');
     }
     const applied = [...await readAppliedMigrations(pool)].sort();
+    const attempts = await readExistingMigrationAttempts(pool);
     const [rows] = await pool.query(
       `SELECT COALESCE(SUM(data_length + index_length), 0) AS bytes
        FROM information_schema.tables
@@ -268,6 +286,8 @@ async function collectDatabaseState(config, {
     );
     return {
       appliedMigrations: applied,
+      migrationAttempts: attempts,
+      incompleteMigrationAttempts: findIncompleteMigrationAttempts(applied, attempts),
       estimatedBytes: Number(rows?.[0]?.bytes ?? 0),
     };
   } finally {
@@ -358,6 +378,7 @@ export async function collectUpdatePreflight({
   const blockers = [];
 
   if (running) blockers.push('UPDATE_APPLICATION_RUNNING');
+  if (database.incompleteMigrationAttempts.length > 0) blockers.push('UPDATE_MIGRATION_RECOVERY_REQUIRED');
   if (config.storage.s3.bucket && !allowUnverifiedS3) blockers.push('UPDATE_S3_BACKUP_UNVERIFIED');
   if (disk.freeBytes < minimumFreeBytes) blockers.push('UPDATE_DISK_SPACE_INSUFFICIENT');
   if (!migrationHistory.compatible) blockers.push('UPDATE_MIGRATION_HISTORY_INCOMPATIBLE');
@@ -378,6 +399,7 @@ export async function collectUpdatePreflight({
     pendingMigrations: migrationHistory.pendingMigrations,
     unknownAppliedMigrations: migrationHistory.unknownAppliedMigrations,
     migrationHistoryGap: migrationHistory.migrationHistoryGap,
+    incompleteMigrationAttempts: database.incompleteMigrationAttempts,
     s3Configured: Boolean(config.storage.s3.bucket),
     s3Bucket: config.storage.s3.bucket || null,
     blockers,
