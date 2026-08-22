@@ -28,7 +28,7 @@ test('init writes same-origin port 3008 defaults', async () => {
   assert.equal(Object.values(env).includes('8055'), false);
 });
 
-test('help advertises init, bootstrap and start', async () => {
+test('help advertises setup, runtime and managed upgrade commands', async () => {
   const lines = [];
   await runCli(['help'], { output: { log: (line) => lines.push(line) }, env: {} });
   const help = lines.join('\n');
@@ -36,6 +36,10 @@ test('help advertises init, bootstrap and start', async () => {
   assert.match(help, /yuncms init/);
   assert.match(help, /yuncms bootstrap/);
   assert.match(help, /yuncms start/);
+  assert.match(help, /yuncms backup/);
+  assert.match(help, /yuncms restore/);
+  assert.match(help, /yuncms update/);
+  assert.match(help, /--dry-run/);
 });
 
 test('start command receives current environment and working directory', async () => {
