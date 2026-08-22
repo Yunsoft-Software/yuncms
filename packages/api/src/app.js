@@ -7,6 +7,7 @@ import {
 
 import { createAuthenticationMiddleware } from './authentication.js';
 import { apiErrorHandler } from './error-response.js';
+import { createFixedWindowRateLimit } from './rate-limit.js';
 import { createAuditRouter } from './routes/audit.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createFilesRouter } from './routes/files.js';
@@ -74,6 +75,16 @@ function requestIdentity(req, res, next) {
   next();
 }
 
+function createApiRateLimit(config) {
+  const limits = config?.server?.rateLimit;
+  if (!limits?.enabled) return null;
+  return createFixedWindowRateLimit({
+    windowMs: limits.windowMs,
+    max: limits.max,
+    maxBuckets: limits.maxBuckets,
+  });
+}
+
 export function createApp({
   pool,
   config,
@@ -120,6 +131,9 @@ export function createApp({
 
   app.use(createStudioMiddleware({ root: studioRoot }));
 
+  const apiRateLimit = createApiRateLimit(config);
+  if (apiRateLimit) app.use(apiRateLimit);
+
   app.use(createAuthenticationMiddleware({
     pool,
     config,
@@ -157,4 +171,10 @@ export function createApp({
   return app;
 }
 
-export { CONTENT_SECURITY_POLICY, requestIdentity, securityHeaders, studioCors };
+export {
+  CONTENT_SECURITY_POLICY,
+  createApiRateLimit,
+  requestIdentity,
+  securityHeaders,
+  studioCors,
+};

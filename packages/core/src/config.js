@@ -44,6 +44,21 @@ export function loadConfig(env = process.env) {
       port: serverPort,
       studioOrigin,
       trustProxyHops: readInteger(env.TRUST_PROXY_HOPS, 0, 'TRUST_PROXY_HOPS', { min: 0, max: 10 }),
+      rateLimit: {
+        enabled: readBoolean(env.API_RATE_LIMIT_ENABLED, true),
+        windowMs: readInteger(env.API_RATE_LIMIT_WINDOW_MS, 60_000, 'API_RATE_LIMIT_WINDOW_MS', {
+          min: 1000,
+          max: 24 * 60 * 60 * 1000,
+        }),
+        max: readInteger(env.API_RATE_LIMIT_MAX, 300, 'API_RATE_LIMIT_MAX', {
+          min: 1,
+          max: 1_000_000,
+        }),
+        maxBuckets: readInteger(env.API_RATE_LIMIT_MAX_BUCKETS, 10_000, 'API_RATE_LIMIT_MAX_BUCKETS', {
+          min: 1,
+          max: 1_000_000,
+        }),
+      },
     },
     logging: {
       level: readString(env.LOG_LEVEL, 'info'),
