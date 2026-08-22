@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { BACKUP_FORMAT_VERSION, restoreProjectBackup } from '../src/project-backup.js';
+import { restoreProjectBackup } from '../src/project-backup.js';
 
 const env = {
   DB_HOST: '127.0.0.1',
@@ -15,9 +15,9 @@ const env = {
   FILES_LOCAL_ROOT: '.yuncms/uploads',
 };
 
-async function writeManifest(backupPath, project = {}, database = {}) {
+async function writeManifest(backupPath, project = {}, database = {}, overrides = {}) {
   const manifest = {
-    format: BACKUP_FORMAT_VERSION,
+    format: 1,
     complete: true,
     createdAt: '2026-08-22T09:00:00.000Z',
     database: {
@@ -39,6 +39,7 @@ async function writeManifest(backupPath, project = {}, database = {}) {
       ...project,
     },
     s3: { configured: false, bucket: null, objectsBackedUp: false },
+    ...overrides,
   };
   await writeFile(join(backupPath, 'manifest.json'), `${JSON.stringify(manifest)}\n`);
   return manifest;
@@ -58,7 +59,7 @@ test('corrupt database backup is rejected before database reset', async () => {
         backupPath,
         cwd,
         env,
-        output: { log() {} },
+        output: { log() {}, warn() {} },
         async resetDatabaseFn() { resetCalled = true; },
         async restoreDatabaseFn() { throw new Error('must not restore'); },
       }),
@@ -84,12 +85,67 @@ test('manifest-declared missing project asset is rejected before database reset'
         backupPath,
         cwd,
         env,
-        output: { log() {} },
+        output: { log() {}, warn() {} },
         async verifyDatabaseFn() { return { decompressedBytes: 10 }; },
         async resetDatabaseFn() { resetCalled = true; },
         async restoreDatabaseFn() { throw new Error('must not restore'); },
       }),
       (error) => error.code === 'BACKUP_ASSET_MISSING',
+    );
+    assert.equal(resetCalled, false);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('malformed project metadata is rejected before database validation or reset', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'yuncms-restore-manifest-'));
+  const backupPath = join(cwd, 'backup');
+  await mkdir(backupPath);
+  try {
+    await writeManifest(backupPath, {}, {}, { project: null });
+    await writeFile(join(backupPath, 'database.sql.gz'), 'placeholder');
+    let verifyCalled = false;
+    let resetCalled = false;
+
+    await assert.rejects(
+      restoreProjectBackup({
+        backupPath,
+        cwd,
+        env,
+        output: { log() {}, warn() {} },
+        async verifyDatabaseFn() { verifyCalled = true; return { decompressedBytes: 10 }; },
+        async resetDatabaseFn() { resetCalled = true; },
+      }),
+      (error) => error.code === 'BACKUP_MANIFEST_INVALID',
+    );
+    assert.equal(verifyCalled, false);
+    assert.equal(resetCalled, false);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('manifest asset with wrong filesystem type is rejected before database reset', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'yuncms-restore-type-'));
+  const backupPath = join(cwd, 'backup');
+  await mkdir(join(backupPath, 'project'), { recursive: true });
+  try {
+    await writeManifest(backupPath, { packageJson: true });
+    await writeFile(join(backupPath, 'database.sql.gz'), 'placeholder');
+    await mkdir(join(backupPath, 'project', 'package.json'));
+    let resetCalled = false;
+
+    await assert.rejects(
+      restoreProjectBackup({
+        backupPath,
+        cwd,
+        env,
+        output: { log() {}, warn() {} },
+        async verifyDatabaseFn() { return { decompressedBytes: 10 }; },
+        async resetDatabaseFn() { resetCalled = true; },
+      }),
+      (error) => error.code === 'BACKUP_ASSET_TYPE_INVALID',
     );
     assert.equal(resetCalled, false);
   } finally {
@@ -112,10 +168,9 @@ test('different database target is rejected before validation or reset by defaul
         backupPath,
         cwd,
         env: { ...env, DB_DATABASE: 'recovery_database' },
-        output: { log() {} },
+        output: { log() {}, warn() {} },
         async verifyDatabaseFn() { verifyCalled = true; return { decompressedBytes: 10 }; },
         async resetDatabaseFn() { resetCalled = true; },
-        async restoreDatabaseFn() { throw new Error('must not restore'); },
       }),
       (error) => error.code === 'BACKUP_DATABASE_TARGET_MISMATCH',
     );
@@ -167,6 +222,7 @@ test('cross-database disaster recovery preserves current target env while restor
       'DB_DATABASE="recovery_database"\nRECOVERY_ONLY="yes"\n',
     );
     assert.ok(warnings.some((message) => message.includes('Preserving the current .env')));
+    assert.ok(warnings.some((message) => message.includes('legacy backup format 1')));
     assert.equal(await readFile(join(backupPath, 'project', '.env'), 'utf8'), 'DB_DATABASE="source_database"\n');
   } finally {
     await rm(cwd, { recursive: true, force: true });
@@ -188,7 +244,7 @@ test('beforeDestructive guard runs after backup validation and can stop database
         backupPath,
         cwd,
         env,
-        output: { log() {} },
+        output: { log() {}, warn() {} },
         async verifyDatabaseFn() {
           sequence.push('verify');
           return { decompressedBytes: 10 };
@@ -200,7 +256,6 @@ test('beforeDestructive guard runs after backup validation and can stop database
           throw error;
         },
         async resetDatabaseFn() { resetCalled = true; },
-        async restoreDatabaseFn() { throw new Error('must not restore'); },
       }),
       (error) => error.code === 'UPDATE_APPLICATION_RUNNING',
     );
@@ -231,10 +286,9 @@ for (const targetKind of ['files', 'extensions']) {
           backupPath,
           cwd,
           env,
-          output: { log() {} },
+          output: { log() {}, warn() {} },
           async verifyDatabaseFn() { verifyCalled = true; return { decompressedBytes: 10 }; },
           async resetDatabaseFn() { resetCalled = true; },
-          async restoreDatabaseFn() { throw new Error('must not restore'); },
         }),
         (error) => error.code === 'BACKUP_RESTORE_PATH_CONFLICT'
           && error.backupPath === backupPath,
