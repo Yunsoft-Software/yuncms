@@ -8,7 +8,7 @@ The current upgrade flow is **maintenance-window based**, not zero-downtime depl
 
 Stop the YunCMS service **at the supervisor level** first (systemd, PM2, Docker/Compose, Plesk process manager, etc.). Do not only kill a child process that the supervisor will immediately restart.
 
-`yuncms backup` and `yuncms update` fail closed when the configured local YunCMS health endpoint is still reachable. Managed `update` and destructive `restore` operations are also serialized by an atomic per-project lock stored under the operating-system temp directory, outside project data and backup trees.
+`yuncms backup`, `yuncms update` and destructive `yuncms restore ... --yes` fail closed when the configured local YunCMS health endpoint is still reachable. Managed `update` and destructive `restore` operations are also serialized by an atomic per-project lock stored under the operating-system temp directory, outside project data and backup trees.
 
 If a process is killed hard, a stale lock may remain. YunCMS intentionally does not guess whether it is safe to remove that lock. Verify that no update/restore process is active before deleting a stale lock path reported by `UPDATE_ALREADY_RUNNING`.
 
@@ -105,6 +105,14 @@ To pin the release:
 yuncms update --to 0.2.0
 ```
 
+If the currently installed YunCMS version predates the managed `update` command itself, invoke the already-published target CLI explicitly as the one-time bootstrap updater:
+
+```bash
+npx --yes @yunsoft/yuncms@0.2.0 update --to 0.2.0
+```
+
+The target CLI still operates on the current project directory, reads the installed project version, creates the same mandatory backup and then installs/verifies the target locally. Once the project is on a version that includes managed updates, normal `yuncms update` can be used for later releases.
+
 For S3 installations, only after provider-side object recovery/versioning has been verified:
 
 ```bash
@@ -154,12 +162,13 @@ The expected recovery path is restoring the verified pre-update backup.
 If package installation, migration or new-runtime readiness verification fails after the backup exists, `yuncms update` attempts automatic rollback:
 
 1. revalidate the backup gzip and every asset that its manifest declares before deleting anything;
-2. reset the target database's current tables/views;
-3. restore `database.sql.gz`;
-4. restore local Files, extensions, `.env`, `package.json` and `package-lock.json` to their pre-update state;
-5. reinstall the old dependency graph (`npm ci` when a lockfile existed);
-6. start the restored runtime temporarily and require `/ready`;
-7. stop the temporary runtime again.
+2. recheck that the configured YunCMS service is still stopped;
+3. reset the target database's current tables/views;
+4. restore `database.sql.gz`;
+5. restore local Files, extensions, `.env`, `package.json` and `package-lock.json` to their pre-update state;
+6. reinstall the old dependency graph (`npm ci` when a lockfile existed);
+7. start the restored runtime temporarily and require `/ready`;
+8. stop the temporary runtime again.
 
 If rollback succeeds, the original update error is still returned, with rollback marked completed. The operator should inspect the failure before restarting production.
 
@@ -173,7 +182,7 @@ The backup directory is intentionally preserved for manual recovery.
 
 ## Manual restore
 
-Restore is destructive and requires explicit confirmation:
+Restore is destructive. Keep the service supervisor stopped and provide explicit confirmation:
 
 ```bash
 yuncms restore /path/to/backup --yes
@@ -187,7 +196,7 @@ For an intentional disaster-recovery restore to a different database target:
 yuncms restore /path/to/backup --yes --allow-different-database-target
 ```
 
-Before destructive reset, restore revalidates the database gzip and confirms that every manifest-declared local asset exists. Only then does it reset current database tables/views and import the dump. This prevents both corrupted backups from wiping a healthy database and tables created only by a failed migration from surviving an old dump import.
+Before destructive reset, restore revalidates the database gzip and confirms that every manifest-declared local asset exists. It then rechecks the configured YunCMS health endpoint immediately before the reset. Only then does it reset current database tables/views and import the dump. This prevents corrupted backups from wiping a healthy database, catches supervisor auto-restart races, and prevents tables created only by a failed migration from surviving an old dump import.
 
 ## Starting production again
 
