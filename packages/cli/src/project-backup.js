@@ -333,12 +333,16 @@ export async function restoreProjectBackup({
     sourceName: 'package-lock.json',
     target: resolve(cwd, 'package-lock.json'),
   });
-  await restoreOptionalFile({
-    backupPath: resolvedBackupPath,
-    existed: manifest.project.env,
-    sourceName: '.env',
-    target: resolve(cwd, '.env'),
-  });
+  if (allowDifferentDatabaseTarget) {
+    output.warn?.('Preserving the current .env because restore targets a different database; the backup .env remains available inside the backup directory.');
+  } else {
+    await restoreOptionalFile({
+      backupPath: resolvedBackupPath,
+      existed: manifest.project.env,
+      sourceName: '.env',
+      target: resolve(cwd, '.env'),
+    });
+  }
 
   output.log?.(`Restore completed: ${resolvedBackupPath}`);
   return { backupPath: resolvedBackupPath, manifest };
