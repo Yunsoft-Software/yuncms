@@ -17,7 +17,13 @@ function fakeLock(events) {
   };
 }
 
-test('manual restore checks service state before invoking destructive restore', async () => {
+function fakeMaintenanceLock(events) {
+  return {
+    async release() { events.push('db-unlock'); },
+  };
+}
+
+test('manual restore checks service state before acquiring database maintenance lock', async () => {
   const events = [];
   await assert.rejects(
     runRestoreCommand({
@@ -26,6 +32,7 @@ test('manual restore checks service state before invoking destructive restore', 
       env,
       output: { log() {} },
       async acquireLock() { events.push('lock'); return fakeLock(events); },
+      async acquireMaintenanceLock() { events.push('db-lock'); return fakeMaintenanceLock(events); },
       async assertStopped(options) {
         events.push(`stopped:${options.host}:${options.port}`);
         const error = new Error('running');
@@ -40,7 +47,7 @@ test('manual restore checks service state before invoking destructive restore', 
   assert.deepEqual(events, ['lock', 'stopped:0.0.0.0:3008', 'unlock']);
 });
 
-test('manual restore passes a second stopped-service guard into the pre-destructive hook', async () => {
+test('manual restore holds database lock and passes a second stopped-service guard before destructive reset', async () => {
   const events = [];
   await runRestoreCommand({
     args: ['./backup', '--yes'],
@@ -48,6 +55,7 @@ test('manual restore passes a second stopped-service guard into the pre-destruct
     env,
     output: { log() {} },
     async acquireLock() { events.push('lock'); return fakeLock(events); },
+    async acquireMaintenanceLock() { events.push('db-lock'); return fakeMaintenanceLock(events); },
     async assertStopped() { events.push('stopped'); return true; },
     async restoreBackup(options) {
       events.push('restore-validate');
@@ -57,5 +65,15 @@ test('manual restore passes a second stopped-service guard into the pre-destruct
     },
   });
 
-  assert.deepEqual(events, ['lock', 'stopped', 'restore-validate', 'stopped', 'restore-reset', 'unlock']);
+  assert.deepEqual(events, [
+    'lock',
+    'stopped',
+    'db-lock',
+    'stopped',
+    'restore-validate',
+    'stopped',
+    'restore-reset',
+    'db-unlock',
+    'unlock',
+  ]);
 });
