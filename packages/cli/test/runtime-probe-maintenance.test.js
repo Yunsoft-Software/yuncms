@@ -60,3 +60,32 @@ test('runtime probe rejects an invalid maintenance token before spawning', async
   );
   assert.equal(spawned, false);
 });
+
+test('runtime probe bounds shutdown when the ready child ignores TERM and KILL', async () => {
+  const child = new EventEmitter();
+  const signals = [];
+  child.stderr = new PassThrough();
+  child.kill = (signal) => {
+    signals.push(signal);
+    return true;
+  };
+
+  await assert.rejects(
+    verifyInstalledRuntime({
+      cwd: '/srv/yuncms',
+      port: 3008,
+      timeoutMs: 1_000,
+      shutdownGraceMs: 10,
+      spawnProcess() { return child; },
+      async fetchFn() {
+        return {
+          ok: true,
+          async json() { return { status: 'ready' }; },
+        };
+      },
+    }),
+    (error) => error.code === 'UPDATE_PROBE_SHUTDOWN_TIMEOUT',
+  );
+
+  assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
+});

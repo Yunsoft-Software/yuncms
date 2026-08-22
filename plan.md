@@ -29,7 +29,7 @@
 - [x] MySQL pool, pinned transactions, retryable DB errors and advisory schema locks.
 - [x] Successful migration journal + compatibility gate.
 - [x] Migration-attempt journal records applying/applied/failed state and completed statement index so partially committed MySQL DDL is never blindly retried.
-- [x] An incomplete attempt whose migration is absent from the successful journal fails with `DATABASE_MIGRATION_RECOVERY_REQUIRED` and requires operator recovery/backup restore.
+- [x] An incomplete attempt whose migration is absent from the successful journal fails bootstrap and normal API compatibility startup with `DATABASE_MIGRATION_RECOVERY_REQUIRED` and requires operator recovery/backup restore.
 - [x] Core migrations `0001`–`0012` registered.
 - [x] `0005`: deny-by-default Public role.
 - [x] `0006`: Studio branding/theme/locale.
@@ -171,7 +171,8 @@
 - [x] Backup/restore coverage includes format-2 SHA-256 integrity, manifest/type/symlink validation, gzip validation, DB reset order, exact project-state restoration and legacy format-1 recovery warning.
 - [x] Managed-update coverage includes dry-run/no-mutation, SemVer/history barriers, project + DB locks, startup maintenance gate, same-version DB drift, successful bootstrap/readiness and automatic rollback behavior.
 - [x] External-command coverage includes bounded npm/bootstrap and mysql/mysqldump timeouts, termination escalation and synchronous spawn failure normalization.
-- [x] Migration-attempt source coverage proves a simulated partial DDL failure is recorded and refuses a blind retry.
+- [x] Migration-attempt source coverage proves a simulated partial DDL failure is recorded, refuses a blind retry and blocks normal runtime compatibility startup.
+- [x] Runtime-probe source coverage proves a ready child that ignores TERM/KILL fails in bounded time.
 - [x] Upgrade safety tests are explicitly included in `npm run test:fast`, not only auto-discovered by the complete suite.
 - [x] EN/TR parity/static key scan remains in the complete suite.
 - [ ] Execute Node 24, real MySQL and browser/provider/supervisor gates in `todo.md` before calling this exact source state deployment-verified.
@@ -190,7 +191,7 @@
 - [x] Project identity canonicalizes symlink aliases to the same physical project.
 - [x] Generic npm/bootstrap commands and mysql/mysqldump clients have bounded configurable execution timeouts with TERM/KILL escalation.
 - [x] Target package is installed exactly while preserving dependencies/devDependencies/optionalDependencies placement; same-version DB drift skips needless reinstall and runs guarded bootstrap.
-- [x] New runtime is started temporarily and must pass `/ready`; the verification process is then gracefully stopped for supervisor handoff.
+- [x] New runtime is started temporarily and must pass `/ready`; supervisor handoff requires a bounded TERM/KILL shutdown instead of waiting forever for the verification process.
 - [x] Restore validates manifest, asset shape, gzip and format-2 integrity before destructive reset, then removes current DB tables/views and imports the snapshot.
 - [x] Automatic rollback restores DB/project files, reconstructs the old dependency graph and verifies the restored runtime; rollback failure surfaces `UPDATE_ROLLBACK_FAILED` and preserves backup evidence.
 - [x] Restore requires explicit `--yes`; cross-database-target restore requires an additional explicit override and preserves the recovery target `.env`.

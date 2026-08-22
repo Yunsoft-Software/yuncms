@@ -46,7 +46,7 @@ YUNCMS_CLI_COMMAND_TIMEOUT_MS=900000
 YUNCMS_DB_TOOL_TIMEOUT_MS=7200000
 ```
 
-The first value covers npm/package/bootstrap commands (15 minutes by default). The second covers `mysql`/`mysqldump` (2 hours by default). On timeout YunCMS requests `SIGTERM`, escalates to `SIGKILL` after a grace period and returns a timeout error.
+The first value covers npm/package/bootstrap commands (15 minutes by default). The second covers `mysql`/`mysqldump` (2 hours by default). On timeout YunCMS requests `SIGTERM`, escalates to `SIGKILL` after a grace period and returns a timeout error. The temporary readiness runtime also has a bounded TERM/KILL shutdown after `/ready`; an unresponsive probe fails the update instead of holding maintenance locks forever.
 
 Increase these only after measuring a verified large production install/database. Do not use an arbitrarily huge value merely to hide a hung command.
 
@@ -181,7 +181,7 @@ The update sequence is:
 10. recheck service state and database maintenance ownership;
 11. start the target runtime temporarily with the in-memory maintenance bypass token;
 12. require `/ready` to return `status=ready`;
-13. gracefully stop that temporary runtime;
+13. stop that temporary runtime with bounded TERM/KILL escalation;
 14. recheck that no unexpected supervisor process is reachable;
 15. release the database and project locks and leave production start to the normal supervisor.
 
@@ -204,6 +204,8 @@ If MySQL DDL partially succeeds and the process then fails, the next bootstrap d
 ```text
 DATABASE_MIGRATION_RECOVERY_REQUIRED
 ```
+
+Normal API compatibility startup also checks the migration-attempt journal when it exists. An unapplied `applying` or `failed` attempt therefore blocks an older/restored runtime from serving against a potentially partial future schema.
 
 Managed update preflight also refuses to create a new "recovery" backup from a database that already contains an incomplete migration attempt. Recover from a known-good earlier backup first.
 

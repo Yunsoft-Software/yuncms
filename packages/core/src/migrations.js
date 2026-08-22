@@ -65,8 +65,14 @@ function migrationRecoveryError(attempts) {
   return error;
 }
 
-async function assertNoIncompleteMigrationAttempts(database, applied) {
-  const attempts = await readMigrationAttempts(database);
+async function assertNoIncompleteMigrationAttempts(database, applied, { allowMissingJournal = false } = {}) {
+  let attempts;
+  try {
+    attempts = await readMigrationAttempts(database);
+  } catch (error) {
+    if (allowMissingJournal && error?.code === 'ER_NO_SUCH_TABLE') return;
+    throw error;
+  }
   const inconsistent = attempts.filter((attempt) => !applied.has(attempt.migration_id));
   if (inconsistent.length > 0) throw migrationRecoveryError(inconsistent);
 }
@@ -169,6 +175,8 @@ export async function assertMigrationsApplied(database, requiredMigrationIds) {
     }
     throw error;
   }
+
+  await assertNoIncompleteMigrationAttempts(database, applied, { allowMissingJournal: true });
 
   const missing = requiredMigrationIds.filter((id) => !applied.has(id));
 

@@ -133,6 +133,42 @@ test('compatibility check fails closed when migrations are missing', async () =>
   );
 });
 
+test('compatibility check blocks startup when any unapplied migration attempt is incomplete', async () => {
+  const database = createMigrationDatabase({
+    applied: ['0001'],
+    attempts: [{
+      migration_id: 'future-partial-migration',
+      status: 'failed',
+      statement_index: 1,
+      started_at: new Date(),
+      finished_at: new Date(),
+      error_code: 'ER_DDL_FAILED',
+      error_message: 'partial DDL',
+    }],
+  });
+
+  await assert.rejects(
+    assertMigrationsApplied(database, ['0001']),
+    (error) => error.code === 'DATABASE_MIGRATION_RECOVERY_REQUIRED'
+      && error.migrationAttempts[0].migration_id === 'future-partial-migration',
+  );
+});
+
+test('compatibility remains readable for pre-attempt-journal databases', async () => {
+  const database = createMigrationDatabase({ applied: ['0001'] });
+  const originalQuery = database.query.bind(database);
+  database.query = async (sql, params) => {
+    if (sql.replace(/\s+/g, ' ').trim().startsWith('SELECT migration_id, status, statement_index')) {
+      const error = new Error('attempt journal missing');
+      error.code = 'ER_NO_SUCH_TABLE';
+      throw error;
+    }
+    return originalQuery(sql, params);
+  };
+
+  await assert.doesNotReject(assertMigrationsApplied(database, ['0001']));
+});
+
 test('system schema quotes the MySQL reserved system column', () => {
   const systemSchema = CORE_MIGRATIONS.find(({ id }) => id === '0001-system-schema');
   const collectionsTable = systemSchema.statements.find((statement) => (

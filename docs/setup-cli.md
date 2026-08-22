@@ -37,7 +37,7 @@ yuncms bootstrap
 
 It validates connectivity, obtains the bootstrap advisory lock, applies missing core migrations, reports schema version and closes the pool on success or failure.
 
-The migration runner records both successful migrations and active/failed attempts. If a DDL migration partially executes and fails, YunCMS refuses a blind retry with `DATABASE_MIGRATION_RECOVERY_REQUIRED`; restore the verified pre-upgrade backup instead.
+The migration runner records both successful migrations and active/failed attempts. If a DDL migration partially executes and fails, YunCMS refuses a blind retry and normal API compatibility startup with `DATABASE_MIGRATION_RECOVERY_REQUIRED`; restore the verified pre-upgrade backup instead.
 
 `bootstrap` does not create the first admin; use interactive `init` for that current workflow.
 
