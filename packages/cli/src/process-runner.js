@@ -136,11 +136,8 @@ export async function runCapturedProcess(command, args = [], {
         forceRejectHandle = setTimeout(() => {
           finish(() => reject(timeoutError(command, args, resolvedTimeoutMs, stdout, stderr)));
         }, resolvedKillGraceMs);
-        forceRejectHandle.unref?.();
       }, resolvedKillGraceMs);
-      forceKillHandle.unref?.();
     }, resolvedTimeoutMs);
-    timeoutHandle.unref?.();
 
     child.once('error', (error) => {
       finish(() => {
