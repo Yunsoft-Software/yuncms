@@ -4,7 +4,7 @@ import { assertPermissionValidationRule } from '../permission-validation.js';
 import { compileFilter } from '../query.js';
 import { SchemaCache } from '../schema.js';
 import {
-  assertActionOnlyPermissionPayload,
+  assertSystemPermissionPayload,
   assertSystemResourceAction,
   isPermissionManagedSystemResource,
 } from '../system-permissions.js';
@@ -208,7 +208,7 @@ export class PermissionsService extends BaseService {
         throw error;
       }
       assertSystemResourceAction(collectionSchema, action);
-      assertActionOnlyPermissionPayload(collectionSchema, input);
+      assertSystemPermissionPayload(collectionSchema, action, input);
     }
 
     const fields = normalizePermissionFields(input.fields ?? null, collectionSchema);
@@ -267,7 +267,9 @@ export class PermissionsService extends BaseService {
       throw error;
     }
     const collectionSchema = await this.#collectionSchema(existing.collection);
-    if (collectionSchema.system) assertActionOnlyPermissionPayload(collectionSchema, patch);
+    if (collectionSchema.system) {
+      assertSystemPermissionPayload(collectionSchema, existing.action, patch);
+    }
 
     const assignments = [];
     const params = [];

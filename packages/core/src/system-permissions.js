@@ -1,4 +1,5 @@
 const ALL_ACTIONS = Object.freeze(['read', 'create', 'update', 'delete']);
+const PERMISSION_MODES = new Set(['action-only', 'filter-read']);
 
 function parseMetadata(value) {
   if (value == null) return {};
@@ -14,16 +15,28 @@ function isEnabledFlag(value) {
   return value === true || value === 1;
 }
 
+function advancedUnsupported(collectionSchema, message) {
+  const error = new Error(message ?? `System resource ${collectionSchema.collection} does not support this advanced permission rule`);
+  error.code = 'SYSTEM_PERMISSION_ADVANCED_UNSUPPORTED';
+  throw error;
+}
+
 export function systemPermissionConfig(collectionSchema) {
   if (!collectionSchema?.system) return null;
   const metadata = parseMetadata(collectionSchema.metadata);
   if (!isEnabledFlag(metadata.permissionManaged)) return null;
+  const mode = metadata.permissionMode ?? 'action-only';
+  if (!PERMISSION_MODES.has(mode)) {
+    const error = new Error(`Unsupported system permission mode for ${collectionSchema.collection}: ${mode}`);
+    error.code = 'SYSTEM_PERMISSION_MODE_UNSUPPORTED';
+    throw error;
+  }
   const allowedActions = Array.isArray(metadata.allowedActions)
     ? metadata.allowedActions.filter((action) => ALL_ACTIONS.includes(action))
     : [];
   return Object.freeze({
     resource: metadata.resource ?? collectionSchema.collection,
-    mode: metadata.permissionMode ?? 'action-only',
+    mode,
     allowedActions: Object.freeze([...new Set(allowedActions)]),
   });
 }
@@ -43,12 +56,42 @@ export function assertSystemResourceAction(collectionSchema, action) {
   return config;
 }
 
-export function assertActionOnlyPermissionPayload(collectionSchema, { fields, filter, validation } = {}) {
+export function assertSystemPermissionPayload(
+  collectionSchema,
+  action,
+  { fields, filter, validation } = {},
+) {
+  const config = systemPermissionConfig(collectionSchema);
+  if (!config) return;
+
+  if (config.mode === 'action-only') {
+    if (fields != null || filter != null || validation != null) {
+      advancedUnsupported(
+        collectionSchema,
+        `System resource ${collectionSchema.collection} supports action-level permissions only`,
+      );
+    }
+    return;
+  }
+
+  if (config.mode === 'filter-read') {
+    if (fields != null || validation != null) {
+      advancedUnsupported(
+        collectionSchema,
+        `System resource ${collectionSchema.collection} supports only a row filter on read permissions`,
+      );
+    }
+    if (filter != null && action !== 'read') {
+      advancedUnsupported(
+        collectionSchema,
+        `System resource ${collectionSchema.collection} permits row filters only for read`,
+      );
+    }
+  }
+}
+
+export function assertActionOnlyPermissionPayload(collectionSchema, payload = {}) {
   const config = systemPermissionConfig(collectionSchema);
   if (!config || config.mode !== 'action-only') return;
-  if (fields != null || filter != null || validation != null) {
-    const error = new Error(`System resource ${collectionSchema.collection} supports action-level permissions only`);
-    error.code = 'SYSTEM_PERMISSION_ADVANCED_UNSUPPORTED';
-    throw error;
-  }
+  return assertSystemPermissionPayload(collectionSchema, 'read', payload);
 }

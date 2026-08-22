@@ -64,6 +64,7 @@ export {
 } from './system-fields.js';
 export {
   assertActionOnlyPermissionPayload,
+  assertSystemPermissionPayload,
   assertSystemResourceAction,
   isPermissionManagedSystemResource,
   systemPermissionConfig,

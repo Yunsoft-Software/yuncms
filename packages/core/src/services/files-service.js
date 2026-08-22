@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { compileFilter } from '../query.js';
 import { BaseService } from './base-service.js';
 import { resolveSystemResourceAccess } from './system-resource-access.js';
 
@@ -88,6 +89,31 @@ export class FilesService extends BaseService {
     });
   }
 
+  #compileReadScope(permission, id = null) {
+    let sql = '';
+    let params = [];
+
+    if (permission?.filter) {
+      const collectionSchema = this.schema?.collections?.yuncms_files;
+      if (!collectionSchema) {
+        throw fileError(
+          'SYSTEM_SCHEMA_REQUIRED',
+          'System schema is required to enforce a filtered Files permission',
+        );
+      }
+      const compiled = compileFilter(permission.filter, collectionSchema);
+      sql = compiled.sql;
+      params = [...compiled.params];
+    }
+
+    if (id != null) {
+      sql = sql ? `${sql} AND id = ?` : ' WHERE id = ?';
+      params.push(id);
+    }
+
+    return { sql, params };
+  }
+
   async #readOneUnsafe(id) {
     const [rows] = await this.database.query(
       `SELECT id, storage, filename_disk, filename_download, title, mimetype, filesize,
@@ -100,20 +126,34 @@ export class FilesService extends BaseService {
     return normalizeRow(rows[0]);
   }
 
-  async readMany() {
-    await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
+  async #readOneAuthorized(id, permission) {
+    const scope = this.#compileReadScope(permission, id);
     const [rows] = await this.database.query(
       `SELECT id, storage, filename_disk, filename_download, title, mimetype, filesize,
               uploaded_by, uploaded_at, metadata
-       FROM yuncms_files
+       FROM yuncms_files${scope.sql}
+       LIMIT 1`,
+      scope.params,
+    );
+    return normalizeRow(rows[0]);
+  }
+
+  async readMany() {
+    const permission = await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
+    const scope = this.#compileReadScope(permission);
+    const [rows] = await this.database.query(
+      `SELECT id, storage, filename_disk, filename_download, title, mimetype, filesize,
+              uploaded_by, uploaded_at, metadata
+       FROM yuncms_files${scope.sql}
        ORDER BY uploaded_at DESC, id DESC`,
+      scope.params,
     );
     return rows.map(normalizeRow);
   }
 
   async readOne(id) {
-    await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
-    return this.#readOneUnsafe(id);
+    const permission = await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
+    return this.#readOneAuthorized(id, permission);
   }
 
   async createOne({
@@ -177,8 +217,8 @@ export class FilesService extends BaseService {
   }
 
   async readContent(id) {
-    await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
-    const file = await this.#readOneUnsafe(id);
+    const permission = await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
+    const file = await this.#readOneAuthorized(id, permission);
     if (!file) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
     const driver = this.storage.get(file.storage);
     const contents = await driver.get(file.filename_disk);

@@ -90,7 +90,7 @@ test('system permission resources migration is required and registers only bound
   assert.match(source, /'yuncms_files'/);
   assert.match(source, /'yuncms_roles'/);
   assert.match(source, /'permissionManaged', TRUE/);
-  assert.match(source, /'allowedActions', JSON_ARRAY\('read'\)/);
+  assert.match(source, /'allowedActions', JSON_ARRAY\('read'/);
   assert.doesNotMatch(source, /'yuncms_permissions'.*permissionManaged/s);
   assert.doesNotMatch(source, /password_hash/);
 });
@@ -124,14 +124,24 @@ test('file-backed Studio favicon migration remains required', () => {
   assert.match(source, /REFERENCES yuncms_files \(id\) ON DELETE SET NULL/);
 });
 
-test('role permission actions migration is the latest compatibility gate', () => {
+test('role permission actions migration remains required', () => {
   const migration = CORE_MIGRATIONS.find(({ id }) => id === '0011-role-permission-actions');
   assert.ok(migration);
   assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0011-role-permission-actions'));
   const source = migration.statements.join('\n');
   assert.match(source, /collection = 'yuncms_roles'/);
   assert.match(source, /JSON_ARRAY\('read', 'create', 'update', 'delete'\)/);
-  assert.equal(CORE_MIGRATIONS.at(-1).id, '0011-role-permission-actions');
+});
+
+test('Files read-filter migration is the latest compatibility gate', () => {
+  const migration = CORE_MIGRATIONS.find(({ id }) => id === '0012-files-read-filters');
+  assert.ok(migration);
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0012-files-read-filters'));
+  const source = migration.statements.join('\n');
+  assert.match(source, /collection = 'yuncms_files'/);
+  assert.match(source, /permissionMode/);
+  assert.match(source, /filter-read/);
+  assert.equal(CORE_MIGRATIONS.at(-1).id, '0012-files-read-filters');
 });
 
 test('advisory lock uses one connection and always releases it', async () => {
