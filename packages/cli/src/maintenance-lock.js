@@ -29,17 +29,26 @@ export async function acquireDatabaseMaintenanceLock({
 
   const config = loadConfig(env);
   const pool = createPool(config.database);
-  const connection = await pool.getConnection();
+  let connection;
+  try {
+    connection = await pool.getConnection();
+  } catch (error) {
+    await closePool(pool).catch(() => {});
+    throw error;
+  }
+
   const name = lockName(config.database.database);
   let acquired = false;
+  let connectionId = null;
 
   try {
     const [rows] = await connection.query(
-      'SELECT GET_LOCK(?, ?) AS acquired',
+      'SELECT GET_LOCK(?, ?) AS acquired, CONNECTION_ID() AS connection_id',
       [name, timeoutSeconds],
     );
     acquired = Number(rows?.[0]?.acquired) === 1;
-    if (!acquired) {
+    connectionId = Number(rows?.[0]?.connection_id);
+    if (!acquired || !Number.isInteger(connectionId) || connectionId <= 0) {
       const error = new Error(
         `Another YunCMS maintenance operation is using database ${config.database.database}`,
       );
@@ -57,6 +66,30 @@ export async function acquireDatabaseMaintenanceLock({
   return {
     name,
     database: config.database.database,
+    async assertHeld() {
+      if (released) {
+        const error = new Error('Database maintenance lock has already been released');
+        error.code = 'DATABASE_MAINTENANCE_LOCK_LOST';
+        throw error;
+      }
+      let rows;
+      try {
+        [rows] = await connection.query('SELECT IS_USED_LOCK(?) AS connection_id', [name]);
+      } catch (cause) {
+        const error = new Error(`Database maintenance lock connection was lost for ${config.database.database}`);
+        error.code = 'DATABASE_MAINTENANCE_LOCK_LOST';
+        error.database = config.database.database;
+        error.cause = cause;
+        throw error;
+      }
+      if (Number(rows?.[0]?.connection_id) !== connectionId) {
+        const error = new Error(`Database maintenance lock is no longer held for ${config.database.database}`);
+        error.code = 'DATABASE_MAINTENANCE_LOCK_LOST';
+        error.database = config.database.database;
+        throw error;
+      }
+      return true;
+    },
     async release() {
       if (released) return;
       released = true;
