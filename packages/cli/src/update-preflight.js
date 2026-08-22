@@ -24,6 +24,7 @@ import { isLocalYunCmsReachable } from './service-state.js';
 
 const MIN_FREE_HEADROOM_BYTES = 256 * 1024 * 1024;
 const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const DEPENDENCY_SECTIONS = Object.freeze(['dependencies', 'devDependencies', 'optionalDependencies']);
 
 function updateError(code, message) {
   const error = new Error(message);
@@ -42,9 +43,8 @@ async function readJson(path, code) {
   }
 }
 
-function projectDeclaresYunCms(packageJson) {
-  return ['dependencies', 'devDependencies', 'optionalDependencies']
-    .some((key) => packageJson?.[key]?.['@yunsoft/yuncms']);
+function projectDependencySection(packageJson) {
+  return DEPENDENCY_SECTIONS.find((key) => packageJson?.[key]?.['@yunsoft/yuncms']) ?? null;
 }
 
 function parseSemanticVersion(version) {
@@ -61,7 +61,8 @@ function parseSemanticVersion(version) {
 export async function readProjectPackageState(cwd = process.cwd()) {
   const projectPackagePath = resolve(cwd, 'package.json');
   const project = await readJson(projectPackagePath, 'UPDATE_PROJECT_PACKAGE_REQUIRED');
-  if (!projectDeclaresYunCms(project)) {
+  const dependencySection = projectDependencySection(project);
+  if (!dependencySection) {
     throw updateError(
       'UPDATE_PROJECT_PACKAGE_REQUIRED',
       'Project package.json must declare @yunsoft/yuncms before managed updates can run',
@@ -86,6 +87,7 @@ export async function readProjectPackageState(cwd = process.cwd()) {
     projectPackagePath,
     installedPackagePath: installedPath,
     currentVersion,
+    dependencySection,
   };
 }
 
@@ -321,6 +323,7 @@ export async function collectUpdatePreflight({
   return {
     currentVersion: packageState.currentVersion,
     targetVersion,
+    dependencySection: packageState.dependencySection,
     upToDate: targetVersion === packageState.currentVersion,
     running,
     databaseBytes: database.estimatedBytes,
