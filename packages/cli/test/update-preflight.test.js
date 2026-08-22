@@ -9,6 +9,7 @@ import { runBackupCommand } from '../src/backup-command.js';
 import { parseCommandOptions } from '../src/command-options.js';
 import { verifyDatabaseDump } from '../src/database-backup.js';
 import {
+  analyzeMigrationHistory,
   assertUpdatePreflightReady,
   compareVersions,
 } from '../src/update-preflight.js';
@@ -47,6 +48,29 @@ test('version comparison follows semantic version precedence including prereleas
     () => compareVersions('1.0', '1.0.0'),
     (error) => error.code === 'UPDATE_VERSION_INVALID',
   );
+});
+
+test('migration history must be a contiguous prefix of target migrations', () => {
+  const target = ['0001', '0002', '0003', '0004'];
+
+  assert.deepEqual(
+    analyzeMigrationHistory(['0001', '0002'], target),
+    {
+      pendingMigrations: ['0003', '0004'],
+      unknownAppliedMigrations: [],
+      migrationHistoryGap: [],
+      compatible: true,
+    },
+  );
+
+  const gapped = analyzeMigrationHistory(['0001', '0003'], target);
+  assert.equal(gapped.compatible, false);
+  assert.deepEqual(gapped.pendingMigrations, ['0002', '0004']);
+  assert.deepEqual(gapped.migrationHistoryGap, ['0003']);
+
+  const unknown = analyzeMigrationHistory(['0001', 'legacy-custom'], target);
+  assert.equal(unknown.compatible, false);
+  assert.deepEqual(unknown.unknownAppliedMigrations, ['legacy-custom']);
 });
 
 test('preflight blocker set fails closed before backup/update mutation', () => {
