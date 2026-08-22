@@ -1,7 +1,10 @@
 import { resolve } from 'node:path';
 
+import { loadConfig } from '@yunsoft/yuncms-core';
+
 import { parseCommandOptions } from './command-options.js';
 import { restoreProjectBackup } from './project-backup.js';
+import { assertYunCmsStopped } from './service-state.js';
 import { acquireUpdateLock } from './update-lock.js';
 
 export async function runRestoreCommand({
@@ -11,6 +14,8 @@ export async function runRestoreCommand({
   output = console,
   restoreBackup = restoreProjectBackup,
   acquireLock = acquireUpdateLock,
+  assertStopped = assertYunCmsStopped,
+  fetchFn = globalThis.fetch,
 } = {}) {
   const { values, positionals } = parseCommandOptions(args, {
     boolean: ['--yes', '--allow-different-database-target'],
@@ -24,14 +29,23 @@ export async function runRestoreCommand({
     throw error;
   }
 
+  const config = loadConfig(env);
+  const assertServiceStopped = () => assertStopped({
+    host: config.server.host,
+    port: config.server.port,
+    fetchFn,
+  });
+
   const lock = await acquireLock({ cwd });
   try {
+    await assertServiceStopped();
     return await restoreBackup({
       backupPath: resolve(cwd, positionals[0]),
       cwd,
       env,
       output,
       allowDifferentDatabaseTarget: values['--allow-different-database-target'] === true,
+      beforeDestructive: assertServiceStopped,
     });
   } finally {
     await lock.release();
