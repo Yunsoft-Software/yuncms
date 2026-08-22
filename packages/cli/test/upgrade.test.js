@@ -118,7 +118,7 @@ test('project backup snapshots database marker, env, package metadata, extension
   }
 });
 
-test('restore resets database first and restores the exact project snapshot', async () => {
+test('restore validates backup before resetting database and restores the exact project snapshot', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'yuncms-restore-test-'));
   try {
     await mkdir(join(cwd, 'extensions'), { recursive: true });
@@ -152,11 +152,12 @@ test('restore resets database first and restores the exact project snapshot', as
       cwd,
       env: baseEnv,
       output: silentOutput(),
+      async verifyDatabaseFn() { sequence.push('verify'); return { decompressedBytes: 1234 }; },
       async resetDatabaseFn() { sequence.push('reset'); },
       async restoreDatabaseFn() { sequence.push('restore'); },
     });
 
-    assert.deepEqual(sequence, ['reset', 'restore']);
+    assert.deepEqual(sequence, ['verify', 'reset', 'restore']);
     assert.equal(await readFile(join(cwd, 'extensions', 'example.js'), 'utf8'), 'old-extension');
     assert.equal(await readFile(join(cwd, '.yuncms', 'uploads', 'asset.txt'), 'utf8'), 'old-asset');
     assert.match(await readFile(join(cwd, 'package.json'), 'utf8'), /0\.1\.1/);
