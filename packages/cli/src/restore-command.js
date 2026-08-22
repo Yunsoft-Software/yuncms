@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 
 import { parseCommandOptions } from './command-options.js';
 import { restoreProjectBackup } from './project-backup.js';
+import { acquireUpdateLock } from './update-lock.js';
 
 export async function runRestoreCommand({
   args = [],
@@ -9,6 +10,7 @@ export async function runRestoreCommand({
   env = process.env,
   output = console,
   restoreBackup = restoreProjectBackup,
+  acquireLock = acquireUpdateLock,
 } = {}) {
   const { values, positionals } = parseCommandOptions(args, {
     boolean: ['--yes', '--allow-different-database-target'],
@@ -22,11 +24,16 @@ export async function runRestoreCommand({
     throw error;
   }
 
-  return restoreBackup({
-    backupPath: resolve(cwd, positionals[0]),
-    cwd,
-    env,
-    output,
-    allowDifferentDatabaseTarget: values['--allow-different-database-target'] === true,
-  });
+  const lock = await acquireLock({ cwd });
+  try {
+    return await restoreBackup({
+      backupPath: resolve(cwd, positionals[0]),
+      cwd,
+      env,
+      output,
+      allowDifferentDatabaseTarget: values['--allow-different-database-target'] === true,
+    });
+  } finally {
+    await lock.release();
+  }
 }
