@@ -15,13 +15,14 @@
 ## 1. Runtime / install
 
 - [x] `yuncms init`, bootstrap/start/help and Node 24 guard.
-- [x] Managed CLI commands now include `backup`, guarded `restore`, `update` and non-mutating `update --dry-run` for npm-installed projects.
+- [x] Managed CLI commands include `backup`, guarded `restore`, `update` and non-mutating `update --dry-run` for npm-installed projects.
 - [x] API + built Studio use one Express listener.
 - [x] Default/fresh-init port contract is 3008 for server, Studio origin and public auth URL.
 - [x] Request ids, safe errors, structured logs and bounded trust-proxy handling.
 - [x] Browser-facing hardening includes `nosniff`, frame denial, referrer/permissions/CORP/COOP policy, Studio-compatible CSP for default Yunsoft images and blob PDF frames, and HTTPS-only HSTS emission.
 - [x] Process-local auth rate limits plus a bounded global API rate limit protect API/auth/extension routes while health/readiness and already-served Studio assets stay available.
 - [x] Process-local pressure shedding rejects new API work with `503 + Retry-After` when configured concurrent-request or heap thresholds are reached.
+- [x] Normal CLI/API startup fails closed while the canonical project maintenance lock is active; only the updater's in-memory readiness-probe token can bypass it.
 
 ## 2. MySQL / migrations
 
@@ -145,7 +146,8 @@
 - [x] `docs/rest-api.md` is a detailed endpoint reference with auth, Items, schema, relations, Users/Roles/Files, branding and health examples.
 - [x] `docs/api-query-language.md` documents all implemented collection query parameters/operators, URL encoding, pagination, nested filters, Directus-style wildcard/direct-relation fields and legacy expansion.
 - [x] `docs/permissions.md` documents deny-by-default explicit grants, filtered Files reads, delegated-role escalation boundaries and process-local permission caching.
-- [x] `docs/upgrades.md` documents maintenance-window backup/update/restore behavior, migration recovery, S3 boundaries and rollback.
+- [x] `docs/upgrades.md` documents maintenance-window backup/update/restore behavior, format-2 integrity, startup/database locks, timeouts, migration recovery, S3 boundaries and rollback.
+- [x] `docs/codex-managed-upgrade-hardening.md` defines the additional real-environment release gates for integrity, process timeouts, supervisor races and multi-instance boundaries.
 - [x] Studio customization documentation covers Files-backed logo/favicon selection and public branding endpoints.
 - [x] Existing architecture/auth/permissions/files/database/security/deployment documentation remains linked from README.
 
@@ -166,30 +168,39 @@
 - [x] Files full-preview and contain-style UI contracts.
 - [x] File-backed logo/favicon service/API/client source contracts.
 - [x] Dark pagination/permission/badge surface contracts.
-- [x] Backup/restore source coverage includes dump arguments, snapshot contents, pre-destructive validation, DB reset order and exact project-state restoration.
-- [x] Managed-update source coverage includes dry-run/no-mutation, preflight barriers, operation locking, successful install/bootstrap/readiness order and automatic rollback behavior.
+- [x] Backup/restore coverage includes format-2 SHA-256 integrity, manifest/type/symlink validation, gzip validation, DB reset order, exact project-state restoration and legacy format-1 recovery warning.
+- [x] Managed-update coverage includes dry-run/no-mutation, SemVer/history barriers, project + DB locks, startup maintenance gate, same-version DB drift, successful bootstrap/readiness and automatic rollback behavior.
+- [x] External-command coverage includes bounded npm/bootstrap and mysql/mysqldump timeouts, termination escalation and synchronous spawn failure normalization.
 - [x] Migration-attempt source coverage proves a simulated partial DDL failure is recorded and refuses a blind retry.
+- [x] Upgrade safety tests are explicitly included in `npm run test:fast`, not only auto-discovered by the complete suite.
 - [x] EN/TR parity/static key scan remains in the complete suite.
-- [ ] Execute Node 24, real MySQL and browser gates in `todo.md` before calling this exact source state deployment-verified.
+- [ ] Execute Node 24, real MySQL and browser/provider/supervisor gates in `todo.md` before calling this exact source state deployment-verified.
 
 ## 13. Production upgrade / recovery
 
-- [x] Preflight resolves the actual npm target, loads that target package's required migration IDs and rejects incompatible migration histories/downgrades before mutation.
+- [x] Preflight resolves the actual npm target, loads that target package's required migration IDs and rejects incompatible/gapped histories, incomplete attempts and downgrades before mutation.
 - [x] Preflight requires npm/MySQL client tools, DB connectivity and sufficient disk for estimated DB + local uploads/extensions/project metadata + safety headroom.
 - [x] Backup is mandatory for managed updates and snapshots a streamed+verified gzip DB dump plus `.env`, package metadata, local extensions and local Files when present.
+- [x] New backup format 2 stores deterministic SHA-256 digests for the compressed DB and every present managed project asset/tree; restore revalidates them before DB reset.
+- [x] Legacy format-1 backups remain recoverable with an explicit integrity-warning boundary rather than being silently upgraded in meaning.
 - [x] S3 object data is never falsely reported as locally backed up; managed update requires explicit operator acknowledgement after provider-side recovery is verified.
-- [x] Backup/update refuse a reachable configured YunCMS process; managed update rechecks after package install to catch supervisor auto-restart races.
-- [x] Real update/restore operations are serialized with an atomic per-project lock outside project/backup data; stale locks fail closed for operator inspection.
-- [x] Target package is installed exactly, then migrations run through the newly installed CLI rather than stale global/npx code.
+- [x] Backup/update/restore refuse a reachable configured YunCMS process and recheck service state around destructive/probe boundaries.
+- [x] Real maintenance operations are serialized with both a canonical per-project OS-temp lock and a MySQL advisory maintenance lock; DB ownership loss fails closed.
+- [x] Project lock doubles as a normal startup barrier for gate-enabled versions; only a random in-memory readiness-probe token whose hash is stored in the lock can bypass it.
+- [x] Project identity canonicalizes symlink aliases to the same physical project.
+- [x] Generic npm/bootstrap commands and mysql/mysqldump clients have bounded configurable execution timeouts with TERM/KILL escalation.
+- [x] Target package is installed exactly while preserving dependencies/devDependencies/optionalDependencies placement; same-version DB drift skips needless reinstall and runs guarded bootstrap.
 - [x] New runtime is started temporarily and must pass `/ready`; the verification process is then gracefully stopped for supervisor handoff.
-- [x] Restore validates the dump and manifest-declared assets before destructive reset, then removes current DB tables/views and imports the exact DB snapshot.
+- [x] Restore validates manifest, asset shape, gzip and format-2 integrity before destructive reset, then removes current DB tables/views and imports the snapshot.
 - [x] Automatic rollback restores DB/project files, reconstructs the old dependency graph and verifies the restored runtime; rollback failure surfaces `UPDATE_ROLLBACK_FAILED` and preserves backup evidence.
-- [x] Restore requires explicit `--yes`; cross-database-target restore requires an additional explicit override.
-- [x] Current V1 is deliberately maintenance-window based; source does not execute arbitrary systemd/PM2/Docker/Plesk restart commands.
+- [x] Restore requires explicit `--yes`; cross-database-target restore requires an additional explicit override and preserves the recovery target `.env`.
+- [x] Current updater is deliberately maintenance-window based and never executes arbitrary systemd/PM2/Docker/Plesk restart commands.
 
 ## 14. Known follow-ups, not current source claims
 
+- Distributed maintenance/read-write barrier for multiple active API hosts/containers; current project startup marker protects the local physical project and the DB advisory lock serializes maintenance commands, but all API instances sharing a DB/storage must still be stopped operationally.
 - Atomic release-directory/symlink deployment and zero/near-zero-downtime rolling handoff; the current managed updater intentionally operates on the existing npm project during a maintenance window.
+- Cryptographically authenticated/signed backup manifests for adversarial backup storage; current SHA-256 manifest digests detect corruption/uncoordinated modification but are not signatures against an attacker who can rewrite the manifest too.
 - Server-side search/pagination for very large Files/Users/relation-picker datasets; current branding modal only limits rendered results client-side.
 - O2M/M2M nested expansion and recursive relation depths beyond the current direct to-one field engine.
 - Generic value editors for custom extension columns inside specialized Users/Files/Roles record screens.
