@@ -1,6 +1,6 @@
 {
   "name": "@yunsoft/yuncms-api",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Express API runtime and bundled Studio server for YunCMS.",
   "license": "MIT",
   "type": "module",
@@ -32,7 +32,7 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@yunsoft/yuncms-core": "0.1.4",
+    "@yunsoft/yuncms-core": "0.1.5",
     "express": "5.2.1"
   }
 }
