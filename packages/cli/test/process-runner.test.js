@@ -95,3 +95,16 @@ test('CLI command timeout environment value is validated before spawning', async
   );
   assert.equal(spawned, false);
 });
+
+test('synchronous process spawn failure is normalized with command context', async () => {
+  const startError = new Error('spawn failed');
+  await assert.rejects(
+    runCapturedProcess('npm', ['view'], {
+      spawnProcess() { throw startError; },
+    }),
+    (error) => error === startError
+      && error.code === 'COMMAND_START_FAILED'
+      && error.command === 'npm'
+      && error.args[0] === 'view',
+  );
+});
