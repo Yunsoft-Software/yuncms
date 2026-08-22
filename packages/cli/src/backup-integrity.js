@@ -58,6 +58,12 @@ export async function hashFile(path) {
   return hash.digest('hex');
 }
 
+function compareEntryNames(left, right) {
+  if (left.name < right.name) return -1;
+  if (left.name > right.name) return 1;
+  return 0;
+}
+
 async function hashDirectoryEntry(root, path, hash) {
   const info = await pathInfo(path);
   const relativePath = relative(root, path).split(sep).join('/');
@@ -65,7 +71,7 @@ async function hashDirectoryEntry(root, path, hash) {
   if (info.isDirectory()) {
     hash.update(`D\0${relativePath}\0`);
     const entries = await readdir(path, { withFileTypes: true });
-    entries.sort((left, right) => left.name.localeCompare(right.name, 'en'));
+    entries.sort(compareEntryNames);
     for (const entry of entries) {
       await hashDirectoryEntry(root, resolve(path, entry.name), hash);
     }
