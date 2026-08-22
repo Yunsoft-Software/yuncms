@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url';
 import express from 'express';
 
 import { discoverExtensions } from './discovery.js';
+import { ExtensionScheduler } from './scheduler.js';
 
 function extensionError(code, message) {
   const error = new Error(message);
@@ -54,7 +55,7 @@ function createBaseContext({ services, database, schemaCache, emitter, storage, 
   });
 }
 
-function hookRegistrationApi(emitter, baseContext, manifest) {
+function hookRegistrationApi(emitter, baseContext, manifest, scheduler) {
   const registration = Object.freeze({
     extensionId: manifest.id,
     priority: Number.isInteger(manifest.priority) ? manifest.priority : 0,
@@ -85,6 +86,9 @@ function hookRegistrationApi(emitter, baseContext, manifest) {
         extensionId: manifest.id,
       });
     },
+    schedule(expression, handler, options = {}) {
+      return scheduler.register(manifest.id, expression, handler, options);
+    },
   });
 }
 
@@ -106,13 +110,22 @@ export async function loadExtensionRuntime({
 
   const manifests = await discoverExtensions({ rootDir, localDirectory, includeDependencies });
   const baseContext = createBaseContext({ services, database, schemaCache, emitter, storage, logger, env });
+  const scheduler = new ExtensionScheduler({
+    database,
+    services,
+    schemaCache,
+    emitter,
+    storage,
+    logger,
+    env,
+  });
   const endpointExtensions = [];
 
   for (const manifest of manifests) {
     const definition = await importExtension(manifest);
 
     if (manifest.type === 'hook') {
-      await definition.register(hookRegistrationApi(emitter, baseContext, manifest), baseContext);
+      await definition.register(hookRegistrationApi(emitter, baseContext, manifest, scheduler), baseContext);
       logger.info?.(`Loaded YunCMS hook extension: ${manifest.id}`);
       continue;
     }
@@ -132,6 +145,12 @@ export async function loadExtensionRuntime({
     endpointExtensions: Object.freeze(endpointExtensions),
     async init(event) {
       await emitter.init(event, baseContext);
+    },
+    startSchedules() {
+      scheduler.start();
+    },
+    async stopSchedules(options = {}) {
+      return scheduler.stop(options);
     },
   });
 }
