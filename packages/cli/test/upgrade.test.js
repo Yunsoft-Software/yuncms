@@ -8,7 +8,6 @@ import { runCli } from '../src/cli.js';
 import { buildDatabaseClientArgs } from '../src/database-backup.js';
 import { resetDatabaseObjects } from '../src/database-reset.js';
 import {
-  BACKUP_FORMAT_VERSION,
   createProjectBackup,
   restoreProjectBackup,
 } from '../src/project-backup.js';
@@ -25,7 +24,7 @@ async function fakeMaintenanceLock() { return { async assertHeld() { return true
 async function createBackupFixture(cwd) {
   await mkdir(join(cwd, '.yuncms', 'backups', 'fixture'), { recursive: true });
   const backupPath = join(cwd, '.yuncms', 'backups', 'fixture');
-  const manifest = { format: BACKUP_FORMAT_VERSION, complete: true, createdAt: '2026-08-22T09:00:00.000Z', database: { host: '127.0.0.1', port: 3306, database: 'yuncms_test', user: 'yuncms', ssl: false, verifiedDecompressedBytes: 1 }, project: { env: true, packageJson: true, packageLock: true, extensions: true, localFiles: true, localFilesRoot: '.yuncms/uploads' }, s3: { configured: false, bucket: null, objectsBackedUp: false } };
+  const manifest = { format: 1, complete: true, createdAt: '2026-08-22T09:00:00.000Z', database: { host: '127.0.0.1', port: 3306, database: 'yuncms_test', user: 'yuncms', ssl: false, verifiedDecompressedBytes: 1 }, project: { env: true, packageJson: true, packageLock: true, extensions: true, localFiles: true, localFilesRoot: '.yuncms/uploads' }, s3: { configured: false, bucket: null, objectsBackedUp: false } };
   await writeFile(join(backupPath, 'manifest.json'), `${JSON.stringify(manifest)}\n`);
   await writeFile(join(backupPath, 'database.sql.gz'), 'placeholder');
   return { backupPath, manifest };
@@ -45,6 +44,7 @@ test('project backup snapshots database marker, env, package metadata, extension
     await writeFile(join(cwd, '.env'), 'DB_DATABASE="yuncms_test"\n'); await writeFile(join(cwd, 'package.json'), '{"dependencies":{"@yunsoft/yuncms":"0.1.1"}}\n'); await writeFile(join(cwd, 'package-lock.json'), '{"lockfileVersion":3}\n'); await writeFile(join(cwd, 'extensions', 'example.js'), 'export default {};\n'); await writeFile(join(cwd, '.yuncms', 'uploads', 'asset.txt'), 'asset');
     const result = await createProjectBackup({ cwd, env: baseEnv, now: new Date('2026-08-22T09:00:00.000Z'), output: silentOutput(), async dumpDatabaseFn({ outputPath }) { await writeFile(outputPath, 'fake-gzip'); }, async verifyDatabaseFn() { return { decompressedBytes: 1234 }; } });
     assert.equal(result.manifest.complete, true); assert.equal(result.manifest.database.verifiedDecompressedBytes, 1234); assert.equal(result.manifest.project.env, true); assert.equal(result.manifest.project.packageJson, true); assert.equal(result.manifest.project.packageLock, true); assert.equal(result.manifest.project.extensions, true); assert.equal(result.manifest.project.localFiles, true);
+    assert.equal(result.manifest.format, 2); assert.equal(result.manifest.integrity.algorithm, 'sha256'); assert.match(result.manifest.integrity.database, /^[0-9a-f]{64}$/);
     assert.equal(await readFile(join(result.backupPath, 'extensions', 'example.js'), 'utf8'), 'export default {};\n'); assert.equal(await readFile(join(result.backupPath, 'files', 'asset.txt'), 'utf8'), 'asset');
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
