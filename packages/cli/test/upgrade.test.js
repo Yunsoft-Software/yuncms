@@ -30,6 +30,10 @@ function silentOutput() {
   return { log() {}, warn() {}, error() {} };
 }
 
+async function fakeMaintenanceLock() {
+  return { async release() {} };
+}
+
 async function createBackupFixture(cwd) {
   await mkdir(join(cwd, '.yuncms', 'backups', 'fixture'), { recursive: true });
   const backupPath = join(cwd, '.yuncms', 'backups', 'fixture');
@@ -279,9 +283,10 @@ test('successful update backs up first, installs exact target, bootstraps and pr
       env: baseEnv,
       output: silentOutput(),
       fetchFn: async () => { throw new Error('connection refused'); },
+      acquireMaintenanceLock: fakeMaintenanceLock,
       async collectPreflight() {
         return {
-          currentVersion: '0.1.1', targetVersion: '0.1.2', upToDate: false,
+          currentVersion: '0.1.1', targetVersion: '0.1.2', dependencySection: 'dependencies', upToDate: false,
           pendingMigrations: ['0013-example'], databaseBytes: 1024,
           freeDiskBytes: 1024 * 1024 * 1024, s3Configured: false, s3Bucket: null, blockers: [],
         };
@@ -317,9 +322,10 @@ test('failed target migration restores backup, reinstalls old lockfile and verif
         env: baseEnv,
         output: silentOutput(),
         fetchFn: async () => { throw new Error('connection refused'); },
+        acquireMaintenanceLock: fakeMaintenanceLock,
         async collectPreflight() {
           return {
-            currentVersion: '0.1.1', targetVersion: '0.1.2', upToDate: false,
+            currentVersion: '0.1.1', targetVersion: '0.1.2', dependencySection: 'dependencies', upToDate: false,
             pendingMigrations: ['0013-example'], databaseBytes: 1024,
             freeDiskBytes: 1024 * 1024 * 1024, s3Configured: false, s3Bucket: null, blockers: [],
           };
