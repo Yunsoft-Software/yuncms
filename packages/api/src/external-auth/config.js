@@ -93,20 +93,38 @@ function readOauth2(env, prefix) {
   });
 }
 
+function assertLdapAttribute(value, prefix, label) {
+  if (!/^[A-Za-z][A-Za-z0-9-]{0,63}$/.test(value)) {
+    throw configError(`${prefix} ${label} is invalid`);
+  }
+  return value;
+}
+
 function readLdap(env, prefix) {
   const allowInsecure = readBoolean(env, `${prefix}_ALLOW_INSECURE`, false);
   const url = readUrl(env, `${prefix}_URL`, { protocols: allowInsecure ? ['ldap:', 'ldaps:'] : ['ldaps:'] });
-  const userAttribute = readString(env, `${prefix}_USER_ATTRIBUTE`, 'uid');
-  const emailAttribute = readString(env, `${prefix}_EMAIL_ATTRIBUTE`, 'mail');
-  for (const [label, value] of [['user attribute', userAttribute], ['email attribute', emailAttribute]]) {
-    if (!/^[A-Za-z][A-Za-z0-9-]{0,63}$/.test(value)) throw configError(`${prefix} ${label} is invalid`);
-  }
+  const userAttribute = assertLdapAttribute(
+    readString(env, `${prefix}_USER_ATTRIBUTE`, 'uid'),
+    prefix,
+    'user attribute',
+  );
+  const subjectAttribute = assertLdapAttribute(
+    readString(env, `${prefix}_SUBJECT_ATTRIBUTE`, 'entryUUID'),
+    prefix,
+    'subject attribute',
+  );
+  const emailAttribute = assertLdapAttribute(
+    readString(env, `${prefix}_EMAIL_ATTRIBUTE`, 'mail'),
+    prefix,
+    'email attribute',
+  );
   return Object.freeze({
     url,
     baseDn: requireString(env, `${prefix}_BASE_DN`),
     bindDn: readString(env, `${prefix}_BIND_DN`) || null,
     bindPassword: readString(env, `${prefix}_BIND_PASSWORD`) || null,
     userAttribute,
+    subjectAttribute,
     emailAttribute,
     allowInsecure,
   });
