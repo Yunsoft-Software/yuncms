@@ -125,8 +125,12 @@ function createHarness({ denyJunction = false } = {}) {
 
     async readManyWithMeta(query) {
       calls.push({ collection: this.collection, query });
+      const source = { id: 'article-1', title: 'Article' };
+      const selected = query.fields?.includes('*')
+        ? Object.keys(source)
+        : (query.fields ?? Object.keys(source));
       return {
-        data: [{ id: 'article-1', title: 'Article' }],
+        data: [Object.fromEntries(selected.filter((field) => Object.hasOwn(source, field)).map((field) => [field, source[field]]))],
         meta: { total_count: 1, limit: 100, offset: 0 },
       };
     }
@@ -177,7 +181,6 @@ test('M2M uses a stable target alias, enforces junction read access and does not
   });
   assert.deepEqual(result.data[0], {
     id: 'article-1',
-    title: 'Article',
     tags: [{ name: 'News' }, { name: 'Tech' }],
   });
   assert.equal(JSON.stringify(result.data).includes('tag_id'), false);
