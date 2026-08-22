@@ -1,17 +1,21 @@
-import { createHash } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { mkdir, open, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+
+import {
+  hashMaintenanceBypassToken,
+  maintenanceLockPath,
+} from '@yunsoft/yuncms-core';
 
 export function updateLockPath(cwd = process.cwd()) {
-  const projectKey = createHash('sha256').update(resolve(cwd)).digest('hex').slice(0, 32);
-  return join(tmpdir(), 'yuncms-update-locks', `${projectKey}.lock`);
+  return maintenanceLockPath(cwd);
 }
 
 export async function acquireUpdateLock({
   cwd = process.cwd(),
   now = new Date(),
   pid = process.pid,
+  generateToken = () => randomBytes(32).toString('hex'),
 } = {}) {
   const path = updateLockPath(cwd);
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
@@ -22,7 +26,7 @@ export async function acquireUpdateLock({
   } catch (error) {
     if (error?.code === 'EEXIST') {
       const locked = new Error(
-        `Another YunCMS update/restore operation may already be running. Inspect and remove the stale lock only after verifying no operation is active: ${path}`,
+        `Another YunCMS backup/update/restore operation may already be running. Inspect and remove the stale lock only after verifying no operation is active: ${path}`,
       );
       locked.code = 'UPDATE_ALREADY_RUNNING';
       locked.lockPath = path;
@@ -31,8 +35,19 @@ export async function acquireUpdateLock({
     throw error;
   }
 
+  let bypassToken;
   try {
-    await handle.writeFile(`${JSON.stringify({ pid, startedAt: now.toISOString(), cwd: resolve(cwd) }, null, 2)}\n`, 'utf8');
+    bypassToken = generateToken();
+    const bypassTokenHash = hashMaintenanceBypassToken(bypassToken);
+    await handle.writeFile(
+      `${JSON.stringify({
+        pid,
+        startedAt: now.toISOString(),
+        cwd: resolve(cwd),
+        bypassTokenHash,
+      }, null, 2)}\n`,
+      'utf8',
+    );
   } catch (error) {
     await handle.close().catch(() => {});
     await rm(path, { force: true }).catch(() => {});
@@ -42,6 +57,7 @@ export async function acquireUpdateLock({
   let released = false;
   return {
     path,
+    bypassToken,
     async release() {
       if (released) return;
       released = true;
