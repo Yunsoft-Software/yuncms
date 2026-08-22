@@ -164,6 +164,7 @@ async function start() {
     listeningServer.once('error', reject);
   });
   await extensionRuntime.init('app.afterStart');
+  extensionRuntime.startSchedules();
 }
 
 async function shutdown(signal) {
@@ -176,6 +177,10 @@ async function shutdown(signal) {
   }, 10_000);
   forceExit.unref();
 
+  const schedulesStopped = await extensionRuntime?.stopSchedules({ timeoutMs: 5_000 }).catch(() => false);
+  if (schedulesStopped === false) {
+    logger.warn('YunCMS extension jobs exceeded graceful shutdown budget', { signal });
+  }
   await extensionRuntime?.init('app.beforeStop').catch((error) => {
     logger.error('YunCMS extension beforeStop hook failed', { code: error?.code ?? null });
   });
