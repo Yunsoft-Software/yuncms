@@ -19,13 +19,16 @@ MCP_MAX_ITEMS=100
 MCP_MAX_RESULT_BYTES=1000000
 ```
 
-Allowed browser origins default to the configured Studio origin. Override with an exact comma-separated allowlist:
+Browser origins default to the configured Studio origin. Request hosts default to the host (including port when present) derived from the Studio origin:
 
 ```env
 MCP_ALLOWED_ORIGINS=https://studio.example.com,https://agent.example.com
+MCP_ALLOWED_HOSTS=api.example.com
 ```
 
-Only `http`/`https` origins are accepted.
+`MCP_ALLOWED_ORIGINS` accepts exact `http`/`https` origins. `MCP_ALLOWED_HOSTS` accepts exact host or `host:port` values, not URLs.
+
+Both checks are intentional. Origin validation protects browser-originated MCP requests, while Host validation also protects non-browser MCP clients and helps prevent DNS-rebinding attacks against an MCP listener. When YunCMS is behind a reverse proxy, configure `MCP_ALLOWED_HOSTS` for the public Host header actually forwarded to YunCMS.
 
 ## Transport
 
@@ -56,6 +59,8 @@ MCP_REQUIRE_AUTHENTICATION=false
 ```
 
 allows Public accountability instead. This should only be used when the Public role has intentionally bounded permissions suitable for the exposed tools.
+
+Host and Origin validation still apply even when Public MCP access is explicitly enabled.
 
 ## Read tools
 
@@ -145,6 +150,8 @@ To-many relation expansion also retains the core relation-row and query-cost lim
 
 Known safe query/permission errors are returned to the tool caller with their bounded YunCMS code/message. Unexpected internal errors are normalized to `INTERNAL_ERROR`; raw stack traces and secrets are not returned as tool content.
 
+Invalid MCP hosts fail with `MCP_HOST_FORBIDDEN`. Invalid browser origins fail with `MCP_ORIGIN_FORBIDDEN`. These checks happen before MCP tool execution.
+
 ## Recommended production configuration
 
 Start read-only:
@@ -153,6 +160,7 @@ Start read-only:
 MCP_ENABLED=true
 MCP_WRITES_ENABLED=false
 MCP_REQUIRE_AUTHENTICATION=true
+MCP_ALLOWED_HOSTS=api.example.com
 MCP_ALLOWED_ORIGINS=https://studio.example.com
 ```
 
