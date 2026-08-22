@@ -12,7 +12,7 @@ Important invariants:
 - role-less public accountability is not granted item access;
 - system/admin bypass is explicit;
 - session/API-token authentication resolves the user's current role before service execution;
-- trusted extensions that instantiate services with request service options inherit the same accountability and request-local permission cache.
+- trusted extensions that instantiate services with request service options inherit the same accountability and permission cache.
 
 ## RolesService
 
@@ -54,12 +54,12 @@ Filters and validations use the same allowlisted field/operator language as the 
 
 ## Permission-managed system resources
 
-Core migration `0007-system-permission-resources` registers a deliberately small set of system resources in schema metadata. Migration `0011-role-permission-actions` expands Roles to the same explicit CRUD-grant model. This does **not** expose generic `/items/yuncms_*` CRUD; specialized services remain the execution path.
+Core migration `0007-system-permission-resources` registers a deliberately small set of system resources in schema metadata. Migration `0011-role-permission-actions` expands Roles to the same explicit CRUD-grant model. Migration `0012-files-read-filters` adds a narrowly scoped read-filter capability to Files. This does **not** expose generic `/items/yuncms_*` CRUD; specialized services remain the execution path.
 
 | Resource | Explicitly grantable actions | Advanced field/row rules |
 | --- | --- | --- |
 | `yuncms_users` | read, create, update, delete | No; action-level only |
-| `yuncms_files` | read, create, update, delete | No; action-level only |
+| `yuncms_files` | read, create, update, delete | `read` may have a server-side row filter; other actions remain action-level only |
 | `yuncms_roles` | read, create, update, delete | No; action-level only |
 
 Everything else under the system schema stays non-delegatable unless it is explicitly registered in a future migration. In particular, permission records themselves are not a delegatable system resource.
@@ -70,18 +70,20 @@ Additional safety rules:
 
 - no Public/custom system-resource access exists until an administrator creates the exact permission row;
 - grants cannot expose non-permission-managed system collections;
-- a delegated user manager cannot assign the Administrator role or modify/delete Administrator accounts;
+- a delegated user manager cannot assign the Administrator role, cannot move itself or another user to a different non-admin role, and cannot modify/delete Administrator accounts;
 - the Public role cannot be assigned to an authenticated user;
 - delegated Roles create cannot create Administrator/Public roles;
 - Administrator/Public roles retain protected deletion semantics;
 - Permissions management itself remains administrator/system-only;
 - generic `ItemsService` refuses system collections and requires the dedicated service.
 
-Because current system-resource permissions are action-level only, grant a system-resource action only when exposing that specialized action is intentional. For example, `yuncms_files:read` permits the normal Files read/list/content path; leaving the permission absent keeps Files private.
+For Files, an explicit `read` grant without a filter intentionally preserves the existing all-Files read behavior. Add a filter when only a subset should be visible, for example by title, uploader, MIME type or another registered Files schema field. The Files service applies that filter consistently to list, single-record and content reads; a file outside the permitted scope is returned as not found and its storage object is not read.
+
+The `filter-read` system permission mode is deliberately narrow: it does not allow field allowlists or validation rules, and row filters are rejected on create/update/delete grants.
 
 The Studio permission matrix shows explicitly permission-managed system resources and every action their metadata exposes. Public uses the same matrix as other non-admin roles rather than receiving an artificial blanket lock.
 
-## Resolution and request-local cache
+## Resolution and process-local cache
 
 `PermissionsService.resolve(action, collection)`:
 
@@ -91,9 +93,11 @@ The Studio permission matrix shows explicitly permission-managed system resource
 4. resolves the exact role/collection/action row, including for Public;
 5. denies missing permission rows;
 6. rejects malformed metadata;
-7. caches the resolved result only inside the current request context.
+7. caches resolved decisions in the configured cache store.
 
-The cache is intentionally request-local, so there is no cross-process stale-permission cache to invalidate. Permission mutations clear the current request cache.
+The default cache store is a bounded process-local memory store. Default permission-cache TTL is 30 seconds and default capacity is 5,000 entries. Permission create/update/delete clears the local cache immediately. `CACHE_ENABLED=false` disables it.
+
+The cache API is asynchronous and store-agnostic so a shared Redis adapter can be added without changing permission resolution code. Redis is **not** currently wired as a runtime store; `CACHE_STORE=memory` is the only accepted runtime value. For a single YunCMS process this is sufficient. Multi-process/container deployments still need a shared cache/invalidation and shared rate-limit store before relying on cache coherence across instances.
 
 ## Field and row enforcement
 
@@ -166,4 +170,4 @@ The Studio exposes administrator role/permission management plus the permission 
 
 ## Remaining verification
 
-Source-level enforcement and regression coverage exist. Real MySQL/API privilege-escalation, Public Files, explicit Roles CRUD grants and system-resource delegation checks are kept in the guarded release integration suite and `todo.md` until executed against the target environment.
+Source-level enforcement and regression coverage exist. Real MySQL/API privilege-escalation, filtered Public Files, explicit Roles CRUD grants, cache invalidation and system-resource delegation checks are kept in the guarded release integration suite and `todo.md` until executed against the target environment.
