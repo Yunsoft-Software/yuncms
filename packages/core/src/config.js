@@ -38,6 +38,26 @@ function readFailureMode(value, fallback = 'best-effort') {
   return mode;
 }
 
+function readOriginList(value, fallback) {
+  const entries = readString(value, '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const source = entries.length > 0 ? entries : [fallback];
+  return [...new Set(source.map((entry) => {
+    let url;
+    try {
+      url = new URL(entry);
+    } catch {
+      throw new Error(`MCP_ALLOWED_ORIGINS contains an invalid URL: ${entry}`);
+    }
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw new Error(`MCP_ALLOWED_ORIGINS must use http or https: ${entry}`);
+    }
+    return url.origin;
+  }))];
+}
+
 export function loadEnvFileIfPresent(path = '.env') {
   try {
     loadEnvFile(path);
@@ -81,6 +101,14 @@ export function loadConfig(env = process.env) {
       },
     },
     logging: { level: readString(env.LOG_LEVEL, 'info') },
+    mcp: {
+      enabled: readBoolean(env.MCP_ENABLED, false),
+      writesEnabled: readBoolean(env.MCP_WRITES_ENABLED, false),
+      requireAuthentication: readBoolean(env.MCP_REQUIRE_AUTHENTICATION, true),
+      maxItems: readInteger(env.MCP_MAX_ITEMS, 100, 'MCP_MAX_ITEMS', { min: 1, max: 500 }),
+      maxResultBytes: readInteger(env.MCP_MAX_RESULT_BYTES, 1_000_000, 'MCP_MAX_RESULT_BYTES', { min: 10_000, max: 10_000_000 }),
+      allowedOrigins: readOriginList(env.MCP_ALLOWED_ORIGINS, studioOrigin),
+    },
     cache: {
       enabled: readBoolean(env.CACHE_ENABLED, true),
       store: cacheStore,
