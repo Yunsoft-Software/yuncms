@@ -46,12 +46,22 @@ function localCliPath(cwd) {
   return resolve(cwd, 'node_modules', '@yunsoft', 'yuncms', 'bin', 'yuncms.js');
 }
 
-async function installVersion({ cwd, env, targetVersion, runProcess }) {
+function dependencySaveArgs(dependencySection = 'dependencies') {
+  if (dependencySection === 'dependencies') return [];
+  if (dependencySection === 'devDependencies') return ['--save-dev'];
+  if (dependencySection === 'optionalDependencies') return ['--save-optional'];
+  const error = new Error(`Unsupported YunCMS dependency section: ${dependencySection}`);
+  error.code = 'UPDATE_DEPENDENCY_SECTION_INVALID';
+  throw error;
+}
+
+async function installVersion({ cwd, env, targetVersion, dependencySection, runProcess }) {
   return runProcess(
     'npm',
     [
       'install',
       '--save-exact',
+      ...dependencySaveArgs(dependencySection),
       '--no-audit',
       '--no-fund',
       `@yunsoft/yuncms@${targetVersion}`,
@@ -148,7 +158,13 @@ export async function runUpdateCommand({
 
     try {
       output.log?.(`Installing @yunsoft/yuncms@${report.targetVersion}`);
-      await installVersion({ cwd, env, targetVersion: report.targetVersion, runProcess });
+      await installVersion({
+        cwd,
+        env,
+        targetVersion: report.targetVersion,
+        dependencySection: report.dependencySection,
+        runProcess,
+      });
 
       await assertServiceStopped();
 
