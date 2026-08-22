@@ -7,6 +7,7 @@ import {
   CollectionsService,
   createAccountability,
   createDatabasePool,
+  createPublicAccountability,
   createSystemAccountability,
   FieldsService,
   ItemsService,
@@ -53,6 +54,8 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
   const permissions = new PermissionsService({ database: pool, accountability: system });
   let customRoleId = null;
   let userReadPermissionId = null;
+  let publicUserReadPermissionId = null;
+  let roleUpdatePermissionId = null;
 
   try {
     await bootstrapDatabase(pool);
@@ -151,28 +154,46 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
     assert.equal(userRows.some((user) => user.id === actorId), true);
 
     const [publicRoles] = await pool.query('SELECT id FROM yuncms_roles WHERE public = 1 LIMIT 1');
+    const publicUsers = new UsersService({
+      database: pool,
+      accountability: createPublicAccountability({ role: publicRoles[0].id }),
+    });
     await assert.rejects(
-      permissions.createOne({
-        role: publicRoles[0].id,
-        collection: 'yuncms_users',
-        action: 'read',
-      }),
-      (error) => error.code === 'PUBLIC_SYSTEM_ACCESS_FORBIDDEN',
+      publicUsers.readMany(),
+      (error) => error.code === 'FORBIDDEN',
     );
+    const publicUserReadPermission = await permissions.createOne({
+      role: publicRoles[0].id,
+      collection: 'yuncms_users',
+      action: 'read',
+    });
+    publicUserReadPermissionId = publicUserReadPermission.id;
+    assert.equal((await publicUsers.readMany()).some((user) => user.id === actorId), true);
+
+    const delegatedRoles = new RolesService({
+      database: pool,
+      accountability: createAccountability({ user: actorId, role: customRoleId }),
+    });
     await assert.rejects(
-      permissions.createOne({
-        role: customRoleId,
-        collection: 'yuncms_roles',
-        action: 'update',
-      }),
-      (error) => error.code === 'SYSTEM_PERMISSION_ACTION_PROTECTED',
+      delegatedRoles.updateOne(customRoleId, { description: 'Before grant' }),
+      (error) => error.code === 'FORBIDDEN',
     );
+    const roleUpdatePermission = await permissions.createOne({
+      role: customRoleId,
+      collection: 'yuncms_roles',
+      action: 'update',
+    });
+    roleUpdatePermissionId = roleUpdatePermission.id;
+    const updatedRole = await delegatedRoles.updateOne(customRoleId, { description: 'Delegated' });
+    assert.equal(updatedRole.description, 'Delegated');
 
     await pool.query('DELETE FROM yuncms_users WHERE id = ?', [actorId]);
     const preserved = await items.readOne(created.id);
     assert.equal(preserved.created_by, null);
     assert.equal(preserved.updated_by, null);
   } finally {
+    if (roleUpdatePermissionId) await permissions.deleteOne(roleUpdatePermissionId).catch(() => {});
+    if (publicUserReadPermissionId) await permissions.deleteOne(publicUserReadPermissionId).catch(() => {});
     if (userReadPermissionId) await permissions.deleteOne(userReadPermissionId).catch(() => {});
     if (customRoleId) await roles.deleteOne(customRoleId).catch(() => {});
     await collections.deleteOne(collection, { destructive: true }).catch(() => {});

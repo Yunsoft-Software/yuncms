@@ -67,7 +67,9 @@ function createDatabase({ grants = [], publicRole = null, existingRoles = [] } =
         });
         return [{ affectedRows: 1 }, []];
       }
-      if (normalized.includes('FROM yuncms_roles') && normalized.includes('WHERE id = ?')) {
+      if (normalized.startsWith('SELECT')
+        && normalized.includes('FROM yuncms_roles')
+        && normalized.includes('WHERE id = ?')) {
         const role = roles.get(params[0]);
         return [role ? [{ ...role }] : [], []];
       }

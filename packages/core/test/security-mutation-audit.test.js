@@ -86,7 +86,8 @@ test('permission deletion emits the prior rule for security audit history', asyn
   const database = {
     async query(sql, params = []) {
       const normalized = sql.replace(/\s+/g, ' ').trim();
-      if (normalized.includes('FROM yuncms_permissions WHERE id = ?')) {
+      if (normalized.startsWith('SELECT')
+        && normalized.includes('FROM yuncms_permissions WHERE id = ?')) {
         return [[{
           id: params[0],
           role: 'role-1',
