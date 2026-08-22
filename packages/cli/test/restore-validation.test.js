@@ -211,3 +211,39 @@ test('beforeDestructive guard runs after backup validation and can stop database
     await rm(cwd, { recursive: true, force: true });
   }
 });
+
+for (const targetKind of ['files', 'extensions']) {
+  test(`restore rejects a backup source nested inside the ${targetKind} restore target before DB validation/reset`, async () => {
+    const cwd = await mkdtemp(join(tmpdir(), `yuncms-restore-path-${targetKind}-`));
+    const root = targetKind === 'files'
+      ? join(cwd, '.yuncms', 'uploads')
+      : join(cwd, 'extensions');
+    const backupPath = join(root, 'moved-backup');
+    await mkdir(backupPath, { recursive: true });
+    try {
+      await writeManifest(backupPath);
+      await writeFile(join(backupPath, 'database.sql.gz'), 'placeholder');
+      let verifyCalled = false;
+      let resetCalled = false;
+
+      await assert.rejects(
+        restoreProjectBackup({
+          backupPath,
+          cwd,
+          env,
+          output: { log() {} },
+          async verifyDatabaseFn() { verifyCalled = true; return { decompressedBytes: 10 }; },
+          async resetDatabaseFn() { resetCalled = true; },
+          async restoreDatabaseFn() { throw new Error('must not restore'); },
+        }),
+        (error) => error.code === 'BACKUP_RESTORE_PATH_CONFLICT'
+          && error.backupPath === backupPath,
+      );
+
+      assert.equal(verifyCalled, false);
+      assert.equal(resetCalled, false);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+}
