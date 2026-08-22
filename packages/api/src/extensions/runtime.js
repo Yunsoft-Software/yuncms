@@ -54,19 +54,36 @@ function createBaseContext({ services, database, schemaCache, emitter, storage, 
   });
 }
 
-function hookRegistrationApi(emitter, baseContext) {
+function hookRegistrationApi(emitter, baseContext, manifest) {
+  const registration = Object.freeze({
+    extensionId: manifest.id,
+    priority: Number.isInteger(manifest.priority) ? manifest.priority : 0,
+  });
+
   return Object.freeze({
-    filter(event, handler) {
+    filter(event, handler, options = {}) {
       return emitter.registerFilter(event, (payload, eventContext) =>
-        handler(payload, { ...baseContext, ...eventContext }));
+        handler(payload, { ...baseContext, ...eventContext }), {
+        ...registration,
+        ...options,
+        extensionId: manifest.id,
+      });
     },
-    action(event, handler) {
+    action(event, handler, options = {}) {
       return emitter.registerAction(event, (payload, eventContext) =>
-        handler(payload, { ...baseContext, ...eventContext }));
+        handler(payload, { ...baseContext, ...eventContext }), {
+        ...registration,
+        ...options,
+        extensionId: manifest.id,
+      });
     },
-    init(event, handler) {
+    init(event, handler, options = {}) {
       return emitter.registerInit(event, (eventContext) =>
-        handler({ ...baseContext, ...eventContext }));
+        handler({ ...baseContext, ...eventContext }), {
+        ...registration,
+        ...options,
+        extensionId: manifest.id,
+      });
     },
   });
 }
@@ -90,13 +107,12 @@ export async function loadExtensionRuntime({
   const manifests = await discoverExtensions({ rootDir, localDirectory, includeDependencies });
   const baseContext = createBaseContext({ services, database, schemaCache, emitter, storage, logger, env });
   const endpointExtensions = [];
-  const hookApi = hookRegistrationApi(emitter, baseContext);
 
   for (const manifest of manifests) {
     const definition = await importExtension(manifest);
 
     if (manifest.type === 'hook') {
-      await definition.register(hookApi, baseContext);
+      await definition.register(hookRegistrationApi(emitter, baseContext, manifest), baseContext);
       logger.info?.(`Loaded YunCMS hook extension: ${manifest.id}`);
       continue;
     }
