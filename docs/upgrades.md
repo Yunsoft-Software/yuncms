@@ -153,11 +153,6 @@ yuncms update --to 0.2.0
 
 If the currently installed YunCMS version predates the managed `update` command itself, invoke the already-published target CLI explicitly as the one-time bootstrap updater:
 
-```bash\ nnpx --yes @yunsoft/yuncms@0.2.0 update --to 0.2.0
-```
-
-Remove the accidental space after `bash` if copying from a renderer; the command itself is:
-
 ```bash
 npx --yes @yunsoft/yuncms@0.2.0 update --to 0.2.0
 ```
