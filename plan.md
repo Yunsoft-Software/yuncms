@@ -18,7 +18,7 @@
 - [x] API + built Studio use one Express listener.
 - [x] Default/fresh-init port contract is 3008 for server, Studio origin and public auth URL.
 - [x] Request ids, safe errors, structured logs and bounded trust-proxy handling.
-- [x] Browser-facing hardening includes `nosniff`, frame denial, referrer/permissions/CORP/COOP policy, CSP and HTTPS-only HSTS emission.
+- [x] Browser-facing hardening includes `nosniff`, frame denial, referrer/permissions/CORP/COOP policy, Studio-compatible CSP for default Yunsoft images and blob PDF frames, and HTTPS-only HSTS emission.
 - [x] Process-local auth rate limits plus a bounded global API rate limit protect API/auth/extension routes while health/readiness and already-served Studio assets stay available.
 - [x] Process-local pressure shedding rejects new API work with `503 + Retry-After` when configured concurrent-request or heap thresholds are reached.
 
@@ -81,9 +81,9 @@
 - [x] `fields`, `filter`, `sort`, `limit`, `offset` and legacy direct `expand` query surface.
 - [x] Directus-style direct-relation field selection supports `fields=*`, `fields=*.*`, `relation.*` and `relation.field` while preserving field/row RBAC at both source and target levels.
 - [x] Filter operators include comparisons, IN/NOT IN, NULL checks, text matching and nested AND/OR.
-- [x] Query complexity is bounded: fields/sort counts, maximum offset, filter depth/node count and IN/NOT-IN list size fail closed before expensive SQL is generated.
+- [x] Query complexity is bounded: fields/sort counts, direct-relation expansion count, maximum offset, filter depth/node count and public IN/NOT-IN list size fail closed before expensive SQL is generated.
 - [x] RBAC row filters and field allowlists remain part of every query.
-- [x] Direct to-one relation expansion reuses target RBAC, supports one relation depth and no longer has the former arbitrary eight-field cap.
+- [x] Direct to-one relation expansion reuses target RBAC, keeps hidden target lookup keys internal, batches 500-row lookups and supports one relation depth with a 20-relation complexity budget instead of the former eight-field cap.
 - [x] Generic ItemsService refuses system collections so specialized safeguards cannot be bypassed.
 - [x] Detailed Items query-language documentation includes operator tables, curl examples, pagination, wildcard/nested relation fields and JavaScript usage.
 
@@ -155,7 +155,7 @@
 - [x] Core + Studio schema-name normalization tests.
 - [x] Human field-label/API-key payload tests.
 - [x] Data Model V2 label/key, ordering, relation and system-field source contracts.
-- [x] `fields=*`, `fields=*.*`, direct nested field selection and legacy expansion regression contracts.
+- [x] `fields=*`, `fields=*.*`, direct nested field selection, hidden target-key projection, 500-row lookup batching and bounded legacy expansion regression contracts.
 - [x] Public Files deny-without-grant / allow-with-explicit-grant core and Studio permission-matrix contracts.
 - [x] Roles create/update/delete deny-without-grant / allow-with-explicit-grant contracts, including Public-configurable action metadata and protected administrator/public role invariants.
 - [x] Shared Studio confirmation dialogs remain distinct from forbidden native browser dialogs.

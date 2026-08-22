@@ -29,10 +29,11 @@ const CONTENT_SECURITY_POLICY = [
   "frame-ancestors 'none'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://yunsoft.com",
   "font-src 'self' data:",
   "connect-src 'self'",
   "media-src 'self' blob:",
+  "frame-src 'self' blob:",
   "worker-src 'self' blob:",
   "form-action 'self'",
 ].join('; ');

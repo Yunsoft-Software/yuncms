@@ -11,6 +11,7 @@ export const QUERY_LIMITS = Object.freeze({
   defaultLimit: 100,
   maxLimit: 500,
   maxFields: 100,
+  maxRelationExpansions: 20,
   maxSortFields: 20,
   maxOffset: 1_000_000,
   maxFilterDepth: 8,

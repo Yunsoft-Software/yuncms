@@ -111,6 +111,48 @@ test('role row filter is server-enforced while hidden fields cannot be queried b
   );
 });
 
+test('relation reads keep hidden lookup fields internal and chunk trusted source keys', async () => {
+  const database = createDatabase({
+    permission: {
+      id: 'permission-1',
+      role: 'role-1',
+      collection: 'projects',
+      action: 'read',
+      fields: JSON.stringify(['title']),
+      filter: JSON.stringify({ status: { _eq: 'active' } }),
+      validation: null,
+    },
+  });
+  const service = new ItemsService('projects', {
+    database,
+    schema,
+    accountability: createAccountability({ user: 'user-1', role: 'role-1' }),
+  });
+
+  const result = await service.readManyForRelation({
+    fields: ['*'],
+    lookupField: 'id',
+    values: Array.from({ length: 101 }, (_, index) => `project-${index}`),
+  });
+
+  assert.deepEqual(result.visibleFields, ['title']);
+  const selectCalls = database.calls.filter(({ sql }) => sql.startsWith('SELECT `title`, `id` FROM `projects`'));
+  assert.equal(selectCalls.length, 2);
+  assert.match(selectCalls[0].sql, /WHERE \(\(`status` = \?\)\) AND \(\(`id` IN \(/);
+  assert.equal(selectCalls[0].params.length, 102);
+  assert.equal(selectCalls[1].params.length, 3);
+  assert.equal(database.calls.some(({ sql }) => sql.includes('COUNT(*)')), false);
+
+  await assert.rejects(
+    service.readManyForRelation({
+      fields: ['id'],
+      lookupField: 'id',
+      values: ['project-1'],
+    }),
+    (error) => error.code === 'INVALID_QUERY' && /Unknown field/.test(error.message),
+  );
+});
+
 test('bulk update/delete require explicit non-empty filters', async () => {
   const database = createDatabase();
   const service = new ItemsService('projects', {

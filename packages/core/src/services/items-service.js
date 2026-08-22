@@ -7,6 +7,7 @@ import {
   compileSelectFields,
   compileSort,
   parseItemsQuery,
+  QUERY_LIMITS,
 } from '../query.js';
 import { SchemaCache } from '../schema.js';
 import { isSystemManagedField, systemMutationEntries } from '../system-fields.js';
@@ -213,6 +214,58 @@ export class ItemsService extends BaseService {
         offset: query.offset,
       },
     };
+  }
+
+  async readManyForRelation({ fields = null, lookupField, values = [] } = {}) {
+    const schema = await this.getCollectionSchema();
+    const trustedLookupField = assertIdentifier(lookupField, 'relation lookup field');
+    if (!schema.fields[trustedLookupField]) {
+      throw serviceError(
+        'INVALID_QUERY',
+        `Unknown relation lookup field: ${trustedLookupField}`,
+        trustedLookupField,
+      );
+    }
+    if (!Array.isArray(values) || values.length === 0 || values.length > QUERY_LIMITS.maxLimit) {
+      throw serviceError(
+        'INVALID_QUERY',
+        `Relation lookup values must contain between 1 and ${QUERY_LIMITS.maxLimit} entries`,
+        trustedLookupField,
+      );
+    }
+
+    const permission = await this.resolvePermission('read');
+    const accessSchema = schemaForFields(schema, permission.fields);
+    const visibleSelection = compileSelectFields(normalizeFields(fields), accessSchema);
+    const internalSchema = {
+      ...accessSchema,
+      fields: {
+        ...accessSchema.fields,
+        [trustedLookupField]: schema.fields[trustedLookupField],
+      },
+    };
+    const internalSelection = compileSelectFields(
+      [...visibleSelection.fields, trustedLookupField],
+      internalSchema,
+    );
+    const permissionFilter = compileFilter(permission.filter, schema);
+    const table = quoteIdentifier(this.collection, 'collection name');
+    const data = [];
+
+    for (let offset = 0; offset < values.length; offset += QUERY_LIMITS.maxInValues) {
+      const chunk = values.slice(offset, offset + QUERY_LIMITS.maxInValues);
+      const filter = combineCompiledFilters(
+        permissionFilter,
+        compileFilter({ [trustedLookupField]: { _in: chunk } }, schema),
+      );
+      const [rows] = await this.database.query(
+        `SELECT ${internalSelection.sql} FROM ${table}${filter.sql} LIMIT ?`,
+        [...filter.params, chunk.length],
+      );
+      data.push(...rows);
+    }
+
+    return { data, visibleFields: visibleSelection.fields };
   }
 
   async readOne(id, { fields = null } = {}) {

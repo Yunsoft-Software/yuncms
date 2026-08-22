@@ -31,6 +31,8 @@ test('baseline API security headers fail closed for framing and MIME sniffing', 
   assert.equal(res.headers.get('content-security-policy'), CONTENT_SECURITY_POLICY);
   assert.match(CONTENT_SECURITY_POLICY, /object-src 'none'/);
   assert.match(CONTENT_SECURITY_POLICY, /frame-ancestors 'none'/);
+  assert.match(CONTENT_SECURITY_POLICY, /img-src 'self' data: blob: https:\/\/yunsoft\.com/);
+  assert.match(CONTENT_SECURITY_POLICY, /frame-src 'self' blob:/);
   assert.equal(res.headers.has('strict-transport-security'), false);
 });
 

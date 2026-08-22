@@ -1,8 +1,9 @@
 import { assertIdentifier } from './identifier.js';
+import { QUERY_LIMITS } from './query.js';
 import { SchemaCache } from './schema.js';
 import { ItemsService } from './services/items-service.js';
 
-export const MAX_EXPAND_FIELDS = Number.POSITIVE_INFINITY;
+export const MAX_EXPAND_FIELDS = QUERY_LIMITS.maxRelationExpansions;
 const defaultSchemaCache = new SchemaCache();
 
 function expansionError(code, message, path = null) {
@@ -29,6 +30,13 @@ function assertFieldToken(field, path) {
 
 export function parseExpandInput(value) {
   const fields = [...new Set(normalizeDelimited(value))];
+  if (fields.length > MAX_EXPAND_FIELDS) {
+    throw expansionError(
+      'INVALID_QUERY',
+      `expand cannot contain more than ${MAX_EXPAND_FIELDS} entries`,
+      'expand',
+    );
+  }
   for (const field of fields) {
     try {
       assertIdentifier(field, 'expand field');
@@ -110,6 +118,16 @@ function mergeExpansionSelection(expansions, relationField, targetField) {
   expansions.set(relationField, [...new Set([...current, targetField])]);
 }
 
+function assertExpansionLimit(expansions, path = 'fields') {
+  if (expansions.size > MAX_EXPAND_FIELDS) {
+    throw expansionError(
+      'INVALID_QUERY',
+      `Relation expansion cannot contain more than ${MAX_EXPAND_FIELDS} fields`,
+      path,
+    );
+  }
+}
+
 function parseFieldsPlan({ value, snapshot, collection, sourceSchema, permission }) {
   const tokens = normalizeDelimited(value);
   if (tokens.length === 0) {
@@ -136,6 +154,7 @@ function parseFieldsPlan({ value, snapshot, collection, sourceSchema, permission
       )) {
         mergeExpansionSelection(expansions, relationField, '*');
       }
+      assertExpansionLimit(expansions);
       continue;
     }
 
@@ -164,6 +183,7 @@ function parseFieldsPlan({ value, snapshot, collection, sourceSchema, permission
     directRelation(snapshot, collection, relationField, `fields.${token}`);
     sourceFields.push(relationField);
     mergeExpansionSelection(expansions, relationField, targetField);
+    assertExpansionLimit(expansions);
   }
 
   return {
@@ -179,6 +199,7 @@ function addLegacyExpansions({ query, plan, snapshot, collection, sourceSchema, 
     }
     directRelation(snapshot, collection, field, `expand.${field}`);
     mergeExpansionSelection(plan.expansions, field, '*');
+    assertExpansionLimit(plan.expansions, 'expand');
     if (plan.sourceFields && !plan.sourceFields.includes('*') && !plan.sourceFields.includes(field)) {
       plan.sourceFields.push(field);
     }
@@ -213,15 +234,10 @@ function baseQuery(query, sourceFields) {
   return base;
 }
 
-function targetQueryFields(selection, targetKey) {
-  if (selection.includes('*')) return ['*'];
-  return [...new Set([...selection, targetKey])];
-}
-
-function projectTarget(target, selection) {
-  if (selection.includes('*')) return target;
+function projectTarget(target, selection, visibleFields) {
+  const projectedFields = selection.includes('*') ? visibleFields : selection;
   return Object.fromEntries(
-    selection
+    projectedFields
       .filter((field) => Object.hasOwn(target, field))
       .map((field) => [field, target[field]]),
   );
@@ -251,14 +267,14 @@ async function expandRows({ collection, rows, expansions, options, ItemsServiceC
     }
 
     const targetService = new ItemsServiceClass(targetCollection, options);
-    const targetRows = await targetService.readMany({
-      fields: targetQueryFields(selection, targetKey),
-      filter: { [targetKey]: { _in: values } },
-      limit: Math.min(values.length, 500),
+    const targetResult = await targetService.readManyForRelation({
+      fields: selection,
+      lookupField: targetKey,
+      values,
     });
 
     const byKey = new Map();
-    for (const target of targetRows) {
+    for (const target of targetResult.data) {
       if (!Object.hasOwn(target, targetKey)) {
         throw expansionError(
           'FORBIDDEN_FIELD',
@@ -266,7 +282,10 @@ async function expandRows({ collection, rows, expansions, options, ItemsServiceC
           `fields.${field}`,
         );
       }
-      byKey.set(String(target[targetKey]), projectTarget(target, selection));
+      byKey.set(
+        String(target[targetKey]),
+        projectTarget(target, selection, targetResult.visibleFields),
+      );
     }
 
     expandedRows = expandedRows.map((row) => ({

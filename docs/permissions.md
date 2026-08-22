@@ -148,6 +148,7 @@ Direct to-one expansion also honors RBAC:
 - `fields=*.*`, `relation.*` and `relation.field` use the same permission-aware direct relation engine as legacy `expand`;
 - target records are loaded through `ItemsService` with the same accountability;
 - target field allowlists/row filters remain effective;
+- target primary/lookup keys needed for relation matching stay internal when their field allowlist hides them;
 - inaccessible targets resolve to `null` rather than bypassing target restrictions.
 
 ## Management REST

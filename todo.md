@@ -18,7 +18,7 @@ Run from a fresh checkout of the final `21-08-2026` state.
 - [ ] Verify `GET /items/articles?fields=id,title,author_id.*` returns the selected source fields plus all readable author fields.
 - [ ] Verify `GET /items/articles?fields=id,author_id.name` returns only `name` inside the expanded author object while still using the target key internally for lookup.
 - [ ] Verify source and target field allowlists plus target row filters still apply to `*.*`, `relation.*` and `relation.field` and cannot be widened by wildcards.
-- [ ] Verify legacy `expand=author_id` still works and no longer rejects a request merely because more than eight direct relations were requested.
+- [ ] Verify legacy `expand=author_id` still works, accepts up to 20 direct relations and rejects a 21st before target queries execute.
 - [ ] Verify deeper paths and junction/M2M expansion fail closed with the documented unsupported-relation error until those capabilities are implemented.
 - [ ] Exercise the configured query limits with oversized fields/sort arrays, deep/numerous filter nodes, oversized IN lists and an offset above the configured maximum; all must fail before an expensive SQL query executes.
 

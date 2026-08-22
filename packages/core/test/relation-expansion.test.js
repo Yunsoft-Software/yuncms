@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseExpandInput, readManyWithRelations } from '../src/relation-expansion.js';
+import {
+  MAX_EXPAND_FIELDS,
+  parseExpandInput,
+  readManyWithRelations,
+} from '../src/relation-expansion.js';
 
 const schema = {
   collections: {
@@ -36,7 +40,11 @@ const schema = {
   ]),
 };
 
-function createHarness({ sourcePermission = { fields: null } } = {}) {
+function createHarness({
+  sourcePermission = { fields: null },
+  targetPermission = { fields: null },
+  sourceRows = [{ id: 'article-1', title: 'Hello', author_id: 'author-1' }],
+} = {}) {
   const calls = [];
 
   class FakeItemsService {
@@ -45,20 +53,27 @@ function createHarness({ sourcePermission = { fields: null } } = {}) {
     }
 
     async resolvePermission() {
-      return this.collection === 'articles' ? sourcePermission : { fields: null };
+      return this.collection === 'articles' ? sourcePermission : targetPermission;
     }
 
     async readManyWithMeta(query) {
       calls.push({ collection: this.collection, method: 'readManyWithMeta', query });
       return {
-        data: [{ id: 'article-1', title: 'Hello', author_id: 'author-1' }],
-        meta: { total_count: 1, limit: 100, offset: 0 },
+        data: sourceRows,
+        meta: { total_count: sourceRows.length, limit: 100, offset: 0 },
       };
     }
 
-    async readMany(query) {
-      calls.push({ collection: this.collection, method: 'readMany', query });
-      return [{ id: 'author-1', name: 'Ada', bio: 'Writer' }];
+    async readManyForRelation(query) {
+      calls.push({ collection: this.collection, method: 'readManyForRelation', query });
+      const allFields = ['id', 'name', 'bio'];
+      const visibleFields = query.fields.includes('*')
+        ? (targetPermission.fields ?? allFields)
+        : query.fields;
+      return {
+        data: query.values.map((value) => ({ id: value, name: 'Ada', bio: 'Writer' })),
+        visibleFields,
+      };
     }
   }
 
@@ -91,7 +106,8 @@ test('fields=*.* expands every readable direct relation one level', async () => 
   assert.deepEqual(calls[0].query.fields, ['*']);
   const targetCall = calls.find((call) => call.collection === 'authors');
   assert.deepEqual(targetCall.query.fields, ['*']);
-  assert.deepEqual(targetCall.query.filter, { id: { _in: ['author-1'] } });
+  assert.equal(targetCall.query.lookupField, 'id');
+  assert.deepEqual(targetCall.query.values, ['author-1']);
   assert.deepEqual(result.data[0].author_id, {
     id: 'author-1',
     name: 'Ada',
@@ -110,7 +126,8 @@ test('relation.field selects only the requested nested relation fields', async (
 
   assert.deepEqual(calls[0].query.fields, ['id', 'author_id']);
   const targetCall = calls.find((call) => call.collection === 'authors');
-  assert.deepEqual(targetCall.query.fields, ['name', 'id']);
+  assert.deepEqual(targetCall.query.fields, ['name']);
+  assert.equal(targetCall.query.lookupField, 'id');
   assert.deepEqual(result.data[0].author_id, { name: 'Ada' });
 });
 
@@ -128,8 +145,12 @@ test('relation.* expands a selected direct relation with all readable target fie
   assert.equal(result.data[0].author_id.name, 'Ada');
 });
 
-test('legacy expand remains supported without an arbitrary relation-count cap', async () => {
+test('legacy expand supports the documented bounded relation budget', async () => {
   assert.doesNotThrow(() => parseExpandInput('a,b,c,d,e,f,g,h,i,j'));
+  assert.throws(
+    () => parseExpandInput(Array.from({ length: MAX_EXPAND_FIELDS + 1 }, (_, index) => `r${index}`)),
+    (error) => error.code === 'INVALID_QUERY' && error.path === 'expand',
+  );
 
   const { FakeItemsService, calls } = createHarness();
   const result = await readManyWithRelations({
@@ -142,6 +163,38 @@ test('legacy expand remains supported without an arbitrary relation-count cap', 
   assert.deepEqual(calls[0].query.fields, ['id', 'author_id']);
   assert.deepEqual(calls.find((call) => call.collection === 'authors').query.fields, ['*']);
   assert.equal(result.data[0].author_id.name, 'Ada');
+});
+
+test('target lookup keys stay internal when the target field allowlist hides them', async () => {
+  const { FakeItemsService } = createHarness({ targetPermission: { fields: ['name'] } });
+  const result = await readManyWithRelations({
+    collection: 'articles',
+    query: { fields: 'id,author_id.*' },
+    options: { schema, database: {} },
+    ItemsServiceClass: FakeItemsService,
+  });
+
+  assert.deepEqual(result.data[0].author_id, { name: 'Ada' });
+  assert.equal(Object.hasOwn(result.data[0].author_id, 'id'), false);
+});
+
+test('relation lookup accepts a full 500-row source page without widening public IN limits', async () => {
+  const sourceRows = Array.from({ length: 500 }, (_, index) => ({
+    id: `article-${index}`,
+    author_id: `author-${index}`,
+  }));
+  const { FakeItemsService, calls } = createHarness({ sourceRows });
+  const result = await readManyWithRelations({
+    collection: 'articles',
+    query: { fields: 'id,author_id.name', limit: 500 },
+    options: { schema, database: {} },
+    ItemsServiceClass: FakeItemsService,
+  });
+
+  const targetCall = calls.find((call) => call.collection === 'authors');
+  assert.equal(targetCall.query.values.length, 500);
+  assert.equal(result.data.length, 500);
+  assert.deepEqual(result.data[499].author_id, { name: 'Ada' });
 });
 
 test('legacy expand preserves expand-specific error paths', async () => {

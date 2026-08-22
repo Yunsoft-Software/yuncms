@@ -74,7 +74,7 @@ Response:
 | `sort` | Comma-separated sort keys | database/default order |
 | `limit` | Maximum number of records returned | `100`, max `500` |
 | `offset` | Number of matching rows to skip | `0` |
-| `expand` | Legacy direct-relation expansion syntax | no arbitrary relation-count cap |
+| `expand` | Legacy direct-relation expansion syntax | max `20` direct relations |
 
 Unknown query parameters fail with `INVALID_QUERY`; YunCMS does not silently ignore typos.
 
@@ -136,6 +136,8 @@ Important rules:
 - `*.*` only expands source relation fields the current accountability may read;
 - an explicitly requested unknown or forbidden relation field fails closed;
 - target collection row filters and field allowlists are applied again while expanding;
+- relation lookup keys may be selected internally for matching but are removed from the response when the target field allowlist hides them;
+- a request may expand at most `20` direct relations, and a 500-row source page is resolved in bounded target-key batches;
 - the current relation engine supports one direct to-one depth; deeper relation paths and junction/M2M expansion remain unsupported for now.
 
 ---
