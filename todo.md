@@ -46,6 +46,7 @@ Use a disposable MySQL 8-compatible database whose name contains `test`, `ci` or
 - [ ] Verify `logo_file` and `favicon_file` are nullable indexed `CHAR(36)` FKs to `yuncms_files(id)` with `ON DELETE SET NULL`.
 - [ ] Verify `0011` updates only `yuncms_roles` permission metadata so `allowedActions` is exactly `read/create/update/delete` and does not create any permission rows automatically.
 - [ ] Verify `0012` updates only `yuncms_files` permission metadata to `permissionMode=filter-read`, increments schema state and does not create/expand any permission row automatically.
+
 ## 5. Human collection / field names
 
 - [ ] In Studio create `Müşteri Talepleri`; verify the suggested machine key is `musteri_talepleri`, the display label remains exactly `Müşteri Talepleri`, and the physical/API collection key is normalized.
@@ -145,6 +146,73 @@ Use a disposable MySQL 8-compatible database whose name contains `test`, `ci` or
 - [ ] If more than one API process/container is deployed, do **not** assume the current memory cache/rate-limit state is shared; add/verify a shared Redis-compatible store before relying on cross-instance cache invalidation or distributed limiting.
 - [ ] If production uses S3-compatible storage, verify upload/list/download/delete, full previews, branding logo/favicon reads, reconciliation and redacted provider errors against the actual provider.
 
-## 15. Final release decision
+## 15. Backup / restore / managed update release gate
 
-- [ ] Only after applicable checks above are removed as successfully completed should this exact source state be called deployment-verified production ready.
+These checks were added for the `22-08-2026` managed upgrade implementation and require a real Node 24/npm/MySQL/process environment. Do not mark the upgrade path production-verified from source tests alone.
+
+### Source and CLI gates
+
+- [ ] On a real Node.js 24 checkout run `npm run test:fast`, `npm test` and `npm run test:release`; the new migration-attempt, backup/restore, update preflight, operation-lock and rollback regression tests must all pass.
+- [ ] Pack/install the publishable `@yunsoft/yuncms` artifacts into a clean npm project that declares `@yunsoft/yuncms` in `package.json`; verify `yuncms help` exposes `backup`, `restore`, `update` and `update --dry-run` without regressing `init/bootstrap/start`.
+- [ ] Verify a project with no `@yunsoft/yuncms` dependency and a project with no installed `node_modules/@yunsoft/yuncms` fail managed update before mutation with the documented project/package errors.
+- [ ] Run `yuncms update --dry-run` against a real published target and confirm npm target resolution plus loading `REQUIRED_CORE_MIGRATION_IDS` from the staged target package works with lifecycle scripts disabled during inspection.
+- [ ] Verify a target version lower than the installed version is rejected with the downgrade blocker and no package/database mutation occurs.
+- [ ] Verify unknown applied migration IDs not present in the target package produce `UPDATE_MIGRATION_HISTORY_INCOMPATIBLE` and prevent update.
+
+### Real MySQL backup / restore
+
+Use a disposable dedicated MySQL 8-compatible database with representative custom collections, relations, users/roles/permissions, audit rows and Files metadata.
+
+- [ ] Confirm the production MySQL client tools (`mysqldump`, `mysql`) used on the host accept the generated TCP/UTF-8/SSL arguments and that the configured YunCMS DB user has the exact privileges needed for table/data/trigger dump and restore.
+- [ ] Run `yuncms backup` with the service stopped; verify `database.sql.gz` is a valid non-empty gzip and the manifest contains no DB password, S3 secret/access key or auth secrets beyond the intentionally copied protected `.env` file.
+- [ ] Verify `.env`, `package.json`, `package-lock.json`, local `extensions/` and configured local Files root are captured exactly when present and recorded as absent when they did not exist.
+- [ ] Verify a corrupt/truncated/empty database dump is rejected by restore **before** any table/view is dropped.
+- [ ] Remove an asset that `manifest.json` declares (for example `project/package.json` or `files/`) and verify restore fails with `BACKUP_ASSET_MISSING` before destructive DB reset.
+- [ ] Add an extra table and view after taking the backup, then run restore into the disposable DB; verify reset drops both, the dump recreates only backup-state objects, FK checks are restored, and schema/data matches the snapshot.
+- [ ] Compare representative row counts/data checksums and schema definitions before backup vs after restore rather than only checking that commands exit zero.
+- [ ] Verify restore refuses a different DB host/port/name by default and succeeds against an intentional disposable alternate target only with `--allow-different-database-target`.
+- [ ] Exercise DB SSL/TLS with the actual production-compatible MySQL client and verify `--ssl-mode=REQUIRED` works in that environment.
+- [ ] Run backup/restore with a realistically large DB and local Files tree to confirm streaming behavior stays memory-bounded and preflight disk estimates include DB + local Files/extensions/project metadata + headroom.
+
+### Partial DDL / migration recovery
+
+- [ ] In a disposable DB introduce a test migration containing at least two DDL statements and force the second statement to fail after the first has committed implicitly; verify `yuncms_schema_migration_attempts` records `failed` with the completed statement index.
+- [ ] Immediately rerun bootstrap and verify it returns `DATABASE_MIGRATION_RECOVERY_REQUIRED` without re-executing the already-applied first statement.
+- [ ] Restore the pre-update backup and verify both the partial DDL object and failed-attempt journal state disappear with the restored database snapshot.
+- [ ] Kill the migration process hard while an attempt is `applying`; on the next bootstrap verify the stale applying attempt also fails closed instead of blind retrying.
+
+### Running-service and concurrency guards
+
+- [ ] While YunCMS is running, verify both `yuncms backup` and real `yuncms update` refuse to mutate/snapshot state.
+- [ ] Test `HOST=127.0.0.1`, `HOST=0.0.0.0` and the actual production bind address so the service-running guard reaches the configured local process correctly.
+- [ ] With a real auto-restarting supervisor (systemd/PM2/Docker/Plesk), stop only the child process and prove the supervisor restart is caught before backup/migration; then stop the supervisor itself and confirm the update can proceed.
+- [ ] Start two real update/restore commands for the same project concurrently; the second must fail with `UPDATE_ALREADY_RUNNING` while the first holds the OS-temp lock.
+- [ ] Hard-kill an update process, verify the stale lock remains, then confirm the reported lock can be manually removed **only after** verifying no update/restore process remains.
+- [ ] Verify two different project paths get different operation locks and do not block one another.
+
+### Successful managed update
+
+- [ ] Publish/install two disposable YunCMS versions with a real migration difference and update from the older project to the newer one using `yuncms update --to <version>`.
+- [ ] Confirm the mandatory backup exists and verifies before `npm install` modifies package files.
+- [ ] Confirm package.json/package-lock resolve the exact requested YunCMS target and bootstrap is executed through the **newly installed** CLI, not the old globally/npx-cached code.
+- [ ] Confirm target migrations apply exactly once and the target runtime reaches `/ready` in the temporary verification process.
+- [ ] Confirm the temporary verification runtime terminates cleanly and production is **not** silently left running outside the configured supervisor; start the normal supervisor manually and verify health/ready/Studio/API afterward.
+- [ ] Repeat with an extension installed and verify extension startup compatibility is exercised by the temporary runtime probe.
+
+### Automatic rollback
+
+- [ ] Force target package installation to fail after the backup exists; verify automatic rollback restores project package files/DB/files/extensions and reinstalls the old dependency graph.
+- [ ] Force the target migration to fail after a partial DDL change; verify automatic rollback resets current DB objects, restores the old dump, restores package/files/extensions/env, runs `npm ci` when the old lockfile existed and verifies the old runtime via `/ready`.
+- [ ] Force the new runtime or an installed extension to fail during startup after successful migration; verify the same full rollback executes and the old runtime readiness probe passes.
+- [ ] After a successful rollback confirm the CLI still returns the **original update error** with `rollbackPerformed=true` and preserves the backup path for inspection.
+- [ ] Independently force rollback restore, old dependency reinstall or old runtime probe to fail; verify the final error becomes `UPDATE_ROLLBACK_FAILED`, contains both update/rollback failure context and leaves the backup directory untouched for manual recovery.
+
+### S3 / external storage
+
+- [ ] With real S3-compatible storage configured, verify `yuncms update` blocks without explicit acknowledgement because YunCMS does not copy bucket objects into the local backup.
+- [ ] Enable and test provider-side object versioning/snapshot/replication recovery first; only then run the update with `--allow-unverified-s3` and verify metadata/package rollback plus provider-side object recovery form a complete recovery plan.
+- [ ] Confirm `manifest.json` records the S3 bucket identifier but never stores access credentials and never claims `objectsBackedUp=true`.
+
+## 16. Final release decision
+
+- [ ] Only after applicable checks above, including the managed upgrade/rollback release gate, are removed as successfully completed should this exact source state be called deployment-verified production ready.
