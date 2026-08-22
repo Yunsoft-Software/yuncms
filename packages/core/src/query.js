@@ -7,6 +7,17 @@ const FILTER_OPERATORS = new Set([
   '_contains', '_starts_with', '_ends_with',
 ]);
 
+export const QUERY_LIMITS = Object.freeze({
+  defaultLimit: 100,
+  maxLimit: 500,
+  maxFields: 100,
+  maxSortFields: 20,
+  maxOffset: 1_000_000,
+  maxFilterDepth: 8,
+  maxFilterNodes: 100,
+  maxInValues: 100,
+});
+
 function queryError(message, path = null) {
   const error = new Error(message);
   error.code = 'INVALID_QUERY';
@@ -14,11 +25,14 @@ function queryError(message, path = null) {
   return error;
 }
 
-function normalizeDelimited(value, label) {
+function normalizeDelimited(value, label, { maxItems }) {
   if (value == null || value === '') return null;
   const values = Array.isArray(value) ? value : String(value).split(',');
   const normalized = values.map((item) => String(item).trim()).filter(Boolean);
   if (normalized.length === 0) throw queryError(`${label} cannot be empty`, label);
+  if (normalized.length > maxItems) {
+    throw queryError(`${label} cannot contain more than ${maxItems} entries`, label);
+  }
   return normalized;
 }
 
@@ -50,7 +64,8 @@ function normalizeFilter(value) {
   return value;
 }
 
-export function parseItemsQuery(raw = {}, { defaultLimit = 100, maxLimit = 500 } = {}) {
+export function parseItemsQuery(raw = {}, options = {}) {
+  const limits = { ...QUERY_LIMITS, ...options };
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw queryError('Query must be an object');
   }
@@ -60,11 +75,19 @@ export function parseItemsQuery(raw = {}, { defaultLimit = 100, maxLimit = 500 }
   }
 
   return {
-    fields: normalizeDelimited(raw.fields, 'fields'),
+    fields: normalizeDelimited(raw.fields, 'fields', { maxItems: limits.maxFields }),
     filter: normalizeFilter(raw.filter),
-    sort: normalizeDelimited(raw.sort, 'sort'),
-    limit: normalizeInteger(raw.limit, defaultLimit, { label: 'limit', min: 1, max: maxLimit }),
-    offset: normalizeInteger(raw.offset, 0, { label: 'offset', min: 0, max: Number.MAX_SAFE_INTEGER }),
+    sort: normalizeDelimited(raw.sort, 'sort', { maxItems: limits.maxSortFields }),
+    limit: normalizeInteger(raw.limit, limits.defaultLimit, {
+      label: 'limit',
+      min: 1,
+      max: limits.maxLimit,
+    }),
+    offset: normalizeInteger(raw.offset, 0, {
+      label: 'offset',
+      min: 0,
+      max: limits.maxOffset,
+    }),
   };
 }
 
@@ -105,7 +128,7 @@ function escapeLike(value) {
   return String(value).replace(/[\\%_]/g, '\\$&');
 }
 
-function compileOperator(fieldSql, operator, value, path) {
+function compileOperator(fieldSql, operator, value, path, limits) {
   if (!FILTER_OPERATORS.has(operator)) throw queryError(`Unknown filter operator: ${operator}`, path);
 
   switch (operator) {
@@ -122,6 +145,9 @@ function compileOperator(fieldSql, operator, value, path) {
     case '_in':
     case '_nin': {
       if (!Array.isArray(value)) throw queryError(`${operator} requires an array`, path);
+      if (value.length > limits.maxInValues) {
+        throw queryError(`${operator} accepts at most ${limits.maxInValues} values`, path);
+      }
       if (value.length === 0) return { sql: operator === '_in' ? '0 = 1' : '1 = 1', params: [] };
       const placeholders = value.map(() => '?').join(', ');
       return {
@@ -146,9 +172,17 @@ function compileOperator(fieldSql, operator, value, path) {
   }
 }
 
-function compileFilterObject(filter, schema, path = 'filter') {
+function compileFilterObject(filter, schema, path, limits, state, depth) {
   if (!filter || typeof filter !== 'object' || Array.isArray(filter)) {
     throw queryError('Filter node must be an object', path);
+  }
+  if (depth > limits.maxFilterDepth) {
+    throw queryError(`Filter depth cannot exceed ${limits.maxFilterDepth}`, path);
+  }
+
+  state.nodes += 1;
+  if (state.nodes > limits.maxFilterNodes) {
+    throw queryError(`Filter cannot contain more than ${limits.maxFilterNodes} nodes`, path);
   }
 
   const fragments = [];
@@ -160,7 +194,7 @@ function compileFilterObject(filter, schema, path = 'filter') {
         throw queryError(`${key} requires a non-empty array`, `${path}.${key}`);
       }
       const children = value.map((child, index) =>
-        compileFilterObject(child, schema, `${path}.${key}.${index}`));
+        compileFilterObject(child, schema, `${path}.${key}.${index}`, limits, state, depth + 1));
       fragments.push(`(${children.map((child) => child.sql).join(key === '_and' ? ' AND ' : ' OR ')})`);
       for (const child of children) params.push(...child.params);
       continue;
@@ -174,7 +208,13 @@ function compileFilterObject(filter, schema, path = 'filter') {
     const fieldSql = quoteIdentifier(key, 'field name');
     const fieldFragments = [];
     for (const [operator, operatorValue] of Object.entries(value)) {
-      const compiled = compileOperator(fieldSql, operator, operatorValue, `${path}.${key}.${operator}`);
+      const compiled = compileOperator(
+        fieldSql,
+        operator,
+        operatorValue,
+        `${path}.${key}.${operator}`,
+        limits,
+      );
       fieldFragments.push(compiled.sql);
       params.push(...compiled.params);
     }
@@ -186,8 +226,9 @@ function compileFilterObject(filter, schema, path = 'filter') {
   return { sql: fragments.join(' AND '), params };
 }
 
-export function compileFilter(filter, schema) {
+export function compileFilter(filter, schema, options = {}) {
   if (!filter) return { sql: '', params: [] };
-  const compiled = compileFilterObject(filter, schema);
+  const limits = { ...QUERY_LIMITS, ...options };
+  const compiled = compileFilterObject(filter, schema, 'filter', limits, { nodes: 0 }, 1);
   return { sql: ` WHERE ${compiled.sql}`, params: compiled.params };
 }

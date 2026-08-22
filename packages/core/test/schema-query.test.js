@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { compileFieldColumn } from '../src/field-types.js';
-import { compileFilter, compileSelectFields, compileSort, parseItemsQuery } from '../src/query.js';
+import {
+  compileFilter,
+  compileSelectFields,
+  compileSort,
+  parseItemsQuery,
+  QUERY_LIMITS,
+} from '../src/query.js';
 
 const schema = {
   fields: {
@@ -47,6 +53,18 @@ test('items query parser rejects unknown parameters and clamps shape', () => {
   assert.deepEqual(parseItemsQuery({ fields: '*' }).fields, ['*']);
   assert.throws(() => parseItemsQuery({ raw: 'sql' }), /Unknown query parameter/);
   assert.throws(() => parseItemsQuery({ limit: 9999 }), /limit must be an integer/);
+  assert.throws(
+    () => parseItemsQuery({ offset: QUERY_LIMITS.maxOffset + 1 }),
+    /offset must be an integer/,
+  );
+  assert.throws(
+    () => parseItemsQuery({ fields: Array.from({ length: QUERY_LIMITS.maxFields + 1 }, () => 'id') }),
+    /fields cannot contain more than/,
+  );
+  assert.throws(
+    () => parseItemsQuery({ sort: Array.from({ length: QUERY_LIMITS.maxSortFields + 1 }, () => 'title') }),
+    /sort cannot contain more than/,
+  );
 });
 
 test('select and sort compilers resolve only schema fields', () => {
@@ -73,4 +91,31 @@ test('filter compiler parameterizes values and fails closed on operators', () =>
   assert.deepEqual(compiled.params, ['active', 10, '%100\\%\\_safe%', 'draft', 'review']);
   assert.throws(() => compileFilter({ status: { _sql: '1=1' } }, schema), /Unknown filter operator/);
   assert.throws(() => compileFilter({ missing: { _eq: 1 } }, schema), /Unknown field/);
+});
+
+test('filter compiler rejects oversized IN lists and excessive nesting', () => {
+  assert.throws(
+    () => compileFilter({
+      status: { _in: Array.from({ length: QUERY_LIMITS.maxInValues + 1 }, (_, index) => `s-${index}`) },
+    }, schema),
+    /accepts at most/,
+  );
+
+  let nested = { status: { _eq: 'active' } };
+  for (let index = 0; index < QUERY_LIMITS.maxFilterDepth; index += 1) {
+    nested = { _and: [nested] };
+  }
+
+  assert.throws(() => compileFilter(nested, schema), /Filter depth cannot exceed/);
+});
+
+test('filter compiler rejects excessive logical node counts', () => {
+  const filter = {
+    _or: Array.from(
+      { length: QUERY_LIMITS.maxFilterNodes },
+      (_, index) => ({ status: { _eq: `state-${index}` } }),
+    ),
+  };
+
+  assert.throws(() => compileFilter(filter, schema), /Filter cannot contain more than/);
 });
