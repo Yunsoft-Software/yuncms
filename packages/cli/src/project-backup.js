@@ -14,6 +14,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { loadConfig } from '@yunsoft/yuncms-core';
 
 import { dumpDatabase, restoreDatabase } from './database-backup.js';
+import { resetDatabaseObjects } from './database-reset.js';
 
 export const BACKUP_FORMAT_VERSION = 1;
 
@@ -255,6 +256,7 @@ export async function restoreProjectBackup({
   env = process.env,
   allowDifferentDatabaseTarget = false,
   restoreDatabaseFn = restoreDatabase,
+  resetDatabaseFn = resetDatabaseObjects,
   output = console,
 } = {}) {
   if (!backupPath) {
@@ -267,6 +269,8 @@ export async function restoreProjectBackup({
   const config = loadConfig(env);
   assertRestoreDatabaseMatches(manifest, config, allowDifferentDatabaseTarget);
 
+  output.log?.(`Resetting database before restore: ${config.database.database}`);
+  await resetDatabaseFn({ config: config.database });
   output.log?.(`Restoring database backup: ${resolvedBackupPath}`);
   await restoreDatabaseFn({
     config: config.database,
