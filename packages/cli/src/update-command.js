@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { loadConfig } from '@yunsoft/yuncms-core';
 
 import { parseCommandOptions } from './command-options.js';
+import { acquireDatabaseMaintenanceLock } from './maintenance-lock.js';
 import {
   createProjectBackup,
   readBackupManifest,
@@ -106,6 +107,7 @@ export async function runUpdateCommand({
   restoreBackup = restoreProjectBackup,
   verifyRuntime = verifyInstalledRuntime,
   acquireLock = acquireUpdateLock,
+  acquireMaintenanceLock = acquireDatabaseMaintenanceLock,
   assertStopped = assertYunCmsStopped,
   fetchFn = globalThis.fetch,
 } = {}) {
@@ -120,6 +122,7 @@ export async function runUpdateCommand({
   const allowUnverifiedS3 = values['--allow-unverified-s3'] === true;
   const config = loadConfig(env);
   const lock = dryRun ? null : await acquireLock({ cwd });
+  let maintenanceLock = null;
   const assertServiceStopped = () => assertStopped({
     host: config.server.host,
     port: config.server.port,
@@ -127,6 +130,8 @@ export async function runUpdateCommand({
   });
 
   try {
+    if (!dryRun) maintenanceLock = await acquireMaintenanceLock({ env });
+
     const report = await collectPreflight({
       cwd,
       env,
@@ -220,6 +225,7 @@ export async function runUpdateCommand({
       }
     }
   } finally {
+    if (maintenanceLock) await maintenanceLock.release();
     if (lock) await lock.release();
   }
 }
