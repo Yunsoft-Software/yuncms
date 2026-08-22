@@ -18,17 +18,17 @@ const config = {
   user: 'yuncms', password: 'secret', ssl: false,
 };
 
-function fakeChild({ restore = false, signals = [] } = {}) {
+function fakeChild({ restore = false, signals = [], exitOnTerm = false } = {}) {
   const child = new EventEmitter();
   child.stdout = restore ? null : new PassThrough();
   child.stdin = restore ? new PassThrough() : null;
   child.stderr = new PassThrough();
   child.kill = (signal) => {
     signals.push(signal);
-    if (signal === 'SIGKILL') {
+    if ((signal === 'SIGTERM' && exitOnTerm) || signal === 'SIGKILL') {
       child.stdout?.end();
       child.stderr.end();
-      queueMicrotask(() => child.emit('exit', null, 'SIGKILL'));
+      queueMicrotask(() => child.emit('exit', null, signal));
     }
     return true;
   };
@@ -87,4 +87,39 @@ test('mysql restore timeout terminates the child after input streaming', async (
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
+});
+
+test('mysqldump stream failure terminates and reaps the child before returning', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'yuncms-dump-stream-fail-'));
+  const signals = [];
+  const child = fakeChild({ signals, exitOnTerm: true });
+  try {
+    const promise = dumpDatabase({
+      config,
+      outputPath: join(cwd, 'missing-parent', 'database.sql.gz'),
+      timeoutMs: 1_000,
+      killGraceMs: 10,
+      spawnProcess() { return child; },
+    });
+    child.stdout.end('fixture');
+
+    await assert.rejects(promise);
+    assert.deepEqual(signals, ['SIGTERM']);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test('synchronous database process spawn failure is normalized before any pipeline starts', async () => {
+  const startError = new Error('spawn unavailable');
+  await assert.rejects(
+    dumpDatabase({
+      config,
+      outputPath: '/tmp/unused-database.sql.gz',
+      spawnProcess() { throw startError; },
+    }),
+    (error) => error === startError
+      && error.code === 'BACKUP_PROCESS_START_FAILED'
+      && error.command === 'mysqldump',
+  );
 });
