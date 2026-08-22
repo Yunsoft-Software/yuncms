@@ -163,6 +163,14 @@ test('real mysqldump backup and destructive restore reproduce exact DB and local
       env,
       output: { log() {}, warn() {} },
     });
+    assert.equal(backup.manifest.format, 2);
+    assert.equal(backup.manifest.integrity.algorithm, 'sha256');
+    assert.match(backup.manifest.integrity.database, /^[0-9a-f]{64}$/);
+    assert.match(backup.manifest.integrity.project.env, /^[0-9a-f]{64}$/);
+    assert.match(backup.manifest.integrity.project.packageJson, /^[0-9a-f]{64}$/);
+    assert.match(backup.manifest.integrity.project.packageLock, /^[0-9a-f]{64}$/);
+    assert.match(backup.manifest.integrity.project.extensions, /^[0-9a-f]{64}$/);
+    assert.match(backup.manifest.integrity.project.localFiles, /^[0-9a-f]{64}$/);
     assert.ok(backup.manifest.database.verifiedDecompressedBytes > 0);
     assert.equal(backup.manifest.s3.objectsBackedUp, false);
     const manifestText = await readFile(join(backup.backupPath, 'manifest.json'), 'utf8');
