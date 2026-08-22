@@ -110,6 +110,11 @@ export async function runUpdateCommand({
   const allowUnverifiedS3 = values['--allow-unverified-s3'] === true;
   const config = loadConfig(env);
   const lock = dryRun ? null : await acquireLock({ cwd });
+  const assertServiceStopped = () => assertStopped({
+    host: config.server.host,
+    port: config.server.port,
+    fetchFn,
+  });
 
   try {
     const report = await collectPreflight({
@@ -133,11 +138,7 @@ export async function runUpdateCommand({
     }
 
     assertUpdatePreflightReady(report);
-    await assertStopped({
-      host: config.server.host,
-      port: config.server.port,
-      fetchFn,
-    });
+    await assertServiceStopped();
 
     const backupPath = values['--backup-output']
       ? resolve(cwd, values['--backup-output'])
@@ -149,11 +150,7 @@ export async function runUpdateCommand({
       output.log?.(`Installing @yunsoft/yuncms@${report.targetVersion}`);
       await installVersion({ cwd, env, targetVersion: report.targetVersion, runProcess });
 
-      await assertStopped({
-        host: config.server.host,
-        port: config.server.port,
-        fetchFn,
-      });
+      await assertServiceStopped();
 
       output.log?.('Applying target database migrations');
       await bootstrapInstalledVersion({ cwd, env, runProcess });
@@ -183,6 +180,7 @@ export async function runUpdateCommand({
           cwd,
           env,
           output,
+          beforeDestructive: assertServiceStopped,
         });
         await reinstallBackedUpDependencies({
           cwd,
