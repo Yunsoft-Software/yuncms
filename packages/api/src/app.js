@@ -7,6 +7,7 @@ import {
 
 import { createAuthenticationMiddleware } from './authentication.js';
 import { apiErrorHandler } from './error-response.js';
+import { createPressureLimit } from './pressure-limit.js';
 import { createFixedWindowRateLimit } from './rate-limit.js';
 import { createAuditRouter } from './routes/audit.js';
 import { createAuthRouter } from './routes/auth.js';
@@ -131,6 +132,9 @@ export function createApp({
   });
 
   app.use(createStudioMiddleware({ root: studioRoot }));
+
+  const pressureLimit = createPressureLimit(config.server?.pressure);
+  if (pressureLimit) app.use(pressureLimit);
 
   const apiRateLimit = createApiRateLimit(config);
   if (apiRateLimit) app.use(apiRateLimit);

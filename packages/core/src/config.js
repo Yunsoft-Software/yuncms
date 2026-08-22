@@ -67,6 +67,21 @@ export function loadConfig(env = process.env) {
           max: 1_000_000,
         }),
       },
+      pressure: {
+        enabled: readBoolean(env.PRESSURE_LIMIT_ENABLED, true),
+        maxConcurrent: readInteger(env.PRESSURE_MAX_CONCURRENT, 250, 'PRESSURE_MAX_CONCURRENT', {
+          min: 1,
+          max: 100_000,
+        }),
+        maxHeapPercent: readInteger(env.PRESSURE_MAX_HEAP_PERCENT, 95, 'PRESSURE_MAX_HEAP_PERCENT', {
+          min: 1,
+          max: 100,
+        }),
+        retryAfterSeconds: readInteger(env.PRESSURE_RETRY_AFTER_SECONDS, 1, 'PRESSURE_RETRY_AFTER_SECONDS', {
+          min: 1,
+          max: 3600,
+        }),
+      },
     },
     logging: {
       level: readString(env.LOG_LEVEL, 'info'),
