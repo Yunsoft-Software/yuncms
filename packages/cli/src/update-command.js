@@ -185,6 +185,7 @@ export async function runUpdateCommand({
       : null;
     const backup = await createBackup({ cwd, env, output, backupPath });
     await readBackupManifest(backup.backupPath);
+    await assertServiceStopped();
     await assertMaintenanceHeld();
 
     try {
@@ -206,6 +207,7 @@ export async function runUpdateCommand({
 
       output.log?.('Applying target database migrations');
       await bootstrapInstalledVersion({ cwd, env, runProcess });
+      await assertServiceStopped();
       await assertMaintenanceHeld();
 
       output.log?.('Starting temporary readiness probe');
@@ -216,6 +218,7 @@ export async function runUpdateCommand({
         maintenanceBypassToken,
         fetchFn,
       });
+      await assertServiceStopped();
       await assertMaintenanceHeld();
 
       output.log?.(`YunCMS update verified: ${report.currentVersion} -> ${report.targetVersion}`);
@@ -241,6 +244,7 @@ export async function runUpdateCommand({
           output,
           beforeDestructive,
         });
+        await assertServiceStopped();
         await assertMaintenanceHeld();
 
         await reinstallBackedUpDependencies({
@@ -249,6 +253,7 @@ export async function runUpdateCommand({
           manifest: restored.manifest,
           runProcess,
         });
+        await assertServiceStopped();
         await assertMaintenanceHeld();
 
         await verifyRuntime({
@@ -258,6 +263,7 @@ export async function runUpdateCommand({
           maintenanceBypassToken,
           fetchFn,
         });
+        await assertServiceStopped();
         await assertMaintenanceHeld();
 
         updateError.rollbackPerformed = true;
