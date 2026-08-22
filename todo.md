@@ -2,7 +2,7 @@
 
 Only checks that still require a real Node 24 checkout, browser, MySQL instance or deployment provider belong here. This is a **pending verification list**: when a check passes it is removed, not kept as `[x]` history. If its covered source changes later, it becomes pending again.
 
-Current assistant environment cannot execute the release gates: it has Node `22.16.0`, npm `10.9.2`, and the container cannot resolve `github.com`. Do not treat source inspection as executed verification. For the managed-upgrade work, Codex should follow `docs/codex-managed-upgrade-verification.md` and leave command/evidence notes without secrets.
+For the remaining managed-upgrade checks, follow `docs/codex-managed-upgrade-verification.md` and leave command/evidence notes without secrets. Registry publication checks require an authenticated npm session; deployment/provider checks require their named external environment.
 
 ## 1. Directus-style fields / relation query smoke
 
@@ -154,9 +154,7 @@ These checks were added for the `22-08-2026` managed upgrade implementation and 
 
 ### Source and CLI gates
 
-- [ ] On a real Node.js 24 checkout run `npm run test:fast`, `npm test` and `npm run test:release`; the migration-attempt, backup/restore, SemVer, dependency-section, update preflight, operation-lock and rollback regression tests must all pass.
-- [ ] Verify `npm run test:fast` actually includes every managed-upgrade CLI regression file, including `update-dependency-section.test.js`; do not accept only full-suite coverage.
-- [ ] Pack/install the publishable `@yunsoft/yuncms` artifacts into a clean npm project that declares `@yunsoft/yuncms` in `package.json`; verify `yuncms help` exposes `backup`, `restore`, `update` and `update --dry-run` without regressing `init/bootstrap/start`.
+- [ ] After publication, install `@yunsoft/yuncms@0.1.4` into a clean registry-only npm project; run `yuncms help`, `init`, `bootstrap`, `start` and `update --dry-run` against disposable infrastructure so no local workspace/tarball can mask a packaging or registry error.
 - [ ] Verify a project with no `@yunsoft/yuncms` dependency and a project with no installed `node_modules/@yunsoft/yuncms` fail managed update before mutation with the documented project/package errors.
 - [ ] Verify an invalid installed package version fails with `UPDATE_INSTALLED_VERSION_INVALID` before backup/mutation.
 - [ ] Run `yuncms update --dry-run` against a real published target and confirm npm target resolution plus loading `REQUIRED_CORE_MIGRATION_IDS` from the staged target package works with lifecycle scripts disabled during inspection.
@@ -164,26 +162,6 @@ These checks were added for the `22-08-2026` managed upgrade implementation and 
 - [ ] Verify a target version lower than the installed version is rejected with `UPDATE_DOWNGRADE_FORBIDDEN` and no package/database mutation occurs.
 - [ ] Verify unknown applied migration IDs not present in the target package produce `UPDATE_MIGRATION_HISTORY_INCOMPATIBLE` and prevent update.
 - [ ] Verify a project that stores `@yunsoft/yuncms` under `devDependencies` remains there after update (`--save-dev`), and one under `optionalDependencies` remains optional (`--save-optional`).
-
-### Dedicated automated MySQL upgrade gate
-
-Use a **separate disposable database** that is not the normal integration DB. Its name must contain `test`, `ci` or `dev`.
-
-Set:
-
-```text
-YUNCMS_TEST_MYSQL=1
-YUNCMS_TEST_UPGRADE=1
-YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1
-YUNCMS_UPGRADE_TEST_DB_DATABASE=<dedicated_test_database>
-```
-
-plus the normal `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_SSL` values.
-
-- [ ] Run `npm run test:upgrade:mysql`; both tests in `test/integration/managed-upgrade.test.js` must pass.
-- [ ] Confirm the partial-DDL test records `status=failed`, `statement_index=1`, and retry fails with `DATABASE_MIGRATION_RECOVERY_REQUIRED` before re-executing statement 1.
-- [ ] Confirm the real `mysqldump` round-trip restores the pre-backup DB row, removes post-backup table/view objects, restores local Files/extensions/package/env bytes, and leaves no DB password/S3 secret in the manifest.
-- [ ] Confirm the dedicated test DB is cleaned afterward; a failed test must not leave synthetic failed migration attempts that poison later bootstrap runs.
 
 ### Real MySQL backup / restore
 
