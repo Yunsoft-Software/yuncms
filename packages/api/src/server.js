@@ -1,5 +1,6 @@
 import {
   assertDatabaseCompatible,
+  assertMaintenanceStartupAllowed,
   closeDatabasePool,
   createCoreServiceRegistry,
   createDatabasePool,
@@ -20,6 +21,10 @@ import { INTERNAL_AUDIT_EVENTS } from './audit-events.js';
 import { loadExtensionRuntime } from './extensions/runtime.js';
 
 loadEnvFileIfPresent();
+await assertMaintenanceStartupAllowed({
+  cwd: process.cwd(),
+  env: process.env,
+});
 const config = loadConfig();
 const logger = createJsonLogger({ level: config.logging.level });
 const pool = createDatabasePool(config.database);
