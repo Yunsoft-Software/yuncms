@@ -12,6 +12,7 @@ import {
   analyzeMigrationHistory,
   assertUpdatePreflightReady,
   compareVersions,
+  findIncompleteMigrationAttempts,
   resolveTargetVersion,
 } from '../src/update-preflight.js';
 
@@ -100,10 +101,28 @@ test('migration history must be a contiguous prefix of target migrations', () =>
   assert.deepEqual(unknown.unknownAppliedMigrations, ['legacy-custom']);
 });
 
+test('preflight identifies failed or applying migration attempts that are not in the applied journal', () => {
+  const attempts = [
+    { migration_id: '0001', status: 'applied', statement_index: 2 },
+    { migration_id: '0002', status: 'failed', statement_index: 1 },
+    { migration_id: '0003', status: 'applying', statement_index: 0 },
+  ];
+  const incomplete = findIncompleteMigrationAttempts(['0001'], attempts);
+  assert.deepEqual(incomplete.map((attempt) => attempt.migration_id), ['0002', '0003']);
+  assert.equal(incomplete[0].status, 'failed');
+  assert.equal(incomplete[1].status, 'applying');
+
+  assert.deepEqual(
+    findIncompleteMigrationAttempts(['0001', '0002', '0003'], attempts),
+    [],
+  );
+});
+
 test('preflight blocker set fails closed before backup/update mutation', () => {
   const report = {
     blockers: [
       'UPDATE_APPLICATION_RUNNING',
+      'UPDATE_MIGRATION_RECOVERY_REQUIRED',
       'UPDATE_MIGRATION_HISTORY_INCOMPATIBLE',
     ],
   };
@@ -111,6 +130,7 @@ test('preflight blocker set fails closed before backup/update mutation', () => {
     () => assertUpdatePreflightReady(report),
     (error) => error.code === 'UPDATE_PREFLIGHT_FAILED'
       && error.blockers.includes('UPDATE_APPLICATION_RUNNING')
+      && error.blockers.includes('UPDATE_MIGRATION_RECOVERY_REQUIRED')
       && error.blockers.includes('UPDATE_MIGRATION_HISTORY_INCOMPATIBLE'),
   );
 });
