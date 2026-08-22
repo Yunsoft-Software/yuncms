@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -9,8 +10,17 @@ function sha256(value) {
   return createHash('sha256').update(String(value)).digest('hex');
 }
 
+export function canonicalProjectPath(cwd = process.cwd()) {
+  const absolute = resolve(cwd);
+  try {
+    return realpathSync.native ? realpathSync.native(absolute) : realpathSync(absolute);
+  } catch {
+    return absolute;
+  }
+}
+
 export function maintenanceLockPath(cwd = process.cwd()) {
-  const projectKey = sha256(resolve(cwd)).slice(0, 32);
+  const projectKey = sha256(canonicalProjectPath(cwd)).slice(0, 32);
   return join(tmpdir(), 'yuncms-update-locks', `${projectKey}.lock`);
 }
 
