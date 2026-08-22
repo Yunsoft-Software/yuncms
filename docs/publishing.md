@@ -18,6 +18,8 @@ Every `0.1.0` package was verified through unauthenticated `npm view` queries an
 
 The `0.1.1` package family was published on 2026-08-17 after the Node 24 fast/full/release gates, real-MySQL integration, Studio browser smoke and package contract checks passed. All four exact versions and internal dependency pins were then verified through unauthenticated registry queries and a clean `@yunsoft/yuncms@0.1.1` install/CLI smoke.
 
+The `0.1.5` package family was published on 2026-08-22 after Node 24 fast/release gates, real MySQL/API and managed-upgrade integration, local tarball installation, registry-only installation/runtime smoke and a published `0.1.3 -> 0.1.5` managed transition passed. All four registry SHASUM values and exact internal `0.1.5` dependency pins were verified anonymously. Version `0.1.4` was uploaded only to npm's staging area and was superseded before publication because staged approval required a separate interactive 2FA flow; it must not be treated as a public release.
+
 ## Naming direction
 
 Keep the product and executable command simple:

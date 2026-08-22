@@ -34,8 +34,8 @@ This note records completed local release-candidate checks without credentials o
 - The temporary post-update runtime probe now has a bounded TERM/KILL shutdown path and reports a deterministic timeout instead of waiting indefinitely.
 - The CLI start signal regression no longer emits the synthetic test signal before the asynchronous maintenance check installs its handlers.
 
-## Registry staging and still-pending checks
+## Superseded staged candidate
 
-The npm session was authenticated as `raichubuilds` with read-write access to all four `@yunsoft` packages. Direct publish was correctly refused because npm requires an interactive second factor or an eligible granular token. The four `0.1.4` tarballs were then uploaded through npm staged publishing; their staged SHASUM values matched the locally reviewed tarballs. They are not public until the account's web 2FA setup is completed and the stages are approved in dependency order.
+The npm session was authenticated as `raichubuilds` with read-write access to all four `@yunsoft` packages. Direct publish was correctly refused because npm requires an interactive second factor or an eligible granular token. The four `0.1.4` tarballs were uploaded through npm staged publishing and their staged SHASUM values matched the locally reviewed tarballs.
 
-Stage approval, registry-only installation, published-target dry-run/first-transition update, forced rollback, real supervisor race, production MySQL 8/TLS/scale and S3-provider recovery checks remain pending in `todo.md` until executed in their required environments.
+The `0.1.4` stages were deliberately not approved because npm staged approval still requires interactive 2FA even when a scoped token can bypass 2FA for direct publication. The candidate was superseded by public `0.1.5`; see `release-evidence-0.1.5.md`. The unused `0.1.4` stage records remain pending cleanup and must not be promoted.

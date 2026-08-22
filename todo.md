@@ -2,7 +2,7 @@
 
 Only checks that still require a real Node 24 checkout, browser, MySQL instance or deployment provider belong here. This is a **pending verification list**: when a check passes it is removed, not kept as `[x]` history. If its covered source changes later, it becomes pending again.
 
-For the remaining managed-upgrade checks, follow `docs/codex-managed-upgrade-verification.md` and leave command/evidence notes without secrets. The `0.1.4` package family is staged in npm but still requires the account's interactive 2FA setup/approval; deployment/provider checks require their named external environment.
+For the remaining managed-upgrade checks, follow `docs/codex-managed-upgrade-verification.md` and leave command/evidence notes without secrets. The `0.1.5` package family is published and registry-verified; deployment/provider checks still require their named external environment.
 
 ## 1. Directus-style fields / relation query smoke
 
@@ -154,14 +154,9 @@ These checks were added for the `22-08-2026` managed upgrade implementation and 
 
 ### Source and CLI gates
 
-- [ ] After publication, install `@yunsoft/yuncms@0.1.4` into a clean registry-only npm project; run `yuncms help`, `init`, `bootstrap`, `start` and `update --dry-run` against disposable infrastructure so no local workspace/tarball can mask a packaging or registry error.
-- [ ] Verify a project with no `@yunsoft/yuncms` dependency and a project with no installed `node_modules/@yunsoft/yuncms` fail managed update before mutation with the documented project/package errors.
-- [ ] Verify an invalid installed package version fails with `UPDATE_INSTALLED_VERSION_INVALID` before backup/mutation.
-- [ ] Run `yuncms update --dry-run` against a real published target and confirm npm target resolution plus loading `REQUIRED_CORE_MIGRATION_IDS` from the staged target package works with lifecycle scripts disabled during inspection.
+- [ ] Reject the four superseded `0.1.4` npm stage records when interactive npm 2FA is available; do not approve them because public `0.1.5` is the verified `latest` release.
+- [ ] Rotate the repo-local scoped publishing token before it expires on 2026-11-20; npm caps write tokens at 90 days. Keep the replacement only in the ignored `.credentials/npmrc` file with mode `0600`.
 - [ ] Verify SemVer prerelease precedence with real/published targets when available: stable -> prerelease must be treated as downgrade; prerelease -> stable must be allowed.
-- [ ] Verify a target version lower than the installed version is rejected with `UPDATE_DOWNGRADE_FORBIDDEN` and no package/database mutation occurs.
-- [ ] Verify unknown applied migration IDs not present in the target package produce `UPDATE_MIGRATION_HISTORY_INCOMPATIBLE` and prevent update.
-- [ ] Verify a project that stores `@yunsoft/yuncms` under `devDependencies` remains there after update (`--save-dev`), and one under `optionalDependencies` remains optional (`--save-optional`).
 
 ### Real MySQL backup / restore
 
@@ -197,13 +192,8 @@ Use a disposable dedicated MySQL 8-compatible database with representative custo
 
 ### Successful managed update
 
-- [ ] Publish/install two disposable YunCMS versions with a real migration difference and update from the older project to the newer one using `yuncms update --to <version>`.
-- [ ] Confirm the mandatory backup exists and verifies before `npm install` modifies package files.
-- [ ] Confirm package.json/package-lock resolve the exact requested YunCMS target and bootstrap is executed through the **newly installed** CLI, not the old globally/npx-cached code.
-- [ ] Confirm target migrations apply exactly once and the target runtime reaches `/ready` in the temporary verification process.
-- [ ] Confirm the temporary verification runtime terminates cleanly and production is **not** silently left running outside the configured supervisor; start the normal supervisor manually and verify health/ready/Studio/API afterward.
+- [ ] Through the actual production supervisor after a maintenance update, start the normal service and verify health/ready/Studio/API; the published transition proved only that YunCMS' temporary verification process stops cleanly and leaves no unmanaged production process running.
 - [ ] Repeat with an extension installed and verify extension startup compatibility is exercised by the temporary runtime probe.
-- [ ] From an older release that does not yet contain the `update` command, verify first transition using `npx --yes @yunsoft/yuncms@<new> update --to <new>` after the new CLI is actually published.
 
 ### Automatic rollback
 
