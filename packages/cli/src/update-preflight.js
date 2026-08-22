@@ -160,6 +160,32 @@ export function compareVersions(left, right) {
   return comparePrerelease(a.prerelease, b.prerelease);
 }
 
+export function analyzeMigrationHistory(appliedMigrations, targetMigrations) {
+  const applied = Array.isArray(appliedMigrations) ? appliedMigrations : [];
+  const target = Array.isArray(targetMigrations) ? targetMigrations : [];
+  const appliedSet = new Set(applied);
+  const targetSet = new Set(target);
+  const unknownAppliedMigrations = applied.filter((id) => !targetSet.has(id));
+  const pendingMigrations = target.filter((id) => !appliedSet.has(id));
+  const migrationHistoryGap = [];
+  let sawMissing = false;
+
+  for (const id of target) {
+    if (!appliedSet.has(id)) {
+      sawMissing = true;
+      continue;
+    }
+    if (sawMissing) migrationHistoryGap.push(id);
+  }
+
+  return {
+    pendingMigrations,
+    unknownAppliedMigrations,
+    migrationHistoryGap,
+    compatible: unknownAppliedMigrations.length === 0 && migrationHistoryGap.length === 0,
+  };
+}
+
 async function inspectTargetMigrations(targetVersion, {
   env,
   runProcess,
@@ -195,7 +221,11 @@ async function inspectTargetMigrations(targetVersion, {
       { cwd: directory, env },
     );
     const migrations = JSON.parse(result.stdout);
-    if (!Array.isArray(migrations) || migrations.some((id) => typeof id !== 'string')) {
+    if (
+      !Array.isArray(migrations)
+      || migrations.some((id) => typeof id !== 'string' || !id)
+      || new Set(migrations).size !== migrations.length
+    ) {
       throw updateError('UPDATE_TARGET_MIGRATIONS_INVALID', 'Target package exposed an invalid migration list');
     }
     return migrations;
@@ -307,17 +337,14 @@ export async function collectUpdatePreflight({
     collectLocalBackupBytes(cwd, config),
   ]);
 
-  const appliedSet = new Set(database.appliedMigrations);
-  const targetSet = new Set(targetMigrations);
-  const pendingMigrations = targetMigrations.filter((id) => !appliedSet.has(id));
-  const unknownAppliedMigrations = database.appliedMigrations.filter((id) => !targetSet.has(id));
+  const migrationHistory = analyzeMigrationHistory(database.appliedMigrations, targetMigrations);
   const minimumFreeBytes = database.estimatedBytes + localBackupBytes + MIN_FREE_HEADROOM_BYTES;
   const blockers = [];
 
   if (running) blockers.push('UPDATE_APPLICATION_RUNNING');
   if (config.storage.s3.bucket && !allowUnverifiedS3) blockers.push('UPDATE_S3_BACKUP_UNVERIFIED');
   if (disk.freeBytes < minimumFreeBytes) blockers.push('UPDATE_DISK_SPACE_INSUFFICIENT');
-  if (unknownAppliedMigrations.length > 0) blockers.push('UPDATE_MIGRATION_HISTORY_INCOMPATIBLE');
+  if (!migrationHistory.compatible) blockers.push('UPDATE_MIGRATION_HISTORY_INCOMPATIBLE');
   if (compareVersions(targetVersion, packageState.currentVersion) < 0) blockers.push('UPDATE_DOWNGRADE_FORBIDDEN');
 
   return {
@@ -332,8 +359,9 @@ export async function collectUpdatePreflight({
     minimumFreeBytes,
     appliedMigrations: database.appliedMigrations,
     targetMigrations,
-    pendingMigrations,
-    unknownAppliedMigrations,
+    pendingMigrations: migrationHistory.pendingMigrations,
+    unknownAppliedMigrations: migrationHistory.unknownAppliedMigrations,
+    migrationHistoryGap: migrationHistory.migrationHistoryGap,
     s3Configured: Boolean(config.storage.s3.bucket),
     s3Bucket: config.storage.s3.bucket || null,
     blockers,
