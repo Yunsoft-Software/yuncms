@@ -72,6 +72,14 @@ function backupPathConflict(source, destination) {
   return error;
 }
 
+function restorePathConflict(target, backupPath) {
+  const error = new Error(`Backup source cannot be inside a directory that restore will replace: ${target}`);
+  error.code = 'BACKUP_RESTORE_PATH_CONFLICT';
+  error.targetPath = target;
+  error.backupPath = backupPath;
+  return error;
+}
+
 async function assertDirectory(path, code) {
   const info = await stat(path).catch((error) => {
     if (error?.code === 'ENOENT') {
@@ -293,6 +301,14 @@ export async function restoreProjectBackup({
   const config = loadConfig(env);
   assertRestoreDatabaseMatches(manifest, config, allowDifferentDatabaseTarget);
 
+  const localFilesPath = resolveProjectPath(cwd, config.storage.localRoot);
+  const extensionsPath = resolve(cwd, 'extensions');
+  for (const target of [localFilesPath, extensionsPath]) {
+    if (pathInside(target, resolvedBackupPath)) {
+      throw restorePathConflict(target, resolvedBackupPath);
+    }
+  }
+
   const databaseDumpPath = join(resolvedBackupPath, 'database.sql.gz');
   output.log?.(`Validating backup before destructive restore: ${resolvedBackupPath}`);
   await verifyDatabaseFn({ inputPath: databaseDumpPath });
@@ -308,7 +324,6 @@ export async function restoreProjectBackup({
     env,
   });
 
-  const localFilesPath = resolveProjectPath(cwd, config.storage.localRoot);
   await restoreOptionalDirectory({
     backupPath: resolvedBackupPath,
     existed: manifest.project.localFiles,
@@ -319,7 +334,7 @@ export async function restoreProjectBackup({
     backupPath: resolvedBackupPath,
     existed: manifest.project.extensions,
     sourceName: 'extensions',
-    target: resolve(cwd, 'extensions'),
+    target: extensionsPath,
   });
   await restoreOptionalFile({
     backupPath: resolvedBackupPath,
