@@ -7,6 +7,12 @@ export { normalizeDisplayName, normalizeSchemaKey, resolveSchemaName } from './s
 export { YunCmsDatabaseError, normalizeDatabaseError, isRetryableDatabaseError } from './errors.js';
 export { withDatabaseRetry } from './retry.js';
 export {
+  MAINTENANCE_BYPASS_ENV,
+  maintenanceLockPath,
+  hashMaintenanceBypassToken,
+  assertMaintenanceStartupAllowed,
+} from './maintenance-state.js';
+export {
   createAccountability,
   createPublicAccountability,
   createSystemAccountability,
