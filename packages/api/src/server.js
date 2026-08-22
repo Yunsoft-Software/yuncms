@@ -114,6 +114,7 @@ async function start() {
   const services = serviceRegistry.toObject();
   const schemaCache = new SchemaCache();
   const emitter = new HookEmitter({ logger });
+  mailer?.setEmitter(emitter);
   registerInternalAudit({ emitter, services });
 
   extensionRuntime = await loadExtensionRuntime({
