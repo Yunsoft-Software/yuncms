@@ -7,22 +7,10 @@ function service(req, name) {
   const Service = req.context.services[name];
   return new Service(serviceOptionsFromRequest(req));
 }
-
-function authService(req) {
-  return service(req, 'AuthService');
-}
-
-function authTokensService(req) {
-  return service(req, 'AuthTokensService');
-}
-
-function apiTokensService(req) {
-  return service(req, 'ApiTokensService');
-}
-
-function usersService(req) {
-  return service(req, 'UsersService');
-}
+function authService(req) { return service(req, 'AuthService'); }
+function authTokensService(req) { return service(req, 'AuthTokensService'); }
+function apiTokensService(req) { return service(req, 'ApiTokensService'); }
+function usersService(req) { return service(req, 'UsersService'); }
 
 function requireSessionAuthentication(req) {
   if (req.authMethod !== 'session' || !req.authToken) {
@@ -49,55 +37,56 @@ function noStore(req, res, next) {
   next();
 }
 
-export function createAuthRouter({ mailer = null, config = null, logger = console } = {}) {
+export function createAuthRouter({ mailer = null, config = null, logger = console, rateLimitStore = null } = {}) {
   const router = express.Router();
   const limits = config?.auth?.rateLimit ?? {};
+  const sharedStore = limits.store === 'redis' ? rateLimitStore : null;
+  const common = { store: sharedStore, failureMode: limits.failureMode ?? 'best-effort', logger };
   const loginLimit = createFixedWindowRateLimit({
+    ...common,
+    scope: 'auth:login',
     windowMs: limits.loginWindowMs ?? 60_000,
     max: limits.loginMax ?? 10,
+    key: (req) => `${req.ip || req.socket?.remoteAddress || 'unknown'}:${String(req.body?.email ?? '').trim().toLowerCase()}`,
   });
   const refreshLimit = createFixedWindowRateLimit({
+    ...common,
+    scope: 'auth:refresh',
     windowMs: limits.refreshWindowMs ?? 60_000,
     max: limits.refreshMax ?? 30,
+    key: (req) => `${req.ip || req.socket?.remoteAddress || 'unknown'}:${String(req.body?.refresh_token ?? '').slice(0, 24)}`,
   });
   const actionLimit = createFixedWindowRateLimit({
+    ...common,
+    scope: 'auth:action',
     windowMs: limits.actionWindowMs ?? 15 * 60_000,
     max: limits.actionMax ?? 5,
+    key: (req) => `${req.ip || req.socket?.remoteAddress || 'unknown'}:${String(req.body?.email ?? req.body?.user ?? '').trim().toLowerCase()}`,
   });
 
   router.use(noStore);
 
   router.post('/login', loginLimit, async (req, res) => {
-    const result = await authService(req).login({
-      email: req.body?.email,
-      password: req.body?.password,
-      ip: req.ip ?? null,
-      userAgent: req.get('user-agent') ?? null,
-    });
+    const result = await authService(req).login({ email: req.body?.email, password: req.body?.password, ip: req.ip ?? null, userAgent: req.get('user-agent') ?? null });
     res.json({ data: result });
   });
-
   router.post('/refresh', refreshLimit, async (req, res) => {
     const result = await authService(req).refresh(req.body?.refresh_token);
     res.json({ data: result });
   });
-
   router.post('/logout', async (req, res) => {
     requireSessionAuthentication(req);
     await authService(req).logout(req.authToken);
     res.status(204).end();
   });
-
   router.post('/logout-all', async (req, res) => {
     requireSessionAuthentication(req);
     await authService(req).logoutAll();
     res.status(204).end();
   });
-
   router.post('/password-reset/request', actionLimit, async (req, res) => {
     const transport = requireMailer(mailer);
     const result = await authTokensService(req).requestPasswordReset(req.body?.email);
-
     if (result) {
       try {
         const url = actionUrl(config, 'reset', result.token);
@@ -107,22 +96,15 @@ export function createAuthRouter({ mailer = null, config = null, logger = consol
           text: `A password reset was requested for your YunCMS account.\n\nOpen this link to choose a new password:\n${url}\n\nIf you did not request this, you can ignore this message.`,
         });
       } catch (error) {
-        logger.error?.('YunCMS password reset mail delivery failed', {
-          requestId: req.id,
-          code: error?.code,
-          message: error?.message,
-        });
+        logger.error?.('YunCMS password reset mail delivery failed', { requestId: req.id, code: error?.code, message: error?.message });
       }
     }
-
     res.status(202).json({ data: { accepted: true } });
   });
-
   router.post('/password-reset/confirm', actionLimit, async (req, res) => {
     await authTokensService(req).resetPassword(req.body?.token, req.body?.password);
     res.status(204).end();
   });
-
   router.post('/email-verification/request', actionLimit, async (req, res) => {
     const transport = requireMailer(mailer);
     if (!req.accountability?.user) {
@@ -130,7 +112,6 @@ export function createAuthRouter({ mailer = null, config = null, logger = consol
       error.code = 'UNAUTHORIZED';
       throw error;
     }
-
     const userId = req.body?.user ?? req.accountability.user;
     const user = await usersService(req).readOne(userId);
     if (!user) {
@@ -140,29 +121,15 @@ export function createAuthRouter({ mailer = null, config = null, logger = consol
     }
     const result = await authTokensService(req).createEmailVerification(userId);
     const url = actionUrl(config, 'verify', result.token);
-    await transport.send({
-      to: user.email,
-      subject: 'Verify your YunCMS email',
-      text: `Verify your YunCMS email address by opening this link:\n${url}\n\nIf you did not request this, you can ignore this message.`,
-    });
+    await transport.send({ to: user.email, subject: 'Verify your YunCMS email', text: `Verify your YunCMS email address by opening this link:\n${url}\n\nIf you did not request this, you can ignore this message.` });
     res.status(202).json({ data: { accepted: true } });
   });
-
   router.post('/email-verification/confirm', actionLimit, async (req, res) => {
     await authTokensService(req).verifyEmail(req.body?.token);
     res.status(204).end();
   });
-
-  router.get('/tokens', async (req, res) => {
-    const data = await apiTokensService(req).readMany();
-    res.json({ data });
-  });
-
-  router.post('/tokens', async (req, res) => {
-    const data = await apiTokensService(req).createOne(req.body ?? {});
-    res.status(201).json({ data });
-  });
-
+  router.get('/tokens', async (req, res) => { res.json({ data: await apiTokensService(req).readMany() }); });
+  router.post('/tokens', async (req, res) => { res.status(201).json({ data: await apiTokensService(req).createOne(req.body ?? {}) }); });
   router.delete('/tokens/:id', async (req, res) => {
     const deleted = await apiTokensService(req).deleteOne(req.params.id);
     if (!deleted) {
@@ -172,7 +139,6 @@ export function createAuthRouter({ mailer = null, config = null, logger = consol
     }
     res.status(204).end();
   });
-
   return router;
 }
 
