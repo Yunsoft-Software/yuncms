@@ -5,23 +5,67 @@ import { validateMigration, applyMigrations, assertMigrationsApplied } from '../
 import { withAdvisoryLock } from '../src/advisory-lock.js';
 import { CORE_MIGRATIONS, REQUIRED_CORE_MIGRATION_IDS } from '../src/bootstrap.js';
 
-function createMigrationDatabase({ applied = [] } = {}) {
+function createMigrationDatabase({ applied = [], attempts = [], failOnSql = null } = {}) {
   const journal = new Set(applied);
+  const attemptJournal = new Map(attempts.map((attempt) => [attempt.migration_id, { ...attempt }]));
   const statements = [];
 
   return {
     statements,
+    attemptJournal,
     async query(sql, params = []) {
       const normalized = sql.replace(/\s+/g, ' ').trim();
       statements.push({ sql: normalized, params });
 
       if (normalized.startsWith('CREATE TABLE IF NOT EXISTS yuncms_schema_migrations')) return [{}, []];
+      if (normalized.startsWith('CREATE TABLE IF NOT EXISTS yuncms_schema_migration_attempts')) return [{}, []];
       if (normalized.startsWith('SELECT id FROM yuncms_schema_migrations')) {
         return [[...journal].sort().map((id) => ({ id })), []];
+      }
+      if (normalized.startsWith('SELECT migration_id, status, statement_index')) {
+        return [[...attemptJournal.values()].map((attempt) => ({ ...attempt })), []];
+      }
+      if (normalized.startsWith('INSERT INTO yuncms_schema_migration_attempts')) {
+        attemptJournal.set(params[0], {
+          migration_id: params[0],
+          status: 'applying',
+          statement_index: 0,
+          started_at: new Date(),
+          finished_at: null,
+          error_code: null,
+          error_message: null,
+        });
+        return [{ affectedRows: 1 }, []];
+      }
+      if (normalized.startsWith('UPDATE yuncms_schema_migration_attempts SET statement_index')) {
+        const attempt = attemptJournal.get(params[1]);
+        attempt.statement_index = params[0];
+        return [{ affectedRows: 1 }, []];
+      }
+      if (normalized.startsWith("UPDATE yuncms_schema_migration_attempts SET status = 'applied'")) {
+        const attempt = attemptJournal.get(params[0]);
+        attempt.status = 'applied';
+        attempt.finished_at = new Date();
+        attempt.error_code = null;
+        attempt.error_message = null;
+        return [{ affectedRows: 1 }, []];
+      }
+      if (normalized.startsWith("UPDATE yuncms_schema_migration_attempts SET status = 'failed'")) {
+        const attempt = attemptJournal.get(params[2]);
+        attempt.status = 'failed';
+        attempt.finished_at = new Date();
+        attempt.error_code = params[0];
+        attempt.error_message = params[1];
+        return [{ affectedRows: 1 }, []];
       }
       if (normalized.startsWith('INSERT INTO yuncms_schema_migrations')) {
         journal.add(params[0]);
         return [{ affectedRows: 1 }, []];
+      }
+      if (failOnSql && normalized === failOnSql) {
+        const error = new Error('simulated DDL failure');
+        error.code = 'ER_SIMULATED_DDL';
+        throw error;
       }
       return [{ affectedRows: 0 }, []];
     },
@@ -43,6 +87,41 @@ test('migration runner journals only unapplied migrations', async () => {
   assert.deepEqual(result.applied, ['0001', '0002']);
   assert.equal(database.statements.some(({ sql }) => sql === 'SELECT 1'), false);
   assert.equal(database.statements.some(({ sql }) => sql.startsWith('CREATE TABLE example')), true);
+  assert.equal(database.attemptJournal.get('0002').status, 'applied');
+  assert.equal(database.attemptJournal.get('0002').statement_index, 1);
+});
+
+test('migration runner records a failed statement and refuses a blind retry', async () => {
+  const migration = {
+    id: '0002',
+    statements: ['ALTER TABLE example ADD COLUMN first INT', 'ALTER TABLE example ADD COLUMN second INT'],
+  };
+  const database = createMigrationDatabase({ failOnSql: migration.statements[1] });
+
+  await assert.rejects(
+    applyMigrations(database, [migration]),
+    (error) => error.code === 'ER_SIMULATED_DDL' && error.migrationId === '0002',
+  );
+
+  const attempt = database.attemptJournal.get('0002');
+  assert.equal(attempt.status, 'failed');
+  assert.equal(attempt.statement_index, 1);
+  assert.equal(attempt.error_code, 'ER_SIMULATED_DDL');
+
+  const firstStatementRunsBeforeRetry = database.statements.filter(
+    ({ sql }) => sql === migration.statements[0],
+  ).length;
+
+  await assert.rejects(
+    applyMigrations(database, [migration]),
+    (error) => error.code === 'DATABASE_MIGRATION_RECOVERY_REQUIRED'
+      && error.migrationAttempts[0].migration_id === '0002',
+  );
+
+  assert.equal(
+    database.statements.filter(({ sql }) => sql === migration.statements[0]).length,
+    firstStatementRunsBeforeRetry,
+  );
 });
 
 test('compatibility check fails closed when migrations are missing', async () => {
