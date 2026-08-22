@@ -303,10 +303,17 @@ export function createRequestMcpServer(req, mcpConfig = {}) {
 }
 
 export function createMcpAccessGuard(mcpConfig = {}) {
-  const allowedOrigins = new Set(mcpConfig.allowedOrigins ?? []);
+  const allowedOrigins = new Set((mcpConfig.allowedOrigins ?? []).map((value) => String(value).toLowerCase()));
+  const allowedHosts = new Set((mcpConfig.allowedHosts ?? []).map((value) => String(value).toLowerCase()));
   return (req, res, next) => {
+    const host = String(req.get?.('host') ?? '').trim().toLowerCase();
+    if (allowedHosts.size > 0 && (!host || !allowedHosts.has(host))) {
+      return res.status(403).json({
+        errors: [{ code: 'MCP_HOST_FORBIDDEN', message: 'MCP request host is not allowed', request_id: req.id ?? null }],
+      });
+    }
     const origin = req.get?.('origin') ?? null;
-    if (origin && !allowedOrigins.has(origin)) {
+    if (origin && !allowedOrigins.has(String(origin).toLowerCase())) {
       return res.status(403).json({
         errors: [{ code: 'MCP_ORIGIN_FORBIDDEN', message: 'MCP request origin is not allowed', request_id: req.id ?? null }],
       });
