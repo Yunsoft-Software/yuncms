@@ -91,6 +91,7 @@ export function createApp({
   logger = console,
   serviceRegistry = createCoreServiceRegistry(),
   schemaCache = null,
+  permissionCache = null,
   emitter = null,
   storage = null,
   mailer = null,
@@ -140,6 +141,7 @@ export function createApp({
     logger,
     services,
     schemaCache,
+    permissionCache,
     emitter,
     storage,
   }));

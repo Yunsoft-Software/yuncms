@@ -100,7 +100,10 @@ export class PermissionsService extends BaseService {
   async resolve(action, collection) {
     assertAction(action);
     const key = cacheKey(this.accountability, action, collection);
-    if (this.permissionCache?.has(key)) return this.permissionCache.get(key);
+    if (this.permissionCache) {
+      const cached = await this.permissionCache.get(key);
+      if (cached !== undefined) return cached;
+    }
 
     let permission;
     if (this.accountability.admin === true || this.accountability.system === true) {
@@ -159,7 +162,7 @@ export class PermissionsService extends BaseService {
       };
     }
 
-    this.permissionCache?.set(key, permission);
+    if (this.permissionCache) await this.permissionCache.set(key, permission);
     return permission;
   }
 
@@ -239,7 +242,7 @@ export class PermissionsService extends BaseService {
         validation == null ? null : JSON.stringify(validation),
       ],
     );
-    this.permissionCache?.clear();
+    if (this.permissionCache) await this.permissionCache.clear();
     return this.readOne(id);
   }
 
@@ -289,7 +292,7 @@ export class PermissionsService extends BaseService {
       `UPDATE yuncms_permissions SET ${assignments.join(', ')} WHERE id = ?`,
       params,
     );
-    this.permissionCache?.clear();
+    if (this.permissionCache) await this.permissionCache.clear();
     return this.readOne(id);
   }
 
@@ -304,7 +307,7 @@ export class PermissionsService extends BaseService {
       error.code = 'PERMISSION_NOT_FOUND';
       throw error;
     }
-    this.permissionCache?.clear();
+    if (this.permissionCache) await this.permissionCache.clear();
     return true;
   }
 }

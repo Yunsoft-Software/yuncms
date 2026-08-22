@@ -24,6 +24,14 @@ function readString(value, fallback = '') {
   return value === undefined ? fallback : String(value);
 }
 
+function readCacheStore(value) {
+  const store = readString(value, 'memory').trim().toLowerCase();
+  if (store !== 'memory') {
+    throw new Error(`CACHE_STORE must be memory until a shared-store adapter is configured, received: ${store}`);
+  }
+  return store;
+}
+
 export function loadEnvFileIfPresent(path = '.env') {
   try {
     loadEnvFile(path);
@@ -62,6 +70,18 @@ export function loadConfig(env = process.env) {
     },
     logging: {
       level: readString(env.LOG_LEVEL, 'info'),
+    },
+    cache: {
+      enabled: readBoolean(env.CACHE_ENABLED, true),
+      store: readCacheStore(env.CACHE_STORE),
+      ttlMs: readInteger(env.CACHE_TTL_MS, 30_000, 'CACHE_TTL_MS', {
+        min: 1,
+        max: 24 * 60 * 60 * 1000,
+      }),
+      maxEntries: readInteger(env.CACHE_MAX_ENTRIES, 5_000, 'CACHE_MAX_ENTRIES', {
+        min: 1,
+        max: 1_000_000,
+      }),
     },
     database: {
       host: readString(env.DB_HOST, '127.0.0.1'),

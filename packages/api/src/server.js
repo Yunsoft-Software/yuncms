@@ -10,6 +10,7 @@ import {
   loadConfig,
   loadEnvFileIfPresent,
   LocalStorageDriver,
+  MemoryCacheStore,
   S3StorageDriver,
   SchemaCache,
   SmtpMailer,
@@ -35,6 +36,12 @@ if (config.storage.s3.bucket) {
   });
 }
 const storage = createStorageRegistry(storageDrivers);
+const permissionCache = config.cache.enabled
+  ? new MemoryCacheStore({
+    ttlMs: config.cache.ttlMs,
+    maxEntries: config.cache.maxEntries,
+  })
+  : null;
 
 const hasAnyMailConfig = Boolean(
   config.mail.host || config.mail.from || config.mail.user || config.mail.password,
@@ -122,6 +129,7 @@ async function start() {
     logger,
     serviceRegistry,
     schemaCache,
+    permissionCache,
     emitter,
     storage,
     mailer,

@@ -1,4 +1,5 @@
 import { requireAccountability } from './accountability.js';
+import { isCacheStore } from './cache.js';
 
 export function createRequestContext({
   accountability,
@@ -9,14 +10,16 @@ export function createRequestContext({
   env = {},
   emitter = null,
   storage = null,
-  permissionCache = new Map(),
+  permissionCache = null,
   requestId = null,
 } = {}) {
   requireAccountability(accountability);
 
   if (!services) throw new Error('Service registry is required');
   if (!database) throw new Error('Database handle is required');
-  if (!(permissionCache instanceof Map)) throw new Error('Permission cache must be a Map');
+  if (permissionCache !== null && !isCacheStore(permissionCache)) {
+    throw new Error('Permission cache must implement the cache-store contract');
+  }
 
   return Object.freeze({
     accountability,

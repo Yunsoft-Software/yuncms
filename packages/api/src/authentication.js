@@ -25,6 +25,7 @@ export function createAuthenticationMiddleware({
   logger,
   services,
   schemaCache = null,
+  permissionCache = null,
   emitter = null,
   storage = null,
 }) {
@@ -79,6 +80,7 @@ export function createAuthenticationMiddleware({
         env: config,
         emitter,
         storage,
+        permissionCache,
         requestId: req.id,
       });
       next();
