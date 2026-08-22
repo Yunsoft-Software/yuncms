@@ -24,6 +24,7 @@ import { INTERNAL_AUDIT_EVENTS } from './audit-events.js';
 import { loadExternalAuthConfig } from './external-auth/config.js';
 import { ExternalAuthProviderRegistry } from './external-auth/providers.js';
 import { loadExtensionRuntime } from './extensions/runtime.js';
+import { createMcpRouter } from './mcp.js';
 
 loadEnvFileIfPresent();
 await assertMaintenanceStartupAllowed({ cwd: process.cwd(), env: process.env });
@@ -123,6 +124,7 @@ async function start() {
     database: pool,
     logger,
   });
+  const mcpRouter = createMcpRouter({ config, logger });
   mailer?.setEmitter(emitter);
   registerInternalAudit({ emitter, services });
 
@@ -150,6 +152,7 @@ async function start() {
     redisClient,
     externalAuthRegistry,
     endpointExtensions: extensionRuntime.endpointExtensions,
+    mcpRouter,
   });
 
   await extensionRuntime.init('app.beforeStart');
