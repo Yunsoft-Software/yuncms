@@ -178,6 +178,33 @@ test('delegated manager cannot assign administrator role', async () => {
   assert.equal(updateCalled, false);
 });
 
+test('delegated manager cannot assign a different non-admin role', async () => {
+  let updateCalled = false;
+  const database = {
+    async query(sql, params = []) {
+      const normalized = sql.replace(/\s+/g, ' ').trim();
+      if (normalized.includes('FROM yuncms_permissions') && normalized.includes('WHERE role = ?')) {
+        return [[permissionRow('update')], []];
+      }
+      if (normalized.startsWith('SELECT u.id, r.admin AS role_admin')) {
+        return [[{ id: params[0], role_admin: 0 }], []];
+      }
+      if (normalized.startsWith('SELECT id, admin, public FROM yuncms_roles')) {
+        return [[{ id: params[0], admin: 0, public: 0 }], []];
+      }
+      if (normalized.startsWith('UPDATE yuncms_users')) updateCalled = true;
+      return [[], []];
+    },
+  };
+  const service = new UsersService({ database, schema, accountability: delegatedAccountability() });
+
+  await assert.rejects(
+    service.updateOne('manager-1', { role: 'more-powerful-role' }),
+    (error) => error.code === 'FORBIDDEN',
+  );
+  assert.equal(updateCalled, false);
+});
+
 test('delegated manager cannot modify an existing administrator account', async () => {
   let updateCalled = false;
   const database = {

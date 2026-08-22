@@ -63,6 +63,13 @@ async function assertRoleAssignable(database, role, accountability) {
   if (targetRole.admin && accountability.admin !== true && accountability.system !== true) {
     throw forbidden('Only an administrator can assign the administrator role');
   }
+  if (
+    accountability.admin !== true
+    && accountability.system !== true
+    && role !== accountability.role
+  ) {
+    throw forbidden('Delegated user managers may assign only their own role');
+  }
 }
 
 async function assertTargetManageable(database, id, accountability) {
