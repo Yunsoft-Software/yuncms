@@ -158,6 +158,7 @@
 - [x] `fields=*`, `fields=*.*`, direct nested field selection and legacy expansion regression contracts.
 - [x] Public Files deny-without-grant / allow-with-explicit-grant core and Studio permission-matrix contracts.
 - [x] Roles create/update/delete deny-without-grant / allow-with-explicit-grant contracts, including Public-configurable action metadata and protected administrator/public role invariants.
+- [x] Shared Studio confirmation dialogs remain distinct from forbidden native browser dialogs.
 - [x] Files full-preview and contain-style UI contracts.
 - [x] File-backed logo/favicon service/API/client source contracts.
 - [x] Dark pagination/permission/badge surface contracts.
