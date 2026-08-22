@@ -277,12 +277,16 @@ export async function restoreProjectBackup({
   restoreDatabaseFn = restoreDatabase,
   resetDatabaseFn = resetDatabaseObjects,
   verifyDatabaseFn = verifyDatabaseDump,
+  beforeDestructive = null,
   output = console,
 } = {}) {
   if (!backupPath) {
     const error = new Error('Backup path is required');
     error.code = 'BACKUP_PATH_REQUIRED';
     throw error;
+  }
+  if (beforeDestructive !== null && typeof beforeDestructive !== 'function') {
+    throw new Error('beforeDestructive must be a function when provided');
   }
 
   const { backupPath: resolvedBackupPath, manifest } = await readBackupManifest(backupPath);
@@ -293,6 +297,7 @@ export async function restoreProjectBackup({
   output.log?.(`Validating backup before destructive restore: ${resolvedBackupPath}`);
   await verifyDatabaseFn({ inputPath: databaseDumpPath });
   await assertExpectedBackupAssets(resolvedBackupPath, manifest);
+  if (beforeDestructive) await beforeDestructive();
 
   output.log?.(`Resetting database before restore: ${config.database.database}`);
   await resetDatabaseFn({ config: config.database });
