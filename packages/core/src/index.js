@@ -79,6 +79,7 @@ export { withAdvisoryLock } from './advisory-lock.js';
 export {
   ensureMigrationJournal,
   readAppliedMigrations,
+  readMigrationAttempts,
   validateMigration,
   applyMigrations,
   assertMigrationsApplied,
