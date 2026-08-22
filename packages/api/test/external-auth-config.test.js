@@ -31,3 +31,29 @@ test('ldap requires TLS unless explicitly opted into insecure transport', () => 
     AUTH_PROVIDER_CORP_BASE_DN: 'dc=example,dc=test',
   }), /ldaps/);
 });
+
+test('ldap uses a stable subject attribute instead of DN identity', () => {
+  const config = loadExternalAuthConfig({
+    AUTH_PROVIDERS: 'corp',
+    AUTH_PROVIDER_CORP_DRIVER: 'ldap',
+    AUTH_PROVIDER_CORP_URL: 'ldaps://directory.example.test',
+    AUTH_PROVIDER_CORP_BASE_DN: 'dc=example,dc=test',
+  });
+  assert.equal(config.providers[0].subjectAttribute, 'entryUUID');
+
+  const activeDirectory = loadExternalAuthConfig({
+    AUTH_PROVIDERS: 'corp',
+    AUTH_PROVIDER_CORP_DRIVER: 'ldap',
+    AUTH_PROVIDER_CORP_URL: 'ldaps://directory.example.test',
+    AUTH_PROVIDER_CORP_BASE_DN: 'dc=example,dc=test',
+    AUTH_PROVIDER_CORP_SUBJECT_ATTRIBUTE: 'objectGUID',
+  });
+  assert.equal(activeDirectory.providers[0].subjectAttribute, 'objectGUID');
+  assert.throws(() => loadExternalAuthConfig({
+    AUTH_PROVIDERS: 'corp',
+    AUTH_PROVIDER_CORP_DRIVER: 'ldap',
+    AUTH_PROVIDER_CORP_URL: 'ldaps://directory.example.test',
+    AUTH_PROVIDER_CORP_BASE_DN: 'dc=example,dc=test',
+    AUTH_PROVIDER_CORP_SUBJECT_ATTRIBUTE: 'bad attribute',
+  }), /subject attribute is invalid/);
+});
