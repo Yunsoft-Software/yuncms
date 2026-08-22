@@ -31,7 +31,7 @@ export async function isLocalYunCmsReachable({
 export async function assertYunCmsStopped(options = {}) {
   const running = await isLocalYunCmsReachable(options);
   if (!running) return true;
-  const error = new Error('YunCMS is currently reachable; stop the service supervisor before backup/update');
+  const error = new Error('YunCMS is currently reachable; stop the service supervisor before backup, restore or update');
   error.code = 'UPDATE_APPLICATION_RUNNING';
   throw error;
 }
