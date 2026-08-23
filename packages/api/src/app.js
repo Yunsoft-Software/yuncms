@@ -127,6 +127,7 @@ export function createApp({
   redisClient = null,
   externalAuthRegistry = null,
   endpointExtensions = [],
+  aiRouter = null,
   mcpRouter = null,
   studioRoot = undefined,
 }) {
@@ -187,6 +188,7 @@ export function createApp({
   const requestEvents = createRequestEvents(emitter);
   if (requestEvents) app.use(requestEvents);
 
+  if (aiRouter) app.use('/ai', aiRouter);
   if (mcpRouter) app.use('/mcp', mcpRouter);
   app.use('/studio-settings', createStudioSettingsRouter());
   app.use('/auth', createAuthRouter({ mailer, config, logger, rateLimitStore, externalAuthRegistry }));
