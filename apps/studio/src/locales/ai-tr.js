@@ -13,7 +13,7 @@ export const AI_TR = Object.freeze({
   'ai.setupDescription': 'Sunucuya bir model sağlayıcısı bağlandığında bu ekran doğrudan kullanıma açılır. Ayrı bir uygulama çalıştırmanız gerekmez.',
   'ai.newChat': 'Yeni sohbet',
   'ai.welcomeTitle': 'YunCMS verilerinle konuş',
-  'ai.welcomeDescription': 'Koleksiyonlarını ve kayıtlarını mevcut kullanıcı izinların dahilinde inceleyebilirim. Erişimin olmayan verileri göremem.',
+  'ai.welcomeDescription': 'Koleksiyonlarını ve kayıtlarını mevcut kullanıcı izinlerin dahilinde inceleyebilirim. Erişimin olmayan verileri göremem.',
   'ai.starterCollections': 'Koleksiyonlarımı özetle',
   'ai.starterStructure': 'İçerik yapımı ve ilişkilerimi anlat',
   'ai.starterOverview': 'Erişebildiğim verileri genel olarak incele',
