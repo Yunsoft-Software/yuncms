@@ -23,6 +23,12 @@
     "test": "node scripts/verify.mjs full",
     "test:fast": "node scripts/verify.mjs fast",
     "test:release": "node scripts/verify.mjs release",
+    "test:mcp:mysql": "node --test --test-reporter=spec test/integration/mcp-runtime.test.js",
+    "test:migration:mysql": "node --test --test-reporter=spec test/integration/external-auth-migration.test.js",
+    "test:query:mysql": "node --test --test-reporter=spec test/integration/query-capabilities.test.js",
     "test:upgrade:mysql": "node --test --test-reporter=spec test/integration/managed-upgrade.test.js"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0"
   }
 }

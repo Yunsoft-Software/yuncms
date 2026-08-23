@@ -1,6 +1,6 @@
 import express from 'express';
-import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
-import { McpServer } from '@modelcontextprotocol/server';
+import { toNodeHandler } from '@modelcontextprotocol/node';
+import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import {
   readManyWithRelations,
   readOneWithRelations,
@@ -339,21 +339,22 @@ export function createMcpRouter({ config, logger = console } = {}) {
     });
   });
   router.post('/', async (req, res, next) => {
-    const server = createRequestMcpServer(req, config.mcp);
-    const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    let connected = false;
+    const reportError = (error) => logger.error?.('YunCMS MCP request failed', {
+      requestId: req.id ?? null,
+      code: error?.code ?? null,
+    });
+    const handler = createMcpHandler(
+      () => createRequestMcpServer(req, config.mcp),
+      { legacy: 'stateless', onerror: reportError },
+    );
+    const nodeHandler = toNodeHandler(handler, { onerror: reportError });
     try {
-      await server.connect(transport);
-      connected = true;
-      await transport.handleRequest(req, res, req.body);
+      await nodeHandler(req, res, req.body);
     } catch (error) {
       if (!res.headersSent) return next(error);
-      logger.error?.('YunCMS MCP request failed after response started', {
-        requestId: req.id ?? null,
-        code: error?.code ?? null,
-      });
+      reportError(error);
     } finally {
-      if (connected) await server.close().catch(() => {});
+      await handler.close().catch(reportError);
     }
     return undefined;
   });

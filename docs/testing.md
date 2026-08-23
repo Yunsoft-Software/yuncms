@@ -88,6 +88,30 @@ The integration flow covers one real cross-feature path through:
 - malformed JSON and request-id response contract;
 - destructive relation/schema cleanup.
 
+Focused real-MySQL gates can be run independently when their contracts change:
+
+```bash
+npm run test:migration:mysql
+npm run test:query:mysql
+npm run test:mcp:mysql
+npm run test:upgrade:mysql
+```
+
+They use the same `YUNCMS_TEST_MYSQL=1` and
+`YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1` safety gates. Migration and managed-upgrade
+tests additionally require dedicated databases and their explicit opt-ins:
+
+```env
+YUNCMS_TEST_MIGRATION=1
+YUNCMS_MIGRATION_TEST_DB_DATABASE=yuncms_migration_test
+YUNCMS_TEST_UPGRADE=1
+YUNCMS_UPGRADE_TEST_DB_DATABASE=yuncms_upgrade_test
+```
+
+The focused gates verify fresh/pre-0013 migration behavior, bounded multi-hop
+relation expansion and to-many limits, MCP `2026-07-28` negotiation with the
+official v2 client, and real `mysqldump` backup/restore plus maintenance locking.
+
 ## Checks intentionally kept outside the routine source suite
 
 Some claims depend on real infrastructure and cannot be proven by mocks:
