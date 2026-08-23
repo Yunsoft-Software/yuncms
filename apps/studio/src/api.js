@@ -197,6 +197,23 @@ export async function exchangeAuthCode(authCode) {
   return body.data;
 }
 
+export async function aiStatus() {
+  const body = await apiRequest('/ai/status');
+  return body?.data ?? null;
+}
+
+export async function aiChat(messages, { locale = 'tr', allowWrites = false } = {}) {
+  const body = await apiRequest('/ai/chat', {
+    method: 'POST',
+    body: {
+      messages,
+      locale,
+      allow_writes: allowWrites,
+    },
+  });
+  return body?.data ?? null;
+}
+
 export async function logout() {
   const session = readSession();
   try {
