@@ -61,6 +61,7 @@ export function loadAiConfig(env = process.env) {
     model,
     writesEnabled: readBoolean(env.AI_WRITES_ENABLED, false),
     maxToolRounds: readInteger(env.AI_MAX_TOOL_ROUNDS, 6, 'AI_MAX_TOOL_ROUNDS', { min: 1, max: 12 }),
+    maxToolCallsPerRound: readInteger(env.AI_MAX_TOOL_CALLS_PER_ROUND, 8, 'AI_MAX_TOOL_CALLS_PER_ROUND', { min: 1, max: 20 }),
     maxHistory: readInteger(env.AI_MAX_HISTORY, 20, 'AI_MAX_HISTORY', { min: 1, max: 50 }),
     maxMessageChars: readInteger(env.AI_MAX_MESSAGE_CHARS, 12_000, 'AI_MAX_MESSAGE_CHARS', { min: 100, max: 50_000 }),
     maxToolResultBytes: readInteger(env.AI_MAX_TOOL_RESULT_BYTES, 250_000, 'AI_MAX_TOOL_RESULT_BYTES', { min: 10_000, max: 2_000_000 }),
