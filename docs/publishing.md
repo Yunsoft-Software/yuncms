@@ -22,6 +22,8 @@ The `0.1.5` package family was published on 2026-08-22 after Node 24 fast/releas
 
 The `0.1.6` package family was published on 2026-08-23 after Node 24 fast/full/release gates, all nine real MySQL/API integration files, two-process Redis and scheduler checks, Studio browser smoke, managed-backup corruption/target safeguards, final tarball installation and a clean public-registry init/bootstrap/start/login smoke passed. All four `latest` tags, registry SHASUM/integrity values and exact internal `0.1.6` dependency pins were verified anonymously. Detailed commands and remaining deployment-specific exclusions are recorded in [`release-evidence-0.1.6.md`](release-evidence-0.1.6.md).
 
+The `0.1.7` package family was published on 2026-08-23 after a clean published `0.1.5 -> 0.1.6`, blocked managed downgrade, exact backup-based `0.1.6 -> 0.1.5` recovery, repeated `0.1.5 -> 0.1.6` upgrade and final published `0.1.6 -> 0.1.7` transition. It fixes false `SERVER_PRESSURE` responses caused by comparing live heap use with only the currently committed heap, and makes the manual restore dependency-reinstall requirement explicit. Node 24 full/release gates, all nine real integration files, local and registry package checks, MCP v2 negotiation and Studio browser checks passed. Detailed evidence is recorded in [`release-evidence-0.1.7.md`](release-evidence-0.1.7.md).
+
 ## Naming direction
 
 Keep the product and executable command simple:
