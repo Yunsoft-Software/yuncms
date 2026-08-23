@@ -23,6 +23,7 @@ The following real package/database transitions were then executed:
 3. exact restore of the pre-upgrade backup, followed by `npm ci`, returning package/lock/node_modules, 12 migrations, display metadata, rows, permissions, tokens and file bytes to the `0.1.5` snapshot;
 4. a second published `0.1.5 -> 0.1.6` managed update and readiness probe;
 5. published `0.1.6 -> 0.1.7` dry-run and managed update, including a verified backup and readiness probe.
+6. published `0.1.7 -> 0.1.6` dry-run and real update refusal with `UPDATE_DOWNGRADE_FORBIDDEN`; package/lock/node_modules, environment and file hash remained unchanged before the final `0.1.7` restart.
 
 The final project has exact `0.1.7` pins in `package.json` and `package-lock.json`, installed CLI/API/core `0.1.7`, 13 migrations, two articles, two authors, one file and the original Public permissions.
 
@@ -58,6 +59,8 @@ All four packages were published publicly and verified anonymously with `latest=
 The published `0.1.7` runtime completed a 135-request HTTP/API pass without `SERVER_PRESSURE`, negotiated MCP `2026-07-28` as `yuncms 0.1.7`, exposed all seven tools, enforced Host and Origin guards, returned both administrator rows and only one Public row, expanded both authors and reproduced the original file SHA-256.
 
 The built Studio was exercised through a real browser against the published runtime. Turkish login succeeded, the sidebar showed both collections, the content grid showed both relation-expanded records, API status was online, and the preserved PNG opened in the authenticated preview dialog.
+
+After the final downgrade refusal, the published test installation was restarted on `127.0.0.1:3018`; `/health` returned 200 and `/ready` returned 200 with ready status.
 
 ## Remaining deployment-specific exclusions
 
