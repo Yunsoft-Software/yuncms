@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { aiChat, aiStatus } from '../api.js';
+import { trimConversationHistory } from '../ai-history.js';
 import { useI18n } from '../i18n.js';
 
 const STARTER_KEYS = Object.freeze([
@@ -22,13 +23,6 @@ const OPERATION_KEYS = Object.freeze({
 function operationText(operation, t) {
   const key = OPERATION_KEYS[operation?.operation] ?? 'ai.operationGeneric';
   return t(key, { collection: operation?.collection || t('ai.operationData') });
-}
-
-function trimConversationHistory(messages, maxHistory = 20) {
-  const safeLimit = Number.isInteger(maxHistory) && maxHistory > 0 ? maxHistory : 20;
-  let trimmed = messages.slice(-safeLimit);
-  if (trimmed[0]?.role === 'assistant') trimmed = trimmed.slice(1);
-  return trimmed;
 }
 
 export function AiScreen() {
@@ -244,4 +238,4 @@ export function AiScreen() {
   );
 }
 
-export { operationText, trimConversationHistory };
+export { operationText };
