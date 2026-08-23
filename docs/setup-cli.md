@@ -85,6 +85,8 @@ yuncms restore /srv/backups/yuncms-2026-08-22 --yes --allow-different-database-t
 
 Restore resets current tables/views first, then imports the dump and restores project assets. This prevents tables created only by a failed migration from surviving an old dump import.
 
+If package metadata was restored, synchronize installed dependencies before starting the service: use `npm ci` when the snapshot contains `package-lock.json`, otherwise use `npm install`. The restore command prints this required follow-up because it restores package files without mutating `node_modules`.
+
 ### `yuncms update`
 
 Inspect without modifying project state:

@@ -60,7 +60,7 @@ export async function runRestoreCommand({
       await maintenanceLock.assertHeld();
     };
 
-    return await restoreBackup({
+    const restored = await restoreBackup({
       backupPath: resolve(cwd, positionals[0]),
       cwd,
       env,
@@ -68,6 +68,12 @@ export async function runRestoreCommand({
       allowDifferentDatabaseTarget: values['--allow-different-database-target'] === true,
       beforeDestructive,
     });
+    if (restored?.manifest?.project?.packageLock) {
+      output.warn?.('Project package files were restored. Run npm ci before starting YunCMS so node_modules matches the restored lockfile.');
+    } else if (restored?.manifest?.project?.packageJson) {
+      output.warn?.('Project package.json was restored. Run npm install before starting YunCMS so node_modules matches the restored project.');
+    }
+    return restored;
   } finally {
     if (maintenanceLock) await maintenanceLock.release();
     await lock.release();

@@ -265,6 +265,8 @@ Before destructive reset, restore:
 
 Only then does it reset current database tables/views and import the dump.
 
+When the backup contains `package-lock.json`, run `npm ci` after restore and before starting YunCMS. Manual restore replaces the recorded package files but does not mutate `node_modules`; this explicit reinstall makes the installed dependency graph match the restored runtime. If the snapshot contains only `package.json`, run `npm install` instead. The CLI prints the same reminder after a successful restore.
+
 ## Starting production again
 
 A successful `yuncms update` verifies the new runtime and then stops that temporary process. Start YunCMS with the same production supervisor used before the maintenance window.

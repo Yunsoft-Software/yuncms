@@ -59,3 +59,23 @@ test('manual restore holds database lock and rechecks ownership before destructi
     'stopped', 'db-held', 'restore-reset', 'db-unlock', 'unlock',
   ]);
 });
+
+test('manual restore tells operators to reinstall the restored dependency graph', async () => {
+  const warnings = [];
+  const events = [];
+  const restored = await runRestoreCommand({
+    args: ['./backup', '--yes'], cwd: '/srv/yuncms', env,
+    output: { log() {}, warn(message) { warnings.push(message); } },
+    async acquireLock() { return fakeLock(events); },
+    async acquireMaintenanceLock() { return fakeMaintenanceLock(events); },
+    async assertStopped() { return true; },
+    async restoreBackup() {
+      return { manifest: { project: { packageJson: true, packageLock: true } } };
+    },
+  });
+
+  assert.equal(restored.manifest.project.packageLock, true);
+  assert.deepEqual(warnings, [
+    'Project package files were restored. Run npm ci before starting YunCMS so node_modules matches the restored lockfile.',
+  ]);
+});
