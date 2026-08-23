@@ -38,7 +38,8 @@ test('pressure limiter sheds requests when heap pressure reaches threshold', () 
   const limiter = createPressureLimit({
     maxConcurrent: 10,
     maxHeapPercent: 95,
-    memoryUsage: () => ({ heapUsed: 96, heapTotal: 100 }),
+    memoryUsage: () => ({ heapUsed: 96 }),
+    heapSizeLimit: () => 100,
   });
   const res = responseRecorder();
   let nextCalled = false;
@@ -52,11 +53,29 @@ test('pressure limiter sheds requests when heap pressure reaches threshold', () 
   assert.equal(res.body.errors[0].request_id, 'req-memory');
 });
 
+test('pressure limiter compares usage with the V8 heap limit instead of the currently committed heap', () => {
+  const limiter = createPressureLimit({
+    maxConcurrent: 10,
+    maxHeapPercent: 95,
+    memoryUsage: () => ({ heapUsed: 96, heapTotal: 100 }),
+    heapSizeLimit: () => 1000,
+  });
+  const res = responseRecorder();
+  let nextCalled = false;
+
+  limiter({ id: 'req-growing-heap' }, res, () => { nextCalled = true; });
+
+  assert.equal(nextCalled, true);
+  assert.equal(res.statusCode, 200);
+  res.emit('finish');
+});
+
 test('pressure limiter bounds concurrent requests and releases capacity on finish', () => {
   const limiter = createPressureLimit({
     maxConcurrent: 1,
     maxHeapPercent: 95,
-    memoryUsage: () => ({ heapUsed: 10, heapTotal: 100 }),
+    memoryUsage: () => ({ heapUsed: 10 }),
+    heapSizeLimit: () => 100,
   });
 
   const first = responseRecorder();
@@ -83,4 +102,5 @@ test('pressure limiter validates thresholds', () => {
   assert.throws(() => createPressureLimit({ maxConcurrent: 0 }), /maxConcurrent/);
   assert.throws(() => createPressureLimit({ maxHeapPercent: 101 }), /cannot exceed 100/);
   assert.throws(() => createPressureLimit({ retryAfterSeconds: 0 }), /retryAfterSeconds/);
+  assert.throws(() => createPressureLimit({ heapSizeLimit: 100 }), /heapSizeLimit/);
 });
