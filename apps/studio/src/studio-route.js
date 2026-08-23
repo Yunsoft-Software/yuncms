@@ -1,4 +1,4 @@
-const TOP_LEVEL_SECTIONS = new Set(['appearance', 'files', 'roles', 'users']);
+const TOP_LEVEL_SECTIONS = new Set(['ai', 'appearance', 'files', 'roles', 'users']);
 
 function decode(value = '') {
   try {
@@ -84,6 +84,7 @@ export const studioPath = Object.freeze({
   users: () => '#/users',
   newUser: () => '#/users/new',
   user: (userId) => `#/users/${encode(userId)}`,
+  ai: () => '#/ai',
   appearance: () => '#/appearance',
 });
 
