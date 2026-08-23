@@ -248,7 +248,7 @@ test('role permission actions migration remains required', () => {
   assert.match(source, /JSON_ARRAY\('read', 'create', 'update', 'delete'\)/);
 });
 
-test('Files read-filter migration is the latest compatibility gate', () => {
+test('Files read-filter migration remains required', () => {
   const migration = CORE_MIGRATIONS.find(({ id }) => id === '0012-files-read-filters');
   assert.ok(migration);
   assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0012-files-read-filters'));
@@ -256,7 +256,18 @@ test('Files read-filter migration is the latest compatibility gate', () => {
   assert.match(source, /collection = 'yuncms_files'/);
   assert.match(source, /permissionMode/);
   assert.match(source, /filter-read/);
-  assert.equal(CORE_MIGRATIONS.at(-1).id, '0012-files-read-filters');
+});
+
+test('external auth foundation migration is the latest compatibility gate', () => {
+  const migration = CORE_MIGRATIONS.find(({ id }) => id === '0013-external-auth-foundation');
+  assert.ok(migration);
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0013-external-auth-foundation'));
+  const source = migration.statements.join('\n');
+  assert.match(source, /CREATE TABLE IF NOT EXISTS yuncms_auth_identities/);
+  assert.match(source, /UNIQUE KEY uq_yuncms_auth_identity_provider_subject \(provider, subject\)/);
+  assert.match(source, /CREATE TABLE IF NOT EXISTS yuncms_auth_transactions/);
+  assert.match(source, /UNIQUE KEY uq_yuncms_auth_transaction_state \(state_hash\)/);
+  assert.equal(CORE_MIGRATIONS.at(-1).id, '0013-external-auth-foundation');
 });
 
 test('advisory lock uses one connection and always releases it', async () => {

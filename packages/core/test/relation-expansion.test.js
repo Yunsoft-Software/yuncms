@@ -236,8 +236,8 @@ test('wildcard nested expansion silently omits unreadable source relations', asy
   assert.equal(calls.some((call) => call.collection === 'authors'), false);
 });
 
-test('fields rejects relation depth deeper than one level for the current direct relation engine', async () => {
-  const { FakeItemsService } = createHarness();
+test('fields rejects a non-relation segment before executing data queries', async () => {
+  const { FakeItemsService, calls } = createHarness();
   await assert.rejects(
     readManyWithRelations({
       collection: 'articles',
@@ -245,6 +245,7 @@ test('fields rejects relation depth deeper than one level for the current direct
       options: { schema, database: {} },
       ItemsServiceClass: FakeItemsService,
     }),
-    (error) => error.code === 'UNSUPPORTED_RELATION_EXPANSION',
+    (error) => error.code === 'INVALID_QUERY' && error.path === 'fields.author_id.profile.name',
   );
+  assert.deepEqual(calls, []);
 });

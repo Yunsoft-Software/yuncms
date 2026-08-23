@@ -14,6 +14,8 @@ test('global API rate limit is enabled with bounded production defaults', () => 
   const defaults = loadConfig({}).server.rateLimit;
   assert.deepEqual(defaults, {
     enabled: true,
+    store: 'memory',
+    failureMode: 'best-effort',
     windowMs: 60_000,
     max: 300,
     maxBuckets: 10_000,
@@ -36,7 +38,7 @@ test('server pressure limiting is enabled with bounded production defaults', () 
   assert.equal(disabled.enabled, false);
 });
 
-test('permission cache defaults to bounded process-local memory', () => {
+test('permission cache defaults to bounded memory and requires a URL for Redis', () => {
   assert.deepEqual(loadConfig({}).cache, {
     enabled: true,
     store: 'memory',
@@ -44,7 +46,11 @@ test('permission cache defaults to bounded process-local memory', () => {
     maxEntries: 5_000,
   });
   assert.equal(loadConfig({ CACHE_ENABLED: 'false' }).cache.enabled, false);
-  assert.throws(() => loadConfig({ CACHE_STORE: 'redis' }), /CACHE_STORE must be memory/);
+  assert.throws(() => loadConfig({ CACHE_STORE: 'redis' }), /REDIS_URL is required/);
+  assert.equal(loadConfig({
+    CACHE_STORE: 'redis',
+    REDIS_URL: 'redis://127.0.0.1:6379',
+  }).cache.store, 'redis');
 });
 
 test('production-sensitive boolean config fails closed on ambiguous values', () => {
