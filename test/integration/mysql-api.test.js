@@ -65,6 +65,7 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
   let adminUserId;
   let publicPermissionId;
   let uploadedFileId;
+  const signatureFileIds = [];
   let apiTokenId;
 
   try {
@@ -303,6 +304,47 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
     assert.equal(fileContentResponse.status, 200);
     assert.equal(await fileContentResponse.text(), `integration-file-${runId}`);
 
+    const signatureFixtures = [
+      ['fixture.pdf', 'application/pdf', new TextEncoder().encode('%PDF-1.4\n%%EOF\n')],
+      ['fixture.png', 'image/png', Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00])],
+      ['fixture.jpg', 'image/jpeg', Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00])],
+      ['fixture.gif', 'image/gif', new TextEncoder().encode('GIF89a\u0001\u0000\u0001\u0000')],
+      ['fixture.webp', 'image/webp', Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0x04, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x00])],
+    ];
+    for (const [filename, mimetype, bytes] of signatureFixtures) {
+      const signatureUpload = await request('/files', {
+        method: 'POST',
+        token: accessToken,
+        headers: {
+          'content-type': 'application/octet-stream',
+          'x-filename': encodeURIComponent(`${runId}-${filename}`),
+          'x-mimetype': mimetype,
+        },
+        body: bytes,
+      });
+      assert.equal(signatureUpload.response.status, 201, `${mimetype} signature should be accepted`);
+      signatureFileIds.push(signatureUpload.payload.data.id);
+    }
+
+    const mismatchedFilename = `${runId}-spoofed.png`;
+    const mismatchedSignature = await request('/files', {
+      method: 'POST',
+      token: accessToken,
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-filename': encodeURIComponent(mismatchedFilename),
+        'x-mimetype': 'image/png',
+      },
+      body: new TextEncoder().encode('not a PNG file'),
+    });
+    assert.equal(mismatchedSignature.response.status, 400);
+    assert.equal(mismatchedSignature.payload.errors[0].code, 'FILE_MIME_MISMATCH');
+    const [mismatchedRows] = await pool.query(
+      'SELECT id FROM yuncms_files WHERE filename_download = ?',
+      [mismatchedFilename],
+    );
+    assert.deepEqual(mismatchedRows, []);
+
     const filePatch = await request(`/files/${uploadedFileId}`, {
       method: 'PATCH', token: accessToken,
       body: { title: 'Integration file', filenameDownload: `renamed-${runId}.txt` },
@@ -330,6 +372,13 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
     });
     assert.equal(tokenDeleted.response.status, 204);
     apiTokenId = null;
+
+    for (const signatureFileId of signatureFileIds.splice(0)) {
+      const deleted = await request(`/files/${signatureFileId}`, {
+        method: 'DELETE', token: accessToken,
+      });
+      assert.equal(deleted.response.status, 204);
+    }
 
     const fileDeleted = await request(`/files/${uploadedFileId}`, {
       method: 'DELETE', token: accessToken,
@@ -365,6 +414,9 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
     }
     if (apiTokenId) await pool.query('DELETE FROM yuncms_api_tokens WHERE id = ?', [apiTokenId]).catch(() => {});
     if (uploadedFileId) await pool.query('DELETE FROM yuncms_files WHERE id = ?', [uploadedFileId]).catch(() => {});
+    for (const signatureFileId of signatureFileIds) {
+      await pool.query('DELETE FROM yuncms_files WHERE id = ?', [signatureFileId]).catch(() => {});
+    }
     for (const collection of [names.junction, names.articles, names.authors, names.tags]) {
       await pool.query(`DROP TABLE IF EXISTS \`${collection}\``).catch(() => {});
       await pool.query('DELETE FROM yuncms_collections WHERE collection = ?', [collection]).catch(() => {});
