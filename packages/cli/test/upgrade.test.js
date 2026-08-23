@@ -64,7 +64,7 @@ test('restore validates backup before resetting database and restores the exact 
 
 test('database reset disables FK checks and drops views before tables', async () => {
   const calls = []; let released = false; let closed = false;
-  const connection = { async query(sql, params = []) { const normalized = sql.replace(/\s+/g, ' ').trim(); calls.push({ sql: normalized, params }); if (normalized.startsWith('SELECT table_name, table_type')) return [[{ table_name: 'report_view', table_type: 'VIEW' }, { table_name: 'orders', table_type: 'BASE TABLE' }], []]; return [{ affectedRows: 0 }, []]; }, release() { released = true; } };
+  const connection = { async query(sql, params = []) { const normalized = sql.replace(/\s+/g, ' ').trim(); calls.push({ sql: normalized, params }); if (normalized.startsWith('SELECT TABLE_NAME AS object_name, TABLE_TYPE AS object_type')) return [[{ object_name: 'report_view', object_type: 'VIEW' }, { object_name: 'orders', object_type: 'BASE TABLE' }], []]; return [{ affectedRows: 0 }, []]; }, release() { released = true; } };
   const pool = { async getConnection() { return connection; } };
   await resetDatabaseObjects({ config: { database: 'yuncms_test' }, createPool: () => pool, async closePool() { closed = true; } });
   assert.equal(calls[1].sql, 'SET FOREIGN_KEY_CHECKS = 0'); assert.equal(calls[2].sql, 'DROP VIEW IF EXISTS `report_view`'); assert.equal(calls[3].sql, 'DROP TABLE IF EXISTS `orders`'); assert.equal(calls[4].sql, 'SET FOREIGN_KEY_CHECKS = 1'); assert.equal(released, true); assert.equal(closed, true);

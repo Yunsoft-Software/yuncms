@@ -15,18 +15,18 @@ export async function resetDatabaseObjects({
   const connection = await pool.getConnection();
   try {
     const [rows] = await connection.query(
-      `SELECT table_name, table_type
+      `SELECT TABLE_NAME AS object_name, TABLE_TYPE AS object_type
        FROM information_schema.tables
-       WHERE table_schema = ?
-       ORDER BY CASE WHEN table_type = 'VIEW' THEN 0 ELSE 1 END, table_name ASC`,
+       WHERE TABLE_SCHEMA = ?
+       ORDER BY CASE WHEN TABLE_TYPE = 'VIEW' THEN 0 ELSE 1 END, TABLE_NAME ASC`,
       [config.database],
     );
 
     await connection.query('SET FOREIGN_KEY_CHECKS = 0');
     try {
       for (const row of rows) {
-        const name = quoteIdentifier(row.table_name, 'database object name');
-        if (row.table_type === 'VIEW') {
+        const name = quoteIdentifier(row.object_name, 'database object name');
+        if (row.object_type === 'VIEW') {
           await connection.query(`DROP VIEW IF EXISTS ${name}`);
         } else {
           await connection.query(`DROP TABLE IF EXISTS ${name}`);
