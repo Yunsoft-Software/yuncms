@@ -60,11 +60,13 @@ test('AI conversation accepts only bounded user/assistant history and requires a
   );
 });
 
-test('AI status never exposes provider credentials', () => {
+test('AI status exposes limits and capabilities but never provider credentials', () => {
   const service = new AiAssistantService({ config: config(), fetchImpl: async () => assert.fail('not called') });
   const status = service.status();
   assert.equal(status.enabled, true);
   assert.equal(status.model, 'example-model');
+  assert.equal(status.max_history, 20);
+  assert.equal(status.writes_available, false);
   assert.equal(Object.hasOwn(status, 'apiKey'), false);
   assert.equal(JSON.stringify(status).includes('top-secret-key'), false);
 });
@@ -86,6 +88,8 @@ test('AI assistant sends a protected system prompt and returns a normal chat ans
   assert.equal(result.writes_enabled, false);
   assert.match(providerBody.messages[0].content, /embedded inside YunCMS Studio/);
   assert.match(providerBody.messages[0].content, /current account does not have that access/);
+  assert.match(providerBody.messages[0].content, /untrusted data/);
+  assert.match(providerBody.messages[0].content, /stored content/);
   assert.equal(providerBody.messages[1].role, 'user');
   assert.equal(providerBody.tools.some((tool) => tool.function.name === 'items_create'), false);
 });
