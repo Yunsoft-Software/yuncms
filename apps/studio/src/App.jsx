@@ -8,6 +8,7 @@ import { SidebarIcon } from './components/SidebarIcon.jsx';
 import { useI18n } from './i18n.js';
 import { displaySchemaName } from './schema-name.js';
 import { navigateStudio, readStudioRoute, studioPath } from './studio-route.js';
+import { AiScreen } from './screens/AiScreen.jsx';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
 import { ContentScreen } from './screens/ContentScreen.jsx';
@@ -30,6 +31,7 @@ function sectionCopy(section, t) {
     users: ['section.usersTitle', 'section.usersDescription'],
     roles: ['section.rolesTitle', 'section.rolesDescription'],
     files: ['section.filesTitle', 'section.filesDescription'],
+    ai: ['section.aiTitle', 'section.aiDescription'],
     appearance: ['section.appearanceTitle', 'section.appearanceDescription'],
   };
   const keys = copy[section];
@@ -176,6 +178,7 @@ export function App() {
     if (section === 'users') return <UsersScreen route={route} onNavigate={navigateStudio} currentUserId={session?.user?.id} />;
     if (section === 'roles') return <RolesPermissionsScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'files') return <FilesScreen route={route} onNavigate={navigateStudio} />;
+    if (section === 'ai') return <AiScreen />;
     if (section === 'appearance') return <AppearanceScreen />;
     return (
       <ContentScreen
@@ -212,6 +215,7 @@ export function App() {
       users: studioPath.users(),
       roles: studioPath.roles(),
       files: studioPath.files(),
+      ai: studioPath.ai(),
       appearance: studioPath.appearance(),
       content: studioPath.content(contentCollection),
     };
@@ -303,6 +307,16 @@ export function App() {
               </button>
             )}
           </AccordionGroup>
+
+          <button
+            className={`nav-item nav-item-root ${section === 'ai' ? 'active' : ''}`}
+            type="button"
+            title={navigationCollapsed ? t('nav.ai') : undefined}
+            onClick={() => openSection('ai')}
+          >
+            <SidebarIcon name="ai" />
+            <span className="nav-item-label">{t('nav.ai')}</span>
+          </button>
 
           <button
             className={`nav-item nav-item-root ${section === 'files' ? 'active' : ''}`}
