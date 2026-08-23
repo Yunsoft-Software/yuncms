@@ -85,6 +85,16 @@ export function FieldBuilder({ form, setForm, onSubmit, onCancel, allowRequired 
         </section>
 
         <section className="field-config-panel">
+          <label className="field-label mobile-field-type-select">
+            <span>{t('fieldBuilder.chooseType')}</span>
+            <select value={form.type} onChange={(event) => selectType(event.target.value)}>
+              {FIELD_TYPE_GROUPS.map((group) => (
+                <optgroup key={group.key} label={t(group.labelKey)}>
+                  {group.options.map((option) => <option key={option.value} value={option.value}>{t(option.labelKey)}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </label>
           <div className="field-config-heading">
             <span className="field-config-type">{t(`fieldType.${form.type}`)}</span>
             <h4>{t('fieldBuilder.configureField')}</h4>

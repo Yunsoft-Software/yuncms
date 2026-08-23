@@ -1,0 +1,639 @@
+.mobile-menu-label,
+.mobile-filter-toggle,
+.mobile-record-list,
+.mobile-user-list,
+.mobile-field-type-select {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  html,
+  body,
+  #root {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .studio-shell,
+  .studio-shell.sidebar-collapsed {
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: start;
+  }
+
+  .main-content {
+    width: 100%;
+    padding: 16px 12px 36px;
+  }
+
+  .main-content > .page-header {
+    display: none;
+  }
+
+  .screen-stack,
+  .permissions-detail-stack,
+  .routed-form-page,
+  .appearance-layout {
+    gap: 12px;
+  }
+
+  .sidebar,
+  .sidebar-collapsed .sidebar {
+    padding: 8px 12px;
+  }
+
+  .sidebar-brand-row,
+  .sidebar-collapsed .sidebar-brand-row {
+    width: 100%;
+    min-height: 42px;
+    justify-content: space-between;
+  }
+
+  .sidebar .studio-brand,
+  .sidebar-collapsed .sidebar .studio-brand {
+    width: 146px;
+    flex: 0 0 146px;
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  .sidebar .studio-brand-logo,
+  .sidebar-collapsed .sidebar .studio-brand-logo,
+  .sidebar .studio-brand.compact .studio-brand-logo,
+  .sidebar-collapsed .sidebar .studio-brand.compact .studio-brand-logo {
+    width: 146px;
+    max-width: 146px;
+    height: 30px;
+  }
+
+  .sidebar .studio-brand.compact .studio-brand-fallback,
+  .sidebar-collapsed .sidebar .studio-brand.compact .studio-brand-fallback {
+    width: auto;
+    padding-inline: 8px;
+  }
+
+  .sidebar .studio-brand.compact .studio-brand-fallback-full,
+  .sidebar-collapsed .sidebar .studio-brand.compact .studio-brand-fallback-full {
+    display: inline;
+  }
+
+  .sidebar .studio-brand.compact .studio-brand-fallback-compact,
+  .sidebar-collapsed .sidebar .studio-brand.compact .studio-brand-fallback-compact {
+    display: none;
+  }
+
+  .sidebar .sidebar-collapse-button,
+  .sidebar-collapsed .sidebar-collapse-button,
+  .sidebar.mobile-nav-open .sidebar-collapse-button,
+  .sidebar-collapsed .sidebar.mobile-nav-open .sidebar-collapse-button {
+    width: auto;
+    min-width: 42px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 10px;
+    transform: none;
+    border: 1px solid var(--studio-border);
+    background: var(--studio-surface-muted);
+  }
+
+  .sidebar .sidebar-collapse-button .sidebar-icon {
+    transform: rotate(-90deg);
+    transition: transform 150ms ease;
+  }
+
+  .sidebar.mobile-nav-open .sidebar-collapse-button .sidebar-icon {
+    transform: rotate(90deg);
+  }
+
+  .mobile-menu-label {
+    display: inline;
+    color: var(--studio-text-soft);
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .page-breadcrumbs {
+    gap: 6px;
+    margin: 0 2px 4px;
+    padding: 4px 0;
+    overflow: hidden;
+    font-size: 12px;
+  }
+
+  .page-breadcrumbs strong {
+    max-width: 52vw;
+  }
+
+  .panel,
+  .table-panel,
+  .file-library-results {
+    max-width: 100%;
+    border-radius: 14px;
+  }
+
+  .form-panel,
+  .toolbar-panel,
+  .workspace-toolbar,
+  .library-header-panel,
+  .users-header-panel,
+  .appearance-form {
+    padding: 18px;
+  }
+
+  .field-label,
+  .field-label > input:not([type="checkbox"]):not([type="color"]),
+  .field-label > select,
+  .field-label > textarea,
+  .field-label > div,
+  .form-grid,
+  .inline-form {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .panel-heading,
+  .workspace-section-heading,
+  .workspace-toolbar-heading,
+  .appearance-heading {
+    gap: 12px;
+  }
+
+  .panel-heading > button,
+  .workspace-section-heading > button,
+  .workspace-toolbar-heading > button,
+  .appearance-heading > button,
+  .form-actions > button {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .form-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Content list and record pages */
+  .content-toolbar {
+    gap: 14px;
+  }
+
+  .content-toolbar > button {
+    width: 100%;
+  }
+
+  .data-controls-panel {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .content-data-controls-main {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .content-data-controls-main .control-search {
+    grid-column: 1 / -1;
+  }
+
+  .mobile-filter-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 42px;
+  }
+
+  .mobile-filter-toggle small {
+    color: var(--studio-text-muted);
+  }
+
+  .data-controls-panel .filter-builder {
+    display: none;
+  }
+
+  .data-controls-panel .filter-builder.mobile-open {
+    display: grid;
+    grid-template-columns: 1fr;
+    padding-top: 12px;
+  }
+
+  .active-controls-row {
+    min-height: 0;
+  }
+
+  .filter-chip-list .controls-hint {
+    display: none;
+  }
+
+  .section-content .table-panel .table-scroll,
+  .section-users .users-table-panel .table-scroll {
+    display: none;
+  }
+
+  .mobile-record-list,
+  .mobile-user-list {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .mobile-record-card,
+  .mobile-user-card {
+    min-width: 0;
+    display: grid;
+    gap: 14px;
+    padding: 15px;
+    border: 1px solid var(--studio-border);
+    border-radius: 12px;
+    background: var(--studio-surface);
+  }
+
+  .mobile-record-card > header,
+  .mobile-user-card > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .mobile-record-card > header > div,
+  .mobile-user-card > header > div {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  .mobile-record-card > header strong,
+  .mobile-user-card > header strong {
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-record-card > header small,
+  .mobile-user-card > header small,
+  .mobile-record-card dt,
+  .mobile-user-card dt {
+    color: var(--studio-text-muted);
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .mobile-record-card > header code {
+    max-width: 112px;
+    overflow: hidden;
+    color: var(--studio-text-muted);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-record-card dl,
+  .mobile-user-card dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0;
+  }
+
+  .mobile-record-card dl > div,
+  .mobile-user-card dl > div {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+    padding: 10px;
+    border-radius: 9px;
+    background: var(--studio-surface-muted);
+  }
+
+  .mobile-record-card dd,
+  .mobile-user-card dd {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--studio-text);
+    font-size: 12px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .mobile-user-card > button {
+    width: 100%;
+  }
+
+  .record-editor .panel-heading > .text-button {
+    order: -1;
+    justify-self: start;
+    width: fit-content;
+    min-height: 36px;
+  }
+
+  .record-form-grid {
+    gap: 16px;
+  }
+
+  /* Data Model */
+  .data-model-collections-panel {
+    padding: 18px;
+  }
+
+  .data-model-collections-heading {
+    align-items: flex-start;
+  }
+
+  .data-model-collections-heading .primary-button {
+    width: auto;
+  }
+
+  .data-model-detail-panel,
+  .data-model-create-workspace {
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .data-model-detail-heading {
+    gap: 12px;
+    padding-bottom: 12px;
+  }
+
+  .data-model-detail-title {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
+  .data-model-detail-title p {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .route-field .data-model-detail-actions,
+  .route-fields .data-model-detail-actions,
+  .route-new-field .data-model-detail-actions,
+  .route-relations .data-model-detail-actions,
+  .route-new-relation .data-model-detail-actions {
+    display: none;
+  }
+
+  .resource-page-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    margin-inline: -14px;
+    padding: 8px 14px;
+    overflow: visible;
+  }
+
+  .resource-page-nav button {
+    min-width: 0;
+    min-height: 52px;
+    padding: 9px 8px;
+    font-size: 13px;
+  }
+
+  .resource-page-nav small {
+    display: none;
+  }
+
+  .route-field .resource-page-nav,
+  .route-new-field .resource-page-nav {
+    display: none;
+  }
+
+  .resource-page-body {
+    padding: 4px 0 0;
+  }
+
+  .field-detail-grid,
+  .user-detail-page .field-detail-grid,
+  .file-detail-page .field-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-detail-grid article {
+    padding: 13px;
+  }
+
+  .route-new-field .fields-workspace > .workspace-section-heading {
+    display: none;
+  }
+
+  .field-builder {
+    border-radius: 14px;
+    box-shadow: none;
+  }
+
+  .field-builder-header,
+  .field-config-panel {
+    padding: 16px;
+  }
+
+  .field-builder-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .field-builder-header > button {
+    width: 100%;
+  }
+
+  .field-builder-layout {
+    min-height: 0;
+    grid-template-columns: 1fr;
+  }
+
+  .field-type-browser {
+    display: none;
+  }
+
+  .mobile-field-type-select {
+    display: grid;
+  }
+
+  .field-config-panel {
+    gap: 16px;
+  }
+
+  .relation-type-picker {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    overflow: visible;
+  }
+
+  .relation-type-card {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Roles and permissions */
+  .access-role-sidebar {
+    padding: 18px;
+  }
+
+  .role-sidebar-heading > .primary-button {
+    width: 100%;
+  }
+
+  .role-detail-header,
+  .role-summary-panel {
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .role-name-form {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .role-name-form > div,
+  .role-name-field,
+  .role-name-field input {
+    width: 100%;
+  }
+
+  .role-name-form > button {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .role-summary-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+
+  .role-summary-stat,
+  .role-summary-actions > button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .permission-overview-panel {
+    padding: 18px;
+  }
+
+  .permission-overview-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .permission-overview-stats > span {
+    min-width: 0;
+  }
+
+  .permission-matrix-heading,
+  .permission-list-controls,
+  .permission-collection-grid {
+    padding: 14px;
+  }
+
+  .permission-action-row {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .permission-action-controls {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .permission-detail-page {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .permission-rule-page .schema-create-card {
+    padding: 14px;
+  }
+
+  /* Files */
+  .file-list-controls,
+  .user-list-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .file-list-controls .field-label:first-child,
+  .user-list-controls .field-label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .library-header-panel .workspace-toolbar-actions {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .library-header-panel .workspace-toolbar-actions > button {
+    width: 100%;
+  }
+
+  .file-library-results .file-grid {
+    padding: 10px;
+  }
+
+  .file-card .file-preview {
+    min-height: 170px;
+    max-height: 210px;
+  }
+
+  .file-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .file-card-actions button {
+    width: 100%;
+  }
+
+  .file-detail-page,
+  .user-detail-page {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .file-detail-preview {
+    min-height: 180px;
+  }
+
+  /* Users and appearance */
+  .users-header-panel .workspace-toolbar-heading > button {
+    width: 100%;
+  }
+
+  .user-detail-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .appearance-grid,
+  .appearance-brand-assets {
+    gap: 12px;
+  }
+
+  .appearance-preview {
+    position: static;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .mobile-record-card dl,
+  .mobile-user-card dl,
+  .field-detail-grid,
+  .user-detail-page .field-detail-grid,
+  .file-detail-page .field-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}

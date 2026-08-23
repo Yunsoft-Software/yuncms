@@ -299,6 +299,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState([]);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [filterDraft, setFilterDraft] = useState({ field: '', operator: '_contains', value: '' });
   const [sortField, setSortField] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
@@ -419,6 +420,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     setSearchInput('');
     setSearch('');
     setFilters([]);
+    setMobileFiltersOpen(false);
     setFilterDraft({ field: '', operator: '_contains', value: '' });
     setSortField('');
     setSortDirection('asc');
@@ -480,6 +482,10 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   }
 
   const tableFields = useMemo(() => contentTableFields(fields), [fields]);
+  const mobileRecordFields = useMemo(() => {
+    const preferred = tableFields.filter((field) => field.field !== 'id');
+    return (preferred.length > 0 ? preferred : tableFields).slice(0, 4);
+  }, [tableFields]);
   const filterableFields = useMemo(() => fields.filter((field) => !field.hidden && field.type !== 'json'), [fields]);
   const selectedFilterField = filterableFields.find((field) => field.field === filterDraft.field) ?? null;
   const filterOperators = operatorsForField(selectedFilterField, relationLookups[filterDraft.field]);
@@ -522,6 +528,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     setSearchInput('');
     setSearch('');
     setFilters([]);
+    setMobileFiltersOpen(false);
     setSortField('');
     setSortDirection('asc');
     setOffset(0);
@@ -665,7 +672,17 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
             </label>
           </div>
 
-          <form className="filter-builder" onSubmit={addFilter}>
+          <button
+            className="secondary-button mobile-filter-toggle"
+            type="button"
+            aria-expanded={mobileFiltersOpen}
+            onClick={() => setMobileFiltersOpen((value) => !value)}
+          >
+            <span>{t('content.filters')}</span>
+            <small>{t('content.filterCount', { count: filters.length })}</small>
+          </button>
+
+          <form className={`filter-builder ${mobileFiltersOpen ? 'mobile-open' : ''}`} onSubmit={addFilter}>
             <label className="field-label compact-control filter-field-control">
               <span>{t('content.filterField')}</span>
               <select value={filterDraft.field} onChange={(event) => updateFilterField(event.target.value)}>
@@ -812,6 +829,34 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="mobile-record-list" aria-label={visibleCollectionName}>
+            {items.map((record) => {
+              const primaryField = mobileRecordFields[0];
+              return (
+                <article className="mobile-record-card" key={record.id}>
+                  <header>
+                    <div>
+                      <small>{primaryField ? fieldLabel(primaryField) : t('content.records')}</small>
+                      <strong>{primaryField ? renderValue(primaryField, record, relationLookups) : record.id}</strong>
+                    </div>
+                    <code>{record.id}</code>
+                  </header>
+                  <dl>
+                    {mobileRecordFields.slice(1).map((field) => (
+                      <div key={field.field}>
+                        <dt>{fieldLabel(field)}</dt>
+                        <dd>{isFileField(field) ? <FileValuePreview field={field} value={record[field.field]} files={files} t={t} /> : renderValue(field, record, relationLookups)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div className="mobile-card-actions">
+                    <button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.contentRecord(collection, record.id))}>{t('common.edit')}</button>
+                    <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
           <Pagination
             page={currentPage}

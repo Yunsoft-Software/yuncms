@@ -522,6 +522,8 @@ export const EN = Object.freeze({
   'content.filterValue': 'Filter value',
   'content.chooseFieldFirst': 'Choose a field first',
   'content.addFilter': 'Add filter',
+  'content.filters': 'Filters',
+  'content.filterCount': '{count} active',
   'content.activeFilters': 'Active filters',
   'content.filterHint': 'Add filters to narrow this collection.',
   'content.resetView': 'Reset view',

@@ -522,6 +522,8 @@ export const TR = Object.freeze({
   'content.filterValue': 'Filtre değeri',
   'content.chooseFieldFirst': 'Önce bir alan seçin',
   'content.addFilter': 'Filtre ekle',
+  'content.filters': 'Filtreler',
+  'content.filterCount': '{count} aktif',
   'content.activeFilters': 'Aktif filtreler',
   'content.filterHint': 'Bu koleksiyonu daraltmak için filtre ekleyin.',
   'content.resetView': 'Görünümü sıfırla',

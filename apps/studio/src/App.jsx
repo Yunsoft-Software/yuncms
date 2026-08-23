@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 
 import { API_URL, apiRequest, health, logout, readSession, subscribeSession } from './api.js';
 import { collectionUi, sortContentCollections } from './collection-ui.js';
@@ -85,6 +85,7 @@ export function App() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileLayout, setMobileLayout] = useState(() => window.matchMedia('(max-width: 760px)').matches);
   const [groups, setGroups] = useState({ content: true, settings: true });
 
   useEffect(() => subscribeSession(() => setSession(readSession())), []);
@@ -101,6 +102,24 @@ export function App() {
       window.removeEventListener('popstate', updateRoute);
     };
   }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 760px)');
+    const updateLayout = () => setMobileLayout(media.matches);
+    media.addEventListener('change', updateLayout);
+    return () => media.removeEventListener('change', updateLayout);
+  }, []);
+
+  useLayoutEffect(() => {
+    const resetScroll = () => window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    resetScroll();
+    const frame = window.requestAnimationFrame(resetScroll);
+    const settledFrame = window.setTimeout(resetScroll, 50);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(settledFrame);
+    };
+  }, [route.action, route.collection, route.field, route.fileId, route.recordId, route.roleId, route.section, route.userId, route.view]);
 
   useEffect(() => {
     health()
@@ -140,6 +159,7 @@ export function App() {
   }, [session?.user?.id, route.section]);
 
   const section = route.section;
+  const navigationCollapsed = !mobileLayout && sidebarCollapsed;
   const contentCollection = route.collection || '';
   const activeContentCollection = contentCollections.find((entry) => entry.collection === contentCollection) ?? null;
   const contentTitle = activeContentCollection
@@ -223,20 +243,20 @@ export function App() {
       : t('app.apiChecking');
 
   return (
-    <div className={`studio-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`studio-shell ${navigationCollapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className={`sidebar ${mobileNavOpen ? 'mobile-nav-open' : ''}`}>
         <div className="sidebar-brand-row">
-          <StudioBrand compact={sidebarCollapsed} />
+          <StudioBrand compact={navigationCollapsed} />
           <button
             className="sidebar-collapse-button"
             type="button"
-            aria-label={sidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
-            aria-pressed={sidebarCollapsed}
-            aria-expanded={mobileNavOpen}
+            aria-label={mobileLayout ? (mobileNavOpen ? t('nav.closeMenu') : t('nav.openMenu')) : (sidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar'))}
+            aria-pressed={mobileLayout ? undefined : sidebarCollapsed}
+            aria-expanded={mobileLayout ? mobileNavOpen : undefined}
             aria-controls="studio-sidebar-navigation"
-            title={sidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+            title={mobileLayout ? (mobileNavOpen ? t('nav.closeMenu') : t('nav.openMenu')) : (sidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar'))}
             onClick={() => {
-              if (window.matchMedia('(max-width: 760px)').matches) {
+              if (mobileLayout) {
                 setMobileNavOpen((value) => !value);
                 return;
               }
@@ -244,6 +264,7 @@ export function App() {
             }}
           >
             <SidebarIcon name="collapse" />
+            <span className="mobile-menu-label">{mobileNavOpen ? t('nav.closeMenu') : t('nav.openMenu')}</span>
           </button>
         </div>
 
@@ -253,7 +274,7 @@ export function App() {
             label={t('nav.content')}
             icon="content"
             open={groups.content}
-            collapsed={sidebarCollapsed}
+            collapsed={navigationCollapsed}
             onToggle={() => toggleGroup('content')}
           >
             {contentCollections.map((entry) => (
@@ -286,7 +307,7 @@ export function App() {
           <button
             className={`nav-item nav-item-root ${section === 'files' ? 'active' : ''}`}
             type="button"
-            title={sidebarCollapsed ? t('nav.files') : undefined}
+            title={navigationCollapsed ? t('nav.files') : undefined}
             onClick={() => openSection('files')}
           >
             <SidebarIcon name="files" />
@@ -298,7 +319,7 @@ export function App() {
             label={t('nav.settings')}
             icon="appearance"
             open={groups.settings}
-            collapsed={sidebarCollapsed}
+            collapsed={navigationCollapsed}
             onToggle={() => toggleGroup('settings')}
           >
             {settingsSections.map((item) => (
@@ -332,12 +353,12 @@ export function App() {
 
           <div className="sidebar-branding-footer">
             <LanguageSwitcher compact />
-            <YunsoftFooter compact={sidebarCollapsed} />
+            <YunsoftFooter compact={navigationCollapsed} />
           </div>
         </div>
       </aside>
 
-      <main className="main-content">
+      <main className={`main-content section-${section} route-${route.view || 'list'}`}>
         <header className="page-header">
           <div>
             <p className="eyebrow">YunCMS {t('app.studio')}</p>

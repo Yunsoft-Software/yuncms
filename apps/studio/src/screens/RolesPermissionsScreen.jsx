@@ -444,7 +444,7 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
                 </div>
               </section>
 
-              {selectedRole.public && (
+              {Boolean(selectedRole.public) && (
                 <section className="panel public-role-guidance" role="note">
                   <div>
                     <p className="eyebrow">{t('roles.publicAccessTitle')}</p>

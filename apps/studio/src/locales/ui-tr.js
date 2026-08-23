@@ -11,6 +11,8 @@ export const UI_TR = Object.freeze({
 
   'nav.expandSidebar': 'Kenar çubuğunu aç',
   'nav.collapseSidebar': 'Kenar çubuğunu daralt',
+  'nav.openMenu': 'Menüyü aç',
+  'nav.closeMenu': 'Menüyü kapat',
   'nav.studioSections': 'Studio bölümleri',
 
   'auth.signInDescription': 'YunCMS hesabınızla giriş yapın. Kullanabileceğiniz Studio işlemleri rol ve izinleriniz tarafından belirlenir.',

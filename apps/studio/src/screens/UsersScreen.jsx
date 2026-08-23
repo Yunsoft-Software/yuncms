@@ -321,6 +321,22 @@ export function UsersScreen({ currentUserId, route = {}, onNavigate }) {
               </tbody>
             </table>
           </div>
+          <div className="mobile-user-list" aria-label={t('nav.users')}>
+            {pageUsers.map((user) => (
+              <article className="mobile-user-card" key={user.id}>
+                <header>
+                  <div><strong>{user.email}</strong>{user.id === currentUserId && <small>{t('users.you')}</small>}</div>
+                  <span className={`status-pill user-status-pill ${user.status}`}>{statusLabel(user.status, t)}</span>
+                </header>
+                <dl>
+                  <div><dt>{t('users.role')}</dt><dd>{rolesAvailable ? roleIndex.get(user.role)?.name || t('app.noRole') : t('users.roleDetailsUnavailable')}</dd></div>
+                  <div><dt>{t('users.verification')}</dt><dd>{user.email_verified_at ? t('users.verified') : t('users.unverified')}</dd></div>
+                  <div><dt>{t('users.lastAccess')}</dt><dd>{user.last_access ? new Date(user.last_access).toLocaleString(dateLocale) : t('users.never')}</dd></div>
+                </dl>
+                <button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.user(user.id))}>{t('users.openUser')}</button>
+              </article>
+            ))}
+          </div>
           {loading ? (
             <div className="table-footer">{t('users.loading')}</div>
           ) : users.length === 0 ? (

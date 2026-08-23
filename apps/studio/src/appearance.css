@@ -209,16 +209,35 @@ button:focus-visible {
 }
 
 .studio-brand-fallback {
-  width: 34px;
+  width: auto;
+  min-width: 34px;
   height: 34px;
   display: inline-grid;
   place-items: center;
+  padding-inline: 8px;
   border: 1px solid var(--studio-accent-border);
   border-radius: 10px;
   background: var(--studio-accent-soft);
   color: var(--studio-accent);
   font-size: 15px;
   font-weight: 800;
+}
+
+.studio-brand-fallback-compact {
+  display: none;
+}
+
+.studio-brand.compact .studio-brand-fallback {
+  width: 34px;
+  padding-inline: 0;
+}
+
+.studio-brand.compact .studio-brand-fallback-full {
+  display: none;
+}
+
+.studio-brand.compact .studio-brand-fallback-compact {
+  display: inline;
 }
 
 .yunsoft-footer {

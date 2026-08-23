@@ -13,6 +13,7 @@ function absoluteLogoUrl(value) {
 export function StudioBrand({ compact = false, previewSettings = null }) {
   const { settings, resolvedTheme } = useStudioSettings();
   const effectiveSettings = previewSettings ?? settings;
+  const brandName = String(effectiveSettings.brand_name || 'YunCMS').trim() || 'YunCMS';
   const logoUrl = absoluteLogoUrl(resolveStudioLogo(effectiveSettings, resolvedTheme));
   const [failedLogo, setFailedLogo] = useState('');
   const showLogo = logoUrl && failedLogo !== logoUrl;
@@ -28,7 +29,8 @@ export function StudioBrand({ compact = false, previewSettings = null }) {
         />
       ) : (
         <span className="studio-brand-fallback" aria-hidden="true">
-          {String(effectiveSettings.brand_name || 'Y').trim().slice(0, 1).toUpperCase()}
+          <span className="studio-brand-fallback-full">{brandName}</span>
+          <span className="studio-brand-fallback-compact">{brandName.slice(0, 1).toUpperCase()}</span>
         </span>
       )}
     </div>

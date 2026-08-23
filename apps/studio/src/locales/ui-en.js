@@ -11,6 +11,8 @@ export const UI_EN = Object.freeze({
 
   'nav.expandSidebar': 'Expand sidebar',
   'nav.collapseSidebar': 'Collapse sidebar',
+  'nav.openMenu': 'Open menu',
+  'nav.closeMenu': 'Close menu',
   'nav.studioSections': 'Studio sections',
 
   'auth.signInDescription': 'Use your YunCMS account. Available Studio actions are enforced by your role and permissions.',
