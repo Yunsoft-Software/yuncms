@@ -287,6 +287,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   const { t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const requestVersion = useRef(0);
+  const schemaLoadingRef = useRef(true);
   const [fields, setFields] = useState([]);
   const [relationLookups, setRelationLookups] = useState({});
   const [files, setFiles] = useState([]);
@@ -333,6 +334,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
 
   async function loadCollectionSchema(target = collection) {
     const version = ++requestVersion.current;
+    schemaLoadingRef.current = true;
     setFields([]);
     setRelationLookups({});
     setFiles([]);
@@ -340,6 +342,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     setMeta(null);
     setItemsLoading(false);
     if (!target) {
+      schemaLoadingRef.current = false;
       setSchemaLoading(false);
       return;
     }
@@ -364,7 +367,10 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
       if (version !== requestVersion.current) return;
       setError(requestError.message || t('content.schemaLoadError'));
     } finally {
-      if (version === requestVersion.current) setSchemaLoading(false);
+      if (version === requestVersion.current) {
+        schemaLoadingRef.current = false;
+        setSchemaLoading(false);
+      }
     }
   }
 
@@ -418,7 +424,11 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   }, [collection]);
 
   useEffect(() => {
-    if (!collection || schemaLoading || fields.length === 0) return;
+    // The collection-change effect above starts the schema request in the same
+    // effect flush. The ref closes the one-render window before the loading
+    // state update is visible, so stale fields cannot start an item request and
+    // invalidate the schema request version.
+    if (!collection || schemaLoading || schemaLoadingRef.current || fields.length === 0) return;
     loadItems(collection, fields);
   }, [collection, fields, filters, offset, pageSize, schemaLoading, search, sortDirection, sortField]);
 
