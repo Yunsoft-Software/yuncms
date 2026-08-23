@@ -289,7 +289,7 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
 
     client = await connectClient(port, generatedToken.token);
     assert.equal(client.getNegotiatedProtocolVersion(), '2026-07-28');
-    assert.deepEqual(client.getServerVersion(), { name: 'yuncms', version: '0.1.6' });
+    assert.deepEqual(client.getServerVersion(), { name: 'yuncms', version: '0.1.7' });
     const readTools = await client.listTools();
     assert.deepEqual(readTools.tools.map((tool) => tool.name).sort(), [...READ_TOOL_NAMES].sort());
     for (const writeTool of WRITE_TOOL_NAMES) {
