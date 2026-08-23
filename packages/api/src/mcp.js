@@ -291,7 +291,7 @@ export function registerMcpTools(server, req, {
 
 export function createRequestMcpServer(req, mcpConfig = {}) {
   const server = new McpServer(
-    { name: 'yuncms', version: '0.1.5' },
+    { name: 'yuncms', version: '0.1.6' },
     {
       instructions: mcpConfig.writesEnabled
         ? 'Use schema tools before item tools when the collection shape is unknown. YunCMS RBAC applies to every tool call.'
