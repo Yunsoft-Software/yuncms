@@ -17,6 +17,7 @@ import './data-model-v2-interactions.css';
 import './asset-picker.css';
 import './routed-pages.css';
 import './mobile-responsive.css';
+import './ai.css';
 
 if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
