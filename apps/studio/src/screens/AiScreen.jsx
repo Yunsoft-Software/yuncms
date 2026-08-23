@@ -24,6 +24,13 @@ function operationText(operation, t) {
   return t(key, { collection: operation?.collection || t('ai.operationData') });
 }
 
+function trimConversationHistory(messages, maxHistory = 20) {
+  const safeLimit = Number.isInteger(maxHistory) && maxHistory > 0 ? maxHistory : 20;
+  let trimmed = messages.slice(-safeLimit);
+  if (trimmed[0]?.role === 'assistant') trimmed = trimmed.slice(1);
+  return trimmed;
+}
+
 export function AiScreen() {
   const { locale, t } = useI18n();
   const [status, setStatus] = useState(null);
@@ -67,7 +74,10 @@ export function AiScreen() {
 
     const userMessage = { role: 'user', content };
     const nextMessages = [...messages, userMessage];
-    const nextHistory = [...history, userMessage];
+    const nextHistory = trimConversationHistory(
+      [...history, userMessage],
+      Number(status?.max_history) || 20,
+    );
     setMessages(nextMessages);
     setDraft('');
     setError('');
@@ -234,4 +244,4 @@ export function AiScreen() {
   );
 }
 
-export { operationText };
+export { operationText, trimConversationHistory };
