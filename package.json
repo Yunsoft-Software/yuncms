@@ -24,6 +24,8 @@
     "test:fast": "node scripts/verify.mjs fast",
     "test:release": "node scripts/verify.mjs release",
     "test:mcp:mysql": "node --test --test-reporter=spec test/integration/mcp-runtime.test.js",
+    "test:extensions:mysql": "node --test --test-reporter=spec test/integration/extension-process.test.js",
+    "test:redis:mysql": "node --test --test-reporter=spec test/integration/redis-multiprocess.test.js",
     "test:migration:mysql": "node --test --test-reporter=spec test/integration/external-auth-migration.test.js",
     "test:query:mysql": "node --test --test-reporter=spec test/integration/query-capabilities.test.js",
     "test:upgrade:mysql": "node --test --test-reporter=spec test/integration/managed-upgrade.test.js"

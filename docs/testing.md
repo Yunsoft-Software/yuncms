@@ -94,6 +94,8 @@ Focused real-MySQL gates can be run independently when their contracts change:
 npm run test:migration:mysql
 npm run test:query:mysql
 npm run test:mcp:mysql
+npm run test:redis:mysql
+npm run test:extensions:mysql
 npm run test:upgrade:mysql
 ```
 
@@ -106,11 +108,17 @@ YUNCMS_TEST_MIGRATION=1
 YUNCMS_MIGRATION_TEST_DB_DATABASE=yuncms_migration_test
 YUNCMS_TEST_UPGRADE=1
 YUNCMS_UPGRADE_TEST_DB_DATABASE=yuncms_upgrade_test
+YUNCMS_UPGRADE_DIFFERENT_TEST_DB_DATABASE=yuncms_restore_test
+YUNCMS_TEST_REDIS=1
+YUNCMS_TEST_REDIS_URL=redis://127.0.0.1:6379
 ```
 
 The focused gates verify fresh/pre-0013 migration behavior, bounded multi-hop
 relation expansion and to-many limits, MCP `2026-07-28` negotiation with the
-official v2 client, and real `mysqldump` backup/restore plus maintenance locking.
+official v2 client, two-process Redis permission/rate-limit propagation,
+post-success schema events and singleton scheduler shutdown, and real
+`mysqldump` backup/restore plus maintenance locking, corruption rejection and
+different-target recovery safeguards.
 
 ## Checks intentionally kept outside the routine source suite
 
@@ -121,7 +129,7 @@ Some claims depend on real infrastructure and cannot be proven by mocks:
 - actual SMTP delivery/recovery;
 - full browser interaction/accessibility for built Studio;
 - TLS/HSTS/reverse-proxy configuration;
-- multi-instance/shared rate-limit behavior.
+- deployment-specific TLS/ACL Redis and reverse-proxy behavior.
 
 These remain explicit `todo.md` release/deployment checks rather than making everyday Codex runs expensive or flaky.
 

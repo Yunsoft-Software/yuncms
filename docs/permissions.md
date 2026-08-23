@@ -171,4 +171,4 @@ The Studio exposes administrator role/permission management plus the permission 
 
 ## Remaining verification
 
-Source-level enforcement and regression coverage exist. Real MySQL/API privilege-escalation, filtered Public Files, explicit Roles CRUD grants, cache invalidation and system-resource delegation checks are kept in the guarded release integration suite and `todo.md` until executed against the target environment.
+Source-level enforcement and regression coverage exist. The guarded real MySQL/API suite covers filtered Public Files and two-process Redis permission invalidation; deployment-specific provider, proxy and TLS checks remain in `todo.md` until executed against the target environment.

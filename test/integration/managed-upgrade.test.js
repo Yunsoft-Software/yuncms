@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -12,10 +13,8 @@ import {
 } from '@yunsoft/yuncms-core';
 import { resetDatabaseObjects } from '../../packages/cli/src/database-reset.js';
 import { acquireDatabaseMaintenanceLock } from '../../packages/cli/src/maintenance-lock.js';
-import {
-  createProjectBackup,
-  restoreProjectBackup,
-} from '../../packages/cli/src/project-backup.js';
+import { runBackupCommand } from '../../packages/cli/src/backup-command.js';
+import { restoreProjectBackup } from '../../packages/cli/src/project-backup.js';
 
 const MYSQL_ENABLED = process.env.YUNCMS_TEST_MYSQL === '1';
 const UPGRADE_ENABLED = process.env.YUNCMS_TEST_UPGRADE === '1';
@@ -43,6 +42,17 @@ function baseUpgradeEnv() {
     FILES_LOCAL_ROOT: '.yuncms/uploads',
     S3_BUCKET: '',
   };
+}
+
+function availablePort() {
+  return new Promise((resolvePort, reject) => {
+    const reservation = createNetServer();
+    reservation.listen(0, '127.0.0.1', () => {
+      const port = reservation.address().port;
+      reservation.close((error) => (error ? reject(error) : resolvePort(port)));
+    });
+    reservation.once('error', reject);
+  });
 }
 
 async function tableExists(pool, database, table) {
@@ -158,9 +168,9 @@ test('real mysqldump backup and destructive restore reproduce exact DB and local
     await writeFile(join(cwd, '.yuncms', 'uploads', 'asset.txt'), 'before-file\n');
     await writeFile(join(cwd, 'extensions', 'fixture.js'), 'export const state = "before";\n');
 
-    const backup = await createProjectBackup({
+    const backup = await runBackupCommand({
       cwd,
-      env,
+      env: { ...env, PORT: String(await availablePort()) },
       output: { log() {}, warn() {} },
     });
     assert.equal(backup.manifest.format, 2);
@@ -176,6 +186,83 @@ test('real mysqldump backup and destructive restore reproduce exact DB and local
     const manifestText = await readFile(join(backup.backupPath, 'manifest.json'), 'utf8');
     if (env.DB_PASSWORD) assert.equal(manifestText.includes(env.DB_PASSWORD), false);
     if (env.S3_SECRET_ACCESS_KEY) assert.equal(manifestText.includes(env.S3_SECRET_ACCESS_KEY), false);
+
+    const backupPackagePath = join(backup.backupPath, 'project', 'package.json');
+    const originalBackupPackage = await readFile(backupPackagePath);
+    await writeFile(backupPackagePath, '{"dependencies":{"@yunsoft/yuncms":"corrupted"}}\n');
+    await assert.rejects(
+      restoreProjectBackup({
+        backupPath: backup.backupPath,
+        cwd,
+        env,
+        output: { log() {}, warn() {} },
+      }),
+      (error) => error.code === 'BACKUP_INTEGRITY_MISMATCH',
+    );
+    const [afterAssetCorruption] = await pool.query('SELECT value FROM upgrade_fixture WHERE id = 1');
+    assert.equal(afterAssetCorruption[0].value, 'before-update');
+    await writeFile(backupPackagePath, originalBackupPackage);
+
+    const dumpPath = join(backup.backupPath, 'database.sql.gz');
+    const originalDump = await readFile(dumpPath);
+    const corruptedDump = Buffer.from(originalDump);
+    corruptedDump[Math.floor(corruptedDump.length / 2)] ^= 0xff;
+    await writeFile(dumpPath, corruptedDump);
+    await assert.rejects(
+      restoreProjectBackup({
+        backupPath: backup.backupPath,
+        cwd,
+        env,
+        output: { log() {}, warn() {} },
+      }),
+      (error) => ['BACKUP_DATABASE_INVALID', 'BACKUP_INTEGRITY_MISMATCH'].includes(error.code),
+    );
+    const [afterDumpCorruption] = await pool.query('SELECT value FROM upgrade_fixture WHERE id = 1');
+    assert.equal(afterDumpCorruption[0].value, 'before-update');
+    await writeFile(dumpPath, originalDump);
+
+    const differentDatabase = process.env.YUNCMS_UPGRADE_DIFFERENT_TEST_DB_DATABASE;
+    if (differentDatabase) {
+      requireDisposableDatabase(differentDatabase);
+      const differentEnv = { ...env, DB_DATABASE: differentDatabase };
+      const differentConfig = loadConfig(differentEnv);
+      let differentPool = createDatabasePool(differentConfig.database);
+      try {
+        await resetDatabaseObjects({ config: differentConfig.database });
+        await differentPool.query('CREATE TABLE different_target_guard (id INT NOT NULL PRIMARY KEY) ENGINE=InnoDB');
+        await differentPool.query('INSERT INTO different_target_guard (id) VALUES (1)');
+
+        await assert.rejects(
+          restoreProjectBackup({
+            backupPath: backup.backupPath,
+            cwd,
+            env: differentEnv,
+            output: { log() {}, warn() {} },
+          }),
+          (error) => error.code === 'BACKUP_DATABASE_TARGET_MISMATCH',
+        );
+        const [guardRows] = await differentPool.query('SELECT id FROM different_target_guard');
+        assert.deepEqual(guardRows.map((row) => Number(row.id)), [1]);
+
+        await closeDatabasePool(differentPool);
+        differentPool = null;
+        await restoreProjectBackup({
+          backupPath: backup.backupPath,
+          cwd,
+          env: differentEnv,
+          allowDifferentDatabaseTarget: true,
+          output: { log() {}, warn() {} },
+        });
+        differentPool = createDatabasePool(differentConfig.database);
+        const [restoredRows] = await differentPool.query('SELECT id, value FROM upgrade_fixture ORDER BY id');
+        assert.equal(restoredRows.length, 1);
+        assert.equal(restoredRows[0].value, 'before-update');
+        assert.equal(await tableExists(differentPool, differentDatabase, 'different_target_guard'), false);
+      } finally {
+        if (differentPool) await closeDatabasePool(differentPool).catch(() => {});
+        await resetDatabaseObjects({ config: differentConfig.database }).catch(() => {});
+      }
+    }
 
     await pool.query('UPDATE upgrade_fixture SET value = ? WHERE id = 1', ['after-update']);
     await pool.query('CREATE TABLE upgrade_extra (id INT NOT NULL PRIMARY KEY) ENGINE=InnoDB');
