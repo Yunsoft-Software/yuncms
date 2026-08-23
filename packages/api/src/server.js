@@ -20,15 +20,19 @@ import {
   SmtpMailer,
 } from '@yunsoft/yuncms-core';
 import { createApp } from './app.js';
+import { loadAiConfig } from './ai/config.js';
+import { AiAssistantService } from './ai/service.js';
 import { INTERNAL_AUDIT_EVENTS } from './audit-events.js';
 import { loadExternalAuthConfig } from './external-auth/config.js';
 import { ExternalAuthProviderRegistry } from './external-auth/providers.js';
 import { loadExtensionRuntime } from './extensions/runtime.js';
 import { createMcpRouter } from './mcp.js';
+import { createAiRouter } from './routes/ai.js';
 
 loadEnvFileIfPresent();
 await assertMaintenanceStartupAllowed({ cwd: process.cwd(), env: process.env });
 const config = loadConfig();
+const aiConfig = loadAiConfig(process.env);
 const externalAuthConfig = loadExternalAuthConfig(process.env);
 const logger = createJsonLogger({ level: config.logging.level });
 const pool = createDatabasePool(config.database);
@@ -124,6 +128,8 @@ async function start() {
     database: pool,
     logger,
   });
+  const aiAssistant = new AiAssistantService({ config: aiConfig, logger });
+  const aiRouter = createAiRouter({ assistant: aiAssistant });
   const mcpRouter = createMcpRouter({ config, logger });
   mailer?.setEmitter(emitter);
   registerInternalAudit({ emitter, services });
@@ -152,6 +158,7 @@ async function start() {
     redisClient,
     externalAuthRegistry,
     endpointExtensions: extensionRuntime.endpointExtensions,
+    aiRouter,
     mcpRouter,
   });
 
