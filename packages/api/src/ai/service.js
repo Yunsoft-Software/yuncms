@@ -33,8 +33,11 @@ function normalizeAssistantContent(content) {
     .join('\n\n');
 }
 
-function normalizeToolCalls(value) {
+function normalizeToolCalls(value, maxCalls = 8) {
   if (!Array.isArray(value)) return [];
+  if (value.length > maxCalls) {
+    throw aiError('AI_TOOL_CALL_LIMIT', `AI provider requested more than ${maxCalls} tool calls in one round`);
+  }
   return value.map((entry) => {
     const id = String(entry?.id ?? '').trim();
     const name = String(entry?.function?.name ?? '').trim();
@@ -193,7 +196,10 @@ export class AiAssistantService {
 
     for (let round = 0; round <= this.config.maxToolRounds; round += 1) {
       const assistantMessage = await this.#providerCompletion(providerMessages, tools);
-      const toolCalls = normalizeToolCalls(assistantMessage.tool_calls);
+      const toolCalls = normalizeToolCalls(
+        assistantMessage.tool_calls,
+        this.config.maxToolCallsPerRound ?? 8,
+      );
       if (toolCalls.length === 0) {
         const content = normalizeAssistantContent(assistantMessage.content);
         if (!content) throw aiError('AI_PROVIDER_RESPONSE_INVALID', 'AI provider returned an empty response');
