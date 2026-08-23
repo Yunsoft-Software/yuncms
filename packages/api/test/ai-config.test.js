@@ -11,6 +11,7 @@ test('AI assistant is disabled and read-only by default', () => {
   assert.equal(config.apiKey, null);
   assert.equal(config.model, null);
   assert.equal(config.maxToolRounds, 6);
+  assert.equal(config.maxToolCallsPerRound, 8);
   assert.equal(config.maxHistory, 20);
 });
 
@@ -21,12 +22,14 @@ test('AI assistant auto-enables when model and API key are configured', () => {
     AI_BASE_URL: 'https://openrouter.ai/api/v1/',
     AI_WRITES_ENABLED: 'true',
     AI_MAX_TOOL_ROUNDS: '4',
+    AI_MAX_TOOL_CALLS_PER_ROUND: '5',
   });
   assert.equal(config.enabled, true);
   assert.equal(config.writesEnabled, true);
   assert.equal(config.baseUrl, 'https://openrouter.ai/api/v1');
   assert.equal(config.model, 'example/model');
   assert.equal(config.maxToolRounds, 4);
+  assert.equal(config.maxToolCallsPerRound, 5);
 });
 
 test('AI assistant can be explicitly disabled even when credentials exist', () => {
@@ -57,5 +60,16 @@ test('AI provider URL rejects non-http URLs and embedded credentials', () => {
   assert.throws(
     () => loadAiConfig({ AI_BASE_URL: 'https://user:pass@example.test/v1' }),
     /cannot include credentials/,
+  );
+});
+
+test('AI tool-call fanout has a bounded configuration range', () => {
+  assert.throws(
+    () => loadAiConfig({ AI_MAX_TOOL_CALLS_PER_ROUND: '0' }),
+    /AI_MAX_TOOL_CALLS_PER_ROUND must be an integer between 1 and 20/,
+  );
+  assert.throws(
+    () => loadAiConfig({ AI_MAX_TOOL_CALLS_PER_ROUND: '21' }),
+    /AI_MAX_TOOL_CALLS_PER_ROUND must be an integer between 1 and 20/,
   );
 });
