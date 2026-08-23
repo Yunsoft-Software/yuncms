@@ -20,6 +20,8 @@ The `0.1.1` package family was published on 2026-08-17 after the Node 24 fast/fu
 
 The `0.1.5` package family was published on 2026-08-22 after Node 24 fast/release gates, real MySQL/API and managed-upgrade integration, local tarball installation, registry-only installation/runtime smoke and a published `0.1.3 -> 0.1.5` managed transition passed. All four registry SHASUM values and exact internal `0.1.5` dependency pins were verified anonymously. Version `0.1.4` was uploaded only to npm's staging area and was superseded before publication because staged approval required a separate interactive 2FA flow; it must not be treated as a public release.
 
+The `0.1.6` package family was published on 2026-08-23 after Node 24 fast/full/release gates, all nine real MySQL/API integration files, two-process Redis and scheduler checks, Studio browser smoke, managed-backup corruption/target safeguards, final tarball installation and a clean public-registry init/bootstrap/start/login smoke passed. All four `latest` tags, registry SHASUM/integrity values and exact internal `0.1.6` dependency pins were verified anonymously. Detailed commands and remaining deployment-specific exclusions are recorded in [`release-evidence-0.1.6.md`](release-evidence-0.1.6.md).
+
 ## Naming direction
 
 Keep the product and executable command simple:
