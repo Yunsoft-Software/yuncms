@@ -7,6 +7,7 @@ import { LanguageSwitcher, StudioBrand, YunsoftFooter } from './components/Studi
 import { SidebarIcon } from './components/SidebarIcon.jsx';
 import { useI18n } from './i18n.js';
 import { displaySchemaName } from './schema-name.js';
+import { navigateStudio, readStudioRoute, studioPath } from './studio-route.js';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
 import { ContentScreen } from './screens/ContentScreen.jsx';
@@ -78,15 +79,28 @@ export function App() {
   const { t } = useI18n();
   const [session, setSession] = useState(() => readSession());
   const [authAction, setAuthAction] = useState(() => readAuthAction());
-  const [section, setSection] = useState('content');
+  const [route, setRoute] = useState(() => readStudioRoute());
   const [contentCollections, setContentCollections] = useState([]);
-  const [contentCollection, setContentCollection] = useState('');
   const [healthState, setHealthState] = useState('checking');
   const [loggingOut, setLoggingOut] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [groups, setGroups] = useState({ content: true, settings: true });
 
   useEffect(() => subscribeSession(() => setSession(readSession())), []);
+
+  useEffect(() => {
+    const updateRoute = () => {
+      setRoute(readStudioRoute());
+      setMobileNavOpen(false);
+    };
+    window.addEventListener('hashchange', updateRoute);
+    window.addEventListener('popstate', updateRoute);
+    return () => {
+      window.removeEventListener('hashchange', updateRoute);
+      window.removeEventListener('popstate', updateRoute);
+    };
+  }, []);
 
   useEffect(() => {
     health()
@@ -99,11 +113,9 @@ export function App() {
       const response = await apiRequest('/schema/collections');
       const visible = sortContentCollections(response?.data ?? []);
       setContentCollections(visible);
-      setContentCollection((current) => (
-        visible.some((entry) => entry.collection === current)
-          ? current
-          : visible[0]?.collection || ''
-      ));
+      if (route.section === 'content' && !visible.some((entry) => entry.collection === route.collection)) {
+        navigateStudio(studioPath.content(visible[0]?.collection || ''), { replace: true });
+      }
     } catch {
       setContentCollections([]);
     }
@@ -117,18 +129,18 @@ export function App() {
         if (cancelled) return;
         const visible = sortContentCollections(response?.data ?? []);
         setContentCollections(visible);
-        setContentCollection((current) => (
-          visible.some((entry) => entry.collection === current)
-            ? current
-            : visible[0]?.collection || ''
-        ));
+        if (route.section === 'content' && !visible.some((entry) => entry.collection === route.collection)) {
+          navigateStudio(studioPath.content(visible[0]?.collection || ''), { replace: true });
+        }
       })
       .catch(() => {
         if (!cancelled) setContentCollections([]);
       });
     return () => { cancelled = true; };
-  }, [session?.user?.id, section]);
+  }, [session?.user?.id, route.section]);
 
+  const section = route.section;
+  const contentCollection = route.collection || '';
   const activeContentCollection = contentCollections.find((entry) => entry.collection === contentCollection) ?? null;
   const contentTitle = activeContentCollection
     ? displaySchemaName(activeContentCollection, 'collection')
@@ -140,19 +152,21 @@ export function App() {
     : sectionCopy(section, t);
 
   const activeScreen = useMemo(() => {
-    if (section === 'data-model') return <DataModelScreen onCollectionsChanged={loadNavigationCollections} />;
-    if (section === 'users') return <UsersScreen currentUserId={session?.user?.id} />;
-    if (section === 'roles') return <RolesPermissionsScreen />;
-    if (section === 'files') return <FilesScreen />;
+    if (section === 'data-model') return <DataModelScreen route={route} onNavigate={navigateStudio} onCollectionsChanged={loadNavigationCollections} />;
+    if (section === 'users') return <UsersScreen route={route} onNavigate={navigateStudio} currentUserId={session?.user?.id} />;
+    if (section === 'roles') return <RolesPermissionsScreen route={route} onNavigate={navigateStudio} />;
+    if (section === 'files') return <FilesScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'appearance') return <AppearanceScreen />;
     return (
       <ContentScreen
         collection={contentCollection}
         collectionLabel={contentTitle}
-        onOpenDataModel={() => setSection('data-model')}
+        route={route}
+        onNavigate={navigateStudio}
+        onOpenDataModel={() => navigateStudio(studioPath.dataModel())}
       />
     );
-  }, [contentCollection, contentTitle, section, session?.user?.id]);
+  }, [contentCollection, contentTitle, route, section, session?.user?.id]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -173,7 +187,15 @@ export function App() {
   }
 
   function openSection(nextSection, group = null) {
-    setSection(nextSection);
+    const destinations = {
+      'data-model': studioPath.dataModel(),
+      users: studioPath.users(),
+      roles: studioPath.roles(),
+      files: studioPath.files(),
+      appearance: studioPath.appearance(),
+      content: studioPath.content(contentCollection),
+    };
+    navigateStudio(destinations[nextSection] || studioPath.content(contentCollection));
     if (group) setGroups((current) => ({ ...current, [group]: true }));
   }
 
@@ -202,7 +224,7 @@ export function App() {
 
   return (
     <div className={`studio-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-      <aside className="sidebar">
+      <aside className={`sidebar ${mobileNavOpen ? 'mobile-nav-open' : ''}`}>
         <div className="sidebar-brand-row">
           <StudioBrand compact={sidebarCollapsed} />
           <button
@@ -210,14 +232,22 @@ export function App() {
             type="button"
             aria-label={sidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
             aria-pressed={sidebarCollapsed}
+            aria-expanded={mobileNavOpen}
+            aria-controls="studio-sidebar-navigation"
             title={sidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
-            onClick={() => setSidebarCollapsed((value) => !value)}
+            onClick={() => {
+              if (window.matchMedia('(max-width: 760px)').matches) {
+                setMobileNavOpen((value) => !value);
+                return;
+              }
+              setSidebarCollapsed((value) => !value);
+            }}
           >
             <SidebarIcon name="collapse" />
           </button>
         </div>
 
-        <nav aria-label={t('nav.studioSections')} className="sidebar-nav">
+        <nav id="studio-sidebar-navigation" aria-label={t('nav.studioSections')} className="sidebar-nav">
           <AccordionGroup
             id="content"
             label={t('nav.content')}
@@ -233,8 +263,8 @@ export function App() {
                 type="button"
                 title={entry.collection}
                 onClick={() => {
-                  setContentCollection(entry.collection);
-                  openSection('content', 'content');
+                  navigateStudio(studioPath.content(entry.collection));
+                  setGroups((current) => ({ ...current, content: true }));
                 }}
               >
                 <CollectionIcon name={collectionUi(entry).icon} size={16} />

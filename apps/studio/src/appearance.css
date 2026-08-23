@@ -2,6 +2,9 @@
   --studio-accent: #2563eb;
   --studio-accent-soft: #2563eb18;
   --studio-accent-border: #2563eb55;
+  --studio-danger: #b42318;
+  --studio-success-bg: #dcfce7;
+  --studio-success-text: #166534;
   --studio-bg: #f5f7fb;
   --studio-surface: #ffffff;
   --studio-surface-muted: #f7f9fc;
@@ -26,6 +29,9 @@
   --studio-border: #2b3442;
   --studio-border-soft: #252d39;
   --studio-input: #131821;
+  --studio-danger: #ff8a80;
+  --studio-success-bg: #183c2b;
+  --studio-success-text: #86efac;
   color-scheme: dark;
 }
 

@@ -4,6 +4,7 @@ import { apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
 import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
 import { useI18n } from '../i18n.js';
+import { studioPath } from '../studio-route.js';
 
 const USER_SORT_OPTIONS = [
   ['email-asc', 'users.emailAsc'],
@@ -33,7 +34,7 @@ function statusLabel(status, t) {
   return t(`users.${status === 'disabled' ? 'disabled' : status}`);
 }
 
-export function UsersScreen({ currentUserId }) {
+export function UsersScreen({ currentUserId, route = {}, onNavigate }) {
   const { locale, t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const [users, setUsers] = useState([]);
@@ -42,7 +43,6 @@ export function UsersScreen({ currentUserId }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
-  const [showCreateUser, setShowCreateUser] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -112,7 +112,7 @@ export function UsersScreen({ currentUserId }) {
     setError('');
     setNotice('');
     try {
-      await apiRequest('/users', {
+      const response = await apiRequest('/users', {
         method: 'POST',
         body: {
           email: form.email,
@@ -122,10 +122,10 @@ export function UsersScreen({ currentUserId }) {
         },
       });
       setForm({ email: '', password: '', role: '', status: 'active' });
-      setShowCreateUser(false);
       setPage(1);
       setNotice(t('users.createdNotice'));
       await load();
+      if (response?.data?.id) onNavigate?.(studioPath.user(response.data.id));
     } catch (requestError) {
       setError(requestError.message || t('users.createError'));
     }
@@ -174,6 +174,7 @@ export function UsersScreen({ currentUserId }) {
       await apiRequest(`/users/${encodeURIComponent(user.id)}`, { method: 'DELETE' });
       setNotice(t('users.deletedNotice', { email: user.email }));
       await load();
+      if (route.view === 'detail') onNavigate?.(studioPath.users());
     } catch (requestError) {
       setError(requestError.message || t('users.deleteError'));
     }
@@ -188,6 +189,27 @@ export function UsersScreen({ currentUserId }) {
   }
 
   const dateLocale = locale === 'tr' ? 'tr-TR' : 'en-US';
+  const routedUser = users.find((user) => String(user.id) === String(route.userId)) ?? null;
+
+  if (route.view === 'new') {
+    return (
+      <div className="screen-stack routed-form-page">
+        <nav className="page-breadcrumbs" aria-label={t('nav.users')}><button type="button" onClick={() => onNavigate?.(studioPath.users())}>{t('nav.users')}</button><span aria-hidden="true">/</span><strong>{t('users.newUser')}</strong></nav>
+        {error && <div className="error-banner" role="alert">{error}</div>}
+        <section className="panel form-panel create-user-panel"><div className="panel-heading"><div><p className="eyebrow">{t('users.newUser')}</p><h2>{t('users.createUser')}</h2><p>{t('users.createDescription')}</p></div><button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.users())}>{t('common.cancel')}</button></div><form className="form-grid inline-form" onSubmit={createUser}><label className="field-label"><span>{t('auth.email')}</span><input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} required autoFocus /></label><label className="field-label"><span>{t('auth.password')}</span><input type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>{rolesAvailable ? <label className="field-label"><span>{t('users.role')}</span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}><option value="">{t('app.noRole')}</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label> : <div className="inline-info">{t('users.roleUnavailableForCreate')}</div>}<label className="field-label"><span>{t('common.status')}</span><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}><option value="active">{t('users.active')}</option><option value="suspended">{t('users.suspended')}</option><option value="disabled">{t('users.disabled')}</option></select></label><button className="primary-button" type="submit">{t('users.createUser')}</button></form></section>
+      </div>
+    );
+  }
+
+  if (route.view === 'detail') {
+    return (
+      <div className="screen-stack routed-form-page">
+        <nav className="page-breadcrumbs" aria-label={t('nav.users')}><button type="button" onClick={() => onNavigate?.(studioPath.users())}>{t('nav.users')}</button><span aria-hidden="true">/</span><strong>{routedUser?.email || t('users.userDetails')}</strong></nav>
+        {error && <div className="error-banner" role="alert">{error}</div>}{notice && <div className="notice-banner" role="status">{notice}</div>}
+        {!routedUser ? <section className="panel empty-state"><div><h2>{loading ? t('users.loading') : t('users.userNotFound')}</h2></div></section> : <section className="panel user-detail-page"><header className="workspace-section-heading"><div><p className="eyebrow">{t('users.userDetails')}</p><h2>{routedUser.email}</h2><p>{routedUser.id}</p></div><span className={`status-pill user-status-pill ${routedUser.status}`}>{statusLabel(routedUser.status, t)}</span></header><div className="field-detail-grid"><article><small>{t('users.role')}</small><strong>{roleIndex.get(routedUser.role)?.name || t('app.noRole')}</strong></article><article><small>{t('users.verification')}</small><strong>{routedUser.email_verified_at ? t('users.verified') : t('users.unverified')}</strong></article><article><small>{t('users.lastAccess')}</small><strong>{routedUser.last_access ? new Date(routedUser.last_access).toLocaleString(dateLocale) : t('users.never')}</strong></article><article><small>{t('common.status')}</small><strong>{statusLabel(routedUser.status, t)}</strong></article></div><div className="user-detail-controls">{rolesAvailable && <label className="field-label"><span>{t('users.role')}</span><select value={routedUser.role ?? ''} onChange={(event) => updateUser(routedUser, { role: event.target.value || null })}><option value="">{t('app.noRole')}</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>}<label className="field-label"><span>{t('common.status')}</span><select value={routedUser.status} disabled={routedUser.id === currentUserId} onChange={(event) => updateUser(routedUser, { status: event.target.value })}><option value="active">{t('users.active')}</option><option value="suspended">{t('users.suspended')}</option><option value="disabled">{t('users.disabled')}</option></select></label></div><div className="page-danger-zone"><div><strong>{t('users.userActions')}</strong><p>{t('users.userActionsHint')}</p></div><div>{!routedUser.email_verified_at && <button className="secondary-button" type="button" onClick={() => sendVerification(routedUser)}>{t('users.sendVerification')}</button>}<button className="danger-button" type="button" disabled={routedUser.id === currentUserId} onClick={() => deleteUser(routedUser)}>{t('common.delete')}</button></div></div></section>}
+      </div>
+    );
+  }
 
   return (
     <div className="screen-stack">
@@ -201,8 +223,8 @@ export function UsersScreen({ currentUserId }) {
               active: users.filter((user) => user.status === 'active').length,
             })}</p>
           </div>
-          <button className="primary-button" type="button" onClick={() => setShowCreateUser((value) => !value)}>
-            {showCreateUser ? t('users.closeForm') : t('users.newUser')}
+          <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.newUser())}>
+            {t('users.newUser')}
           </button>
         </div>
 
@@ -248,52 +270,6 @@ export function UsersScreen({ currentUserId }) {
         </div>
       </section>
 
-      {showCreateUser && (
-        <section className="panel form-panel create-user-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">{t('users.newUser')}</p>
-              <h2>{t('users.createUser')}</h2>
-              <p>{t('users.createDescription')}</p>
-            </div>
-            <button className="text-button" type="button" onClick={() => setShowCreateUser(false)}>{t('common.cancel')}</button>
-          </div>
-          <form className="form-grid inline-form" onSubmit={createUser}>
-            <label className="field-label">
-              <span>{t('auth.email')}</span>
-              <input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} required autoFocus />
-            </label>
-            <label className="field-label">
-              <span>{t('auth.password')}</span>
-              <input type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required />
-            </label>
-            {rolesAvailable ? (
-              <label className="field-label">
-                <span>{t('users.role')}</span>
-                <select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>
-                  <option value="">{t('app.noRole')}</option>
-                  {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-                </select>
-              </label>
-            ) : (
-              <div className="field-label">
-                <span>{t('users.role')}</span>
-                <div className="inline-info compact-info">{t('users.roleUnavailableForCreate')}</div>
-              </div>
-            )}
-            <label className="field-label">
-              <span>{t('common.status')}</span>
-              <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
-                <option value="active">{t('users.active')}</option>
-                <option value="suspended">{t('users.suspended')}</option>
-                <option value="disabled">{t('users.disabled')}</option>
-              </select>
-            </label>
-            <button className="primary-button" type="submit">{t('users.createUser')}</button>
-          </form>
-        </section>
-      )}
-
       {error && <div className="error-banner" role="alert">{error}</div>}
       {notice && <div className="notice-banner" role="status">{notice}</div>}
 
@@ -323,20 +299,13 @@ export function UsersScreen({ currentUserId }) {
                     </td>
                     <td>
                       {rolesAvailable ? (
-                        <select aria-label={t('users.roleFor', { email: user.email })} value={user.role ?? ''} onChange={(event) => updateUser(user, { role: event.target.value || null })}>
-                          <option value="">{t('app.noRole')}</option>
-                          {roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-                        </select>
+                        <span>{roleIndex.get(user.role)?.name || t('app.noRole')}</span>
                       ) : (
                         <span className="status-pill">{user.role ? t('users.roleDetailsUnavailable') : t('app.noRole')}</span>
                       )}
                     </td>
                     <td>
-                      <select aria-label={t('users.statusFor', { email: user.email })} value={user.status} disabled={user.id === currentUserId} onChange={(event) => updateUser(user, { status: event.target.value })}>
-                        <option value="active">{t('users.active')}</option>
-                        <option value="suspended">{t('users.suspended')}</option>
-                        <option value="disabled">{t('users.disabled')}</option>
-                      </select>
+                      <span>{statusLabel(user.status, t)}</span>
                     </td>
                     <td>
                       <span className={`status-pill verification-pill ${user.email_verified_at ? 'verified' : ''}`}>
@@ -345,10 +314,7 @@ export function UsersScreen({ currentUserId }) {
                     </td>
                     <td>{user.last_access ? new Date(user.last_access).toLocaleString(dateLocale) : t('users.never')}</td>
                     <td className="row-actions">
-                      {!user.email_verified_at && (
-                        <button className="text-button" type="button" onClick={() => sendVerification(user)}>{t('users.sendVerification')}</button>
-                      )}
-                      <button className="danger-button" type="button" disabled={user.id === currentUserId} onClick={() => deleteUser(user)}>{t('common.delete')}</button>
+                      <button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.user(user.id))}>{t('users.openUser')}</button>
                     </td>
                   </tr>
                 ))}

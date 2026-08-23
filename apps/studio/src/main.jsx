@@ -15,6 +15,7 @@ import './navigation-v2.css';
 import './data-model-v2.css';
 import './data-model-v2-interactions.css';
 import './asset-picker.css';
+import './routed-pages.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

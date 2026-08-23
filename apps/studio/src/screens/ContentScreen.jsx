@@ -7,6 +7,7 @@ import { Pagination } from '../components/Pagination.jsx';
 import { contentTableFields, isFileField, isImageField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
+import { studioPath } from '../studio-route.js';
 
 const PAGE_SIZES = [25, 50, 100];
 
@@ -283,7 +284,7 @@ function RecordForm({ collection, collectionLabel, fields, relationLookups, file
   );
 }
 
-export function ContentScreen({ collection, collectionLabel = '', onOpenDataModel }) {
+export function ContentScreen({ collection, collectionLabel = '', onOpenDataModel, route = {}, onNavigate }) {
   const { t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const requestVersion = useRef(0);
@@ -293,8 +294,8 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   const [files, setFiles] = useState([]);
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState(null);
-  const [editing, setEditing] = useState(null);
-  const [creating, setCreating] = useState(false);
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [loadedRecordKey, setLoadedRecordKey] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState([]);
@@ -306,6 +307,9 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   const [schemaLoading, setSchemaLoading] = useState(true);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [error, setError] = useState('');
+  const creating = route.view === 'new';
+  const editing = route.view === 'record' ? editingRecord : null;
+  const routeRecordKey = route.view === 'record' ? `${collection}:${route.recordId}` : '';
 
   async function buildRelationLookups(target, relations) {
     const directRelations = relations.filter((relation) =>
@@ -411,8 +415,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   }, [searchInput]);
 
   useEffect(() => {
-    setEditing(null);
-    setCreating(false);
+    setEditingRecord(null);
     setSearchInput('');
     setSearch('');
     setFilters([]);
@@ -422,6 +425,25 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     setOffset(0);
     loadCollectionSchema(collection);
   }, [collection]);
+
+  useEffect(() => {
+    if (route.view !== 'record' || !collection || !route.recordId) {
+      return;
+    }
+    const requestKey = `${collection}:${route.recordId}`;
+    let cancelled = false;
+    setError('');
+    apiRequest(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(route.recordId)}`)
+      .then((response) => { if (!cancelled) setEditingRecord(response?.data ?? null); })
+      .catch((requestError) => {
+        if (!cancelled) {
+          setEditingRecord(null);
+          setError(requestError.message || t('content.dataLoadError'));
+        }
+      })
+      .finally(() => { if (!cancelled) setLoadedRecordKey(requestKey); });
+    return () => { cancelled = true; };
+  }, [collection, route.recordId, route.view]);
 
   useEffect(() => {
     // The collection-change effect above starts the schema request in the same
@@ -541,23 +563,41 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     setFiles((current) => [file, ...current.filter((entry) => entry.id !== file.id)]);
   }
 
+  const visibleCollectionName = collectionLabel || collection;
+
+  if (route.view === 'record' && loadedRecordKey !== routeRecordKey) {
+    return <section className="panel"><p>{t('common.loading')}</p></section>;
+  }
+
+  if (route.view === 'record' && !editingRecord) {
+    return (
+      <div className="routed-form-page">
+        <nav className="page-breadcrumbs" aria-label={visibleCollectionName}><button type="button" onClick={() => onNavigate?.(studioPath.content(collection))}>{visibleCollectionName}</button><span aria-hidden="true">/</span><strong>{t('content.recordNotFound')}</strong></nav>
+        <section className="panel empty-state empty-state-action"><div><h2>{t('content.recordNotFound')}</h2><p>{t('content.recordNotFoundDescription')}</p></div><button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.content(collection))}>{t('common.back')}</button></section>
+        {error && <div className="error-banner" role="alert">{error}</div>}
+      </div>
+    );
+  }
+
   if (creating || editing) {
     return (
-      <RecordForm
-        collection={collection}
-        collectionLabel={collectionLabel}
-        fields={fields}
-        relationLookups={relationLookups}
-        files={files}
-        record={editing}
-        onFileUploaded={registerUploadedFile}
-        onCancel={() => { setCreating(false); setEditing(null); }}
-        onSaved={async () => {
-          setCreating(false);
-          setEditing(null);
-          await loadItems();
-        }}
-      />
+      <div className="routed-form-page">
+        <nav className="page-breadcrumbs" aria-label={visibleCollectionName}><button type="button" onClick={() => onNavigate?.(studioPath.content(collection))}>{visibleCollectionName}</button><span aria-hidden="true">/</span><strong>{creating ? t('content.createRecord') : t('content.editRecord')}</strong></nav>
+        <RecordForm
+          collection={collection}
+          collectionLabel={collectionLabel}
+          fields={fields}
+          relationLookups={relationLookups}
+          files={files}
+          record={editing}
+          onFileUploaded={registerUploadedFile}
+          onCancel={() => onNavigate?.(studioPath.content(collection))}
+          onSaved={async () => {
+            await loadItems();
+            onNavigate?.(studioPath.content(collection));
+          }}
+        />
+      </div>
     );
   }
 
@@ -576,8 +616,6 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     );
   }
 
-  const visibleCollectionName = collectionLabel || collection;
-
   return (
     <div className="screen-stack">
       <section className="panel toolbar-panel content-toolbar">
@@ -587,7 +625,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
           {visibleCollectionName !== collection && <code className="schema-machine-key">{collection}</code>}
           <p>{meta?.total_count != null ? t('content.matchingRecords', { count: meta.total_count }) : t('app.contentDescription')}</p>
         </div>
-        <button className="primary-button" type="button" onClick={() => setCreating(true)}>
+        <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.contentNew(collection))}>
           {t('content.newRecord')}
         </button>
       </section>
@@ -726,7 +764,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
       ) : !itemsLoading && totalCount === 0 && !hasActiveControls ? (
         <section className="panel empty-state empty-state-action">
           <div><h2>{t('content.noRecordsYet')}</h2><p>{t('content.firstRecordDescription', { collection: visibleCollectionName })}</p></div>
-          <button className="primary-button" type="button" onClick={() => setCreating(true)}>{t('content.createFirstRecord')}</button>
+          <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.contentNew(collection))}>{t('content.createFirstRecord')}</button>
         </section>
       ) : !itemsLoading && totalCount === 0 ? (
         <section className="panel empty-state empty-state-action">
@@ -767,7 +805,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                       </td>
                     ))}
                     <td className="row-actions">
-                      <button className="text-button" type="button" onClick={() => setEditing(record)}>{t('common.edit')}</button>
+                      <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.contentRecord(collection, record.id))}>{t('common.edit')}</button>
                       <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>
                     </td>
                   </tr>

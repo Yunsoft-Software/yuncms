@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { useConfirmDialog } from '../components/DialogProvider.jsx';
-import { Modal } from '../components/Modal.jsx';
 import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
 import { useI18n } from '../i18n.js';
+import { studioPath } from '../studio-route.js';
 import {
   canConfigurePermission,
   canUseAdvancedPermission,
@@ -56,7 +56,7 @@ function isRestricted(permission) {
   ));
 }
 
-export function RolesPermissionsScreen() {
+export function RolesPermissionsScreen({ route = {}, onNavigate }) {
   const { t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const [roles, setRoles] = useState([]);
@@ -100,8 +100,9 @@ export function RolesPermissionsScreen() {
       setSelectedRoleId((current) => {
         const preferred = preferredRole || current;
         if (nextRoles.some((role) => role.id === preferred)) return preferred;
-        return nextRoles.find((role) => !role.admin)?.id || nextRoles[0]?.id || '';
+        return '';
       });
+      if (preferredRole && !nextRoles.some((role) => role.id === preferredRole)) onNavigate?.(studioPath.roles());
     } catch (requestError) {
       setError(requestError.message || t('roles.loadError'));
     } finally {
@@ -113,6 +114,11 @@ export function RolesPermissionsScreen() {
     load();
   }, []);
 
+  useEffect(() => {
+    setSelectedRoleId(route.roleId || '');
+    setShowCreateRole(route.view === 'new');
+  }, [route.roleId, route.view]);
+
   const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? null;
   const permissionIndex = useMemo(() => new Map(permissions.map((permission) => [
     permissionKey(permission.role, permission.collection, permission.action),
@@ -120,6 +126,10 @@ export function RolesPermissionsScreen() {
   ])), [permissions]);
   const selectedRolePermissions = useMemo(() => permissions.filter((permission) =>
     permission.role === selectedRoleId), [permissions, selectedRoleId]);
+  const permissionCollection = collections.find((entry) => entry.collection === route.collection) ?? null;
+  const routedPermission = route.view === 'permission'
+    ? permissionIndex.get(permissionKey(route.roleId, route.collection, route.action)) ?? null
+    : null;
   const restrictedRuleCount = useMemo(
     () => selectedRolePermissions.filter(isRestricted).length,
     [selectedRolePermissions],
@@ -194,6 +204,7 @@ export function RolesPermissionsScreen() {
       setRolePage(1);
       setNotice(t('roles.createdNotice'));
       await load(createdId);
+      onNavigate?.(studioPath.role(createdId));
     } catch (requestError) {
       setError(requestError.message || t('roles.createError'));
     }
@@ -234,6 +245,7 @@ export function RolesPermissionsScreen() {
       setNotice(t('roles.deletedNotice'));
       setAdvancedPermission(null);
       await load('');
+      onNavigate?.(studioPath.roles());
     } catch (requestError) {
       setError(requestError.message || t('roles.deleteError'));
     }
@@ -274,13 +286,15 @@ export function RolesPermissionsScreen() {
     }
   }
 
-  async function openAdvanced(permission) {
+  async function loadPermissionEditor(permission) {
     const collection = collections.find((entry) => entry.collection === permission.collection);
-    if (!collection || !canUseAdvancedPermission(collection)) return;
+    if (!collection) return;
     setError('');
     setNotice('');
     try {
-      const fieldResponse = await apiRequest(`/schema/collections/${encodeURIComponent(permission.collection)}/fields`);
+      const fieldResponse = canUseAdvancedPermission(collection)
+        ? await apiRequest(`/schema/collections/${encodeURIComponent(permission.collection)}/fields`)
+        : { data: [] };
       setAdvancedFields((fieldResponse?.data ?? []).filter((field) => !field.hidden));
       setAdvancedPermission(permission);
       setAdvancedForm({
@@ -293,6 +307,25 @@ export function RolesPermissionsScreen() {
       setError(requestError.message || t('roles.permissionDetailsError'));
     }
   }
+
+  function openPermissionPage(collection, action) {
+    if (!selectedRole) return;
+    onNavigate?.(studioPath.permission(selectedRole.id, collection.collection, action));
+  }
+
+  useEffect(() => {
+    if (route.view !== 'permission' || !route.roleId || !route.collection || !route.action || loading) return;
+    const permission = permissionIndex.get(permissionKey(route.roleId, route.collection, route.action));
+    loadPermissionEditor(permission || {
+      id: null,
+      role: route.roleId,
+      collection: route.collection,
+      action: route.action,
+      fields: null,
+      filter: null,
+      validation: null,
+    });
+  }, [loading, permissionIndex, route.action, route.collection, route.roleId, route.view]);
 
   function toggleAdvancedField(fieldName) {
     setAdvancedForm((current) => ({
@@ -326,7 +359,6 @@ export function RolesPermissionsScreen() {
         },
       });
       setNotice(t('roles.advancedSaved'));
-      setAdvancedPermission(null);
       await load(selectedRoleId);
     } catch (requestError) {
       setError(requestError instanceof SyntaxError
@@ -342,7 +374,7 @@ export function RolesPermissionsScreen() {
       {error && <div className="error-banner" role="alert">{error}</div>}
       {notice && <div className="notice-banner" role="status">{notice}</div>}
 
-      <section className="permissions-layout">
+      <section className={`permissions-layout routed-view-${route.view || 'list'}`}>
         <aside className="panel form-panel role-sidebar access-role-sidebar">
           <div className="panel-heading role-sidebar-heading">
             <div>
@@ -350,7 +382,7 @@ export function RolesPermissionsScreen() {
               <h2>{t('roles.roles')}</h2>
               <p>{t('roles.summary', { count: roles.length })}</p>
             </div>
-            <button className="primary-button" type="button" onClick={() => setShowCreateRole((value) => !value)}>
+            <button className="primary-button" type="button" onClick={() => onNavigate?.(showCreateRole ? studioPath.roles() : studioPath.newRole())}>
               {showCreateRole ? t('common.cancel') : t('common.create')}
             </button>
           </div>
@@ -372,7 +404,7 @@ export function RolesPermissionsScreen() {
 
           <div className="list-stack role-list role-list-page">
             {pagedRoles.items.map((role) => (
-              <button className={`list-button role-list-button ${role.id === selectedRoleId ? 'active' : ''}`} key={role.id} type="button" onClick={() => setSelectedRoleId(role.id)}>
+              <button className={`list-button role-list-button ${role.id === selectedRoleId ? 'active' : ''}`} key={role.id} type="button" onClick={() => onNavigate?.(studioPath.role(role.id))}>
                 <span>
                   <strong>{role.name}</strong>
                   <small>{role.admin ? t('roles.adminFullAccess') : role.public ? t('roles.publicRole') : role.description || t('roles.customRole')}</small>
@@ -388,10 +420,12 @@ export function RolesPermissionsScreen() {
         </aside>
 
         <div className="permissions-detail-stack">
+          {selectedRole && <nav className="page-breadcrumbs" aria-label={t('roles.roles')}><button type="button" onClick={() => onNavigate?.(studioPath.roles())}>{t('roles.roles')}</button><span aria-hidden="true">/</span><strong>{selectedRole.name}</strong>{route.view === 'permission' && <><span aria-hidden="true">/</span><button type="button" onClick={() => onNavigate?.(studioPath.role(selectedRole.id))}>{t('roles.permissions')}</button><span aria-hidden="true">/</span><strong>{route.collection} · {actionLabel(route.action, t)}</strong></>}</nav>}
           {!selectedRole ? (
             <section className="panel empty-state"><div><h2>{t('roles.selectRole')}</h2><p>{t('roles.selectRoleDescription')}</p></div></section>
           ) : (
             <>
+              {route.view !== 'permission' && <>
               <section className="panel role-detail-header role-summary-panel">
                 <form className="role-name-form" onSubmit={saveRoleName}>
                   <div>
@@ -447,48 +481,37 @@ export function RolesPermissionsScreen() {
                     <span className="result-count">{t('roles.collectionCount', { visible: visibleCollections.length, total: collections.length })}</span>
                     {(collectionSearch || configuredOnly) && <button className="text-button" type="button" onClick={() => { setCollectionSearch(''); setConfiguredOnly(false); }}>{t('common.reset')}</button>}
                   </div>
-                  <div className="table-scroll permission-matrix-scroll">
-                    <table className="permission-matrix">
-                      <thead><tr><th>{t('roles.collection')}</th>{ACTIONS.map((action) => <th key={action}>{actionLabel(action, t)}</th>)}</tr></thead>
-                      <tbody>
-                        {pagedCollections.items.map((collection) => {
-                          const policy = permissionResourcePolicy(collection);
-                          return (
-                            <tr key={collection.collection}>
-                              <td>
-                                <div className="permission-collection-name">
-                                  <strong>{collection.collection}</strong>
-                                  {policy.systemManaged && <span className="status-pill system-resource-pill">{t('roles.systemResource')}</span>}
-                                </div>
-                                {collection.note && <small className="matrix-note">{collection.note}</small>}
-                              </td>
-                              {ACTIONS.map((action) => {
-                                const key = permissionKey(selectedRole.id, collection.collection, action);
-                                const permission = permissionIndex.get(key);
-                                const allowed = canConfigurePermission(collection, action, selectedRole);
-                                const advanced = isRestricted(permission);
-                                if (!allowed) {
-                                  return <td key={action}><span className="status-pill protected-permission">{t('roles.protected')}</span></td>;
-                                }
-                                return (
-                                  <td key={action}>
-                                    <div className="permission-cell">
-                                      <label className={`permission-toggle ${permission ? 'enabled' : ''}`}>
-                                        <input type="checkbox" checked={Boolean(permission)} disabled={busyKey === key} onChange={() => togglePermission(collection, action)} aria-label={t('roles.actionCollection', { action: actionLabel(action, t), collection: collection.collection })} />
-                                        <span>{permission ? t('roles.allowed') : t('roles.off')}</span>
-                                      </label>
-                                      {permission && canUseAdvancedPermission(collection) && (
-                                        <button className="text-button permission-configure" type="button" onClick={() => openAdvanced(permission)}>{advanced ? t('roles.restricted') : t('roles.configure')}</button>
-                                      )}
+                  <div className="permission-collection-grid">
+                    {pagedCollections.items.map((collection) => {
+                      const policy = permissionResourcePolicy(collection);
+                      return (
+                        <article className="permission-collection-card" key={collection.collection}>
+                          <header>
+                            <div className="permission-collection-name"><strong>{collection.collection}</strong>{policy.systemManaged && <span className="status-pill system-resource-pill">{t('roles.systemResource')}</span>}</div>
+                            <small>{collection.note || t('roles.collectionPermissionHint')}</small>
+                          </header>
+                          <div className="permission-action-list">
+                            {ACTIONS.map((action) => {
+                              const key = permissionKey(selectedRole.id, collection.collection, action);
+                              const permission = permissionIndex.get(key);
+                              const allowed = canConfigurePermission(collection, action, selectedRole);
+                              const advanced = isRestricted(permission);
+                              return (
+                                <div className="permission-action-row" key={action}>
+                                  <div><strong>{actionLabel(action, t)}</strong><small>{permission ? (advanced ? t('roles.restricted') : t('roles.allRecords')) : t('roles.permissionDisabled')}</small></div>
+                                  {allowed ? (
+                                    <div className="permission-action-controls">
+                                      <label className={`permission-toggle ${permission ? 'enabled' : ''}`}><input type="checkbox" checked={Boolean(permission)} disabled={busyKey === key} onChange={() => togglePermission(collection, action)} aria-label={t('roles.actionCollection', { action: actionLabel(action, t), collection: collection.collection })} /><span>{permission ? t('roles.allowed') : t('roles.off')}</span></label>
+                                      <button className="secondary-button permission-configure" type="button" onClick={() => openPermissionPage(collection, action)}>{t('roles.openPermission')}</button>
                                     </div>
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                  ) : <span className="status-pill protected-permission">{t('roles.protected')}</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </article>
+                      );
+                    })}
                   </div>
                   {!loading && collections.length === 0 ? (
                     <div className="table-footer">{t('roles.createCollectionFirst')}</div>
@@ -499,43 +522,57 @@ export function RolesPermissionsScreen() {
                   )}
                 </section>
               )}
+              </>}
+
+              {route.view === 'permission' && (
+                <section className="panel permission-detail-page">
+                  {!permissionCollection ? (
+                    <div className="empty-state"><div><h2>{t('roles.permissionNotFound')}</h2><p>{t('roles.permissionNotFoundDescription')}</p></div><button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.role(selectedRole.id))}>{t('roles.backToRole')}</button></div>
+                  ) : (
+                    <>
+                      <header className="permission-detail-heading">
+                        <div><p className="eyebrow">{t('roles.permissionDetail')}</p><h2>{permissionCollection.collection} · {actionLabel(route.action, t)}</h2><p>{permissionCollection.note || t('roles.permissionDetailDescription')}</p></div>
+                        <span className={`permission-state-badge ${routedPermission ? 'enabled' : 'disabled'}`}>{routedPermission ? t('roles.permissionEnabled') : t('roles.permissionDisabled')}</span>
+                      </header>
+
+                      {!canConfigurePermission(permissionCollection, route.action, selectedRole) ? (
+                        <div className="inline-info">{t('roles.protected')}</div>
+                      ) : (
+                        <>
+                          <div className="permission-master-switch">
+                            <div><strong>{t('roles.permissionMasterSwitch')}</strong><p>{t('roles.permissionMasterSwitchHint')}</p></div>
+                            <label className={`permission-toggle ${routedPermission ? 'enabled' : ''}`}><input type="checkbox" checked={Boolean(routedPermission)} disabled={busyKey === permissionKey(selectedRole.id, permissionCollection.collection, route.action)} onChange={() => togglePermission(permissionCollection, route.action)} /><span>{routedPermission ? t('roles.allowed') : t('roles.off')}</span></label>
+                          </div>
+
+                          {!routedPermission ? (
+                            <div className="empty-state permission-disabled-state"><div><h3>{t('roles.permissionDisabled')}</h3><p>{t('roles.enableBeforeRules')}</p></div></div>
+                          ) : canUseAdvancedPermission(permissionCollection) && advancedPermission?.id === routedPermission.id ? (
+                            <form id="advanced-permission-form" className="advanced-permission-grid permission-rule-page" onSubmit={saveAdvancedPermission}>
+                              <div className="schema-create-card form-stack">
+                                <div><strong>{t('roles.allowedFields')}</strong><p>{t('roles.allowedFieldsDescription')}</p></div>
+                                <label className="checkbox-label"><input type="checkbox" checked={advancedForm.allFields} onChange={(event) => setAdvancedForm((current) => ({ ...current, allFields: event.target.checked }))} />{t('roles.allowAllFields')}</label>
+                                {!advancedForm.allFields && <div className="field-choice-grid">{advancedFields.map((field) => <label className="field-choice" key={field.field}><input type="checkbox" checked={advancedForm.fields.includes(field.field)} onChange={() => toggleAdvancedField(field.field)} /><span><strong>{field.name || field.field}</strong><small>{field.field} · {field.type}</small></span></label>)}</div>}
+                              </div>
+                              <div className="schema-create-card form-stack">
+                                <label className="field-label"><span>{t('roles.rowFilter')}</span><small>{t('roles.rowFilterDescription')}</small><textarea rows="8" value={advancedForm.filter} onChange={(event) => setAdvancedForm((current) => ({ ...current, filter: event.target.value }))} placeholder='{"status":{"_eq":"active"}}' /></label>
+                                <label className="field-label"><span>{t('roles.validation')}</span><small>{supportsValidation(route.action) ? t('roles.validationWriteDescription') : t('roles.validationUnsupported')}</small><textarea rows="8" value={advancedForm.validation} disabled={!supportsValidation(route.action)} onChange={(event) => setAdvancedForm((current) => ({ ...current, validation: event.target.value }))} placeholder='{"status":{"_in":["draft","active"]}}' /></label>
+                                <div className="form-actions"><button className="primary-button" type="submit" disabled={savingAdvanced}>{savingAdvanced ? t('common.saving') : t('roles.saveRules')}</button></div>
+                              </div>
+                            </form>
+                          ) : (
+                            <div className="inline-info">{t('roles.actionOnlyPermission')}</div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+                </section>
+              )}
             </>
           )}
         </div>
       </section>
 
-      <Modal
-        open={Boolean(advancedPermission)}
-        eyebrow={t('roles.advancedPermission')}
-        title={advancedPermission ? `${advancedPermission.collection} · ${actionLabel(advancedPermission.action, t)}` : t('roles.permissions')}
-        description={t('roles.advancedDescription')}
-        className="permission-editor-modal"
-        onClose={() => !savingAdvanced && setAdvancedPermission(null)}
-        actions={advancedPermission ? (
-          <>
-            <button className="text-button" type="button" disabled={savingAdvanced} onClick={() => setAdvancedPermission(null)}>{t('common.cancel')}</button>
-            <button className="primary-button" type="submit" form="advanced-permission-form" disabled={savingAdvanced}>{savingAdvanced ? t('common.saving') : t('roles.saveRules')}</button>
-          </>
-        ) : null}
-      >
-        {advancedPermission && (
-          <form id="advanced-permission-form" className="advanced-permission-grid" onSubmit={saveAdvancedPermission}>
-            <div className="schema-create-card form-stack">
-              <div><strong>{t('roles.allowedFields')}</strong><p>{t('roles.allowedFieldsDescription')}</p></div>
-              <label className="checkbox-label"><input type="checkbox" checked={advancedForm.allFields} onChange={(event) => setAdvancedForm((current) => ({ ...current, allFields: event.target.checked }))} />{t('roles.allowAllFields')}</label>
-              {!advancedForm.allFields && (
-                <div className="field-choice-grid">
-                  {advancedFields.map((field) => <label className="field-choice" key={field.field}><input type="checkbox" checked={advancedForm.fields.includes(field.field)} onChange={() => toggleAdvancedField(field.field)} /><span><strong>{field.field}</strong><small>{field.type}</small></span></label>)}
-                </div>
-              )}
-            </div>
-            <div className="schema-create-card form-stack">
-              <label className="field-label"><span>{t('roles.rowFilter')}</span><small>{t('roles.rowFilterDescription')}</small><textarea rows="8" value={advancedForm.filter} onChange={(event) => setAdvancedForm((current) => ({ ...current, filter: event.target.value }))} placeholder='{"status":{"_eq":"active"}}' /></label>
-              <label className="field-label"><span>{t('roles.validation')}</span><small>{supportsValidation(advancedPermission.action) ? t('roles.validationWriteDescription') : t('roles.validationUnsupported')}</small><textarea rows="8" value={advancedForm.validation} disabled={!supportsValidation(advancedPermission.action)} onChange={(event) => setAdvancedForm((current) => ({ ...current, validation: event.target.value }))} placeholder='{"status":{"_in":["draft","active"]}}' /></label>
-            </div>
-          </form>
-        )}
-      </Modal>
     </div>
   );
 }

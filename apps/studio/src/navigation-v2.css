@@ -77,6 +77,60 @@
 }
 
 @media (max-width: 760px) {
+  .sidebar,
+  .sidebar-collapsed .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    min-height: auto;
+    max-height: 100dvh;
+    padding: 10px 14px;
+    overflow-y: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--studio-border);
+    box-shadow: 0 8px 24px rgb(15 23 42 / 8%);
+  }
+
+  .sidebar-brand-row,
+  .sidebar-collapsed .sidebar-brand-row {
+    min-height: 42px;
+    flex-direction: row;
+  }
+
+  .sidebar .studio-brand-logo {
+    width: auto;
+    max-width: 122px;
+    height: 30px;
+  }
+
+  .sidebar .sidebar-collapse-button,
+  .sidebar-collapsed .sidebar-collapse-button {
+    transform: rotate(-90deg);
+  }
+
+  .sidebar.mobile-nav-open .sidebar-collapse-button,
+  .sidebar-collapsed .sidebar.mobile-nav-open .sidebar-collapse-button {
+    transform: rotate(90deg);
+  }
+
+  .sidebar:not(.mobile-nav-open) .sidebar-nav,
+  .sidebar:not(.mobile-nav-open) .sidebar-footer {
+    display: none;
+  }
+
+  .sidebar.mobile-nav-open .sidebar-nav {
+    display: grid;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--studio-border-soft);
+  }
+
+  .sidebar.mobile-nav-open .sidebar-footer {
+    display: grid;
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
   .nav-group-title,
   .nav-item-root {
     font-size: 15px;

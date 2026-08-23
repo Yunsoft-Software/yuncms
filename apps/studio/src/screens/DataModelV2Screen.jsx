@@ -14,6 +14,7 @@ import {
 } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName, schemaKeyFromName } from '../schema-name.js';
+import { studioPath } from '../studio-route.js';
 
 const ACCOUNTABILITY_FIELDS = Object.freeze([
   ['created_at', 'collectionBuilder.createdAt', 'collectionBuilder.createdAtHint'],
@@ -67,21 +68,18 @@ function reorderCollections(rows, sourceName, targetName) {
   return order;
 }
 
-export function DataModelV2Screen({ onCollectionsChanged }) {
+export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate }) {
   const { t } = useI18n();
   const confirmDialog = useConfirmDialog();
   const [collections, setCollections] = useState([]);
   const [selected, setSelected] = useState('');
   const [fields, setFields] = useState([]);
   const [relations, setRelations] = useState([]);
-  const [tab, setTab] = useState('overview');
   const [search, setSearch] = useState('');
   const [fieldSearch, setFieldSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [showCreateCollection, setShowCreateCollection] = useState(false);
-  const [showCreateField, setShowCreateField] = useState(false);
   const [collectionForm, setCollectionForm] = useState(() => emptyCollectionForm());
   const [fieldForm, setFieldForm] = useState(createEmptyFieldForm);
   const [overview, setOverview] = useState({ name: '', note: '', icon: 'collection', visible: true });
@@ -99,6 +97,9 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
     .slice()
     .sort((a, b) => a.collection.localeCompare(b.collection)), [collections]);
   const selectedCollection = collections.find((entry) => entry.collection === selected) ?? null;
+  const selectedField = fields.find((entry) => entry.field === route.field) ?? null;
+  const view = route.view || 'collections';
+  const showCreateCollection = view === 'new-collection';
   const nextCollectionSort = projectCollections.length
     ? Math.max(...projectCollections.map((entry) => collectionUi(entry).sort)) + 10
     : 10;
@@ -148,10 +149,9 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
       const response = await apiRequest('/schema/collections');
       const rows = response?.data ?? [];
       setCollections(rows);
-      const next = rows.some((entry) => entry.collection === preferred)
-        ? preferred
-        : rows.find((entry) => !entry.system)?.collection || rows[0]?.collection || '';
+      const next = rows.some((entry) => entry.collection === preferred) ? preferred : '';
       setSelected(next);
+      if (preferred && !next) onNavigate?.(studioPath.dataModel());
     } catch (requestError) {
       setError(requestError.message || t('dataModel.schemaLoadError'));
     } finally {
@@ -177,7 +177,13 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
     }
   }
 
-  useEffect(() => { loadCollections(); }, []);
+  useEffect(() => { loadCollections(route.collection || ''); }, []);
+
+  useEffect(() => {
+    const next = route.collection || '';
+    if (next !== selected) setSelected(next);
+    if (view === 'new-relation' && route.relationKind) setRelationMode(route.relationKind);
+  }, [route.collection, route.relationKind, view]);
 
   useEffect(() => {
     if (!selectedCollection) return;
@@ -188,15 +194,13 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
       icon: ui.icon,
       visible: !selectedCollection.hidden,
     });
-    setTab('overview');
     setFieldSearch('');
-    setShowCreateField(false);
     setFieldForm(createEmptyFieldForm());
-    setRelationMode('m2o');
+    setRelationMode(view === 'new-relation' && route.relationKind ? route.relationKind : 'm2o');
     setDirectForm({ manyField: '', oneCollection: '', onDelete: 'RESTRICT' });
     setM2mForm({ junctionCollection: '', leftCollection: selected, rightCollection: '' });
     loadSelected(selected);
-  }, [selected]);
+  }, [selected, selectedCollection?.collection]);
 
   function flash(message) {
     setNotice(message);
@@ -226,10 +230,10 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
         },
       });
       const createdKey = response?.data?.collection || key;
-      setShowCreateCollection(false);
       setCollectionForm(emptyCollectionForm(nextCollectionSort + 10));
       flash(t('dataModel.collectionCreated', { name: displayName }));
       await notifyCollectionsChanged(createdKey);
+      onNavigate?.(studioPath.collection(createdKey));
     } catch (requestError) {
       setError(requestError.message || t('dataModel.collectionCreateError'));
     }
@@ -308,6 +312,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
       await apiRequest(`/schema/collections/${encodeURIComponent(selected)}?destructive=true`, { method: 'DELETE' });
       flash(t('dataModel.collectionDeleted', { name: displaySchemaName(selectedCollection, 'collection') }));
       await notifyCollectionsChanged('');
+      onNavigate?.(studioPath.dataModel());
     } catch (requestError) {
       setError(requestError.message || t('dataModel.collectionDeleteError'));
     }
@@ -323,9 +328,9 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
         : `/schema/collections/${encodeURIComponent(selected)}/fields`;
       await apiRequest(path, { method: 'POST', body });
       setFieldForm(createEmptyFieldForm());
-      setShowCreateField(false);
       flash(t('dataModel.fieldAdded', { name: body.name || body.field }));
       await loadSelected();
+      onNavigate?.(studioPath.field(selected, body.field));
     } catch (requestError) {
       setError(requestError.message || t('dataModel.fieldCreateError'));
     }
@@ -358,6 +363,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
       await apiRequest(`/schema/collections/${encodeURIComponent(selected)}/fields/${encodeURIComponent(field.field)}?destructive=true`, { method: 'DELETE' });
       flash(t('dataModel.fieldDeleted', { name: displaySchemaName(field, 'field') }));
       await loadSelected();
+      if (view === 'field') onNavigate?.(studioPath.fields(selected));
     } catch (requestError) {
       setError(requestError.message || t('dataModel.fieldDeleteError'));
     }
@@ -382,6 +388,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
       }));
       setDirectForm({ manyField: '', oneCollection: '', onDelete: 'RESTRICT' });
       await loadSelected();
+      onNavigate?.(studioPath.relations(selected));
     } catch (requestError) {
       setError(requestError.message || t(kind === 'o2o' ? 'dataModel.o2oCreateError' : 'dataModel.relationCreateError'));
     }
@@ -425,6 +432,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
       setM2mForm({ junctionCollection: '', leftCollection: selected, rightCollection: '' });
       await notifyCollectionsChanged(selected);
       await loadSelected(selected);
+      onNavigate?.(studioPath.relations(selected));
     } catch (requestError) {
       setError(requestError.message || t('dataModel.m2mCreateError'));
     }
@@ -468,18 +476,18 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
   const selectedIndex = projectCollections.findIndex((entry) => entry.collection === selected);
 
   return (
-    <div className="data-model-v2">
+    <div className="data-model-v2 routed-resource-page">
       {error && <div className="error-banner" role="alert">{error}</div>}
       {notice && <div className="notice-banner" role="status">{notice}</div>}
 
-      <div className="data-model-v2-layout">
+      <div className={`data-model-v2-layout routed-view-${view}`}>
         <aside className="panel data-model-collections-panel">
           <div className="data-model-collections-heading">
             <div><p className="eyebrow">{t('nav.dataModel')}</p><h2>{t('dataModel.collections')}</h2></div>
             <button className="primary-button" type="button" onClick={() => {
               setCollectionForm(emptyCollectionForm(nextCollectionSort));
-              setShowCreateCollection((value) => !value);
-            }}>{showCreateCollection ? t('common.close') : t('common.create')}</button>
+              onNavigate?.(studioPath.newCollection());
+            }}>{t('common.create')}</button>
           </div>
 
           <label className="field-label data-model-collection-search">
@@ -494,7 +502,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
                 className={`data-model-collection-item ${selected === entry.collection ? 'active' : ''} ${draggedCollection === entry.collection ? 'dragging' : ''}`}
                 type="button"
                 key={entry.collection}
-                onClick={() => setSelected(entry.collection)}
+                onClick={() => onNavigate?.(studioPath.collection(entry.collection))}
                 draggable={!search.trim()}
                 onDragStart={(event) => {
                   setDraggedCollection(entry.collection);
@@ -525,7 +533,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
 
             {filteredSystems.length > 0 && <small className="data-model-group-label system-group-label">{t('dataModel.systemCollections')}</small>}
             {filteredSystems.map((entry) => (
-              <button className={`data-model-collection-item system ${selected === entry.collection ? 'active' : ''}`} type="button" key={entry.collection} onClick={() => setSelected(entry.collection)}>
+              <button className={`data-model-collection-item system ${selected === entry.collection ? 'active' : ''}`} type="button" key={entry.collection} onClick={() => onNavigate?.(studioPath.collection(entry.collection))}>
                 <CollectionIcon name={entry.collection === 'yuncms_users' ? 'users' : entry.collection === 'yuncms_files' ? 'folder' : entry.collection === 'yuncms_roles' ? 'shield' : 'collection'} />
                 <span><strong>{displaySchemaName(entry, 'collection')}</strong><small>{entry.collection} · {t('dataModel.systemManaged')}</small></span>
               </button>
@@ -538,7 +546,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
             <section className="panel data-model-create-workspace">
               <div className="workspace-section-heading">
                 <div><p className="eyebrow">{t('dataModel.newCollection')}</p><h2>{t('dataModel.createCollection')}</h2><p>{t('dataModel.createCollectionHint')}</p></div>
-                <button className="text-button" type="button" onClick={() => setShowCreateCollection(false)}>{t('common.cancel')}</button>
+                <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.dataModel())}>{t('common.cancel')}</button>
               </div>
               <form className="data-model-create-form" onSubmit={createCollection}>
                 <div className="data-model-create-main">
@@ -587,18 +595,18 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
                 <div className="data-model-detail-actions"><span className="schema-count">{t('dataModel.fieldCount', { count: fields.length })}</span>{!selectedCollection.system && <button className="danger-button" type="button" onClick={deleteCollection}>{t('dataModel.deleteCollectionAction')}</button>}</div>
               </header>
 
-              <div className="data-model-tabs" role="tablist">
-                {['overview', 'fields', 'relations'].map((name) => (
-                  <button type="button" role="tab" aria-selected={tab === name} className={tab === name ? 'active' : ''} key={name} onClick={() => setTab(name)}>{t(`dataModel.tab.${name}`)}</button>
-                ))}
-              </div>
+              <nav className="resource-page-nav" aria-label={displaySchemaName(selectedCollection, 'collection')}>
+                <button type="button" aria-current={view === 'overview' ? 'page' : undefined} onClick={() => onNavigate?.(studioPath.collection(selected))}><strong>{t('dataModel.tab.overview')}</strong><small>{t('dataModel.collectionSettings')}</small></button>
+                <button type="button" aria-current={['fields', 'field', 'new-field'].includes(view) ? 'page' : undefined} onClick={() => onNavigate?.(studioPath.fields(selected))}><strong>{t('dataModel.tab.fields')}</strong><small>{t('dataModel.fieldCount', { count: fields.length })}</small></button>
+                <button type="button" aria-current={['relations', 'new-relation'].includes(view) ? 'page' : undefined} onClick={() => onNavigate?.(studioPath.relations(selected))}><strong>{t('dataModel.tab.relations')}</strong><small>{t('dataModel.existingRelations')}</small></button>
+              </nav>
 
-              {tab === 'overview' && (
-                <div className="data-model-tab-panel collection-overview-panel">
+              {view === 'overview' && (
+                <div className="resource-page-body collection-overview-panel">
                   {selectedCollection.system ? (
                     <div className="system-collection-overview">
                       <div className="inline-info"><strong>{t('dataModel.systemCollection')}</strong><br />{t('dataModel.systemCollectionExtensionHint')}</div>
-                      <button className="primary-button" type="button" onClick={() => { setTab('fields'); setShowCreateField(true); }}>{t('dataModel.addCustomSystemField')}</button>
+                      <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.newField(selected))}>{t('dataModel.addCustomSystemField')}</button>
                     </div>
                   ) : (
                     <div className="collection-overview-grid">
@@ -619,10 +627,11 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
                 </div>
               )}
 
-              {tab === 'fields' && (
-                <div className="data-model-tab-panel fields-workspace">
-                  <div className="workspace-section-heading"><div><h3>{t('dataModel.fields')}</h3><p>{selectedCollection.system ? t('dataModel.systemFieldsHint') : t('dataModel.fieldsDescription')}</p></div><button className="primary-button" type="button" onClick={() => setShowCreateField((value) => !value)}>{showCreateField ? t('common.close') : t('dataModel.addField')}</button></div>
-                  {showCreateField && <FieldBuilder form={fieldForm} setForm={setFieldForm} onSubmit={createField} onCancel={() => { setShowCreateField(false); setFieldForm(createEmptyFieldForm()); }} allowRequired={!selectedCollection.system} />}
+              {['fields', 'new-field'].includes(view) && (
+                <div className="resource-page-body fields-workspace">
+                  <div className="workspace-section-heading"><div><h3>{view === 'new-field' ? t('dataModel.addField') : t('dataModel.fields')}</h3><p>{selectedCollection.system ? t('dataModel.systemFieldsHint') : t('dataModel.fieldsDescription')}</p></div>{view === 'fields' ? <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.newField(selected))}>{t('dataModel.addField')}</button> : <button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.fields(selected))}>{t('common.back')}</button>}</div>
+                  {view === 'new-field' && <FieldBuilder form={fieldForm} setForm={setFieldForm} onSubmit={createField} onCancel={() => { setFieldForm(createEmptyFieldForm()); onNavigate?.(studioPath.fields(selected)); }} allowRequired={!selectedCollection.system} />}
+                  {view === 'fields' && <>
                   <label className="field-label field-workspace-search"><span>{t('dataModel.findField')}</span><input type="search" value={fieldSearch} onChange={(event) => setFieldSearch(event.target.value)} placeholder={t('dataModel.fieldSearchPlaceholder')} /></label>
                   <div className="field-workspace-list">
                     {visibleFields.map((field) => {
@@ -641,28 +650,61 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
                             <span className="status-pill">{field.required ? t('common.required') : t('common.optional')}</span>
                             {field.readonly && <span className="status-pill">{t('common.readonly')}</span>}
                           </div>
-                          {!selectedCollection.system && field.field !== 'id' && !field.readonly && !isManagedField(field) && <div className="field-workspace-actions"><button className="text-button" type="button" onClick={() => toggleRequired(field)}>{field.required ? t('dataModel.makeOptional') : t('dataModel.makeRequired')}</button><button className="danger-button" type="button" onClick={() => deleteField(field)}>{t('common.delete')}</button></div>}
+                          <div className="field-workspace-actions"><button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.field(selected, field.field))}>{t('dataModel.openField')}</button></div>
                         </div>
                       );
                     })}
                     {visibleFields.length === 0 && <div className="inline-info">{t('dataModel.noFields')}</div>}
                   </div>
+                  </>}
                 </div>
               )}
 
-              {tab === 'relations' && (
-                <div className="data-model-tab-panel relations-workspace">
+              {view === 'field' && (
+                <div className="resource-page-body field-detail-page">
+                  {!selectedField ? (
+                    <div className="inline-info">{t('dataModel.fieldNotFound')}</div>
+                  ) : (
+                    <>
+                      <div className="workspace-section-heading">
+                        <div><p className="eyebrow">{t('dataModel.fieldDetail')}</p><h3>{displaySchemaName(selectedField, 'field')}</h3><code className="schema-machine-key">{selectedField.field}</code></div>
+                        <button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.fields(selected))}>{t('dataModel.backToFields')}</button>
+                      </div>
+                      <div className="field-detail-grid">
+                        <article><small>{t('dataModel.displayName')}</small><strong>{displaySchemaName(selectedField, 'field')}</strong></article>
+                        <article><small>{t('dataModel.apiKey')}</small><strong><code>{selectedField.field}</code></strong></article>
+                        <article><small>{t('common.type')}</small><strong>{t(`fieldType.${fieldDisplayType(selectedField)}`)}</strong></article>
+                        <article><small>{t('common.status')}</small><strong>{selectedField.required ? t('common.required') : t('common.optional')}{selectedField.readonly ? ` · ${t('common.readonly')}` : ''}</strong></article>
+                      </div>
+                      {!selectedCollection.system && selectedField.field !== 'id' && !selectedField.readonly && !isManagedField(selectedField) && (
+                        <div className="page-danger-zone">
+                          <div><strong>{t('dataModel.fieldActions')}</strong><p>{t('dataModel.fieldActionsHint')}</p></div>
+                          <div><button className="secondary-button" type="button" onClick={() => toggleRequired(selectedField)}>{selectedField.required ? t('dataModel.makeOptional') : t('dataModel.makeRequired')}</button><button className="danger-button" type="button" onClick={() => deleteField(selectedField)}>{t('common.delete')}</button></div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {['relations', 'new-relation'].includes(view) && (
+                <div className="resource-page-body relations-workspace">
                   {selectedCollection.system ? <div className="inline-info">{t('dataModel.systemRelationInfo')}</div> : (
                     <>
-                      <div className="relation-type-picker" role="tablist">
+                      <div className="workspace-section-heading">
+                        <div><h3>{view === 'relations' ? t('dataModel.existingRelations') : t('dataModel.createRelation')}</h3><p>{view === 'relations' ? t('dataModel.existingRelationsHint') : t('dataModel.relationPageHint')}</p></div>
+                        {view === 'relations' ? <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.newRelation(selected, 'm2o'))}>{t('dataModel.createRelation')}</button> : <button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.relations(selected))}>{t('common.back')}</button>}
+                      </div>
+
+                      <div className={`relation-type-picker ${view === 'relations' ? 'relation-create-links' : 'relation-kind-selector'}`} aria-label={t('dataModel.tab.relations')}>
                         {[
                           ['m2o', 'dataModel.manyToOne', 'dataModel.m2oShort'],
                           ['o2o', 'dataModel.oneToOne', 'dataModel.o2oShort'],
                           ['m2m', 'dataModel.manyToMany', 'dataModel.m2mShort'],
-                        ].map(([value, titleKey, copyKey]) => <button type="button" key={value} className={`relation-type-card ${relationMode === value ? 'active' : ''}`} onClick={() => setRelationMode(value)}><strong>{t(titleKey)}</strong><small>{t(copyKey)}</small></button>)}
+                        ].map(([value, titleKey, copyKey]) => <button type="button" key={value} aria-pressed={view === 'new-relation' ? relationMode === value : undefined} className={`relation-type-card ${view === 'new-relation' && relationMode === value ? 'active' : ''}`} onClick={() => { setRelationMode(value); onNavigate?.(studioPath.newRelation(selected, value)); }}><strong>{t(titleKey)}</strong><small>{t(copyKey)}</small>{view === 'relations' && <span>{t('dataModel.startRelation')} →</span>}</button>)}
                       </div>
 
-                      <div className="relation-existing-panel">
+                      {view === 'relations' && <div className="relation-existing-panel">
                         <div><h3>{t('dataModel.existingRelations')}</h3><p>{t('dataModel.existingRelationsHint')}</p></div>
                         <div className="relation-v2-list">
                           {directRelations.map((relation) => (
@@ -683,9 +725,9 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
                           ))}
                           {directRelations.length === 0 && m2mGroups.length === 0 && <p className="muted-line">{t('dataModel.noRelations')}</p>}
                         </div>
-                      </div>
+                      </div>}
 
-                      {relationMode === 'm2m' ? (
+                      {view === 'new-relation' && (relationMode === 'm2m' ? (
                         <form className="relation-v2-form" onSubmit={createM2M}>
                           <label className="field-label"><span>{t('dataModel.junctionName')}</span><input value={m2mForm.junctionCollection} onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: schemaKeyFromName(event.target.value, 'collection') }))} placeholder="article_tags" required /></label>
                           <label className="field-label"><span>{t('dataModel.firstCollection')}</span><select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
@@ -699,7 +741,7 @@ export function DataModelV2Screen({ onCollectionsChanged }) {
                           <label className="field-label"><span>{t('dataModel.ifTargetDeleted')}</span><select value={directForm.onDelete} onChange={(event) => setDirectForm((current) => ({ ...current, onDelete: event.target.value }))}><option value="RESTRICT">{t('dataModel.preventDeletion')}</option><option value="CASCADE">{t('dataModel.deleteLinked')}</option><option value="SET NULL">{t('dataModel.clearField')}</option></select></label>
                           <button className="primary-button" type="submit" disabled={relationFields.length === 0}>{t(relationMode === 'o2o' ? 'dataModel.createO2O' : 'dataModel.createRelation')}</button>
                         </form>
-                      )}
+                      ))}
                     </>
                   )}
                 </div>
