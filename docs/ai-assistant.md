@@ -34,11 +34,14 @@ Optional limits:
 ```env
 AI_TIMEOUT_MS=60000
 AI_MAX_TOOL_ROUNDS=6
+AI_MAX_TOOL_CALLS_PER_ROUND=8
 AI_MAX_HISTORY=20
 AI_MAX_MESSAGE_CHARS=12000
 AI_MAX_TOOL_RESULT_BYTES=250000
 AI_MAX_OUTPUT_TOKENS=1500
 ```
+
+`AI_MAX_TOOL_CALLS_PER_ROUND` bounds fanout even when a provider attempts to emit a very large parallel tool-call batch. The accepted range is 1-20.
 
 Provider credentials stay on the API server. They are never returned by `/ai/status` or stored in Studio session state.
 
