@@ -11,6 +11,7 @@ function config(overrides = {}) {
     model: 'example-model',
     writesEnabled: false,
     maxToolRounds: 4,
+    maxToolCallsPerRound: 8,
     maxHistory: 20,
     maxMessageChars: 12_000,
     maxToolResultBytes: 250_000,
@@ -60,15 +61,36 @@ test('AI conversation accepts only bounded user/assistant history and requires a
   );
 });
 
-test('AI status exposes limits and capabilities but never provider credentials', () => {
+test('AI status exposes limits and capabilities but never provider credentials', async () => {
   const service = new AiAssistantService({ config: config(), fetchImpl: async () => assert.fail('not called') });
-  const status = service.status();
+  const status = await service.status();
   assert.equal(status.enabled, true);
   assert.equal(status.model, 'example-model');
   assert.equal(status.max_history, 20);
   assert.equal(status.writes_available, false);
   assert.equal(Object.hasOwn(status, 'apiKey'), false);
   assert.equal(JSON.stringify(status).includes('top-secret-key'), false);
+});
+
+test('AI assistant reads current settings for every request', async () => {
+  let reads = 0;
+  const settingsStore = {
+    async readRuntime() {
+      reads += 1;
+      return config({ model: reads === 1 ? 'model-a' : 'model-b' });
+    },
+  };
+  const providerModels = [];
+  const service = new AiAssistantService({
+    settingsStore,
+    fetchImpl: async (_url, options) => {
+      providerModels.push(JSON.parse(options.body).model);
+      return okResponse({ choices: [{ message: { role: 'assistant', content: 'Tamam.' } }] });
+    },
+  });
+  await service.chat(request(), { messages: [{ role: 'user', content: 'Bir' }] });
+  await service.chat(request(), { messages: [{ role: 'user', content: 'İki' }] });
+  assert.deepEqual(providerModels, ['model-a', 'model-b']);
 });
 
 test('AI assistant sends a protected system prompt and returns a normal chat answer', async () => {
