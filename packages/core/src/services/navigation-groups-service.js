@@ -34,7 +34,6 @@ function normalizeSort(value, fallback = 0) {
 
 export class NavigationGroupsService extends BaseService {
   async readMany() {
-    assertSchemaManager(this.accountability);
     const [rows] = await this.database.query(
       `SELECT id, name, sort, created_at, updated_at
        FROM yuncms_navigation_groups
@@ -44,7 +43,6 @@ export class NavigationGroupsService extends BaseService {
   }
 
   async readOne(id) {
-    assertSchemaManager(this.accountability);
     const [rows] = await this.database.query(
       `SELECT id, name, sort, created_at, updated_at
        FROM yuncms_navigation_groups
