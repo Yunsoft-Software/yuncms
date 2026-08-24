@@ -1,22 +1,25 @@
 # Extensions
 
-YunCMS V1 extensions are trusted server-side JavaScript packages. The API is intentionally small and Directus-inspired: endpoint packages receive an Express router plus context, while hook packages register filter/action/init handlers.
+YunCMS extensions are trusted server-side JavaScript packages. Use them to add HTTP endpoints, react to data lifecycle events or run scheduled server jobs without modifying the YunCMS core packages.
 
-There is no untrusted marketplace sandbox in V1.
+Extensions execute inside the API process and can receive service/database context. Install only code you trust.
 
 ## SDK
 
-Use `@yunsoft/yuncms-extensions-sdk`:
+Install/use the extension SDK in an extension package:
 
 ```js
-import { defineEndpoint, defineHook } from '@yunsoft/yuncms-extensions-sdk';
+import {
+  defineEndpoint,
+  defineHook,
+} from '@yunsoft/yuncms-extensions-sdk';
 ```
 
-The SDK only marks/validates an extension definition. Runtime services stay in the API/core packages rather than being duplicated in the SDK.
+The SDK defines the public extension shape. Runtime services remain supplied by YunCMS so extensions use the same schema, authorization, hooks, Files storage and database process boundary as the main application.
 
 ## Package manifest
 
-Each extension package has a `package.json` with a `yuncms` block:
+Each package needs a `yuncms` block in `package.json`:
 
 ```json
 {
@@ -30,28 +33,37 @@ Each extension package has a `package.json` with a `yuncms` block:
 }
 ```
 
-Current manifest rules:
+Manifest rules:
 
-- type is `endpoint` or `hook` only;
-- id is URL-safe (`a-z`, numbers, `_`, `-`, maximum 64 chars);
-- entry must resolve inside the package root;
+- `type` is `endpoint` or `hook`;
+- `id` uses URL-safe lowercase letters, numbers, `_` or `-` and is at most 64 characters;
+- `entry` must resolve inside the extension package root;
 - duplicate extension ids fail startup;
-- manifest type and default-exported SDK definition type must match.
+- manifest type and the default-exported SDK definition must match.
 
 ## Discovery
 
-At API startup YunCMS discovers:
+At startup YunCMS discovers:
 
 1. local packages under `./extensions/*/package.json`;
-2. installed root-project dependencies/optionalDependencies/devDependencies that contain a `yuncms` manifest.
+2. installed dependencies, optional dependencies and development dependencies in the root project when they contain a valid `yuncms` manifest.
 
-The default local directory is `extensions`. Example packages live under `examples/extensions` and are not automatically loaded.
+The default local directory is `extensions`.
 
-Extension discovery/loading happens after required DB migration compatibility succeeds and before the API begins listening. A malformed extension therefore fails startup rather than leaving a partially running extension set.
+Example packages in the repository live under:
 
-## Endpoint extensions
+```text
+examples/extensions/hello-endpoint
+examples/extensions/normalize-title-hook
+```
 
-Example:
+Examples are not loaded automatically.
+
+Extension validation/loading completes before the API begins listening. A malformed extension therefore fails clearly at startup instead of producing a partially loaded extension set.
+
+# Endpoint extensions
+
+Create `src/index.js`:
 
 ```js
 import { defineEndpoint } from '@yunsoft/yuncms-extensions-sdk';
@@ -63,8 +75,8 @@ export default defineEndpoint((router, context) => {
     res.json({
       data: {
         user: req.accountability?.user ?? null,
-        schema_version: schema.version
-      }
+        schema_version: schema.version,
+      },
     });
   });
 });
@@ -76,126 +88,197 @@ An endpoint extension with id `orders` is mounted at:
 /extensions/orders
 ```
 
-Extension routers are mounted after authentication middleware, so `req.accountability` and `req.context` are available.
+Extension routers run after YunCMS authentication middleware, so request accountability/context is available.
 
-Static endpoint context currently exposes:
+## Endpoint context
 
-- `services`
-- `database`
-- `logger`
-- `env`
-- `emitter`
-- `getSchema()`
-- `getAccountability(req)`
-- `serviceOptions(req)`
+The context includes:
 
-### Calling YunCMS services
+- `services` — service-class registry;
+- `database` — current database pool/connection context;
+- `logger` — structured logger;
+- `env` — process environment;
+- `emitter` — lifecycle event bus;
+- `storage` — registered Files storage context when available;
+- `getSchema()` — current schema snapshot;
+- `getAccountability(req)` — accountability from a request;
+- `serviceOptions(req)` — service constructor options preserving request scope.
 
-Do not make an HTTP request back to YunCMS from an extension running in the same process.
+## Use services, not self-HTTP
 
-Use the service registry/context directly:
+An extension running in YunCMS should not call the same YunCMS server over HTTP merely to read/write local data. Instantiate the service directly:
 
 ```js
+import { defineEndpoint } from '@yunsoft/yuncms-extensions-sdk';
+
 export default defineEndpoint((router, context) => {
   router.get('/orders', async (req, res) => {
     const ItemsService = context.services.ItemsService;
     const service = new ItemsService(
       'orders',
-      await context.serviceOptions(req)
+      await context.serviceOptions(req),
     );
 
-    res.json({ data: await service.readMany() });
+    const rows = await service.readMany({
+      fields: 'id,order_no,total',
+      sort: '-created_at',
+      limit: 25,
+    });
+
+    res.json({ data: rows });
   });
 });
 ```
 
-This preserves the request accountability, schema snapshot, hooks and DB process boundary without self-request/auth-token forwarding complexity.
+This preserves request accountability, permission-cache scope, schema snapshot, hooks and audit behavior without forwarding bearer credentials back to the same process.
 
-## Hook extensions
+Do not replace `serviceOptions(req)` with an Administrator/system context just to make an extension request pass. If the endpoint is acting for the current caller, retain that caller's accountability.
 
-Example:
+# Hook extensions
+
+Hooks can register filters, actions, initialization handlers and scheduled jobs:
 
 ```js
 import { defineHook } from '@yunsoft/yuncms-extensions-sdk';
 
-export default defineHook(({ filter, action, init }) => {
+export default defineHook(({ filter, action, init, schedule }) => {
   init('app.beforeStart', ({ logger }) => {
-    logger.info?.('extension ready');
+    logger.info?.('orders extension ready');
   });
 
   filter('items.create', (payload, context) => {
     if (context.collection !== 'articles') return payload;
     return {
       ...payload,
-      title: payload.title?.trim()
+      title: payload.title?.trim(),
     };
   });
 
   action('items.create', ({ key }, context) => {
     context.logger.info?.(`created ${context.collection}:${key}`);
   });
+
+  schedule(
+    '0 * * * *',
+    async ({ services, serviceOptions }) => {
+      // Scheduled jobs run with explicitly declared system accountability.
+      // Use services directly for local work.
+    },
+    {
+      id: 'hourly-maintenance',
+      accountability: 'system',
+      mode: 'singleton',
+      overlap: 'skip',
+    },
+  );
 });
 ```
 
-Current item events:
+## Item events
 
-- `items.create`
-- `items.update`
-- `items.delete`
+Current item lifecycle events:
 
-`filter` runs before the DB mutation and may transform the payload or throw to reject the operation. The transformed payload still goes through normal schema/RBAC/write-field validation.
+```text
+items.create
+items.update
+items.delete
+```
 
-`action` runs after the corresponding successful mutation. For bulk creates, actions run after the transaction commits. Failed/rejected mutations do not emit a success action.
+### Filters
 
-Hook event context includes normal runtime context plus:
+`filter(event, handler)` runs before the database mutation. The handler can return a transformed payload or throw an error to reject the operation.
 
-- active accountability;
-- collection;
-- operation name;
-- relevant key/filter metadata;
-- hook chain metadata.
+A transformed payload is still checked by normal schema, role, write-field and validation rules. A filter is not an authorization bypass.
 
-## Init events
+### Actions
 
-Currently emitted startup lifecycle events:
+`action(event, handler)` runs after a successful mutation. Failed/rejected mutations do not emit a success action. For bulk creates, actions run after the transaction commits.
 
-- `app.beforeStart`
-- `app.afterStart`
+Hook event context carries the active accountability, collection/operation metadata, relevant keys/filters and hook-chain metadata in addition to the base runtime context.
 
-`app.beforeStart` runs after extensions are loaded but before the HTTP server listens. `app.afterStart` runs after successful listen.
+## Startup events
 
-## Recursion protection
+```text
+app.beforeStart
+app.afterStart
+```
 
-Hook dispatch uses `AsyncLocalStorage` to track one asynchronous hook chain without sharing recursion state between unrelated concurrent requests.
+`app.beforeStart` fires after extensions are loaded but before the HTTP server listens. `app.afterStart` fires after the server has successfully started listening.
 
-Each chain has:
+# Scheduled jobs
 
-- a chain id;
-- depth;
-- event stack.
+Hook extensions can register five-field cron schedules:
 
-Nested service calls from hooks are allowed, but the default maximum hook depth is 12. Exceeding it fails with `HOOK_RECURSION_LIMIT` rather than allowing an infinite self-trigger loop.
+```text
+minute hour day month weekday
+```
 
-## Trust model
+Examples:
 
-Extensions are currently trusted code with server-side access. They can receive the database/service context and execute inside the API process.
+```text
+*/5 * * * *     every 5 minutes
+0 * * * *       every hour
+0 2 * * *       daily at 02:00
+0 9 * * 1-5     weekdays at 09:00
+```
 
-Do not install untrusted extensions. Marketplace sandboxing/process isolation is explicitly outside V1 scope.
+Supported cron syntax includes `*`, numeric values, comma lists, ranges and steps on `*`/ranges. Weekday is `0`–`6`.
 
-## Examples
+Every scheduled job requires a stable id and an explicit system-accountability declaration:
 
-See:
+```js
+schedule('0 2 * * *', handler, {
+  id: 'nightly-cleanup',
+  accountability: 'system',
+  mode: 'singleton',
+  overlap: 'skip',
+});
+```
 
-- `examples/extensions/hello-endpoint`
-- `examples/extensions/normalize-title-hook`
+### Modes
 
-## Still pending
+`per_process` runs the job independently in each API process. Use it only when that behavior is intentional.
 
-- extension enable/disable configuration;
-- hot reload;
-- scheduled-job API;
-- stronger per-extension capability isolation;
-- packaged/npm installation smoke test;
-- real API tests proving extension service calls preserve accountability and never need self-HTTP.
+`singleton` uses a MySQL advisory lock so only one replica executes the matching scheduled job at a time. This is the preferred mode for a cluster-wide maintenance/integration task.
 
-Verification work that requires an installed dependency graph/running API is tracked in `todo.md`.
+### Overlap
+
+The supported overlap behavior is `skip`. If the previous invocation is still running, YunCMS skips the overlapping execution rather than starting another copy.
+
+### Scheduled-job accountability
+
+Scheduled jobs have no end-user request, so they must explicitly declare:
+
+```js
+accountability: 'system'
+```
+
+That is privileged execution. Keep scheduled handlers narrow, validate external inputs and avoid turning user-controlled records into arbitrary administrative instructions.
+
+# Hook recursion protection
+
+Hook dispatch tracks each asynchronous hook chain with `AsyncLocalStorage`. Nested service calls from hooks are allowed, but a chain has a bounded maximum depth (default 12). Excessive recursive triggering fails with `HOOK_RECURSION_LIMIT` instead of looping indefinitely.
+
+Unrelated concurrent requests do not share hook-chain recursion state.
+
+# Trust and security
+
+Extensions are server code, not sandboxed user scripts. They may be able to access database/services/environment depending on context.
+
+Operational rules:
+
+- install only trusted packages;
+- keep secrets in environment/configuration rather than source;
+- preserve request accountability for request-driven endpoints;
+- use system accountability only for jobs/actions that genuinely require it;
+- validate data received from third-party webhooks/APIs;
+- use YunCMS services instead of direct SQL for normal project-data operations so permissions, hooks and schema behavior remain consistent;
+- avoid synchronous/blocking work that would stall the API process.
+
+## Related guides
+
+- [REST API](rest-api.md)
+- [Items query language](api-query-language.md)
+- [Roles and permissions](permissions.md)
+- [Files](files.md)
+- [Architecture](architecture.md)
