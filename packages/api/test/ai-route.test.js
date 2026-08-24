@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { requireAuthenticated } from '../src/routes/ai.js';
+import { requireAdministrator, requireAuthenticated } from '../src/routes/ai.js';
 
 test('AI routes reject Public accountability', () => {
   assert.throws(
@@ -17,9 +17,23 @@ test('AI routes reject requests without an authenticated YunCMS user', () => {
   );
 });
 
-test('AI routes accept an authenticated YunCMS identity', () => {
+test('AI chat routes accept an authenticated YunCMS identity', () => {
   assert.doesNotThrow(() => requireAuthenticated({
     authMethod: 'api_token',
     accountability: { user: 'user-1', role: 'role-1', admin: false, system: false },
+  }));
+});
+
+test('AI settings routes require Administrator or system accountability', () => {
+  assert.throws(
+    () => requireAdministrator({
+      authMethod: 'api_token',
+      accountability: { user: 'user-1', role: 'role-1', admin: false, system: false },
+    }),
+    (error) => error.code === 'FORBIDDEN',
+  );
+  assert.doesNotThrow(() => requireAdministrator({
+    authMethod: 'session',
+    accountability: { user: 'admin-1', role: 'admin-role', admin: true, system: false },
   }));
 });
