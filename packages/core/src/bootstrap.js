@@ -14,6 +14,7 @@ import { rolePermissionActionsMigration } from './migrations/0011-role-permissio
 import { filesReadFiltersMigration } from './migrations/0012-files-read-filters.js';
 import { externalAuthFoundationMigration } from './migrations/0013-external-auth-foundation.js';
 import { aiSettingsMigration } from './migrations/0014-ai-settings.js';
+import { navigationGroupsMigration } from './migrations/0015-navigation-groups.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -32,6 +33,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   filesReadFiltersMigration,
   externalAuthFoundationMigration,
   aiSettingsMigration,
+  navigationGroupsMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(
