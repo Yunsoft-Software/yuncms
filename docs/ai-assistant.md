@@ -4,46 +4,38 @@ YunCMS Studio includes a built-in **Yapay Zeka** chat screen. Users open it dire
 
 The assistant can inspect the current YunCMS schema and records using the **same authenticated user, role and permission rules** as the rest of YunCMS.
 
-## Server configuration
+## Configure from Studio
 
-Yapay Zeka uses an OpenAI-compatible Chat Completions provider.
+Provider configuration is managed from **Yapay Zeka → Ayarlar**. YunCMS does not require `AI_*` environment variables for the assistant.
 
-Minimum configuration:
+An Administrator can configure:
 
-```env
-AI_API_KEY=your-provider-key
-AI_MODEL=your-model-name
+- enabled/disabled state;
+- OpenAI-compatible provider base URL;
+- model identifier;
+- provider API key;
+- whether data-changing tools are available at all;
+- bounded history, tool-call, output and timeout limits.
+
+Saved changes take effect for the next request without restarting the API process.
+
+The saved API key is never returned to Studio. The settings response exposes only whether a credential exists (`has_api_key`).
+
+## Credential storage
+
+Provider credentials are stored in MySQL only as AES-256-GCM ciphertext.
+
+On first API startup after migration `0014-ai-settings`, YunCMS creates a random 32-byte local encryption key at:
+
+```text
+.yuncms/ai-settings.key
 ```
 
-When both values exist, the assistant is enabled automatically. It can also be controlled explicitly:
+The `.yuncms/` directory is ignored by Git. The key file is created with restrictive permissions on platforms that support Unix file modes.
 
-```env
-AI_ENABLED=true
-```
+The encryption key is operationally important. Restoring the database without the corresponding key makes the saved provider API key intentionally undecryptable. Back up this key with the deployment's protected state/secrets and restore it before starting YunCMS against that database.
 
-OpenAI-compatible providers can be selected with:
-
-```env
-AI_BASE_URL=https://api.openai.com/v1
-```
-
-For example, an OpenAI-compatible gateway can use its own `/v1` base URL and model identifier.
-
-Optional limits:
-
-```env
-AI_TIMEOUT_MS=60000
-AI_MAX_TOOL_ROUNDS=6
-AI_MAX_TOOL_CALLS_PER_ROUND=8
-AI_MAX_HISTORY=20
-AI_MAX_MESSAGE_CHARS=12000
-AI_MAX_TOOL_RESULT_BYTES=250000
-AI_MAX_OUTPUT_TOKENS=1500
-```
-
-`AI_MAX_TOOL_CALLS_PER_ROUND` bounds fanout even when a provider attempts to emit a very large parallel tool-call batch. The accepted range is 1-20.
-
-Provider credentials stay on the API server. They are never returned by `/ai/status` or stored in Studio session state.
+Multiple API processes sharing one database must use the same AI settings key. Processes using one installation directory naturally share the file; separate hosts/containers must receive the same protected key through deployment secret/state handling.
 
 ## Studio experience
 
@@ -52,8 +44,9 @@ The Studio sidebar contains **Yapay Zeka** as a top-level section.
 The screen provides:
 
 - a normal chat interface;
+- provider/model settings for Administrators;
 - starter questions for inspecting collections and schema;
-- conversation history for the current page session;
+- bounded conversation history for the current page session;
 - readable summaries of data operations used to answer the request;
 - a clear unconfigured state when no model is connected;
 - light/dark and responsive layouts using the existing Studio theme.
@@ -75,26 +68,16 @@ If a user cannot access data through ordinary YunCMS permissions, the assistant 
 
 ## Data changes
 
-Data-changing abilities are disabled by default:
+Data-changing abilities are disabled in persisted settings by default.
 
-```env
-AI_WRITES_ENABLED=false
-```
-
-To make write tools available at all:
-
-```env
-AI_WRITES_ENABLED=true
-```
-
-Even then, each Studio conversation remains read-only until the user explicitly enables **Veri değişikliklerine izin ver** in the Yapay Zeka screen.
+An Administrator can enable **Veri değiştirme özelliğini kullanılabilir yap** from the settings panel. Even then, each Studio conversation remains read-only until the current user explicitly enables **Veri değişikliklerine izin ver** for their request.
 
 Both conditions must therefore be true:
 
-1. the server allows assistant writes;
-2. the current user enables writes for their request.
+1. the Administrator has made assistant writes available in Yapay Zeka settings;
+2. the current user enables writes for the current request.
 
-Normal YunCMS create/update/delete permissions still apply after both gates are open. Turning on the UI switch does not grant a permission the user's role does not already have.
+Normal YunCMS create/update/delete permissions still apply after both gates are open. Turning on either switch does not grant a permission the user's role does not already have.
 
 ## Prompt-injection boundary
 
@@ -106,7 +89,7 @@ Write operations must originate from the actual user's request and remain subjec
 
 ## Provider privacy
 
-Yapay Zeka is executed against the configured model provider. User chat text and the bounded YunCMS data returned by assistant tools may therefore be sent to that provider when needed to answer a request.
+Yapay Zeka is executed against the provider configured in Studio. User chat text and bounded YunCMS data returned by assistant tools may therefore be sent to that provider when needed to answer a request.
 
 Deployments must choose a provider and data-retention/privacy policy appropriate for their data. Do not enable a third-party provider for sensitive production data until its data-processing terms are acceptable for that deployment.
 
@@ -114,12 +97,8 @@ YunCMS does not intentionally send the provider API key, YunCMS access/refresh t
 
 ## Recommended initial production posture
 
-Start with:
-
-```env
-AI_API_KEY=...
-AI_MODEL=...
-AI_WRITES_ENABLED=false
-```
-
-Use a normal role with only the collections the user needs. Verify read-only behavior and provider/privacy requirements first. Enable `AI_WRITES_ENABLED=true` only after the write/RBAC checks in `todo.md` have been completed in the target environment.
+1. Open **Yapay Zeka → Ayarlar** as Administrator.
+2. Enter the provider URL, model and API key.
+3. Keep data-changing abilities disabled initially.
+4. Verify read/RBAC/provider/privacy behavior in the target environment.
+5. Enable assistant writes only after the write/RBAC checks in `todo.md` pass.
