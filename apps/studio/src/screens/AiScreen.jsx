@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { aiChat, aiStatus } from '../api.js';
+import { aiChat, aiSettings, aiStatus } from '../api.js';
 import { trimConversationHistory } from '../ai-history.js';
+import { AiSettingsPanel } from '../components/AiSettingsPanel.jsx';
 import { useI18n } from '../i18n.js';
 
 const STARTER_KEYS = Object.freeze([
@@ -29,6 +30,9 @@ export function AiScreen() {
   const { locale, t } = useI18n();
   const [status, setStatus] = useState(null);
   const [statusError, setStatusError] = useState('');
+  const [adminSettings, setAdminSettings] = useState(null);
+  const [canManageSettings, setCanManageSettings] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -36,19 +40,48 @@ export function AiScreen() {
   const [allowWrites, setAllowWrites] = useState(false);
   const endRef = useRef(null);
 
+  async function refreshStatus() {
+    const next = await aiStatus();
+    setStatus(next);
+    setStatusError('');
+    return next;
+  }
+
+  async function refreshAdminSettings() {
+    try {
+      const next = await aiSettings();
+      setAdminSettings(next);
+      setCanManageSettings(true);
+      return next;
+    } catch (requestError) {
+      if (requestError?.status === 403) {
+        setAdminSettings(null);
+        setCanManageSettings(false);
+        return null;
+      }
+      throw requestError;
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
-    aiStatus()
-      .then((next) => {
-        if (cancelled) return;
-        setStatus(next);
+    Promise.allSettled([aiStatus(), aiSettings()]).then(([statusResult, settingsResult]) => {
+      if (cancelled) return;
+      if (statusResult.status === 'fulfilled') {
+        setStatus(statusResult.value);
         setStatusError('');
-      })
-      .catch((requestError) => {
-        if (cancelled) return;
+      } else {
         setStatus(null);
-        setStatusError(requestError.message || t('ai.statusFailed'));
-      });
+        setStatusError(statusResult.reason?.message || t('ai.statusFailed'));
+      }
+      if (settingsResult.status === 'fulfilled') {
+        setAdminSettings(settingsResult.value);
+        setCanManageSettings(true);
+      } else if (settingsResult.reason?.status === 403) {
+        setAdminSettings(null);
+        setCanManageSettings(false);
+      }
+    });
     return () => { cancelled = true; };
   }, [t]);
 
@@ -61,6 +94,11 @@ export function AiScreen() {
     () => messages.map((message) => ({ role: message.role, content: message.content })),
     [messages],
   );
+
+  async function handleSettingsSaved() {
+    await Promise.all([refreshStatus(), refreshAdminSettings()]);
+    setAllowWrites(false);
+  }
 
   async function sendMessage(value = draft) {
     const content = String(value ?? '').trim();
@@ -118,15 +156,34 @@ export function AiScreen() {
             <small>{ready ? t('ai.readyHint') : t('ai.notReadyHint')}</small>
           </div>
         </div>
-        <button
-          className="secondary-button ai-new-chat"
-          type="button"
-          disabled={sending || messages.length === 0}
-          onClick={clearConversation}
-        >
-          {t('ai.newChat')}
-        </button>
+        <div className="ai-toolbar-actions">
+          {canManageSettings && (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => setSettingsOpen((value) => !value)}
+            >
+              {settingsOpen ? t('ai.settingsClose') : t('ai.settings')}
+            </button>
+          )}
+          <button
+            className="secondary-button ai-new-chat"
+            type="button"
+            disabled={sending || messages.length === 0}
+            onClick={clearConversation}
+          >
+            {t('ai.newChat')}
+          </button>
+        </div>
       </div>
+
+      {settingsOpen && canManageSettings && adminSettings && (
+        <AiSettingsPanel
+          settings={adminSettings}
+          onSaved={handleSettingsSaved}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
 
       {statusError && <div className="error-banner ai-banner" role="alert">{statusError}</div>}
 
@@ -135,7 +192,12 @@ export function AiScreen() {
           <div className="ai-orb" aria-hidden="true">✦</div>
           <div>
             <h2>{t('ai.setupTitle')}</h2>
-            <p>{t('ai.setupDescription')}</p>
+            <p>{t(canManageSettings ? 'ai.setupDescriptionAdmin' : 'ai.setupDescription')}</p>
+            {canManageSettings && !settingsOpen && (
+              <button className="primary-button" type="button" onClick={() => setSettingsOpen(true)}>
+                {t('ai.openSettings')}
+              </button>
+            )}
           </div>
         </div>
       )}
