@@ -9,7 +9,7 @@ export const aiSettingsMigration = Object.freeze({
       api_key_ciphertext TEXT NULL,
       writes_enabled TINYINT(1) NOT NULL DEFAULT 0,
       max_tool_rounds INT UNSIGNED NOT NULL DEFAULT 6,
-      max_tool_calls_per_round INT UNSIGNED NOT NULL DEFAULT 6,
+      max_tool_calls_per_round INT UNSIGNED NOT NULL DEFAULT 8,
       max_history INT UNSIGNED NOT NULL DEFAULT 20,
       max_message_chars INT UNSIGNED NOT NULL DEFAULT 12000,
       max_tool_result_bytes INT UNSIGNED NOT NULL DEFAULT 250000,
