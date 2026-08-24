@@ -29,10 +29,14 @@ export function legacyCollectionSort(collection = '') {
 export function collectionUi(collection) {
   const metadata = parseCollectionMetadata(collection?.metadata);
   const explicitSort = Number(metadata.sort);
+  const group = typeof metadata.group === 'string' && metadata.group.trim()
+    ? metadata.group.trim()
+    : null;
   return {
     icon: normalizeCollectionIcon(metadata.icon || DEFAULT_COLLECTION_ICON),
     sort: Number.isFinite(explicitSort) ? explicitSort : legacyCollectionSort(collection?.collection),
     hidden: Boolean(collection?.hidden),
+    group,
   };
 }
 
@@ -49,8 +53,7 @@ export function sortContentCollections(collections = []) {
 
 export function collectionMetadataPatch(collection, patch = {}) {
   const current = parseCollectionMetadata(collection?.metadata);
-  return {
-    ...current,
-    ...patch,
-  };
+  const next = { ...current, ...patch };
+  if (next.group == null || next.group === '') delete next.group;
+  return next;
 }
