@@ -6,12 +6,19 @@ import {
   assertSingletonVacant,
   SingletonCollectionsService,
   SingletonItemsService,
+  singletonLockName,
 } from '../src/services/singleton-services.js';
 
 test('core runtime registry uses singleton-safe collection and item services', () => {
   const services = createCoreServiceRegistry().toObject();
   assert.equal(services.ItemsService, SingletonItemsService);
   assert.equal(services.CollectionsService, SingletonCollectionsService);
+});
+
+test('singleton advisory lock names stay bounded for long collection keys', () => {
+  const lock = singletonLockName(`collection_${'x'.repeat(54)}`);
+  assert.ok(lock.length <= 64);
+  assert.match(lock, /^yuncms:singleton:[a-f0-9]{40}$/);
 });
 
 test('singleton vacancy check rejects a second physical item', async () => {
