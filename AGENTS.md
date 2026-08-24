@@ -1,9 +1,9 @@
 # AGENTS.md
 
 ## Product direction
-YunCMS is a small reusable backend platform inspired by the Directus features we actually use. It is an independent implementation, not a Directus fork. Keep the core smaller than Directus and add features only when a real project needs them.
+YunCMS is a small, reusable MySQL backend/CMS platform with a focused administration Studio. Keep the core understandable, stable and extensible; add features when they solve a real product need rather than for checklist parity with another product.
 
-The source of truth for roadmap/status is `plan.md`. Read it before coding.
+Public documentation on `main` is for installers, administrators, API consumers and extension authors. Internal implementation plans, temporary checklists and environment handoff notes belong in issues, pull requests or feature branches, not in root-level `plan.md` / `todo.md` files on `main`.
 
 ## Hard rules
 - Use Node.js 24 LTS.
@@ -16,10 +16,10 @@ The source of truth for roadmap/status is `plan.md`. Read it before coding.
 - Use npm workspaces; do not add a monorepo build orchestrator without a demonstrated need.
 - Do not use GitHub Actions.
 - Keep commits small and focused. Do not mix unrelated refactors/features.
-- Do not copy Directus source code into YunCMS. Directus may be studied for architecture, extension ergonomics, behavior, and edge cases; write YunCMS' implementation independently.
+- Do not copy source code from other CMS products into YunCMS. Study public behavior or architecture only when useful, then implement YunCMS independently.
 - Do not build speculative enterprise features. Prefer the smallest stable API that can be extended later.
 - Every behavior change, bug fix, refactor that can regress behavior, schema change, UI interaction change, authorization change, configuration/default change, and documentation-visible runtime contract must receive corresponding regression coverage in the same development pass.
-- Do not consider a change complete merely because source code was written. Its test coverage and test-handoff state must also be updated.
+- Do not consider a change complete merely because source code was written. Its regression coverage and user-facing documentation must match shipped behavior.
 
 ## Architecture rules
 - HTTP routes are thin. Business logic belongs in services.
@@ -32,51 +32,43 @@ The source of truth for roadmap/status is `plan.md`. Read it before coding.
 - Dedicated services such as `UsersService` own special behavior (password/session rules); do not bypass them through raw generic CRUD for system data.
 - Extensions are trusted server code in V1. Do not add a sandbox/marketplace until the core is stable.
 
-## Directus-like developer ergonomics
-Keep familiar concepts where useful:
-- `ItemsService`, `CollectionsService`, `FieldsService`, `RelationsService`, `UsersService`, `FilesService`.
-- Extension helpers such as `defineEndpoint()` and `defineHook()`.
-- Hook concepts such as filter/action/init.
-- REST paths such as `/items`, `/collections`, `/fields`, `/relations`, `/files`, `/auth`, `/users`, `/roles`.
+## Developer ergonomics
+Keep the public programming model consistent:
+- service classes such as `ItemsService`, `CollectionsService`, `FieldsService`, `RelationsService`, `UsersService`, and `FilesService`;
+- extension helpers such as `defineEndpoint()` and `defineHook()`;
+- filter/action/init hook concepts;
+- stable REST resource paths such as `/items`, `/schema`, `/files`, `/auth`, `/users`, `/roles`, and `/permissions`.
 
-Do not chase API compatibility for its own sake. If Directus behavior would add substantial complexity, document the deliberate difference.
+Do not add compatibility behavior merely to imitate another product. New behavior should have a clear YunCMS use case and a documented contract.
 
-## Documentation/status discipline
-- `plan.md` is a live checklist, not a static proposal.
-- When an implementation task is completed, mark the corresponding `plan.md` checkbox in the same commit when practical; otherwise update it in the immediate follow-up commit.
-- Do not mark an item complete merely because a file/stub exists. The stated behavior must be implemented and, where feasible, tested.
-- If implementation reveals a missing step or an invalid assumption, update `plan.md` before or with the code that depends on the new decision.
-- `todo.md` is only for work blocked by the current environment/manual credentials/infrastructure (for example real MySQL setup, `npm install`, npm publishing/auth, browser checks, provider credentials, or test commands that cannot truthfully be run in the current environment). Do not use `todo.md` as a second roadmap.
-- `todo.md` is a live **pending verification list**, not a completed-test history. Never keep `[x]` completed items there.
-- When a source/test change makes a verification command or manual check necessary but it cannot be executed in the current environment, add that exact pending check to `todo.md` in the same development pass.
-- When a pending test/check is actually executed successfully, remove its `todo.md` entry rather than marking it completed.
-- Once a test/check has been successfully completed and removed from `todo.md`, do not add it back on later turns unless the covered source/test/contract changed in a way that makes the previous result stale, or the target environment materially changed.
-- When test code itself changes, treat the affected test result as stale until rerun; if it cannot be rerun immediately, add the relevant command/check back to `todo.md`.
-- Keep docs aligned with shipped behavior. Do not document unimplemented features as if they exist.
+## Documentation discipline
+- Keep `README.md` as the public entry point and documentation index.
+- Keep detailed usage under `docs/` and write it for users/operators/integrators rather than as a development diary.
+- Document only behavior implemented on `main`; avoid branch names, temporary status language, implementation plans, and stale release checklists in usage guides.
+- Every public endpoint, query option, configuration variable, permission boundary, Studio workflow, CLI command, storage option and extension contract should be discoverable from the documentation index.
+- When behavior changes, update the matching user guide in the same development pass.
+- Internal plans and blocked-environment notes must not be added to `main` as `plan.md`, `todo.md`, roadmap documents, or release scratchpads.
 
 ## Testing
 - Prefer Node's built-in test runner for backend/core unit tests unless a real need forces another framework.
-- Every implementation change must have a directly relevant regression test where technically possible. If a behavior can only be verified with real MySQL, browser interaction, S3, SMTP, packaging, or another unavailable runtime dependency, write the automatable portion first and put the remaining executable/manual verification in `todo.md`.
+- Every implementation change must have a directly relevant regression test where technically possible.
 - Bug fixes must include a test that would have failed before the fix whenever practical.
 - Configuration/default changes must include tests that lock the default and the generated/derived configuration contract.
 - Authorization changes must include positive and negative boundary tests; UI permission changes must also verify that unavailable actions are not misleadingly exposed.
 - Schema/DDL changes must include pure/source tests plus guarded real-MySQL coverage when physical constraints/defaults matter.
-- Studio interaction changes should isolate pure logic for Node tests where possible, plus source-contract tests for React wiring; browser-only visual/interaction checks belong in `todo.md` until executed.
-- After normal source changes run `npm run test:fast`. It is the default Codex feedback loop and intentionally prints only a short stage result unless something fails.
-- Before considering a larger source pass complete run `npm test`; it discovers and runs the complete non-environment test suite.
-- Before a release candidate run `npm run test:release`; it runs the complete suite, Studio production build and npm package dry-run checks.
+- Studio interaction changes should isolate pure logic for Node tests where possible, plus source-contract tests for React wiring.
+- After normal source changes run `npm run test:fast` when the environment supports it.
+- Before considering a larger source pass complete run `npm test`.
+- Before a release candidate run `npm run test:release`.
 - Real MySQL/API integration is opt-in inside the release runner. Use a disposable database whose name contains `test`, `ci` or `dev`, then set both `YUNCMS_TEST_MYSQL=1` and `YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1`.
-- Do not run real MySQL/S3/SMTP/browser checks after every edit. Keep those environment-dependent checks for the relevant milestone/release gate so routine Codex work stays fast and low-noise.
-- Integration tests for schema/CRUD/auth/RBAC must run against real MySQL before those milestones are considered production-verified.
 - Test SQL-injection boundaries, authorization boundaries, transaction rollback, schema concurrency, session rotation/revocation, and extension accountability.
 - Do not weaken tests to make them pass.
 - Do not claim a test passed unless it was actually executed in the current environment or there is a concrete recorded result from the environment that ran it.
 
 ## Before every commit
-1. Re-read the relevant `plan.md` section.
-2. Check `git diff`/changed files and keep scope focused.
-3. Add or update the regression test for the behavior being changed.
-4. Run `npm run test:fast` or the narrower directly relevant test when the environment supports Node 24/dependencies.
-5. If a required test/check cannot be run, add it to `todo.md`. If it ran successfully and its covered code/test has not changed since, remove the pending `todo.md` entry instead of marking it complete.
-6. Update `plan.md` if the task is genuinely complete.
-7. Commit with a short descriptive message.
+1. Check the relevant runtime contract and existing documentation.
+2. Check changed files and keep the scope focused.
+3. Add or update regression coverage when behavior changed.
+4. Run the narrowest relevant test available in the current environment.
+5. Update user-facing documentation when the public contract changed.
+6. Commit with a short descriptive message.
