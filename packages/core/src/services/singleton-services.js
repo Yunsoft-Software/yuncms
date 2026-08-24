@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { withAdvisoryLock } from '../advisory-lock.js';
 import { quoteIdentifier } from '../identifier.js';
 import { CollectionsService } from './collections-service.js';
@@ -7,6 +9,11 @@ function singletonError(code, message) {
   const error = new Error(message);
   error.code = code;
   return error;
+}
+
+function singletonLockName(collection) {
+  const digest = createHash('sha256').update(String(collection)).digest('hex').slice(0, 40);
+  return `yuncms:singleton:${digest}`;
 }
 
 async function assertSingletonVacant(database, collection, schema) {
@@ -24,7 +31,7 @@ export class SingletonItemsService extends ItemsService {
     if (!schema.singleton) return super.createOne(payload);
     return withAdvisoryLock(
       this.database,
-      `yuncms:singleton:${this.collection}`,
+      singletonLockName(this.collection),
       async (connection) => {
         await assertSingletonVacant(connection, this.collection, schema);
         return super.createOne(payload);
@@ -41,7 +48,7 @@ export class SingletonItemsService extends ItemsService {
     }
     return withAdvisoryLock(
       this.database,
-      `yuncms:singleton:${this.collection}`,
+      singletonLockName(this.collection),
       async (connection) => {
         await assertSingletonVacant(connection, this.collection, schema);
         return super.createMany(payloads);
@@ -70,4 +77,4 @@ export class SingletonCollectionsService extends CollectionsService {
   }
 }
 
-export { assertSingletonVacant };
+export { assertSingletonVacant, singletonLockName };
