@@ -1,17 +1,18 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 
-import { API_URL, apiRequest, health, logout, readSession, subscribeSession } from './api.js';
+import { API_URL, apiRequest, health, logout, navigationGroups, readSession, subscribeSession } from './api.js';
 import { collectionUi, sortContentCollections } from './collection-ui.js';
 import { CollectionIcon } from './components/CollectionIcon.jsx';
 import { LanguageSwitcher, StudioBrand, YunsoftFooter } from './components/StudioBrand.jsx';
 import { SidebarIcon } from './components/SidebarIcon.jsx';
 import { useI18n } from './i18n.js';
+import { buildNavigationModel } from './navigation-model.js';
 import { displaySchemaName } from './schema-name.js';
 import { navigateStudio, readStudioRoute, studioPath } from './studio-route.js';
 import { AiScreen } from './screens/AiScreen.jsx';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
-import { ContentScreen } from './screens/ContentScreen.jsx';
+import { ContentRouteScreen } from './screens/ContentRouteScreen.jsx';
 import { DataModelScreen } from './screens/DataModelScreen.jsx';
 import { FilesScreen } from './screens/FilesScreen.jsx';
 import { LoginScreen } from './screens/LoginScreen.jsx';
@@ -77,24 +78,42 @@ function AccordionGroup({ id, label, icon, open, collapsed, onToggle, children }
   );
 }
 
+function ContentCollectionButton({ entry, active, onClick }) {
+  return (
+    <button
+      className={`nav-item collection-nav-item ${active ? 'active' : ''}`}
+      type="button"
+      title={entry.collection}
+      onClick={onClick}
+    >
+      <CollectionIcon name={collectionUi(entry).icon} size={16} />
+      <span className="nav-item-label">{displaySchemaName(entry, 'collection')}</span>
+    </button>
+  );
+}
+
 export function App() {
   const { t } = useI18n();
   const [session, setSession] = useState(() => readSession());
   const [authAction, setAuthAction] = useState(() => readAuthAction());
   const [route, setRoute] = useState(() => readStudioRoute());
   const [contentCollections, setContentCollections] = useState([]);
+  const [navigationGroupRows, setNavigationGroupRows] = useState([]);
   const [healthState, setHealthState] = useState('checking');
   const [loggingOut, setLoggingOut] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileLayout, setMobileLayout] = useState(() => window.matchMedia('(max-width: 760px)').matches);
-  const [groups, setGroups] = useState({ content: true, settings: true });
+  const [groups, setGroups] = useState({ settings: true });
+  const [contentNavFocused, setContentNavFocused] = useState(() => readStudioRoute().section === 'content');
 
   useEffect(() => subscribeSession(() => setSession(readSession())), []);
 
   useEffect(() => {
     const updateRoute = () => {
-      setRoute(readStudioRoute());
+      const nextRoute = readStudioRoute();
+      setRoute(nextRoute);
+      if (nextRoute.section !== 'content') setContentNavFocused(false);
       setMobileNavOpen(false);
     };
     window.addEventListener('hashchange', updateRoute);
@@ -131,31 +150,40 @@ export function App() {
 
   async function loadNavigationCollections() {
     try {
-      const response = await apiRequest('/schema/collections');
+      const [response, groupRows] = await Promise.all([
+        apiRequest('/schema/collections'),
+        navigationGroups(),
+      ]);
       const visible = sortContentCollections(response?.data ?? []);
       setContentCollections(visible);
+      setNavigationGroupRows(groupRows);
       if (route.section === 'content' && !visible.some((entry) => entry.collection === route.collection)) {
         navigateStudio(studioPath.content(visible[0]?.collection || ''), { replace: true });
       }
     } catch {
       setContentCollections([]);
+      setNavigationGroupRows([]);
     }
   }
 
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    apiRequest('/schema/collections')
-      .then((response) => {
+    Promise.all([apiRequest('/schema/collections'), navigationGroups()])
+      .then(([response, groupRows]) => {
         if (cancelled) return;
         const visible = sortContentCollections(response?.data ?? []);
         setContentCollections(visible);
+        setNavigationGroupRows(groupRows);
         if (route.section === 'content' && !visible.some((entry) => entry.collection === route.collection)) {
           navigateStudio(studioPath.content(visible[0]?.collection || ''), { replace: true });
         }
       })
       .catch(() => {
-        if (!cancelled) setContentCollections([]);
+        if (!cancelled) {
+          setContentCollections([]);
+          setNavigationGroupRows([]);
+        }
       });
     return () => { cancelled = true; };
   }, [session?.user?.id, route.section]);
@@ -164,6 +192,10 @@ export function App() {
   const navigationCollapsed = !mobileLayout && sidebarCollapsed;
   const contentCollection = route.collection || '';
   const activeContentCollection = contentCollections.find((entry) => entry.collection === contentCollection) ?? null;
+  const contentNavigation = useMemo(
+    () => buildNavigationModel(contentCollections, navigationGroupRows, { includeHidden: false }),
+    [contentCollections, navigationGroupRows],
+  );
   const contentTitle = activeContentCollection
     ? displaySchemaName(activeContentCollection, 'collection')
     : contentCollection;
@@ -181,15 +213,16 @@ export function App() {
     if (section === 'ai') return <AiScreen />;
     if (section === 'appearance') return <AppearanceScreen />;
     return (
-      <ContentScreen
+      <ContentRouteScreen
         collection={contentCollection}
         collectionLabel={contentTitle}
+        collectionMeta={activeContentCollection}
         route={route}
         onNavigate={navigateStudio}
         onOpenDataModel={() => navigateStudio(studioPath.dataModel())}
       />
     );
-  }, [contentCollection, contentTitle, route, section, session?.user?.id]);
+  }, [activeContentCollection, contentCollection, contentTitle, route, section, session?.user?.id]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -217,8 +250,9 @@ export function App() {
       files: studioPath.files(),
       ai: studioPath.ai(),
       appearance: studioPath.appearance(),
-      content: studioPath.content(contentCollection),
+      content: studioPath.content(contentCollection || contentCollections[0]?.collection || ''),
     };
+    if (nextSection === 'content') setContentNavFocused(true);
     navigateStudio(destinations[nextSection] || studioPath.content(contentCollection));
     if (group) setGroups((current) => ({ ...current, [group]: true }));
   }
@@ -273,81 +307,94 @@ export function App() {
         </div>
 
         <nav id="studio-sidebar-navigation" aria-label={t('nav.studioSections')} className="sidebar-nav">
-          <AccordionGroup
-            id="content"
-            label={t('nav.content')}
-            icon="content"
-            open={groups.content}
-            collapsed={navigationCollapsed}
-            onToggle={() => toggleGroup('content')}
-          >
-            {contentCollections.map((entry) => (
-              <button
-                key={entry.collection}
-                className={`nav-item nav-item-child collection-nav-item ${section === 'content' && contentCollection === entry.collection ? 'active' : ''}`}
-                type="button"
-                title={entry.collection}
-                onClick={() => {
-                  navigateStudio(studioPath.content(entry.collection));
-                  setGroups((current) => ({ ...current, content: true }));
-                }}
-              >
-                <CollectionIcon name={collectionUi(entry).icon} size={16} />
-                <span className="nav-item-label">{displaySchemaName(entry, 'collection')}</span>
+          {contentNavFocused ? (
+            <div className="content-focus-nav">
+              <button className="nav-item content-focus-back" type="button" onClick={() => setContentNavFocused(false)}>
+                <span aria-hidden="true">←</span>
+                <span className="nav-item-label">{t('navigation.backToMain')}</span>
               </button>
-            ))}
-            {contentCollections.length === 0 && (
+
+              {contentNavigation.roots.map((entry) => (
+                <ContentCollectionButton
+                  key={entry.collection}
+                  entry={entry}
+                  active={section === 'content' && contentCollection === entry.collection}
+                  onClick={() => navigateStudio(studioPath.content(entry.collection))}
+                />
+              ))}
+
+              {contentNavigation.groups.map((group) => (
+                <div className="content-focus-group" key={group.id}>
+                  <div className="content-focus-group-title">{group.name}</div>
+                  {group.collections.map((entry) => (
+                    <ContentCollectionButton
+                      key={entry.collection}
+                      entry={entry}
+                      active={section === 'content' && contentCollection === entry.collection}
+                      onClick={() => navigateStudio(studioPath.content(entry.collection))}
+                    />
+                  ))}
+                </div>
+              ))}
+
+              {contentCollections.length === 0 && (
+                <div className="muted-line">{t('navigation.contentEmpty')}</div>
+              )}
+            </div>
+          ) : (
+            <>
               <button
-                className={`nav-item nav-item-child ${section === 'data-model' ? 'active' : ''}`}
+                className={`nav-item nav-item-root ${section === 'content' ? 'active' : ''}`}
                 type="button"
-                onClick={() => openSection('data-model', 'settings')}
+                title={navigationCollapsed ? t('nav.content') : undefined}
+                onClick={() => openSection('content')}
               >
-                <SidebarIcon name="model" size={16} />
-                <span className="nav-item-label">{t('nav.createFirstCollection')}</span>
+                <SidebarIcon name="content" />
+                <span className="nav-item-label">{t('nav.content')}</span>
               </button>
-            )}
-          </AccordionGroup>
 
-          <button
-            className={`nav-item nav-item-root ${section === 'ai' ? 'active' : ''}`}
-            type="button"
-            title={navigationCollapsed ? t('nav.ai') : undefined}
-            onClick={() => openSection('ai')}
-          >
-            <SidebarIcon name="ai" />
-            <span className="nav-item-label">{t('nav.ai')}</span>
-          </button>
-
-          <button
-            className={`nav-item nav-item-root ${section === 'files' ? 'active' : ''}`}
-            type="button"
-            title={navigationCollapsed ? t('nav.files') : undefined}
-            onClick={() => openSection('files')}
-          >
-            <SidebarIcon name="files" />
-            <span className="nav-item-label">{t('nav.files')}</span>
-          </button>
-
-          <AccordionGroup
-            id="settings"
-            label={t('nav.settings')}
-            icon="appearance"
-            open={groups.settings}
-            collapsed={navigationCollapsed}
-            onToggle={() => toggleGroup('settings')}
-          >
-            {settingsSections.map((item) => (
               <button
-                key={item.id}
-                className={`nav-item nav-item-child ${section === item.id ? 'active' : ''}`}
+                className={`nav-item nav-item-root ${section === 'ai' ? 'active' : ''}`}
                 type="button"
-                onClick={() => openSection(item.id, 'settings')}
+                title={navigationCollapsed ? t('nav.ai') : undefined}
+                onClick={() => openSection('ai')}
               >
-                <SidebarIcon name={item.icon} size={16} />
-                <span className="nav-item-label">{t(item.labelKey)}</span>
+                <SidebarIcon name="ai" />
+                <span className="nav-item-label">{t('nav.ai')}</span>
               </button>
-            ))}
-          </AccordionGroup>
+
+              <button
+                className={`nav-item nav-item-root ${section === 'files' ? 'active' : ''}`}
+                type="button"
+                title={navigationCollapsed ? t('nav.files') : undefined}
+                onClick={() => openSection('files')}
+              >
+                <SidebarIcon name="files" />
+                <span className="nav-item-label">{t('nav.files')}</span>
+              </button>
+
+              <AccordionGroup
+                id="settings"
+                label={t('nav.settings')}
+                icon="appearance"
+                open={groups.settings}
+                collapsed={navigationCollapsed}
+                onToggle={() => toggleGroup('settings')}
+              >
+                {settingsSections.map((item) => (
+                  <button
+                    key={item.id}
+                    className={`nav-item nav-item-child ${section === item.id ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => openSection(item.id, 'settings')}
+                  >
+                    <SidebarIcon name={item.icon} size={16} />
+                    <span className="nav-item-label">{t(item.labelKey)}</span>
+                  </button>
+                ))}
+              </AccordionGroup>
+            </>
+          )}
         </nav>
 
         <div className="sidebar-footer">
