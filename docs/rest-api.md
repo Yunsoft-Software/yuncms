@@ -1,10 +1,6 @@
-# YunCMS REST API Reference
+# REST API Reference
 
-YunCMS exposes a compact REST API around dynamic MySQL collections, schema administration, users/RBAC, Files and Studio settings. There is no GraphQL layer and no ORM-specific query language hidden behind the API.
-
-This reference describes the implemented API on branch `16-08-2026`.
-
-## Start here
+YunCMS exposes a REST API for dynamic collection data, schema administration, authentication, users, roles, permissions, Files, Studio settings, audit, AI/MCP integrations and installed endpoint extensions.
 
 Default local origin:
 
@@ -12,63 +8,31 @@ Default local origin:
 http://localhost:3008
 ```
 
-Most application endpoints expect:
+Most authenticated endpoints use:
 
 ```http
 Authorization: Bearer <access-token-or-api-token>
 ```
 
-JSON writes expect:
+JSON writes use:
 
 ```http
 Content-Type: application/json
 ```
 
-For the full Items filtering/sorting/pagination grammar, see **[`api-query-language.md`](api-query-language.md)**.
+Every response receives an `X-Request-Id`. A caller may provide a valid `X-Request-Id`; otherwise YunCMS creates one.
 
----
+## Response shapes
 
-# Human names vs API keys
-
-YunCMS separates names intended for people from identifiers intended for code.
-
-You can create a collection with a natural name:
+Collection/list endpoints normally return:
 
 ```json
 {
-  "name": "Müşteri Talepleri",
-  "collection": "musteri_talepleri"
+  "data": []
 }
 ```
 
-Studio automatically suggests the machine key. The backend normalizes again and never trusts a browser-only transformation.
-
-Examples:
-
-| Display name | Suggested API/MySQL key |
-| --- | --- |
-| `Müşteri Talepleri` | `musteri_talepleri` |
-| `Ürün Fiyatı` | `urun_fiyati` |
-| `İçecek Ölçüsü` | `icecek_olcusu` |
-| `2026 Ürünleri` | `collection_2026_urunleri` |
-
-Field names work the same way:
-
-```json
-{
-  "name": "Ürün Fiyatı",
-  "field": "urun_fiyati",
-  "type": "decimal"
-}
-```
-
-The **display name may be changed later without renaming the physical table/column**. API URLs, JSON field names, filters, sort keys and relation keys use the stable machine identifier.
-
----
-
-# Response format
-
-## List response
+Items collection reads additionally include pagination metadata:
 
 ```json
 {
@@ -81,7 +45,7 @@ The **display name may be changed later without renaming the physical table/colu
 }
 ```
 
-## Single-resource response
+Single resources normally return:
 
 ```json
 {
@@ -91,7 +55,7 @@ The **display name may be changed later without renaming the physical table/colu
 }
 ```
 
-## Error response
+Errors use:
 
 ```json
 {
@@ -106,44 +70,136 @@ The **display name may be changed later without renaming the physical table/colu
 }
 ```
 
-Known auth/input/schema conflicts map to stable 4xx responses. Retryable infrastructure failures map to 503. Unexpected server errors return a generic client message while structured server logs keep the internal error and request id after secret redaction.
+Known authentication, authorization, validation and schema conflicts map to 4xx responses. Capacity/shared-state failures can return 503. Unexpected server failures return a generic client-safe error while the request id remains available for log correlation.
 
----
+# Health and readiness
+
+```text
+GET /health
+GET /ready
+```
+
+`/health` confirms that the HTTP process is alive:
+
+```json
+{
+  "status": "ok",
+  "request_id": "..."
+}
+```
+
+`/ready` also checks MySQL and any Redis instance configured as required shared state. A ready response reports the active cache/rate-limit stores:
+
+```json
+{
+  "status": "ready",
+  "request_id": "...",
+  "shared_state": {
+    "cache": "memory",
+    "api_rate_limit": "memory",
+    "auth_rate_limit": "memory"
+  }
+}
+```
+
+# Human labels and API keys
+
+Collections and fields keep human-readable labels separate from stable machine identifiers.
+
+```json
+{
+  "name": "Customer Requests",
+  "collection": "customer_requests"
+}
+```
+
+```json
+{
+  "name": "Sales Price",
+  "field": "sales_price",
+  "type": "decimal"
+}
+```
+
+URLs, JSON property names, filters, sorting and relation paths always use the stable `collection` / `field` key. Changing a display name does not silently rename the underlying table, column or integration contract.
 
 # Authentication
 
+## Provider discovery
+
 ```text
-POST   /auth/login
-POST   /auth/refresh
-POST   /auth/logout
-POST   /auth/logout-all
-POST   /auth/password-reset/request
-POST   /auth/password-reset/confirm
-POST   /auth/email-verification/request
-POST   /auth/email-verification/confirm
+GET /auth/providers
+```
+
+Returns public metadata for configured external authentication providers. An empty list is valid when only email/password authentication is configured.
+
+## Email/password login
+
+```text
+POST /auth/login
+```
+
+```bash
+curl 'http://localhost:3008/auth/login' \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"your-password"}'
+```
+
+The response contains an opaque access credential and refresh credential. See [`auth.md`](auth.md) for token lifetimes, rotation and revocation.
+
+## External authentication
+
+Browser-based providers use:
+
+```text
+GET  /auth/login/:provider
+GET  /auth/callback/:provider
+POST /auth/callback/:provider
+POST /auth/exchange
+```
+
+The callback can be GET or POST depending on the configured provider protocol. Browser login finishes through a short-lived handoff code which Studio exchanges through `/auth/exchange`.
+
+LDAP-style username/password providers use:
+
+```text
+POST /auth/login/:provider
+```
+
+## Refresh and logout
+
+```text
+POST /auth/refresh
+POST /auth/logout
+POST /auth/logout-all
+```
+
+`/auth/logout` and `/auth/logout-all` require a session access token, not a static API token.
+
+## Password reset and email verification
+
+```text
+POST /auth/password-reset/request
+POST /auth/password-reset/confirm
+POST /auth/email-verification/request
+POST /auth/email-verification/confirm
+```
+
+Password-reset request responses intentionally do not reveal whether an account exists.
+
+## API tokens
+
+```text
 GET    /auth/tokens
 POST   /auth/tokens
 DELETE /auth/tokens/:id
 ```
 
-## Login
+The plaintext token is returned only when created. Stored/listed token data never exposes the secret or hash.
 
-```bash
-curl 'http://localhost:3008/auth/login' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "email": "admin@example.com",
-    "password": "your-password"
-  }'
-```
+# Items: dynamic collection data
 
-The authenticated identity includes the internal role id plus human-readable `role_name`.
-
-Login, refresh and auth-action endpoints use configurable process-local rate limiting. See [`auth.md`](auth.md) for session/token lifecycle details.
-
----
-
-# Items — dynamic collection data
+Every project collection is available at:
 
 ```text
 GET    /items/:collection
@@ -153,89 +209,78 @@ PATCH  /items/:collection/:id
 DELETE /items/:collection/:id
 ```
 
-`:collection` is the machine key, for example `musteri_talepleri`.
+All operations are evaluated through the active role/accountability. The generic Items API does not provide an unguarded path to internal system tables.
 
-## Read collection
+## Read a collection
 
 ```bash
-curl --get 'http://localhost:3008/items/musteri_talepleri' \
+curl --get 'http://localhost:3008/items/orders' \
   -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'fields=id,baslik,durum,oncelik' \
-  --data-urlencode 'filter={"durum":{"_eq":"open"},"oncelik":{"_gte":5}}' \
-  --data-urlencode 'sort=-oncelik,baslik' \
+  --data-urlencode 'fields=id,order_no,total,status,customer_id.name' \
+  --data-urlencode 'filter={"status":{"_in":["paid","processing"]},"total":{"_gte":1000}}' \
+  --data-urlencode 'search=acme' \
+  --data-urlencode 'sort=-created_at,order_no' \
   --data-urlencode 'limit=25' \
   --data-urlencode 'offset=0'
 ```
 
-Supported collection query parameters:
+Collection reads support:
 
-- `fields`
-- `filter`
-- `sort`
-- `limit`
-- `offset`
-- `expand`
+- `fields` including `*`, `*.*` and nested relation projection;
+- `filter` with comparison, list, null and text operators plus `_and`/`_or`;
+- `search` across readable string/text fields;
+- `sort` with multiple ascending/descending fields;
+- `limit` / `offset` pagination;
+- `aggregate` / `groupBy`;
+- relation expansion using relation paths or `expand`.
 
-Full syntax and every filter operator: [`api-query-language.md`](api-query-language.md).
+The complete syntax, limits and examples are in [`api-query-language.md`](api-query-language.md).
 
 ## Read one
 
 ```bash
-curl --get 'http://localhost:3008/items/musteri_talepleri/RECORD_ID' \
+curl --get 'http://localhost:3008/items/articles/ARTICLE_ID' \
   -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'fields=id,baslik,durum'
+  --data-urlencode 'fields=id,title,author_id.name'
 ```
+
+Single-record reads accept `fields` and `expand`.
 
 ## Create
 
 ```bash
-curl 'http://localhost:3008/items/musteri_talepleri' \
+curl 'http://localhost:3008/items/customer_requests' \
   -X POST \
   -H 'Authorization: Bearer YOUR_TOKEN' \
   -H 'Content-Type: application/json' \
-  -d '{
-    "baslik": "Yeni teklif talebi",
-    "durum": "open",
-    "oncelik": 7
-  }'
+  -d '{"title":"New quote request","priority":7}'
 ```
+
+Success returns HTTP 201 with the created record in `data`.
 
 ## Update
 
 ```bash
-curl 'http://localhost:3008/items/musteri_talepleri/RECORD_ID' \
+curl 'http://localhost:3008/items/customer_requests/RECORD_ID' \
   -X PATCH \
   -H 'Authorization: Bearer YOUR_TOKEN' \
   -H 'Content-Type: application/json' \
-  -d '{"durum":"resolved"}'
+  -d '{"status":"resolved"}'
 ```
 
 ## Delete
 
 ```bash
-curl 'http://localhost:3008/items/musteri_talepleri/RECORD_ID' \
+curl 'http://localhost:3008/items/customer_requests/RECORD_ID' \
   -X DELETE \
   -H 'Authorization: Bearer YOUR_TOKEN'
 ```
 
 Success returns `204 No Content`.
 
-## Relation expansion
-
-```bash
-curl --get 'http://localhost:3008/items/articles' \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'fields=id,title,author_id' \
-  --data-urlencode 'expand=author_id'
-```
-
-V1 expands direct to-one relation fields only, max 8 per request. Target rows are loaded under the same accountability, so target row/field permissions remain enforced.
-
----
-
 # Schema administration
 
-Schema endpoints require administrator/system schema-management accountability.
+Schema mutation is an administrative/system capability. Destructive collection, field and managed many-to-many deletion requires an explicit `destructive=true` query flag where documented below.
 
 ## Collections
 
@@ -247,7 +292,7 @@ PATCH  /schema/collections/:collection
 DELETE /schema/collections/:collection?destructive=true
 ```
 
-### Create a collection with a natural display name
+Create:
 
 ```bash
 curl 'http://localhost:3008/schema/collections' \
@@ -255,50 +300,16 @@ curl 'http://localhost:3008/schema/collections' \
   -H 'Authorization: Bearer ADMIN_TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "Müşteri Talepleri",
-    "collection": "musteri_talepleri",
-    "note": "Müşteriden gelen talepler",
-    "hidden": false,
-    "metadata": {
-      "icon": "inbox",
-      "sort": 20
-    },
-    "systemFields": [
-      "created_at",
-      "updated_at",
-      "created_by",
-      "updated_by"
-    ]
+    "name":"Customer Requests",
+    "collection":"customer_requests",
+    "note":"Incoming sales and support requests",
+    "hidden":false,
+    "metadata":{"icon":"inbox","sort":20},
+    "systemFields":["created_at","updated_at","created_by","updated_by"]
   }'
 ```
 
-You may also omit a dedicated machine key and send the human text through `collection`; the backend normalizes it. Explicitly sending both is recommended for automation/config-as-code because the stable identifier is visible in the request.
-
-### Change only the display name
-
-```bash
-curl 'http://localhost:3008/schema/collections/musteri_talepleri' \
-  -X PATCH \
-  -H 'Authorization: Bearer ADMIN_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Müşteri Destek Talepleri"}'
-```
-
-This does **not** rename the physical MySQL table or change API URLs.
-
-### Visibility/icon/sidebar order
-
-These are collection metadata concerns managed by Data Model in Studio:
-
-```json
-{
-  "hidden": false,
-  "metadata": {
-    "icon": "inbox",
-    "sort": 30
-  }
-}
-```
+Changing only `name`, `note`, visibility or UI metadata does not rename the physical collection key.
 
 ## Fields
 
@@ -311,39 +322,36 @@ PATCH  /schema/collections/:collection/fields/:field/schema
 DELETE /schema/collections/:collection/fields/:field?destructive=true
 ```
 
-### Short text
+Example string field:
 
 ```json
 {
-  "name": "Başlık",
-  "field": "baslik",
+  "name": "Title",
+  "field": "title",
   "type": "string",
   "length": 255,
   "required": true
 }
 ```
 
-### Decimal
+Example decimal field:
 
 ```json
 {
-  "name": "Ürün Fiyatı",
-  "field": "urun_fiyati",
+  "name": "Sales Price",
+  "field": "sales_price",
   "type": "decimal",
   "precision": 12,
-  "scale": 2,
-  "required": false
+  "scale": 2
 }
 ```
 
-### Image / File
-
-Studio exposes File and Image as semantic field types. Physically they are UUID-backed references with a dedicated interface:
+File/Image controls are UUID-backed semantic fields selected from the Files library:
 
 ```json
 {
-  "name": "Kapak Görseli",
-  "field": "kapak_gorseli",
+  "name": "Cover Image",
+  "field": "cover_image",
   "type": "uuid",
   "interface": "image",
   "options": {
@@ -353,64 +361,9 @@ Studio exposes File and Image as semantic field types. Physically they are UUID-
 }
 ```
 
-### Change a field display name
+Physical field mutations such as required/nullability and managed indexing use the separate `/schema` field mutation endpoint so UI metadata changes are not confused with DDL changes.
 
-```bash
-curl 'http://localhost:3008/schema/collections/products/fields/urun_fiyati' \
-  -X PATCH \
-  -H 'Authorization: Bearer ADMIN_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Satış Fiyatı"}'
-```
-
-The API field key remains `urun_fiyati`.
-
-### Physical field changes
-
-Physical mutation is intentionally separate:
-
-```bash
-curl 'http://localhost:3008/schema/collections/products/fields/urun_fiyati/schema' \
-  -X PATCH \
-  -H 'Authorization: Bearer ADMIN_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{"required":true,"indexed":true}'
-```
-
-Supported V1 physical changes include required/nullability, supported defaults, timestamp automation and managed single-field indexing. Arbitrary type conversion is intentionally not exposed as a casual metadata edit.
-
-## Bounded system collection field extension
-
-Schema managers may add custom optional fields to the explicitly extensible system resources:
-
-```text
-POST /schema/system-collections/:collection/fields
-```
-
-Current bounded resources:
-
-- `yuncms_users`
-- `yuncms_files`
-- `yuncms_roles`
-
-Internal sessions/tokens/permissions/audit resources remain fail-closed.
-
-Example:
-
-```bash
-curl 'http://localhost:3008/schema/system-collections/yuncms_users/fields' \
-  -X POST \
-  -H 'Authorization: Bearer ADMIN_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "name": "Departman",
-    "field": "departman",
-    "type": "string",
-    "length": 100
-  }'
-```
-
-Custom system fields are optional-only in V1 to avoid breaking existing system rows with an unsafe NOT NULL migration.
+See [`data-model.md`](data-model.md) for field families, system fields, deletion behavior and relation modeling.
 
 ## Relations
 
@@ -426,7 +379,7 @@ POST   /schema/relations/m2m
 DELETE /schema/relations/m2m/:junctionCollection?destructive=true
 ```
 
-### M2O
+Many-to-one:
 
 ```json
 {
@@ -437,20 +390,9 @@ DELETE /schema/relations/m2m/:junctionCollection?destructive=true
 }
 ```
 
-### O2O
+One-to-one uses the same many/one shape and is physically enforced with a foreign key plus unique index.
 
-```json
-{
-  "manyCollection": "profiles",
-  "manyField": "user_id",
-  "oneCollection": "users",
-  "onDelete": "CASCADE"
-}
-```
-
-O2O is physically enforced with a foreign key + unique index.
-
-### M2M
+Managed many-to-many:
 
 ```json
 {
@@ -460,9 +402,15 @@ O2O is physically enforced with a foreign key + unique index.
 }
 ```
 
-Destructive collection, field and M2M deletion requires an explicit destructive flag; the HTTP verb alone is not treated as confirmation.
+## Extensible system resources
 
----
+Administrators may add bounded optional custom fields to explicitly extensible system collections:
+
+```text
+POST /schema/system-collections/:collection/fields
+```
+
+Current supported resources include users, files and roles. Internal session/token/permission/audit structures are not made generically extensible through this endpoint.
 
 # Users
 
@@ -474,11 +422,7 @@ PATCH  /users/:id
 DELETE /users/:id
 ```
 
-Accounts created through the privileged management path are immediately email-verified and can sign in without waiting for a verification message.
-
-Users access can be delegated through the bounded `yuncms_users` permission resource. Privilege-escalation guards still prevent delegated managers from assigning protected Administrator/Public roles or taking over Administrator accounts.
-
----
+Management-created accounts are treated as verified management users. Delegated user-management permissions still enforce protected Administrator/Public role invariants.
 
 # Roles and permissions
 
@@ -496,18 +440,11 @@ PATCH  /permissions/:id
 DELETE /permissions/:id
 ```
 
-Project collection permissions support:
+A permission is scoped to a role, collection/resource and action (`read`, `create`, `update`, `delete`). Project collection permissions may also define field allowlists, row filters and prospective create/update validation rules.
 
-- action: `read`, `create`, `update`, `delete`;
-- field allowlists;
-- row filters;
-- prospective create/update validation.
-
-System resources are deliberately narrower. Users/Files may be delegated action-by-action, Roles read-only, Public never receives system-resource access.
+Selected system resources such as users, files and roles can be explicitly delegated through their dedicated services while protected resource invariants remain enforced.
 
 See [`permissions.md`](permissions.md).
-
----
 
 # Files
 
@@ -521,23 +458,26 @@ PATCH  /files/:id
 DELETE /files/:id
 ```
 
-## Upload raw bytes
+Files access follows the explicit `yuncms_files` permission model. This permits intentional authenticated or Public read access when an administrator grants it; filtered read grants can expose only a permitted subset.
 
-YunCMS uses raw binary request bodies for file uploads rather than base64 JSON.
+## Upload
+
+Upload bytes are sent directly instead of base64 JSON:
 
 ```bash
-curl 'http://localhost:3008/files' \
+curl 'http://localhost:3008/files?storage=local' \
   -X POST \
   -H 'Authorization: Bearer YOUR_TOKEN' \
   -H 'Content-Type: application/octet-stream' \
   -H 'X-Filename: product-photo.png' \
   -H 'X-Mimetype: image/png' \
+  -H 'X-Title: Product photo' \
   --data-binary '@./product-photo.png'
 ```
 
-Studio additionally sends/uses file metadata and previews through the authenticated file content endpoint.
+When an S3-compatible driver is configured, use `?storage=s3`.
 
-## Download/read bytes
+## Download
 
 ```bash
 curl 'http://localhost:3008/files/FILE_ID/content' \
@@ -545,9 +485,11 @@ curl 'http://localhost:3008/files/FILE_ID/content' \
   --output downloaded-file.bin
 ```
 
+Content reads enforce the same Files read permission and row filter as metadata reads.
+
 ## Reconciliation
 
-`POST /files/reconcile` is administrator-only. Default behavior is dry-run. Orphan deletion is explicit and age-guarded.
+`POST /files/reconcile` is an administrative maintenance operation. It is dry-run by default:
 
 ```json
 {
@@ -557,28 +499,23 @@ curl 'http://localhost:3008/files/FILE_ID/content' \
 }
 ```
 
-See [`files.md`](files.md) for storage details.
+See [`files.md`](files.md).
 
----
-
-# Studio settings and branding
+# Studio navigation and settings
 
 ```text
-GET   /studio-settings
-GET   /studio-settings/logo
-GET   /studio-settings/favicon
+GET /studio-navigation
+GET /studio-settings
+GET /studio-settings/logo
+GET /studio-settings/favicon
 PATCH /studio-settings
 ```
 
-`GET /studio-settings` is intentionally public because login/reset/verification surfaces need safe display settings before authentication.
+Safe display settings are readable before authentication so the login/reset/verification screens can render configured branding. Updating Studio settings requires administrative/system access.
 
-`PATCH /studio-settings` is administrator/system-only.
+Logo and favicon settings point to Files records rather than arbitrary external asset URLs.
 
-Logo and favicon configuration stores selected **Files ids**, not arbitrary external asset URLs. The narrow public logo/favicon endpoints expose only the currently configured branding images; they do not make the Files API public.
-
-When no custom favicon is configured, Studio uses the default Yunsoft icon asset.
-
----
+See [`studio.md`](studio.md) and [`studio-customization.md`](studio-customization.md).
 
 # Audit
 
@@ -587,57 +524,61 @@ GET  /audit
 POST /audit/cleanup
 ```
 
-Audit access requires administrator/system accountability. Cleanup is explicit and bounded.
+Audit access and cleanup are privileged operations. Retention and cleanup batch limits are configurable. Schema/data/file/auth lifecycle events record request ids and relevant resource metadata without intentionally exposing plaintext credentials.
 
-Example:
+# AI assistant
 
-```json
-{
-  "retentionDays": 90,
-  "batchSize": 1000,
-  "maxBatches": 100
-}
-```
-
----
-
-# Health / readiness
+When configured, the AI API is mounted under:
 
 ```text
-GET /health
-GET /ready
+/ai
 ```
 
-`/health` reports process health. `/ready` also checks MySQL connectivity.
+The built-in Studio assistant uses the authenticated request's normal accountability. Model/tool access does not create an Administrator bypass. Data-changing tools also require the configured AI write capability and the user's selected per-conversation access mode.
 
-Both run before application authentication so deployment infrastructure can probe them.
+See [`ai-assistant.md`](ai-assistant.md) for configuration, privacy, write modes and prompt-injection boundaries.
 
----
+# MCP
 
-# HTTP hardening
+When enabled, MCP is mounted under:
 
-The API:
+```text
+/mcp
+```
 
-- disables `X-Powered-By`;
-- emits request ids;
-- applies a narrow configured Studio CORS origin;
-- emits `nosniff`, frame-deny, no-referrer and restrictive permissions-policy headers;
-- sets same-origin resource policy;
-- leaves HSTS to the real TLS/reverse-proxy deployment where proxy knowledge is available.
+MCP requests reuse YunCMS services, Items query limits and RBAC. Writes are separately controlled through MCP configuration.
 
----
+See [`mcp.md`](mcp.md) for transport, tools, authentication, origin/host controls and write configuration.
 
-# Current deliberate limits
+# Endpoint extensions
 
-YunCMS is intentionally explicit about V1 boundaries:
+An installed endpoint extension with id `orders` is mounted at:
 
-- no GraphQL;
-- no generic bulk REST mutation endpoints yet, even though bounded bulk service methods exist internally;
-- no nested O2M/M2M expansion;
-- direct relation expansion only;
-- no arbitrary type-conversion UI;
-- no untrusted extension sandbox;
-- no automatic audit cleanup scheduler;
-- very large Files/relation pickers are still candidates for server-side search/pagination expansion.
+```text
+/extensions/orders
+```
 
-The goal is a small surface that behaves predictably rather than a giant API that silently does the wrong thing.
+Extension routers run after authentication middleware and can reuse request accountability and registered services. See [`extensions.md`](extensions.md).
+
+# Request protection
+
+The HTTP layer includes:
+
+- security headers and same-origin Studio policy;
+- configurable API and authentication rate limits;
+- optional Redis-backed shared rate-limit state;
+- pressure limits for concurrent requests/heap pressure;
+- structured request ids and redacted error logging;
+- request-size limits for JSON and file uploads;
+- fail-closed query/schema/permission validation.
+
+Configuration details are in [`configuration.md`](configuration.md) and deployment guidance is in [`deployment.md`](deployment.md).
+
+# Related documentation
+
+- [`api-query-language.md`](api-query-language.md) — all Items query methods and limits.
+- [`data-model.md`](data-model.md) — collections, fields, system fields and relations.
+- [`auth.md`](auth.md) — authentication and external providers.
+- [`permissions.md`](permissions.md) — RBAC, row filters, field permissions and system-resource delegation.
+- [`files.md`](files.md) — local/S3 storage and reconciliation.
+- [`extensions.md`](extensions.md) — endpoint and hook extensions.
