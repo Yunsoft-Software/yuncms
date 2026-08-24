@@ -2,7 +2,7 @@
 
 YunCMS exposes an optional Model Context Protocol endpoint for agents that need to inspect schema and work with collection data through the same service/RBAC layer as REST.
 
-The endpoint is intentionally disabled by default.
+The endpoint is disabled by default.
 
 ## Enable
 
@@ -50,7 +50,7 @@ By default the endpoint requires ordinary YunCMS authentication:
 Authorization: Bearer <session-access-token-or-api-token>
 ```
 
-The resolved YunCMS accountability is passed into every service used by MCP tools. MCP does not create an administrator identity and does not call YunCMS HTTP endpoints from inside the same process.
+The resolved YunCMS accountability is passed into every service used by MCP tools. MCP does not create an Administrator identity and does not call YunCMS HTTP endpoints from inside the same process.
 
 Setting:
 
@@ -58,7 +58,7 @@ Setting:
 MCP_REQUIRE_AUTHENTICATION=false
 ```
 
-allows Public accountability instead. This should only be used when the Public role has intentionally bounded permissions suitable for the exposed tools.
+allows Public accountability instead. Use this only when the Public role has intentionally bounded permissions suitable for the exposed tools.
 
 Host and Origin validation still apply even when Public MCP access is explicitly enabled.
 
@@ -100,7 +100,7 @@ Example input:
 }
 ```
 
-Supported arguments mirror the implemented Items query layer: `fields`, `expand`, scalar `filter`, `search`, scalar `sort`, `aggregate`, `groupBy`, `limit`, and `offset`.
+Supported arguments mirror the Items query layer: `fields`, `expand`, scalar `filter`, `search`, scalar `sort`, `aggregate`, `groupBy`, `limit`, and `offset`.
 
 MCP applies its own maximum item count on top of core query limits.
 
@@ -130,7 +130,7 @@ Available tools then include:
 - `items.update`
 - `items.delete`
 
-These call `ItemsService` directly with the request accountability. Normal create/update/delete permissions, field allowlists, validation rules, row filters, system-field behavior, hooks, and audit behavior remain authoritative.
+These call `ItemsService` directly with request accountability. Normal create/update/delete permissions, field allowlists, validation rules, row filters, system-field behavior, hooks and audit behavior remain authoritative.
 
 Delete is marked destructive in MCP tool metadata.
 
@@ -144,7 +144,7 @@ MCP_MAX_RESULT_BYTES=1000000
 
 Oversized results return a bounded `MCP_RESULT_TOO_LARGE` tool error instead of returning an arbitrarily large payload.
 
-To-many relation expansion also retains the core relation-row and query-cost limits documented in [`api-query-language.md`](api-query-language.md).
+To-many relation expansion also retains the core relation-row and query-cost limits documented in [Items query language](api-query-language.md).
 
 ## Failure behavior
 
@@ -166,4 +166,11 @@ MCP_ALLOWED_ORIGINS=https://studio.example.com
 
 Use a dedicated normal YunCMS user/API token whose role contains only the collections/actions the agent needs. Do not give an agent Administrator merely to make MCP work.
 
-Before enabling write tools in production, complete the MCP real-runtime checks in `todo.md`.
+Before enabling write tools in production, test the actual agent identity against representative create/update/delete permissions, row filters and field allowlists in a non-production collection. Keep `MCP_WRITES_ENABLED=false` unless those writes are an intentional part of the deployment.
+
+## Related guides
+
+- [Configuration](configuration.md)
+- [Items query language](api-query-language.md)
+- [Roles and permissions](permissions.md)
+- [Security](security.md)
