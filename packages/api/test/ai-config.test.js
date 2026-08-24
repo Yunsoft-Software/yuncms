@@ -1,10 +1,35 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { DEFAULT_AI_BASE_URL, loadAiConfig } from '../src/ai/config.js';
+import {
+  aiAdminSettingsFromRow,
+  aiRuntimeSettingsFromRow,
+  DEFAULT_AI_BASE_URL,
+  normalizeAiSettingsPatch,
+} from '../src/ai/config.js';
 
-test('AI assistant is disabled and read-only by default', () => {
-  const config = loadAiConfig({});
+function row(overrides = {}) {
+  return {
+    id: 1,
+    enabled: 0,
+    base_url: DEFAULT_AI_BASE_URL,
+    model: null,
+    api_key_ciphertext: null,
+    writes_enabled: 0,
+    max_tool_rounds: 6,
+    max_tool_calls_per_round: 8,
+    max_history: 20,
+    max_message_chars: 12000,
+    max_tool_result_bytes: 250000,
+    max_output_tokens: 1500,
+    timeout_ms: 60000,
+    updated_at: null,
+    ...overrides,
+  };
+}
+
+test('persisted AI settings default to disabled and read-only', () => {
+  const config = aiRuntimeSettingsFromRow(row());
   assert.equal(config.enabled, false);
   assert.equal(config.writesEnabled, false);
   assert.equal(config.baseUrl, DEFAULT_AI_BASE_URL);
@@ -15,61 +40,56 @@ test('AI assistant is disabled and read-only by default', () => {
   assert.equal(config.maxHistory, 20);
 });
 
-test('AI assistant auto-enables when model and API key are configured', () => {
-  const config = loadAiConfig({
-    AI_API_KEY: 'secret-value',
-    AI_MODEL: 'example/model',
-    AI_BASE_URL: 'https://openrouter.ai/api/v1/',
-    AI_WRITES_ENABLED: 'true',
-    AI_MAX_TOOL_ROUNDS: '4',
-    AI_MAX_TOOL_CALLS_PER_ROUND: '5',
+test('admin settings expose only whether an API key exists', () => {
+  const settings = aiAdminSettingsFromRow(row({ api_key_ciphertext: 'encrypted-value', model: 'example/model' }));
+  assert.equal(settings.has_api_key, true);
+  assert.equal(settings.model, 'example/model');
+  assert.equal(Object.hasOwn(settings, 'api_key'), false);
+  assert.equal(JSON.stringify(settings).includes('encrypted-value'), false);
+});
+
+test('AI settings patch normalizes panel fields', () => {
+  assert.deepEqual(normalizeAiSettingsPatch({
+    enabled: true,
+    base_url: 'https://openrouter.ai/api/v1/',
+    model: ' example/model ',
+    api_key: ' secret-value ',
+    writes_enabled: true,
+    max_tool_rounds: 4,
+    max_tool_calls_per_round: 5,
+  }), {
+    enabled: true,
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'example/model',
+    apiKey: 'secret-value',
+    writesEnabled: true,
+    maxToolRounds: 4,
+    maxToolCallsPerRound: 5,
   });
-  assert.equal(config.enabled, true);
-  assert.equal(config.writesEnabled, true);
-  assert.equal(config.baseUrl, 'https://openrouter.ai/api/v1');
-  assert.equal(config.model, 'example/model');
-  assert.equal(config.maxToolRounds, 4);
-  assert.equal(config.maxToolCallsPerRound, 5);
 });
 
-test('AI assistant can be explicitly disabled even when credentials exist', () => {
-  const config = loadAiConfig({
-    AI_ENABLED: 'false',
-    AI_API_KEY: 'secret-value',
-    AI_MODEL: 'example/model',
-  });
-  assert.equal(config.enabled, false);
-});
-
-test('enabled AI requires both provider credentials and a model', () => {
+test('AI settings reject unsafe provider URLs and conflicting secret changes', () => {
   assert.throws(
-    () => loadAiConfig({ AI_ENABLED: 'true', AI_MODEL: 'example/model' }),
-    /AI_API_KEY is required/,
-  );
-  assert.throws(
-    () => loadAiConfig({ AI_ENABLED: 'true', AI_API_KEY: 'secret-value' }),
-    /AI_MODEL is required/,
-  );
-});
-
-test('AI provider URL rejects non-http URLs and embedded credentials', () => {
-  assert.throws(
-    () => loadAiConfig({ AI_BASE_URL: 'file:///tmp/provider' }),
+    () => normalizeAiSettingsPatch({ base_url: 'file:///tmp/provider' }),
     /must use http or https/,
   );
   assert.throws(
-    () => loadAiConfig({ AI_BASE_URL: 'https://user:pass@example.test/v1' }),
+    () => normalizeAiSettingsPatch({ base_url: 'https://user:pass@example.test/v1' }),
     /cannot include credentials/,
+  );
+  assert.throws(
+    () => normalizeAiSettingsPatch({ api_key: 'new', clear_api_key: true }),
+    /cannot be set and cleared/,
   );
 });
 
-test('AI tool-call fanout has a bounded configuration range', () => {
+test('AI limits remain bounded when saved from Studio', () => {
   assert.throws(
-    () => loadAiConfig({ AI_MAX_TOOL_CALLS_PER_ROUND: '0' }),
-    /AI_MAX_TOOL_CALLS_PER_ROUND must be an integer between 1 and 20/,
+    () => normalizeAiSettingsPatch({ max_tool_calls_per_round: 0 }),
+    /between 1 and 20/,
   );
   assert.throws(
-    () => loadAiConfig({ AI_MAX_TOOL_CALLS_PER_ROUND: '21' }),
-    /AI_MAX_TOOL_CALLS_PER_ROUND must be an integer between 1 and 20/,
+    () => normalizeAiSettingsPatch({ max_tool_calls_per_round: 21 }),
+    /between 1 and 20/,
   );
 });
