@@ -215,6 +215,24 @@
   font-size: 9px;
 }
 
+.navigation-group-rename {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(120px, 280px) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 14px;
+}
+
+.navigation-group-rename input {
+  min-width: 0;
+  padding-block: 7px;
+}
+
+.navigation-group-rename .text-button {
+  white-space: nowrap;
+}
+
 .navigation-group-children .navigation-collection-row:last-child {
   border-bottom: 0;
 }
@@ -287,7 +305,8 @@
     width: 100%;
   }
 
-  .navigation-group-create {
+  .navigation-group-create,
+  .navigation-group-rename {
     grid-template-columns: 1fr;
   }
 
