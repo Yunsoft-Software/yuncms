@@ -10,14 +10,42 @@ function requireAuthenticated(req) {
   if (req?.authMethod === 'public' || !req?.accountability?.user) throw authError();
 }
 
-export function createAiRouter({ assistant } = {}) {
+function requireAdministrator(req) {
+  requireAuthenticated(req);
+  if (req.accountability?.admin === true || req.accountability?.system === true) return;
+  const error = new Error('Yapay Zeka settings require administrator access');
+  error.code = 'FORBIDDEN';
+  throw error;
+}
+
+export function createAiRouter({ assistant, settingsStore } = {}) {
   if (!assistant) throw new Error('AI assistant service is required');
+  if (!settingsStore) throw new Error('AI settings store is required');
   const router = express.Router();
 
-  router.get('/status', (req, res, next) => {
+  router.get('/status', async (req, res, next) => {
     try {
       requireAuthenticated(req);
-      return res.json({ data: assistant.status(), request_id: req.id });
+      return res.json({ data: await assistant.status(), request_id: req.id });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.get('/settings', async (req, res, next) => {
+    try {
+      requireAdministrator(req);
+      return res.json({ data: await settingsStore.readAdmin(), request_id: req.id });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.patch('/settings', async (req, res, next) => {
+    try {
+      requireAdministrator(req);
+      const data = await settingsStore.update(req.body ?? {});
+      return res.json({ data, request_id: req.id });
     } catch (error) {
       return next(error);
     }
@@ -40,4 +68,4 @@ export function createAiRouter({ assistant } = {}) {
   return router;
 }
 
-export { requireAuthenticated };
+export { requireAdministrator, requireAuthenticated };
