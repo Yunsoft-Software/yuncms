@@ -1,110 +1,130 @@
-# YunCMS Items API — Query Language
+# Items API Query Language
 
-This guide documents the query language currently implemented on branch `22-08-2026`.
+This guide documents the query options available on YunCMS collection reads. All examples use stable collection and field API keys; Studio display names are not used in URLs, filters, sorting or relation paths.
 
-Display names are for people; URLs, JSON payloads, filters, sorting and relation paths always use stable collection/field API keys.
+## Endpoints
 
-## Base read endpoints
+Collection reads support the full query language:
 
 ```text
 GET /items/:collection
-GET /items/:collection/:id
 ```
 
-Authenticated requests use a YunCMS session access token or API token:
+Single-record reads support field selection and relation expansion:
+
+```text
+GET /items/:collection/:id?fields=...&expand=...
+```
+
+Authenticated requests normally send:
 
 ```http
-Authorization: Bearer <token>
+Authorization: Bearer <access-token-or-api-token>
 ```
 
-The Public role is deny-by-default. Every read described below still passes through normal collection, row and field permissions.
+Unauthenticated requests use the Public role. Public access is deny-by-default until an administrator explicitly grants the required permission.
 
-## Collection query parameters
+## Query parameters
 
-| Parameter | Purpose | Limits |
+| Parameter | Purpose | Important limits |
 | --- | --- | --- |
-| `fields` | Scalar field selection plus nested relation projection | max 100 field tokens, max 20 relation nodes, max relation depth 4 |
-| `filter` | JSON scalar filter tree | max depth/nodes enforced by query limits |
-| `search` | Search readable string/text fields | bounded text length |
-| `sort` | Comma-separated scalar sort fields | max 20 fields |
-| `aggregate` | `count`, `countDistinct`, `sum`, `avg`, `min`, `max` | bounded aggregate field count |
-| `groupBy` | Group aggregate output by readable scalar fields | requires `aggregate` |
-| `limit` | Returned row count | default 100, max 500 |
-| `offset` | Matching rows to skip | bounded maximum |
-| `expand` | Legacy relation expansion alias | max 20 relation fields |
+| `fields` | Select scalar fields and project relations | 100 field tokens; 20 relation nodes; depth 4 |
+| `filter` | JSON filter tree | depth 8; 100 filter nodes; 100 values per `_in`/`_nin` |
+| `search` | Search readable `string`/`text` fields | 200 characters |
+| `sort` | Comma-separated sort fields | 20 fields |
+| `aggregate` | `count`, `countDistinct`, `sum`, `avg`, `min`, `max` | 20 aggregate field entries |
+| `groupBy` | Group aggregate rows | 10 fields; requires `aggregate` |
+| `limit` | Maximum rows returned | default 100; range 1–500 |
+| `offset` | Rows skipped before the page | range 0–1,000,000 |
+| `expand` | Convenience expansion for direct/virtual relation aliases | shares the 20-node relation budget |
 
-Unknown parameters fail with `INVALID_QUERY`. The complete normalized query also receives a bounded query-cost score; expensive combinations fail before SQL execution.
+Unknown parameters are rejected with `INVALID_QUERY` rather than ignored.
 
-## Field selection
+## Fields
 
-Scalar fields:
+### Select specific scalar fields
 
 ```text
 fields=id,title,status
 ```
 
-All readable scalar fields at the current level:
+### Select all readable scalar fields
 
 ```text
 fields=*
 ```
 
-Nested direct relation:
+`*` means every field visible to the current read permission. It never widens a role field allowlist.
+
+### Select a relation field
+
+For `articles.author_id -> authors.id`:
 
 ```text
 fields=id,title,author_id.name
-fields=*,author_id.*
 ```
 
-Nested paths may traverse up to four relation levels when the path is non-cyclic and remains inside the query-cost/node budgets:
+Example response:
+
+```json
+{
+  "data": [
+    {
+      "id": "article-1",
+      "title": "Example",
+      "author_id": {
+        "name": "Ada"
+      }
+    }
+  ]
+}
+```
+
+### Select all readable fields inside a relation
+
+```text
+fields=id,title,author_id.*
+```
+
+### Select root fields and every readable first-level relation
+
+```text
+fields=*.*
+```
+
+`*.*` expands all readable relation descriptors available at the root collection and selects all readable target fields for those first-level relations. It does not mean unlimited recursive traversal; normal relation depth, node, row and query-cost limits still apply.
+
+### Nested relations
+
+Relation paths can be nested up to four levels:
 
 ```text
 fields=id,author_id.company_id.country_id.name
 ```
 
-`fields=*.*` selects every readable field at the root and expands all readable relation descriptors available at that level. This includes direct to-one fields and bounded reverse/to-many relation aliases described below.
+Cyclic relation paths are rejected.
 
-A wildcard never widens an RBAC field allowlist. Target collections are resolved again with the same request accountability, including target row filters and field allowlists.
+## Relation types
 
-## Relation projection
+YunCMS projects relations as normal JSON values while retaining the same request accountability on every target collection.
 
-### Direct M2O/O2O
+### Many-to-one and one-to-one
 
-If `articles.author_id -> authors.id`:
+A direct to-one relation returns an object or `null`:
 
 ```text
 fields=id,title,author_id.name
 ```
 
-returns:
+### Reverse one-to-many
 
-```json
-{
-  "id": "article-1",
-  "title": "Example",
-  "author_id": {
-    "name": "Ada"
-  }
-}
-```
-
-Lookup keys may be fetched internally for matching and then removed from narrowed nested output.
-
-### Reverse O2M
-
-For a normal M2O relation such as:
-
-```text
-comments.article_id -> articles.id
-```
-
-YunCMS exposes a virtual reverse relation alias on `articles`. The default alias is the many-side collection key when it does not collide with a physical field:
+If `comments.article_id -> articles.id`, YunCMS exposes a virtual reverse alias on `articles`. When the default alias does not collide with a physical field it is normally the many-side collection key:
 
 ```text
 fields=id,title,comments.text
 ```
 
-Example result:
+Result:
 
 ```json
 {
@@ -117,39 +137,43 @@ Example result:
 }
 ```
 
-If the default alias collides, YunCMS derives a deterministic fallback. Relation metadata may also provide a safe `reverseField`/`alias` value.
+Relation metadata may define a safe `reverseField`/`alias`. If an automatically preferred alias collides with a real field, YunCMS derives a deterministic fallback alias.
 
-### Reverse O2O
+### Reverse one-to-one
 
-The reverse side of an O2O relation uses the same virtual-alias model but returns one object or `null`, not an array.
+The reverse side of a one-to-one relation uses the same virtual-alias model but returns one object or `null` instead of an array.
 
-### M2M
+### Many-to-many
 
-For a managed junction between `articles` and `tags`, the source collection receives a virtual target alias, normally the target collection key:
+Managed many-to-many relations expose a virtual target alias. For an articles/tags relation:
 
 ```text
-fields=id,tags.name
+fields=id,title,tags.id,tags.name
 ```
 
-The junction is only an internal traversal detail and is not emitted in the response. The request must have read access to the junction collection and to the target collection. Junction row filters and target row/field permissions are enforced.
+The managed junction is used for traversal but is not emitted in the response. The caller must have read access to the source collection, the junction collection and the target collection. Junction row filters and target row/field permissions are enforced.
 
-To-many expansion is bounded; one expansion operation refuses to load more than the configured core cap (`2000` rows) and relation nodes contribute extra query cost.
+### `expand`
 
-### Legacy `expand`
-
-Legacy direct syntax remains accepted:
+`expand` is a convenience syntax when all readable fields of a relation are wanted:
 
 ```text
 fields=id,title&expand=author_id
 ```
 
-`expand` uses the same relation descriptor/RBAC machinery and the same relation-node budget.
+Multiple aliases are comma-separated:
+
+```text
+expand=author_id,comments
+```
+
+`expand` and relation paths in `fields` use the same relation planner, RBAC checks and relation budget.
 
 ## Filters
 
-`filter` is a JSON object. Values are always SQL parameters; dynamic identifiers are validated against schema metadata.
+`filter` is a JSON object. When sent in a URL it should be URL-encoded by the HTTP client.
 
-Equality/comparison:
+Example:
 
 ```json
 {
@@ -158,16 +182,74 @@ Equality/comparison:
 }
 ```
 
-Supported operators:
+With `curl`:
 
-```text
-_eq _neq _lt _lte _gt _gte
-_in _nin
-_null _nnull
-_contains _starts_with _ends_with
+```bash
+curl --get 'http://localhost:3008/items/products' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'filter={"status":{"_eq":"published"},"price":{"_gte":100,"_lt":500}}'
 ```
 
-Logical groups:
+### Operators
+
+| Operator | Meaning |
+| --- | --- |
+| `_eq` | equals |
+| `_neq` | not equal |
+| `_lt` | less than |
+| `_lte` | less than or equal |
+| `_gt` | greater than |
+| `_gte` | greater than or equal |
+| `_in` | value is in an array |
+| `_nin` | value is not in an array |
+| `_null` | SQL NULL check |
+| `_nnull` | SQL NOT NULL check |
+| `_contains` | text contains value |
+| `_starts_with` | text starts with value |
+| `_ends_with` | text ends with value |
+
+Use `_null` / `_nnull` for null checks:
+
+```json
+{
+  "published_at": { "_null": true }
+}
+```
+
+`_eq: null` and `_neq: null` are intentionally rejected so NULL semantics are explicit.
+
+`_in` and `_nin` require arrays:
+
+```json
+{
+  "status": { "_in": ["paid", "processing"] }
+}
+```
+
+An empty `_in` matches no rows; an empty `_nin` excludes no rows. Each array accepts at most 100 values.
+
+Text operators escape SQL LIKE wildcard characters in user input before binding.
+
+### AND behavior
+
+Different field clauses in the same object are combined with `AND`:
+
+```json
+{
+  "active": { "_eq": true },
+  "priority": { "_gte": 5 }
+}
+```
+
+Multiple operators on one field are also combined with `AND`:
+
+```json
+{
+  "price": { "_gte": 100, "_lte": 500 }
+}
+```
+
+### `_and` and `_or`
 
 ```json
 {
@@ -183,19 +265,33 @@ Logical groups:
 }
 ```
 
-`_in`/`_nin`, filter nesting and total filter-node counts are bounded. LIKE wildcard characters in user text are escaped before binding.
+`_and` and `_or` require non-empty arrays. Filter nesting is limited to 8 levels and 100 total filter nodes.
 
-Current boundary: filters target scalar fields on the current collection. Permission-aware relational filter traversal is still an active source task and is not documented as implemented.
+### Permission filters
+
+A caller filter never replaces the role's row filter. YunCMS combines the permission filter and caller filter with `AND`, so a user cannot broaden access with `_or` or another query expression.
+
+### Relation filtering
+
+Filters currently target scalar fields of the collection being queried. Relation-path filters such as `author_id.name` are not accepted.
 
 ## Search
 
-`search` performs a bounded text search over readable string/text fields in the current collection:
+`search` performs a case behavior determined by the configured MySQL collation and searches across readable `string` and `text` fields of the current collection:
 
 ```text
-search=YunCMS
+search=acme
 ```
 
-Search is combined with both the role row filter and an explicit user `filter` using `AND`.
+Example:
+
+```bash
+curl --get 'http://localhost:3008/items/customers' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'search=acme'
+```
+
+Search is combined with the permission row filter and explicit `filter` using `AND`. If the caller has no readable string/text fields, the search returns no rows rather than inspecting hidden fields.
 
 ## Sorting
 
@@ -211,39 +307,13 @@ Descending:
 sort=-created_at
 ```
 
-Multiple scalar fields:
+Multiple fields:
 
 ```text
 sort=-created_at,title
 ```
 
-Unknown or unreadable fields are rejected. Current boundary: relational sort paths are not implemented yet.
-
-## Aggregate and groupBy
-
-Count all permission-visible rows:
-
-```text
-aggregate={"count":"*"}
-```
-
-Multiple aggregates:
-
-```json
-{
-  "count": "*",
-  "sum": "total",
-  "avg": "total"
-}
-```
-
-Grouped aggregate:
-
-```text
-aggregate={"count":"*","sum":"total"}&groupBy=status
-```
-
-Supported aggregate functions are `count`, `countDistinct`, `sum`, `avg`, `min` and `max`. Aggregate/group fields must be readable scalar fields and still use the effective permission/user filter.
+Sort fields must exist and be readable. Relation-path sorting is not accepted.
 
 ## Pagination
 
@@ -252,10 +322,11 @@ limit=25&offset=0
 limit=25&offset=25
 ```
 
-Normal list responses include:
+Normal collection responses include permission-aware metadata:
 
 ```json
 {
+  "data": [],
   "meta": {
     "total_count": 243,
     "limit": 25,
@@ -264,9 +335,88 @@ Normal list responses include:
 }
 ```
 
-`total_count` is calculated after the effective row filter.
+`total_count` is calculated after the effective permission/user filter.
 
-## Combining features
+## Aggregates
+
+`aggregate` is a JSON object.
+
+Count permission-visible rows:
+
+```text
+aggregate={"count":"*"}
+```
+
+Count a field:
+
+```text
+aggregate={"count":"id"}
+```
+
+Distinct count:
+
+```text
+aggregate={"countDistinct":"customer_id"}
+```
+
+Multiple calculations:
+
+```json
+{
+  "count": "*",
+  "sum": "total",
+  "avg": "total",
+  "min": "total",
+  "max": "total"
+}
+```
+
+Every aggregate field must be readable. `*` is supported only by `count`.
+
+Typical result keys are derived from the function and field:
+
+```json
+{
+  "data": [
+    {
+      "count": 42,
+      "sum_total": "12500.00",
+      "avg_total": "297.619048"
+    }
+  ]
+}
+```
+
+Exact numeric representation follows the MySQL driver/value type used for that field.
+
+## Grouping
+
+`groupBy` requires `aggregate`:
+
+```text
+aggregate={"count":"*","sum":"total"}&groupBy=status
+```
+
+Example output:
+
+```json
+{
+  "data": [
+    { "status": "paid", "count": 20, "sum_total": "8000.00" },
+    { "status": "processing", "count": 8, "sum_total": "2500.00" }
+  ]
+}
+```
+
+Multiple grouping fields are comma-separated:
+
+```text
+groupBy=status,currency
+```
+
+Up to 10 group fields are accepted.
+
+## Combining query options
 
 ```bash
 curl --get 'http://localhost:3008/items/orders' \
@@ -279,35 +429,96 @@ curl --get 'http://localhost:3008/items/orders' \
   --data-urlencode 'offset=0'
 ```
 
-## RBAC and extension query hooks
+## Query safety limits
 
-The effective read flow is conceptually:
+YunCMS applies structural limits before SQL execution:
 
 ```text
-parse + normalize
--> items.query extension filter
--> re-parse / revalidate / query-cost check
--> resolve RBAC
--> compile permission + user filters
--> execute bounded SQL/relation traversal
--> items.read action metadata
+default limit             100
+maximum limit             500
+maximum fields            100
+maximum relation nodes     20
+maximum relation depth      4
+maximum to-many rows      2000 per expansion operation
+maximum sort fields        20
+maximum offset        1,000,000
+maximum filter depth        8
+maximum filter nodes      100
+maximum _in/_nin values   100
+maximum search length     200 characters
+maximum aggregate entries  20
+maximum group fields       10
+maximum query cost       2000
 ```
 
-An `items.query` hook therefore cannot return raw SQL or use a transformed query to restore a forbidden field. The transformed AST is validated again and normal permission enforcement remains authoritative.
+The query-cost score increases with row limit, field count, sorting, relation count/depth, search and aggregates. A structurally valid but overly expensive request fails with `QUERY_COST_LIMIT` instead of running an unbounded query.
 
-## Current deliberate boundary
+## Error behavior
 
-Not currently implemented:
+Malformed or unsupported input returns a structured 4xx error. Examples include:
 
-- relation-path filtering such as filtering `articles` by `author.name`;
+- unknown query parameter;
+- unknown/unreadable field;
+- malformed JSON filter/aggregate;
+- unsupported filter operator;
+- invalid `limit`/`offset`;
+- relation depth/node limit;
+- cyclic relation path;
+- query-cost limit.
+
+Typical shape:
+
+```json
+{
+  "errors": [
+    {
+      "code": "INVALID_QUERY",
+      "message": "Unknown field: secret",
+      "path": "filter.secret",
+      "request_id": "..."
+    }
+  ]
+}
+```
+
+## JavaScript example
+
+```js
+const params = new URLSearchParams({
+  fields: 'id,title,author_id.name',
+  filter: JSON.stringify({
+    status: { _eq: 'published' },
+    priority: { _gte: 5 },
+  }),
+  sort: '-created_at',
+  limit: '25',
+  offset: '0',
+});
+
+const response = await fetch(`/items/articles?${params}`, {
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+});
+
+const result = await response.json();
+```
+
+## Supported boundary
+
+The Items query language intentionally rejects features it does not implement. Current reads do not accept:
+
+- relation-path filtering;
 - relation-path sorting;
-- Directus-style `deep` per-relation filter/sort/limit options;
-- arbitrary query functions/SQL expressions.
+- per-relation nested filter/sort/limit query objects;
+- arbitrary SQL expressions/functions;
+- unknown query parameters.
 
-Those remain explicit source work rather than silently accepted parameters.
+This fail-closed behavior makes integration mistakes visible instead of silently changing query meaning.
 
-## Related docs
+## Related guides
 
-- [`rest-api.md`](rest-api.md) — endpoint reference.
-- [`permissions.md`](permissions.md) — RBAC and row/field rules.
-- [`mcp.md`](mcp.md) — MCP tools reuse this query/service layer.
+- [`rest-api.md`](rest-api.md) — REST endpoint reference.
+- [`permissions.md`](permissions.md) — row, field and action permissions.
+- [`data-model.md`](data-model.md) — collections, fields and relations.
+- [`mcp.md`](mcp.md) — MCP access uses the same service and permission model.
