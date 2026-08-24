@@ -1,60 +1,74 @@
 # Authentication
 
-This document describes authentication behavior implemented on branch `16-08-2026`.
+YunCMS supports email/password sessions, static API tokens, password reset, email verification and optional external identity providers. Authentication always resolves to explicit request accountability; authorization is then evaluated by roles and permissions.
 
 ## Credential model
 
-YunCMS uses opaque server-side credentials rather than JWTs.
+YunCMS uses opaque server-side credentials rather than self-contained JWT access claims.
 
-Token prefixes are intentionally distinct:
+Token prefixes identify the credential class:
 
-- `yca_` — short-lived access token;
+- `yca_` — short-lived session access token;
 - `ycr_` — refresh token;
 - `yct_` — static API token;
 - `ycp_` — password-reset token;
 - `ycv_` — email-verification token.
 
-Only SHA-256 token hashes are persisted. Prefixes identify the token class; stored hash, expiry, active-user state and server-side session/token state remain authoritative.
+Only token hashes are persisted. The database session/token state, expiry, owning user state and current role remain authoritative.
 
-## Passwords
+## Email/password login
 
-Passwords use Node.js `crypto.scrypt` with a random per-password salt and bounded encoded cost parameters. YunCMS does not implement a custom password crypto algorithm.
+```text
+POST /auth/login
+```
 
-Unknown user, wrong password and inactive-user login attempts intentionally return the same public `INVALID_CREDENTIALS` response. The unknown-user path still performs a dummy password verification to reduce trivial account-existence timing differences.
+```bash
+curl 'http://localhost:3008/auth/login' \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"user@example.com","password":"your-password"}'
+```
+
+Passwords use Node.js `crypto.scrypt` with a random per-password salt and encoded bounded cost parameters.
+
+Unknown user, wrong password and inactive-user attempts intentionally produce the same public invalid-credentials behavior. The unknown-user path still performs password work to reduce trivial account-existence timing differences.
 
 ## Sessions
 
-Successful login creates a server-side session containing access/refresh hashes and expiries plus optional IP/user-agent metadata.
+A successful local or external login creates a server-side session with hashed access/refresh credentials and expiries plus optional request metadata.
 
-Current defaults:
+Default lifetime:
 
 - access token: 15 minutes;
 - refresh/session: 30 days.
 
-Refresh rotates both access and refresh credentials. The DB update includes the previous refresh hash, so concurrent reuse of the same refresh token allows only one successful rotation.
+Use the returned access token for ordinary API requests:
 
-Revocation behavior:
-
-- `/auth/logout` revokes the current session;
-- `/auth/logout-all` revokes all sessions for the authenticated user;
-- password change revokes all sessions in the password-change transaction;
-- password reset revokes all sessions while consuming the reset token.
-
-## Bearer authentication and accountability
-
-Application routes accept:
-
-```text
-Authorization: Bearer <access-or-api-token>
+```http
+Authorization: Bearer yca_...
 ```
 
-Refresh/reset/verification tokens are not valid application Bearer credentials.
+### Refresh
 
-Authenticated identity becomes explicit accountability containing user, role and administrator state. Requests without a bearer credential receive explicit public accountability and the configured public role when one exists. Missing role/permission access fails closed.
+```text
+POST /auth/refresh
+```
+
+Refresh rotates both access and refresh credentials. The previous refresh hash participates in the database update, so two concurrent attempts to reuse the same refresh token do not both succeed.
+
+### Logout
+
+```text
+POST /auth/logout
+POST /auth/logout-all
+```
+
+`/auth/logout` revokes the current session. `/auth/logout-all` revokes all sessions for the authenticated user. These endpoints require a session access token rather than a static API token.
+
+Changing or resetting a password also revokes existing sessions.
 
 ## API tokens
 
-Normal users can list/create/revoke only their own API tokens; admin/system accountability may target another user. Creation returns the secret once. List responses never expose token hashes or plaintext secrets.
+API tokens are long-lived bearer credentials for integrations and agents:
 
 ```text
 GET    /auth/tokens
@@ -62,74 +76,75 @@ POST   /auth/tokens
 DELETE /auth/tokens/:id
 ```
 
-API tokens resolve the owning user's current role at authentication time, so disabling the user disables the token.
+Normal users can manage their own tokens; administrative/system access can target another user where allowed.
+
+The plaintext `yct_...` secret is returned only at creation time. List responses do not expose the secret or stored token hash.
+
+API tokens resolve the owning user's current role when authenticated. Disabling the user or changing effective permissions therefore changes what the token can do; the token is not a frozen copy of old privileges.
+
+## Public accountability
+
+A request without a Bearer token is not treated as Administrator. It resolves to explicit Public accountability and the configured Public role. Public access is deny-by-default until permissions are intentionally granted.
+
+This applies to normal Items reads and to system resources that explicitly support delegated/Public permissions, including Files.
 
 ## Password reset
 
-Public request endpoint:
+Request a reset:
 
 ```text
 POST /auth/password-reset/request
 ```
 
-The public response is the same accepted response for malformed, unknown, inactive and active accounts. For an active account YunCMS replaces older unused reset tokens, creates a random one-time token and stores only its hash.
+The public response is deliberately non-enumerating: callers should not be able to learn whether a supplied account exists or is active from this endpoint.
 
-The raw token is passed only to the configured mail transport; it is not returned in the HTTP response.
+For an eligible active account, YunCMS creates a random one-time reset credential, stores only its hash and sends the raw token through the configured mail transport.
 
-Confirmation endpoint:
+Confirm:
 
 ```text
 POST /auth/password-reset/confirm
 ```
 
-Consumption locks/rechecks the unused unexpired token, changes the password, marks the token used, revokes every session and removes sibling reset tokens. Replay fails.
+A successful confirmation consumes the one-time token, changes the password, revokes existing sessions and invalidates sibling reset credentials. Replay fails.
 
 ## Email verification
-
-Verification mail issuance remains available for an existing active user, or for another user under admin/system accountability:
 
 ```text
 POST /auth/email-verification/request
 POST /auth/email-verification/confirm
 ```
 
-Older unused verification tokens are replaced. Confirmation sets `email_verified_at` for an active user and consumes the one-time token.
+Verification credentials are one-time and hashed at rest. Confirmation marks an active user's email as verified.
 
-### Users created by management
+### Management-created users
 
-`UsersService.createOne()` is a privileged management path, not a public signup path. Accounts created from Studio/API through this service are trusted as management-created users and receive `email_verified_at` immediately.
+`UsersService.createOne()` and Studio/API user-management are privileged management paths, not public signup. Users created this way are treated as management-created accounts and are marked verified immediately.
 
-Consequences:
+That includes the first Administrator created by `yuncms init` and users created by a delegated user manager with the corresponding permission.
 
-- an administrator-created user does not need a verification email before normal use;
-- a delegated user manager with explicit `yuncms_users:create` permission gets the same management-created behavior;
-- the first administrator created by `yuncms init` follows the same rule;
-- old/unverified accounts can still use the verification workflow above;
-- a future public/self-registration flow must be implemented separately if email ownership verification is required there.
+## SMTP
 
-## SMTP delivery
+Configure SMTP when password-reset/email-verification messages must be delivered:
 
-SMTP delivery uses Nodemailer. Configuration:
-
-```text
-SMTP_HOST=
+```env
+SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=
 SMTP_PASSWORD=
-SMTP_FROM=
-AUTH_PUBLIC_URL=http://localhost:3008
+SMTP_FROM=no-reply@example.com
+AUTH_PUBLIC_URL=https://cms.example.com
 ```
 
-`SMTP_HOST` and `SMTP_FROM` are required together when mail delivery is configured. Nodemailer file and URL message access are disabled so message content cannot load arbitrary local/remote resources through the transport.
+`AUTH_PUBLIC_URL` must be the externally reachable origin used in links. SMTP URL/file loading in message content is disabled. A temporary SMTP failure does not by itself prevent the API process from starting.
 
-SMTP is not synchronously verified during API startup: a temporary mail-provider outage should not prevent the entire CMS from starting. Delivery failures are logged through the redacting structured logger.
+## Authentication rate limiting
 
-## Rate limiting
+Authentication routes have independent fixed-window limits:
 
-Login, refresh and reset/verification action routes use configurable fixed-window process-local limits:
-
-```text
+```env
+AUTH_RATE_LIMIT_STORE=memory
 AUTH_LOGIN_RATE_WINDOW_MS=60000
 AUTH_LOGIN_RATE_MAX=10
 AUTH_REFRESH_RATE_WINDOW_MS=60000
@@ -138,14 +153,114 @@ AUTH_ACTION_RATE_WINDOW_MS=900000
 AUTH_ACTION_RATE_MAX=5
 ```
 
-Exceeded limits return HTTP 429 with `RATE_LIMITED`.
+`AUTH_RATE_LIMIT_STORE` accepts `memory` or `redis` and can share counters across replicas through Redis. See [Configuration](configuration.md).
 
-The limiter is intentionally process-local in V1. Multi-instance deployment requires a shared limiter/store before relying on one global limit across replicas.
+Exceeded limits return HTTP 429 with a bounded `RATE_LIMITED` response.
 
-## Auth HTTP surface
+# External authentication
+
+Optional providers are configured with `AUTH_PROVIDERS` and provider-specific environment variables. Supported drivers are:
+
+- OIDC;
+- OAuth2;
+- LDAP;
+- SAML.
+
+Public provider metadata is exposed through:
 
 ```text
+GET /auth/providers
+```
+
+Studio can use this list to display configured sign-in methods.
+
+## Browser-provider flow: OIDC, OAuth2, SAML
+
+Start login:
+
+```text
+GET /auth/login/:provider
+```
+
+After authenticating at the identity provider, the provider returns to:
+
+```text
+GET  /auth/callback/:provider
+POST /auth/callback/:provider
+```
+
+The method depends on the provider protocol. YunCMS finishes the browser leg with a short-lived handoff code; Studio exchanges it for normal YunCMS session credentials through:
+
+```text
+POST /auth/exchange
+```
+
+Browser providers require `AUTH_STATE_SECRET` with at least 32 characters. Provider URLs must use HTTPS.
+
+## LDAP flow
+
+LDAP uses a direct username/password request:
+
+```text
+POST /auth/login/:provider
+```
+
+`ldaps://` is required by default. Plain `ldap://` is accepted only when the provider explicitly sets `ALLOW_INSECURE=true`.
+
+## Just-in-time user creation
+
+Each provider can choose whether a valid external identity may create a local user:
+
+```env
+AUTH_PROVIDER_COMPANY_JIT=false
+AUTH_PROVIDER_COMPANY_DEFAULT_ROLE=
+```
+
+If JIT is enabled, a default role is mandatory. Use a least-privilege role rather than Administrator.
+
+## Account linking
+
+Linking an external identity to an existing local account by verified email is off by default:
+
+```env
+AUTH_PROVIDER_COMPANY_LINK_BY_VERIFIED_EMAIL=false
+```
+
+Administrator linking has an additional independent guard:
+
+```env
+AUTH_PROVIDER_COMPANY_ALLOW_ADMIN_LINK=false
+```
+
+Do not enable either option merely to make a provider login work. Enable them only when the identity provider's verified-email semantics and account ownership model are trusted for your deployment.
+
+## OIDC example
+
+```env
+AUTH_PROVIDERS=company
+AUTH_STATE_SECRET=replace-with-a-long-random-secret
+AUTH_PROVIDER_COMPANY_DRIVER=oidc
+AUTH_PROVIDER_COMPANY_LABEL=Company SSO
+AUTH_PROVIDER_COMPANY_ISSUER=https://id.example.com
+AUTH_PROVIDER_COMPANY_CLIENT_ID=your-client-id
+AUTH_PROVIDER_COMPANY_CLIENT_SECRET=your-client-secret
+AUTH_PROVIDER_COMPANY_SCOPES=openid profile email
+AUTH_PROVIDER_COMPANY_JIT=true
+AUTH_PROVIDER_COMPANY_DEFAULT_ROLE=ROLE_UUID
+```
+
+OAuth2, LDAP and SAML variables are listed in [Configuration](configuration.md).
+
+## Auth endpoint summary
+
+```text
+GET    /auth/providers
 POST   /auth/login
+GET    /auth/login/:provider
+POST   /auth/login/:provider
+GET    /auth/callback/:provider
+POST   /auth/callback/:provider
+POST   /auth/exchange
 POST   /auth/refresh
 POST   /auth/logout
 POST   /auth/logout-all
@@ -158,38 +273,23 @@ POST   /auth/tokens
 DELETE /auth/tokens/:id
 ```
 
-## First administrator and `yuncms init`
+## First Administrator
 
-The interactive init flow is wired to the reusable first-admin helper:
+`yuncms init`:
 
-1. configure/reuse `.env`;
-2. verify MySQL connectivity;
-3. bootstrap migrations;
-4. detect an existing administrator;
-5. when absent, prompt for admin email/password and create/reuse the Administrator role;
-6. create the first administrator as an already verified management-created account;
-7. reruns do not silently create a second initial administrator.
+1. configures or reuses the project's environment;
+2. verifies MySQL connectivity;
+3. bootstraps required migrations;
+4. checks whether an Administrator already exists;
+5. prompts for the first Administrator only when needed;
+6. creates that account as a verified management-created user;
+7. does not silently create another initial Administrator on reruns.
 
-## Tables
+See [Setup and CLI](setup-cli.md).
 
-Authentication uses:
+## Related guides
 
-- `yuncms_users`;
-- `yuncms_roles`;
-- `yuncms_sessions`;
-- `yuncms_api_tokens`;
-- `yuncms_auth_tokens`.
-
-`yuncms_auth_tokens` is introduced by migration `0004-auth-action-tokens`.
-
-## Deliberate follow-ups
-
-Not part of current single-process V1:
-
-- shared-store/cluster-wide auth rate limiting;
-- session-management UI/list endpoint;
-- MFA/2FA;
-- SSO/OIDC/SAML/LDAP;
-- public/self-registration flow.
-
-Real MySQL, SMTP and replay/rate-limit verification remains in `todo.md`.
+- [Configuration](configuration.md)
+- [Roles and permissions](permissions.md)
+- [REST API](rest-api.md)
+- [Security](security.md)
