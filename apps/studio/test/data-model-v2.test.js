@@ -10,8 +10,10 @@ const css = readFileSync(resolve(SRC, 'data-model-v2.css'), 'utf8');
 const interactionCss = readFileSync(resolve(SRC, 'data-model-v2-interactions.css'), 'utf8');
 const mainSource = readFileSync(resolve(SRC, 'main.jsx'), 'utf8');
 
-test('Data Model entry uses the collection workspace implementation', () => {
-  assert.match(entrySource, /DataModelV2Screen as DataModelScreen/);
+test('Data Model entry routes the compact home and collection workspace independently', () => {
+  assert.match(entrySource, /view === 'collections'/);
+  assert.match(entrySource, /return <DataModelHomeScreen/);
+  assert.match(entrySource, /return <DataModelV2Screen/);
   assert.match(screenSource, /data-model-v2-layout/);
   assert.match(screenSource, /data-model-collection-list/);
   assert.doesNotMatch(screenSource, /<Pagination/);

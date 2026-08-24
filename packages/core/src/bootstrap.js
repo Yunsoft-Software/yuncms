@@ -15,6 +15,7 @@ import { filesReadFiltersMigration } from './migrations/0012-files-read-filters.
 import { externalAuthFoundationMigration } from './migrations/0013-external-auth-foundation.js';
 import { aiSettingsMigration } from './migrations/0014-ai-settings.js';
 import { navigationGroupsMigration } from './migrations/0015-navigation-groups.js';
+import { navigationGroupCollapseMigration } from './migrations/0016-navigation-group-collapse.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -34,6 +35,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   externalAuthFoundationMigration,
   aiSettingsMigration,
   navigationGroupsMigration,
+  navigationGroupCollapseMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(

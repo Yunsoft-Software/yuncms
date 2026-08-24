@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { incrementSchemaVersion } from '../schema-version.js';
-import { withConnectionTransaction } from '../transaction.js';
+import { withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { assertSchemaManager } from './schema-access.js';
 
@@ -33,10 +33,19 @@ function normalizeSort(value, fallback = 0) {
   return sort;
 }
 
+function normalizeCollapse(value, fallback = 'open') {
+  if (value == null || value === '') return fallback;
+  const collapse = String(value).trim().toLowerCase();
+  if (!['open', 'closed', 'locked'].includes(collapse)) {
+    throw invalid('Navigation group collapse must be open, closed or locked');
+  }
+  return collapse;
+}
+
 export class NavigationGroupsService extends BaseService {
   async readMany() {
     const [rows] = await this.database.query(
-      `SELECT id, name, sort, created_at, updated_at
+      `SELECT id, name, sort, collapse, created_at, updated_at
        FROM yuncms_navigation_groups
        ORDER BY sort ASC, name ASC, id ASC`,
     );
@@ -45,7 +54,7 @@ export class NavigationGroupsService extends BaseService {
 
   async readOne(id) {
     const [rows] = await this.database.query(
-      `SELECT id, name, sort, created_at, updated_at
+      `SELECT id, name, sort, collapse, created_at, updated_at
        FROM yuncms_navigation_groups
        WHERE id = ?
        LIMIT 1`,
@@ -59,9 +68,10 @@ export class NavigationGroupsService extends BaseService {
     const id = randomUUID();
     const name = normalizeName(input.name);
     const sort = normalizeSort(input.sort, 0);
+    const collapse = normalizeCollapse(input.collapse);
     await this.database.query(
-      'INSERT INTO yuncms_navigation_groups (id, name, sort) VALUES (?, ?, ?)',
-      [id, name, sort],
+      'INSERT INTO yuncms_navigation_groups (id, name, sort, collapse) VALUES (?, ?, ?, ?)',
+      [id, name, sort, collapse],
     );
     return this.readOne(id);
   }
@@ -70,7 +80,7 @@ export class NavigationGroupsService extends BaseService {
     assertSchemaManager(this.accountability);
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw invalid('Navigation group patch must be an object');
     const keys = Object.keys(patch);
-    if (keys.length === 0 || keys.some((key) => !['name', 'sort'].includes(key))) {
+    if (keys.length === 0 || keys.some((key) => !['name', 'sort', 'collapse'].includes(key))) {
       throw invalid('Navigation group patch contains unsupported properties');
     }
     const assignments = [];
@@ -82,6 +92,10 @@ export class NavigationGroupsService extends BaseService {
     if (Object.hasOwn(patch, 'sort')) {
       assignments.push('sort = ?');
       params.push(normalizeSort(patch.sort));
+    }
+    if (Object.hasOwn(patch, 'collapse')) {
+      assignments.push('collapse = ?');
+      params.push(normalizeCollapse(patch.collapse));
     }
     params.push(String(id ?? ''));
     const [result] = await this.database.query(
@@ -95,7 +109,7 @@ export class NavigationGroupsService extends BaseService {
   async deleteOne(id) {
     assertSchemaManager(this.accountability);
     const groupId = String(id ?? '');
-    return withConnectionTransaction(this.database, async (connection) => {
+    return withTransaction(this.database, async (connection) => {
       const [existing] = await connection.query(
         'SELECT id FROM yuncms_navigation_groups WHERE id = ? LIMIT 1',
         [groupId],
@@ -115,4 +129,8 @@ export class NavigationGroupsService extends BaseService {
   }
 }
 
-export { normalizeName as normalizeNavigationGroupName, normalizeSort as normalizeNavigationGroupSort };
+export {
+  normalizeCollapse as normalizeNavigationGroupCollapse,
+  normalizeName as normalizeNavigationGroupName,
+  normalizeSort as normalizeNavigationGroupSort,
+};

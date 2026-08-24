@@ -34,11 +34,157 @@ export function buildNavigationModel(collections = [], groups = [], { includeHid
     .sort((a, b) => a.navigationSort - b.navigationSort || a.collection.localeCompare(b.collection));
   const grouped = sortNavigationGroups(groups).map((group) => ({
     ...group,
+    collapse: ['open', 'closed', 'locked'].includes(group.collapse) ? group.collapse : 'open',
     collections: normalized
       .filter((entry) => entry.navigationGroup === group.id)
       .sort((a, b) => a.navigationSort - b.navigationSort || a.collection.localeCompare(b.collection)),
   }));
-  return { roots, groups: grouped };
+  const nodes = [
+    ...roots.map((entry) => ({
+      type: 'collection',
+      id: entry.collection,
+      sort: entry.navigationSort,
+      entry,
+    })),
+    ...grouped.map((group) => ({
+      type: 'group',
+      id: group.id,
+      sort: Number(group.sort ?? 0),
+      group,
+    })),
+  ].sort((left, right) => (
+    left.sort - right.sort
+    || (left.type === right.type ? 0 : left.type === 'group' ? -1 : 1)
+    || String(left.type === 'group' ? left.group.name : left.entry.collection)
+      .localeCompare(String(right.type === 'group' ? right.group.name : right.entry.collection))
+  ));
+  return { roots, groups: grouped, nodes };
+}
+
+export function navigationPointerPosition({ top = 0, height = 0, clientY = 0, allowInside = false } = {}) {
+  const ratio = height > 0 ? (clientY - top) / height : 0.5;
+  if (allowInside && ratio >= 0.25 && ratio <= 0.75) return 'inside';
+  return ratio < 0.5 ? 'before' : 'after';
+}
+
+function insertRelative(list, value, target, position = 'before') {
+  const index = list.findIndex((entry) => entry.type === target?.type && entry.id === target?.id);
+  if (index < 0) return [...list, value];
+  const next = [...list];
+  next.splice(index + (position === 'after' ? 1 : 0), 0, value);
+  return next;
+}
+
+function changedCollectionPatch(entry, group, sort) {
+  const ui = collectionUi(entry);
+  if (ui.group === group && ui.sort === sort) return null;
+  return { collection: entry.collection, group, sort };
+}
+
+export function navigationDropPatches(collections = [], groups = [], source = {}, target = {}) {
+  const model = buildNavigationModel(collections, groups);
+  const sourceCollection = source.type === 'collection'
+    ? collections.find((entry) => !entry.system && entry.collection === source.id)
+    : null;
+  const sourceGroup = source.type === 'group'
+    ? model.groups.find((group) => group.id === source.id)
+    : null;
+  if (!sourceCollection && !sourceGroup) return { collections: [], groups: [] };
+  if (source.type === target.type && source.id === target.id) return { collections: [], groups: [] };
+
+  const sourceUi = sourceCollection ? collectionUi(sourceCollection) : null;
+  const members = new Map(model.groups.map((group) => [
+    group.id,
+    group.collections.filter((entry) => entry.collection !== sourceCollection?.collection),
+  ]));
+  const affectedGroups = new Set(sourceUi?.group ? [sourceUi.group] : []);
+  let roots = model.nodes.filter((node) => !(
+    node.type === source.type && node.id === source.id
+  ));
+
+  if (sourceCollection) {
+    const sourceNode = {
+      type: 'collection',
+      id: sourceCollection.collection,
+      sort: sourceUi.sort,
+      entry: sourceCollection,
+    };
+    const targetCollection = target.type === 'collection'
+      ? collections.find((entry) => !entry.system && entry.collection === target.id)
+      : null;
+    const targetGroup = targetCollection ? collectionUi(targetCollection).group : null;
+
+    if (target.type === 'group' && target.position === 'inside' && members.has(target.id)) {
+      members.get(target.id).push(sourceCollection);
+      affectedGroups.add(target.id);
+    } else if (targetCollection && targetGroup && members.has(targetGroup)) {
+      const groupMembers = members.get(targetGroup);
+      const targetIndex = groupMembers.findIndex((entry) => entry.collection === targetCollection.collection);
+      groupMembers.splice(targetIndex + (target.position === 'after' ? 1 : 0), 0, sourceCollection);
+      affectedGroups.add(targetGroup);
+    } else if (target.type === 'collection' || target.type === 'group') {
+      roots = insertRelative(roots, sourceNode, target, target.position);
+    } else {
+      roots.push(sourceNode);
+    }
+  } else {
+    const sourceNode = {
+      type: 'group',
+      id: sourceGroup.id,
+      sort: Number(sourceGroup.sort ?? 0),
+      group: sourceGroup,
+    };
+    if (target.type === 'collection' || target.type === 'group') {
+      roots = insertRelative(roots, sourceNode, target, target.position);
+    } else {
+      roots.push(sourceNode);
+    }
+  }
+
+  const collectionPatches = [];
+  const groupPatches = [];
+  roots.forEach((node, index) => {
+    const sort = (index + 1) * 10;
+    if (node.type === 'group') {
+      if (Number(node.group.sort ?? 0) !== sort) groupPatches.push({ id: node.id, sort });
+      return;
+    }
+    const patch = changedCollectionPatch(node.entry, null, sort);
+    if (patch) collectionPatches.push(patch);
+  });
+
+  for (const groupId of affectedGroups) {
+    const groupMembers = members.get(groupId) ?? [];
+    groupMembers.forEach((entry, index) => {
+      const patch = changedCollectionPatch(entry, groupId, (index + 1) * 10);
+      if (patch) collectionPatches.push(patch);
+    });
+  }
+
+  return {
+    collections: [...new Map(collectionPatches.map((patch) => [patch.collection, patch])).values()],
+    groups: groupPatches,
+  };
+}
+
+export function navigationAppendPatches(collections = [], groups = []) {
+  const model = buildNavigationModel(collections, groups);
+  const collectionPatches = [];
+  const groupPatches = [];
+  model.nodes.forEach((node, index) => {
+    const sort = (index + 1) * 10;
+    if (node.type === 'group') {
+      if (Number(node.group.sort ?? 0) !== sort) groupPatches.push({ id: node.id, sort });
+      return;
+    }
+    const patch = changedCollectionPatch(node.entry, null, sort);
+    if (patch) collectionPatches.push(patch);
+  });
+  return {
+    collections: collectionPatches,
+    groups: groupPatches,
+    sort: (model.nodes.length + 1) * 10,
+  };
 }
 
 function orderedGroupMembers(collections, groupId, sourceName = null) {

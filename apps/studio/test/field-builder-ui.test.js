@@ -77,7 +77,7 @@ test('field builder accepts a natural display name and maintains a separate gene
 });
 
 test('Data Model V2 uses the dedicated visual builder and defaults accountability fields on new collections', () => {
-  assert.match(dataModelEntrySource, /DataModelV2Screen as DataModelScreen/);
+  assert.match(dataModelEntrySource, /return <DataModelV2Screen/);
   assert.match(dataModelSource, /<FieldBuilder/);
   assert.match(dataModelSource, /systemFields: ACCOUNTABILITY_FIELDS\.map/);
   assert.match(dataModelSource, /systemFields: collectionForm\.systemFields/);

@@ -30,9 +30,11 @@ With the normal single-port setup, `AUTH_PUBLIC_URL` and `STUDIO_ORIGIN` default
 
 The primary Studio navigation is intentionally task-oriented:
 
-- `Content` contains non-system collections directly as nested menu items;
+- `Content` contains non-system collections in the same collection/folder order configured in Data Model;
 - `Library` contains Files;
 - `Settings` contains Data Model, Users and Roles & Permissions.
+
+Data Model folders only organize Studio navigation. They do not create database tables or alter collection relations. Root collections and folders share one ordering domain, and a folder can start open, start collapsed, or remain locked open.
 
 This avoids forcing users to choose a collection from a toolbar dropdown before every content task. If there are no user collections yet, the sidebar sends the administrator directly to Data Model.
 
@@ -70,7 +72,12 @@ Data Model is a settings-style collection builder with collection master/detail 
 
 It supports:
 
+- a compact, interleaved collection/folder tree matching the Content menu;
 - list/create/delete collections;
+- schema-less, one-level navigation folders with create/edit/delete controls;
+- native drag/drop ordering with distinct before, inside, and after targets;
+- folder start-open, start-collapsed, and always-open behavior;
+- inline Content-menu visibility and singleton controls;
 - focused `New collection` creation instead of an always-visible form;
 - project/system collection separation;
 - Fields and Relations tabs;

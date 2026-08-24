@@ -92,6 +92,33 @@ function ContentCollectionButton({ entry, active, onClick }) {
   );
 }
 
+function ContentNavigationGroup({ group, open, activeCollection, onToggle }) {
+  return (
+    <div className="content-focus-group">
+      <button
+        className="content-focus-group-trigger"
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span className={`content-focus-group-chevron ${open ? 'open' : ''}`}>
+          <SidebarIcon name="chevron" size={12} />
+        </span>
+        <CollectionIcon name="folder" size={15} />
+        <strong>{group.name}</strong>
+      </button>
+      {open && group.collections.map((entry) => (
+        <ContentCollectionButton
+          key={entry.collection}
+          entry={entry}
+          active={activeCollection === entry.collection}
+          onClick={() => navigateStudio(studioPath.content(entry.collection))}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function App() {
   const { t } = useI18n();
   const [session, setSession] = useState(() => readSession());
@@ -99,6 +126,7 @@ export function App() {
   const [route, setRoute] = useState(() => readStudioRoute());
   const [contentCollections, setContentCollections] = useState([]);
   const [navigationGroupRows, setNavigationGroupRows] = useState([]);
+  const [contentGroupsOpen, setContentGroupsOpen] = useState({});
   const [healthState, setHealthState] = useState('checking');
   const [loggingOut, setLoggingOut] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -196,6 +224,12 @@ export function App() {
     () => buildNavigationModel(contentCollections, navigationGroupRows, { includeHidden: false }),
     [contentCollections, navigationGroupRows],
   );
+  useEffect(() => {
+    setContentGroupsOpen(Object.fromEntries(navigationGroupRows.map((group) => [
+      group.id,
+      group.collapse !== 'closed',
+    ])));
+  }, [navigationGroupRows]);
   const contentTitle = activeContentCollection
     ? displaySchemaName(activeContentCollection, 'collection')
     : contentCollection;
@@ -314,27 +348,24 @@ export function App() {
                 <span className="nav-item-label">{t('navigation.backToMain')}</span>
               </button>
 
-              {contentNavigation.roots.map((entry) => (
-                <ContentCollectionButton
-                  key={entry.collection}
-                  entry={entry}
-                  active={section === 'content' && contentCollection === entry.collection}
-                  onClick={() => navigateStudio(studioPath.content(entry.collection))}
+              {contentNavigation.nodes.map((node) => node.type === 'group' ? (
+                <ContentNavigationGroup
+                  key={`group:${node.id}`}
+                  group={node.group}
+                  open={node.group.collapse === 'locked' || Boolean(contentGroupsOpen[node.id])}
+                  activeCollection={section === 'content' ? contentCollection : ''}
+                  onToggle={() => {
+                    if (node.group.collapse === 'locked') return;
+                    setContentGroupsOpen((current) => ({ ...current, [node.id]: !current[node.id] }));
+                  }}
                 />
-              ))}
-
-              {contentNavigation.groups.map((group) => (
-                <div className="content-focus-group" key={group.id}>
-                  <div className="content-focus-group-title">{group.name}</div>
-                  {group.collections.map((entry) => (
-                    <ContentCollectionButton
-                      key={entry.collection}
-                      entry={entry}
-                      active={section === 'content' && contentCollection === entry.collection}
-                      onClick={() => navigateStudio(studioPath.content(entry.collection))}
-                    />
-                  ))}
-                </div>
+              ) : (
+                <ContentCollectionButton
+                  key={`collection:${node.id}`}
+                  entry={node.entry}
+                  active={section === 'content' && contentCollection === node.entry.collection}
+                  onClick={() => navigateStudio(studioPath.content(node.entry.collection))}
+                />
               ))}
 
               {contentCollections.length === 0 && (

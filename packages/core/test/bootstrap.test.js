@@ -258,7 +258,7 @@ test('Files read-filter migration remains required', () => {
   assert.match(source, /filter-read/);
 });
 
-test('external auth foundation migration is the latest compatibility gate', () => {
+test('external auth foundation migration remains a required compatibility gate', () => {
   const migration = CORE_MIGRATIONS.find(({ id }) => id === '0013-external-auth-foundation');
   assert.ok(migration);
   assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0013-external-auth-foundation'));
@@ -267,7 +267,22 @@ test('external auth foundation migration is the latest compatibility gate', () =
   assert.match(source, /UNIQUE KEY uq_yuncms_auth_identity_provider_subject \(provider, subject\)/);
   assert.match(source, /CREATE TABLE IF NOT EXISTS yuncms_auth_transactions/);
   assert.match(source, /UNIQUE KEY uq_yuncms_auth_transaction_state \(state_hash\)/);
-  assert.equal(CORE_MIGRATIONS.at(-1).id, '0013-external-auth-foundation');
+});
+
+test('AI settings and navigation groups extend the required compatibility gate', () => {
+  const aiSettings = CORE_MIGRATIONS.find(({ id }) => id === '0014-ai-settings');
+  const navigationGroups = CORE_MIGRATIONS.find(({ id }) => id === '0015-navigation-groups');
+  const navigationGroupCollapse = CORE_MIGRATIONS.find(({ id }) => id === '0016-navigation-group-collapse');
+  assert.ok(aiSettings);
+  assert.ok(navigationGroups);
+  assert.ok(navigationGroupCollapse);
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0014-ai-settings'));
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0015-navigation-groups'));
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0016-navigation-group-collapse'));
+  assert.match(aiSettings.statements.join('\n'), /CREATE TABLE yuncms_ai_settings/);
+  assert.match(navigationGroups.statements.join('\n'), /CREATE TABLE yuncms_navigation_groups/);
+  assert.match(navigationGroupCollapse.statements.join('\n'), /ADD COLUMN collapse VARCHAR\(16\)/);
+  assert.equal(CORE_MIGRATIONS.at(-1).id, '0016-navigation-group-collapse');
 });
 
 test('advisory lock uses one connection and always releases it', async () => {
