@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { incrementSchemaVersion } from '../schema-version.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { assertSchemaManager } from './schema-access.js';
@@ -100,7 +101,7 @@ export class NavigationGroupsService extends BaseService {
         [groupId],
       );
       if (!existing[0]) throw notFound(groupId);
-      await connection.query(
+      const [cleanup] = await connection.query(
         `UPDATE yuncms_collections
          SET metadata = JSON_REMOVE(metadata, '$.group')
          WHERE metadata IS NOT NULL
@@ -108,6 +109,7 @@ export class NavigationGroupsService extends BaseService {
         [groupId],
       );
       await connection.query('DELETE FROM yuncms_navigation_groups WHERE id = ?', [groupId]);
+      if (Number(cleanup.affectedRows ?? 0) > 0) await incrementSchemaVersion(connection);
       return { deleted: true, id: groupId };
     });
   }
