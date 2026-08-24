@@ -32,6 +32,7 @@ const LEGACY_BACKUP_FORMAT_VERSION = 1;
 export const BACKUP_FORMAT_VERSION = 2;
 const SUPPORTED_BACKUP_FORMATS = new Set([LEGACY_BACKUP_FORMAT_VERSION, BACKUP_FORMAT_VERSION]);
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i;
+const AI_SETTINGS_KEY_RELATIVE_PATH = join('.yuncms', 'ai-settings.key');
 
 async function exists(path) {
   try {
@@ -115,6 +116,9 @@ function validateBackupManifest(manifest, manifestPath) {
   for (const key of ['env', 'packageJson', 'packageLock', 'extensions', 'localFiles']) {
     assertManifestBoolean(manifest.project[key], `project.${key}`, manifestPath);
   }
+  if (manifest.project.aiSettingsKey !== undefined) {
+    assertManifestBoolean(manifest.project.aiSettingsKey, 'project.aiSettingsKey', manifestPath);
+  }
   assertManifestString(manifest.project.localFilesRoot, 'project.localFilesRoot', manifestPath);
 
   if (!isObject(manifest.s3)) throw manifestError(manifestPath, 's3 metadata is required');
@@ -133,16 +137,21 @@ function validateBackupManifest(manifest, manifestPath) {
     if (!isObject(manifest.integrity.project)) {
       throw manifestError(manifestPath, 'integrity.project is required');
     }
-    for (const [key, present] of [
-      ['env', manifest.project.env],
-      ['packageJson', manifest.project.packageJson],
-      ['packageLock', manifest.project.packageLock],
-      ['extensions', manifest.project.extensions],
-      ['localFiles', manifest.project.localFiles],
+    for (const [key, present, optionalLegacy] of [
+      ['env', manifest.project.env, false],
+      ['packageJson', manifest.project.packageJson, false],
+      ['packageLock', manifest.project.packageLock, false],
+      ['extensions', manifest.project.extensions, false],
+      ['localFiles', manifest.project.localFiles, false],
+      ['aiSettingsKey', manifest.project.aiSettingsKey === true, manifest.project.aiSettingsKey === undefined],
     ]) {
       const digest = manifest.integrity.project[key];
       if (present) assertDigest(digest, `integrity.project.${key}`, manifestPath);
-      else if (digest !== null) throw manifestError(manifestPath, `integrity.project.${key} must be null when the asset is absent`);
+      else if (!optionalLegacy && digest !== null) {
+        throw manifestError(manifestPath, `integrity.project.${key} must be null when the asset is absent`);
+      } else if (optionalLegacy && digest !== undefined && digest !== null) {
+        throw manifestError(manifestPath, `integrity.project.${key} must be null when the legacy manifest has no asset flag`);
+      }
     }
   }
 
@@ -208,6 +217,7 @@ async function assertExpectedBackupAssets(backupPath, manifest) {
     [manifest.project.env, join(backupPath, 'project', '.env'), 'file'],
     [manifest.project.packageJson, join(backupPath, 'project', 'package.json'), 'file'],
     [manifest.project.packageLock, join(backupPath, 'project', 'package-lock.json'), 'file'],
+    [manifest.project.aiSettingsKey === true, join(backupPath, 'project', 'ai-settings.key'), 'file'],
     [manifest.project.extensions, join(backupPath, 'extensions'), 'directory'],
     [manifest.project.localFiles, join(backupPath, 'files'), 'directory'],
   ];
@@ -227,6 +237,7 @@ async function calculateBackupIntegrity(destination, presence) {
       env: presence.env ? await hashFile(join(destination, 'project', '.env')) : null,
       packageJson: presence.packageJson ? await hashFile(join(destination, 'project', 'package.json')) : null,
       packageLock: presence.packageLock ? await hashFile(join(destination, 'project', 'package-lock.json')) : null,
+      aiSettingsKey: presence.aiSettingsKey ? await hashFile(join(destination, 'project', 'ai-settings.key')) : null,
       extensions: presence.extensions ? await hashDirectory(join(destination, 'extensions')) : null,
       localFiles: presence.localFiles ? await hashDirectory(join(destination, 'files')) : null,
     },
@@ -240,6 +251,7 @@ async function verifyBackupIntegrity(backupPath, manifest) {
     ['env', ['project', '.env'], 'file'],
     ['packageJson', ['project', 'package.json'], 'file'],
     ['packageLock', ['project', 'package-lock.json'], 'file'],
+    ['aiSettingsKey', ['project', 'ai-settings.key'], 'file'],
     ['extensions', ['extensions'], 'directory'],
     ['localFiles', ['files'], 'directory'],
   ]) {
@@ -308,6 +320,7 @@ async function assertRestoreTargets(cwd, localFilesPath, extensionsPath, allowDi
   await assertRestoreTarget(extensionsPath, 'directory');
   await assertRestoreTarget(resolve(cwd, 'package.json'), 'file');
   await assertRestoreTarget(resolve(cwd, 'package-lock.json'), 'file');
+  await assertRestoreTarget(resolve(cwd, AI_SETTINGS_KEY_RELATIVE_PATH), 'file');
   if (!allowDifferentDatabaseTarget) await assertRestoreTarget(resolve(cwd, '.env'), 'file');
 }
 
@@ -393,6 +406,7 @@ export async function createProjectBackup({
       env: await copyOptionalFile(resolve(cwd, '.env'), join(destination, 'project', '.env')),
       packageJson: await copyOptionalFile(resolve(cwd, 'package.json'), join(destination, 'project', 'package.json')),
       packageLock: await copyOptionalFile(resolve(cwd, 'package-lock.json'), join(destination, 'project', 'package-lock.json')),
+      aiSettingsKey: await copyOptionalFile(resolve(cwd, AI_SETTINGS_KEY_RELATIVE_PATH), join(destination, 'project', 'ai-settings.key')),
       extensions: await copyOptionalDirectory(extensionsPath, join(destination, 'extensions')),
       localFiles: await copyOptionalDirectory(localFilesPath, join(destination, 'files')),
     };
@@ -462,7 +476,7 @@ async function restoreOptionalFile({ backupPath, existed, sourceName, target }) 
     await rm(target, { force: true });
     return;
   }
-  await mkdir(dirname(target), { recursive: true });
+  await mkdir(dirname(target), { recursive: true, mode: 0o700 });
   await copyFile(source, target);
 }
 
@@ -548,6 +562,16 @@ export async function restoreProjectBackup({
     sourceName: 'package-lock.json',
     target: resolve(cwd, 'package-lock.json'),
   });
+  if (manifest.project.aiSettingsKey !== undefined) {
+    await restoreOptionalFile({
+      backupPath: resolvedBackupPath,
+      existed: manifest.project.aiSettingsKey,
+      sourceName: 'ai-settings.key',
+      target: resolve(cwd, AI_SETTINGS_KEY_RELATIVE_PATH),
+    });
+  } else {
+    output.warn?.('Backup predates AI settings key snapshots; preserving the current .yuncms/ai-settings.key if present.');
+  }
   if (allowDifferentDatabaseTarget) {
     output.warn?.('Preserving the current .env because restore targets a different database; the backup .env remains available inside the backup directory.');
   } else {
@@ -562,3 +586,5 @@ export async function restoreProjectBackup({
   output.log?.(`Restore completed: ${resolvedBackupPath}`);
   return { backupPath: resolvedBackupPath, manifest };
 }
+
+export { AI_SETTINGS_KEY_RELATIVE_PATH, validateBackupManifest };
