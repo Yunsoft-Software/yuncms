@@ -16,6 +16,7 @@ import { createItemsRouter } from './routes/items.js';
 import { createPermissionsRouter } from './routes/permissions.js';
 import { createRolesRouter } from './routes/roles.js';
 import { createSchemaRouter } from './routes/schema.js';
+import { createStudioNavigationRouter } from './routes/studio-navigation.js';
 import { createStudioSettingsRouter } from './routes/studio-settings.js';
 import { createSystemSchemaRouter } from './routes/system-schema.js';
 import { createUsersRouter } from './routes/users.js';
@@ -190,6 +191,7 @@ export function createApp({
 
   if (aiRouter) app.use('/ai', aiRouter);
   if (mcpRouter) app.use('/mcp', mcpRouter);
+  app.use('/studio-navigation', createStudioNavigationRouter());
   app.use('/studio-settings', createStudioSettingsRouter());
   app.use('/auth', createAuthRouter({ mailer, config, logger, rateLimitStore, externalAuthRegistry }));
   app.use('/items', createItemsRouter());
