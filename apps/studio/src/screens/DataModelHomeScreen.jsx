@@ -37,6 +37,8 @@ export function DataModelHomeScreen({ onNavigate, onCollectionsChanged }) {
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [savingGroup, setSavingGroup] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  const [editingGroupName, setEditingGroupName] = useState('');
   const [dragging, setDragging] = useState(null);
 
   async function load() {
@@ -156,6 +158,30 @@ export function DataModelHomeScreen({ onNavigate, onCollectionsChanged }) {
       await refreshNavigation();
     } catch (requestError) {
       setError(requestError.message || t('navigation.groupCreateFailed'));
+    } finally {
+      setSavingGroup(false);
+    }
+  }
+
+  function beginRename(group) {
+    setEditingGroupId(group.id);
+    setEditingGroupName(group.name);
+    setError('');
+  }
+
+  async function renameGroup(event, group) {
+    event.preventDefault();
+    const name = editingGroupName.trim();
+    if (!name) return;
+    setSavingGroup(true);
+    try {
+      await updateNavigationGroup(group.id, { name });
+      setEditingGroupId(null);
+      setEditingGroupName('');
+      flash(t('navigation.groupRenamed'));
+      await refreshNavigation();
+    } catch (requestError) {
+      setError(requestError.message || t('navigation.groupRenameFailed'));
     } finally {
       setSavingGroup(false);
     }
@@ -308,12 +334,21 @@ export function DataModelHomeScreen({ onNavigate, onCollectionsChanged }) {
                 }}
               >
                 <div className="navigation-group-row">
-                  <span className="navigation-group-title">
-                    <SidebarIcon name="content" size={17} />
-                    <strong>{group.name}</strong>
-                    <small>{t('navigation.menuOnlyGroup')}</small>
-                  </span>
+                  {editingGroupId === group.id ? (
+                    <form className="navigation-group-rename" onSubmit={(event) => renameGroup(event, group)}>
+                      <input autoFocus maxLength="100" value={editingGroupName} onChange={(event) => setEditingGroupName(event.target.value)} />
+                      <button className="text-button" type="submit" disabled={savingGroup || !editingGroupName.trim()}>{t('navigation.saveGroupName')}</button>
+                      <button className="text-button" type="button" onClick={() => { setEditingGroupId(null); setEditingGroupName(''); }}>{t('navigation.cancel')}</button>
+                    </form>
+                  ) : (
+                    <span className="navigation-group-title">
+                      <SidebarIcon name="content" size={17} />
+                      <strong>{group.name}</strong>
+                      <small>{t('navigation.menuOnlyGroup')}</small>
+                    </span>
+                  )}
                   <span className="navigation-row-actions">
+                    <button className="navigation-icon-button" type="button" title={t('navigation.renameGroup')} onClick={() => beginRename(group)}>✎</button>
                     <button className="navigation-icon-button danger" type="button" title={t('navigation.deleteGroup')} onClick={() => removeGroup(group)}>×</button>
                     <button
                       className="navigation-drag-handle"
