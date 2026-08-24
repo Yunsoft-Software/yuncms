@@ -20,8 +20,9 @@ import {
   SmtpMailer,
 } from '@yunsoft/yuncms-core';
 import { createApp } from './app.js';
-import { loadAiConfig } from './ai/config.js';
 import { AiAssistantService } from './ai/service.js';
+import { loadOrCreateAiSettingsKey } from './ai/secret-key.js';
+import { AiSettingsStore } from './ai/settings-store.js';
 import { INTERNAL_AUDIT_EVENTS } from './audit-events.js';
 import { loadExternalAuthConfig } from './external-auth/config.js';
 import { ExternalAuthProviderRegistry } from './external-auth/providers.js';
@@ -32,7 +33,6 @@ import { createAiRouter } from './routes/ai.js';
 loadEnvFileIfPresent();
 await assertMaintenanceStartupAllowed({ cwd: process.cwd(), env: process.env });
 const config = loadConfig();
-const aiConfig = loadAiConfig(process.env);
 const externalAuthConfig = loadExternalAuthConfig(process.env);
 const logger = createJsonLogger({ level: config.logging.level });
 const pool = createDatabasePool(config.database);
@@ -107,6 +107,10 @@ function registerInternalAudit({ emitter, services }) {
 
 async function start() {
   await assertDatabaseCompatible(pool);
+  const aiKey = await loadOrCreateAiSettingsKey();
+  const aiSettingsStore = new AiSettingsStore({ database: pool, key: aiKey.key });
+  if (aiKey.created) logger.info('YunCMS AI settings encryption key created');
+
   if (redisClient) {
     try {
       await redisClient.connect();
@@ -128,8 +132,8 @@ async function start() {
     database: pool,
     logger,
   });
-  const aiAssistant = new AiAssistantService({ config: aiConfig, logger });
-  const aiRouter = createAiRouter({ assistant: aiAssistant });
+  const aiAssistant = new AiAssistantService({ settingsStore: aiSettingsStore, logger });
+  const aiRouter = createAiRouter({ assistant: aiAssistant, settingsStore: aiSettingsStore });
   const mcpRouter = createMcpRouter({ config, logger });
   mailer?.setEmitter(emitter);
   registerInternalAudit({ emitter, services });
