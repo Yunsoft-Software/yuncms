@@ -28,10 +28,14 @@ test('Studio AI client uses built-in chat and administrator settings routes', ()
   assert.match(apiSource, /'\/ai\/settings'/);
   assert.match(apiSource, /export async function aiChat/);
   assert.match(apiSource, /allow_writes: allowWrites/);
+  assert.match(apiSource, /allow_deletes: allowWrites && allowDeletes/);
   assert.match(screenSource, /<AiSettingsPanel/);
   assert.match(screenSource, /requestError\?\.status === 403/);
   assert.match(screenSource, /status\?\.writes_available/);
-  assert.match(screenSource, /aiChat\(nextHistory, \{ locale, allowWrites \}\)/);
+  assert.match(screenSource, /aiChat\(nextHistory, \{ locale, \.\.\.aiAccessFlags\(accessMode\) \}\)/);
+  assert.match(screenSource, /AI_ACCESS_MODES\.READ/);
+  assert.match(screenSource, /AI_ACCESS_MODES\.WRITE/);
+  assert.match(screenSource, /AI_ACCESS_MODES\.FULL/);
 });
 
 test('AI settings form never pre-fills or renders the saved API key', () => {

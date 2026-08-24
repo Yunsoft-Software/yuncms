@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { aiChat, aiSettings, aiStatus } from '../api.js';
+import { AI_ACCESS_MODES, aiAccessFlags } from '../ai-access.js';
 import { trimConversationHistory } from '../ai-history.js';
 import { AiSettingsPanel } from '../components/AiSettingsPanel.jsx';
 import { useI18n } from '../i18n.js';
@@ -37,7 +38,7 @@ export function AiScreen() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [allowWrites, setAllowWrites] = useState(false);
+  const [accessMode, setAccessMode] = useState(AI_ACCESS_MODES.READ);
   const endRef = useRef(null);
 
   async function refreshStatus() {
@@ -97,7 +98,7 @@ export function AiScreen() {
 
   async function handleSettingsSaved() {
     await Promise.all([refreshStatus(), refreshAdminSettings()]);
-    setAllowWrites(false);
+    setAccessMode(AI_ACCESS_MODES.READ);
   }
 
   async function sendMessage(value = draft) {
@@ -116,7 +117,7 @@ export function AiScreen() {
     setSending(true);
 
     try {
-      const result = await aiChat(nextHistory, { locale, allowWrites });
+      const result = await aiChat(nextHistory, { locale, ...aiAccessFlags(accessMode) });
       setMessages([
         ...nextMessages,
         {
@@ -143,7 +144,7 @@ export function AiScreen() {
     setMessages([]);
     setDraft('');
     setError('');
-    setAllowWrites(false);
+    setAccessMode(AI_ACCESS_MODES.READ);
   }
 
   return (
@@ -262,18 +263,31 @@ export function AiScreen() {
         <div className="ai-composer-shell">
           {error && <div className="error-banner ai-banner" role="alert">{error}</div>}
           {status?.writes_available && (
-            <label className="ai-write-toggle">
-              <input
-                type="checkbox"
-                checked={allowWrites}
-                disabled={sending || !ready}
-                onChange={(event) => setAllowWrites(event.target.checked)}
-              />
-              <span>
-                <strong>{t('ai.allowChanges')}</strong>
-                <small>{t('ai.allowChangesHint')}</small>
-              </span>
-            </label>
+            <fieldset className="ai-access-modes" disabled={sending || !ready}>
+              <legend>{t('ai.accessMode')}</legend>
+              <div className="ai-access-options">
+                {[
+                  [AI_ACCESS_MODES.READ, 'ai.accessRead', 'ai.accessReadHint'],
+                  [AI_ACCESS_MODES.WRITE, 'ai.accessWrite', 'ai.accessWriteHint'],
+                  [AI_ACCESS_MODES.FULL, 'ai.accessFull', 'ai.accessFullHint'],
+                ].map(([mode, labelKey, hintKey]) => (
+                  <label className={`ai-access-option ${accessMode === mode ? 'selected' : ''}`} key={mode}>
+                    <input
+                      type="radio"
+                      name="ai-access-mode"
+                      value={mode}
+                      checked={accessMode === mode}
+                      onChange={() => setAccessMode(mode)}
+                    />
+                    <span>
+                      <strong>{t(labelKey)}</strong>
+                      <small>{t(hintKey)}</small>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <small className="ai-access-boundary">{t('ai.accessBoundary')}</small>
+            </fieldset>
           )}
           <div className="ai-composer">
             <textarea

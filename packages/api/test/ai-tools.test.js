@@ -24,21 +24,37 @@ function fakeRequest(ItemsService = class {}) {
   };
 }
 
-test('AI assistant publishes only read tools unless writes are explicitly enabled', () => {
+test('AI assistant publishes read, write and delete tools only for the selected access mode', () => {
   const readOnly = aiToolDefinitions({ writesEnabled: false, maxItems: 25 });
   const writable = aiToolDefinitions({ writesEnabled: true, maxItems: 25 });
+  const full = aiToolDefinitions({ writesEnabled: true, deletesEnabled: true, maxItems: 25 });
   assert.deepEqual(readOnly.map((entry) => entry.function.name), [
     'schema_list_collections',
     'schema_describe_collection',
     'items_read_many',
     'items_read_one',
   ]);
-  assert.deepEqual(writable.slice(-3).map((entry) => entry.function.name), [
+  assert.deepEqual(writable.slice(-2).map((entry) => entry.function.name), [
+    'items_create',
+    'items_update',
+  ]);
+  assert.equal(writable.some((entry) => entry.function.name === 'items_delete'), false);
+  assert.deepEqual(full.slice(-3).map((entry) => entry.function.name), [
     'items_create',
     'items_update',
     'items_delete',
   ]);
   assert.equal(readOnly[2].function.parameters.properties.limit.maximum, 25);
+});
+
+test('AI delete tools require the separate full-access gate', async () => {
+  await assert.rejects(
+    () => executeAiTool(fakeRequest(), 'items_delete', {
+      collection: 'articles',
+      id: 'article-1',
+    }, { writesEnabled: true, deletesEnabled: false }),
+    (error) => error.code === 'AI_TOOL_FORBIDDEN',
+  );
 });
 
 test('AI write tools are blocked server-side when write mode is disabled', async () => {
@@ -69,6 +85,26 @@ test('AI write tools preserve the authenticated request accountability', async (
   assert.equal(constructed.collection, 'articles');
   assert.equal(constructed.options.accountability, req.accountability);
   assert.deepEqual(result, { id: 'item-1', title: 'Hello' });
+});
+
+test('AI full access preserves accountability while executing a delete', async () => {
+  let constructed = null;
+  class ItemsService {
+    constructor(collection, options) {
+      constructed = { collection, options };
+    }
+    async deleteOne(id) {
+      return id;
+    }
+  }
+  const req = fakeRequest(ItemsService);
+  const result = await executeAiTool(req, 'items_delete', {
+    collection: 'articles',
+    id: 'article-1',
+  }, { writesEnabled: true, deletesEnabled: true });
+  assert.equal(constructed.collection, 'articles');
+  assert.equal(constructed.options.accountability, req.accountability);
+  assert.deepEqual(result, { deleted: 'article-1' });
 });
 
 test('AI tool argument validation rejects model-generated unknown properties', async () => {

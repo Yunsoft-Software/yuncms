@@ -108,6 +108,7 @@ test('AI assistant sends a protected system prompt and returns a normal chat ans
   });
   assert.equal(result.message, 'Doğruladım.');
   assert.equal(result.writes_enabled, false);
+  assert.equal(result.deletes_enabled, false);
   assert.match(providerBody.messages[0].content, /embedded inside YunCMS Studio/);
   assert.match(providerBody.messages[0].content, /current account does not have that access/);
   assert.match(providerBody.messages[0].content, /untrusted data/);
@@ -161,13 +162,71 @@ test('AI write tool loop requires server capability and per-request write consen
     allowWrites: true,
   });
   assert.equal(result.writes_enabled, true);
+  assert.equal(result.deletes_enabled, false);
   assert.equal(result.operations.length, 1);
   assert.deepEqual(result.operations[0], { operation: 'items_create', collection: 'articles', success: true });
   assert.equal(constructed.collection, 'articles');
   assert.equal(constructed.options.accountability.user, 'user-1');
   assert.equal(providerBodies[0].tools.some((tool) => tool.function.name === 'items_create'), true);
+  assert.equal(providerBodies[0].tools.some((tool) => tool.function.name === 'items_delete'), false);
+  assert.match(providerBodies[0].messages[0].content, /Delete tools are not available/);
   assert.equal(providerBodies[1].messages.at(-1).role, 'tool');
   assert.match(providerBodies[1].messages.at(-1).content, /created-1/);
+});
+
+test('AI full mode advertises and executes delete while preserving request accountability', async () => {
+  const providerBodies = [];
+  let providerCall = 0;
+  let constructed = null;
+  class ItemsService {
+    constructor(collection, options) {
+      constructed = { collection, options };
+    }
+    async deleteOne(id) {
+      return id;
+    }
+  }
+  const service = new AiAssistantService({
+    config: config({ writesEnabled: true }),
+    fetchImpl: async (_url, options) => {
+      providerBodies.push(JSON.parse(options.body));
+      providerCall += 1;
+      if (providerCall === 1) {
+        return okResponse({
+          choices: [{
+            message: {
+              role: 'assistant',
+              content: null,
+              tool_calls: [{
+                id: 'call-delete-1',
+                type: 'function',
+                function: {
+                  name: 'items_delete',
+                  arguments: JSON.stringify({ collection: 'articles', id: 'article-1' }),
+                },
+              }],
+            },
+          }],
+        });
+      }
+      return okResponse({ choices: [{ message: { role: 'assistant', content: 'Kaydı sildim.' } }] });
+    },
+  });
+
+  const result = await service.chat(request(ItemsService), {
+    messages: [{ role: 'user', content: 'articles içindeki article-1 kaydını sil' }],
+    locale: 'tr',
+    allowWrites: true,
+    allowDeletes: true,
+  });
+  assert.equal(result.writes_enabled, true);
+  assert.equal(result.deletes_enabled, true);
+  assert.deepEqual(result.operations, [{ operation: 'items_delete', collection: 'articles', success: true }]);
+  assert.equal(constructed.collection, 'articles');
+  assert.equal(constructed.options.accountability.user, 'user-1');
+  assert.equal(providerBodies[0].tools.some((tool) => tool.function.name === 'items_delete'), true);
+  assert.match(providerBodies[0].messages[0].content, /without a separate per-operation approval step/);
+  assert.match(providerBodies[1].messages.at(-1).content, /article-1/);
 });
 
 test('AI does not advertise writes when the user has not enabled write mode for the request', async () => {

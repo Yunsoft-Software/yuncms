@@ -212,13 +212,18 @@ export async function saveAiSettings(patch) {
   return body?.data ?? null;
 }
 
-export async function aiChat(messages, { locale = 'tr', allowWrites = false } = {}) {
+export async function aiChat(messages, {
+  locale = 'tr',
+  allowWrites = false,
+  allowDeletes = false,
+} = {}) {
   const body = await apiRequest('/ai/chat', {
     method: 'POST',
     body: {
       messages,
       locale,
       allow_writes: allowWrites,
+      allow_deletes: allowWrites && allowDeletes,
     },
   });
   return body?.data ?? null;

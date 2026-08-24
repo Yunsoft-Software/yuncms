@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { requireAdministrator, requireAuthenticated } from '../src/routes/ai.js';
+import { aiRequestAccess, requireAdministrator, requireAuthenticated } from '../src/routes/ai.js';
 
 test('AI routes reject Public accountability', () => {
   assert.throws(
@@ -36,4 +36,14 @@ test('AI settings routes require Administrator or system accountability', () => 
     authMethod: 'session',
     accountability: { user: 'admin-1', role: 'admin-role', admin: true, system: false },
   }));
+});
+
+test('AI chat request access requires writes before delete can be enabled', () => {
+  assert.deepEqual(aiRequestAccess({}), { allowWrites: false, allowDeletes: false });
+  assert.deepEqual(aiRequestAccess({ allow_deletes: true }), { allowWrites: false, allowDeletes: false });
+  assert.deepEqual(aiRequestAccess({ allow_writes: true }), { allowWrites: true, allowDeletes: false });
+  assert.deepEqual(aiRequestAccess({ allow_writes: true, allow_deletes: true }), {
+    allowWrites: true,
+    allowDeletes: true,
+  });
 });

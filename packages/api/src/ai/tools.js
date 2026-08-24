@@ -164,8 +164,8 @@ function readToolDefinitions(maxItems) {
   ];
 }
 
-function writeToolDefinitions() {
-  return [
+function writeToolDefinitions({ deletesEnabled = false } = {}) {
+  const tools = [
     toolDefinition(
       'items_create',
       'Create one YunCMS item. Use only when the user clearly asks to create data. Field permissions, validation, hooks and auditing apply.',
@@ -188,7 +188,8 @@ function writeToolDefinitions() {
         required: ['collection', 'id', 'data'],
       },
     ),
-    toolDefinition(
+  ];
+  if (deletesEnabled) tools.push(toolDefinition(
       'items_delete',
       'Delete one YunCMS item by id. Use only when the user explicitly asks to delete that item. Normal delete permissions and hooks apply.',
       {
@@ -199,18 +200,23 @@ function writeToolDefinitions() {
         },
         required: ['collection', 'id'],
       },
-    ),
-  ];
+    ));
+  return tools;
 }
 
-export function aiToolDefinitions({ writesEnabled = false, maxItems = 100 } = {}) {
+export function aiToolDefinitions({
+  writesEnabled = false,
+  deletesEnabled = false,
+  maxItems = 100,
+} = {}) {
   return writesEnabled
-    ? [...readToolDefinitions(maxItems), ...writeToolDefinitions()]
+    ? [...readToolDefinitions(maxItems), ...writeToolDefinitions({ deletesEnabled })]
     : readToolDefinitions(maxItems);
 }
 
 export async function executeAiTool(req, name, args, {
   writesEnabled = false,
+  deletesEnabled = false,
   maxItems = 100,
 } = {}) {
   if (name === 'schema_list_collections') {
@@ -255,6 +261,7 @@ export async function executeAiTool(req, name, args, {
     return itemService(req, input.collection).updateOne(input.id, input.data);
   }
   if (name === 'items_delete') {
+    if (!deletesEnabled) throw toolError('AI_TOOL_FORBIDDEN', 'Assistant delete tools are disabled');
     const input = parseArguments(deleteSchema, args);
     return { deleted: await itemService(req, input.collection).deleteOne(input.id) };
   }

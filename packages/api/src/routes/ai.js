@@ -18,6 +18,14 @@ function requireAdministrator(req) {
   throw error;
 }
 
+export function aiRequestAccess(body = {}) {
+  const allowWrites = body?.allow_writes === true;
+  return {
+    allowWrites,
+    allowDeletes: allowWrites && body?.allow_deletes === true,
+  };
+}
+
 export function createAiRouter({ assistant, settingsStore } = {}) {
   if (!assistant) throw new Error('AI assistant service is required');
   if (!settingsStore) throw new Error('AI settings store is required');
@@ -54,10 +62,11 @@ export function createAiRouter({ assistant, settingsStore } = {}) {
   router.post('/chat', async (req, res, next) => {
     try {
       requireAuthenticated(req);
+      const access = aiRequestAccess(req.body);
       const result = await assistant.chat(req, {
         messages: req.body?.messages,
         locale: req.body?.locale,
-        allowWrites: req.body?.allow_writes === true,
+        ...access,
       });
       return res.json({ data: result, request_id: req.id });
     } catch (error) {
