@@ -8,10 +8,10 @@ Engineering rules live in [`AGENTS.md`](AGENTS.md) and apply to every item below
 
 ## 0. Current Studio usability pass
 
-- [ ] Move Yapay Zeka provider/model/write/limit configuration from environment variables into administrator-managed persisted settings in Studio without exposing the saved API key back to clients.
+- [x] Move Yapay Zeka provider/model/write/limit configuration from environment variables into administrator-managed persisted settings in Studio without exposing the saved API key back to clients.
 - [ ] Complete the existing collection `singleton` metadata contract so Studio exposes it, Content bypasses the list page, and service-layer creates cannot produce a second singleton item.
-- [ ] Replace the Data Model collection landing page with a compact Directus-like list: inline visibility toggle, dimmed hidden rows, six-dot drag handle, native drag/drop ordering, and navigation-only parent groups.
-- [ ] Make Content a focused navigation mode: entering Content shows only the content collection/group tree plus a clear way back to the main Studio modules.
+- [x] Replace the Data Model collection landing page with a compact Directus-like list: inline visibility toggle, dimmed hidden rows, six-dot drag handle, native drag/drop ordering, and navigation-only parent groups.
+- [x] Make Content a focused navigation mode: entering Content shows only the content collection/group tree plus a clear way back to the main Studio modules.
 - [ ] Keep field/relation/detail screens functionally intact while simplifying collection navigation and reducing duplicate controls/copy.
 
 ## 1. Query engine — remaining Directus-like depth
