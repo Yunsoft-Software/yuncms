@@ -57,8 +57,10 @@ export { AuthTokensService } from './services/auth-tokens-service.js';
 export { ExternalAuthService, AUTH_TRANSACTION_TTL_MS } from './services/external-auth-service.js';
 export { ApiTokensService } from './services/api-tokens-service.js';
 export { AuditService, redactAuditValue } from './services/audit-service.js';
-export { ItemsService } from './services/items-service.js';
-export { CollectionsService } from './services/collections-service.js';
+export {
+  SingletonItemsService as ItemsService,
+  SingletonCollectionsService as CollectionsService,
+} from './services/singleton-services.js';
 export { FieldsService } from './services/fields-service.js';
 export { SystemCollectionFieldsService } from './services/system-collection-fields-service.js';
 export { RelationsService } from './services/relations-service.js';
@@ -68,6 +70,7 @@ export { PermissionsService } from './services/permissions-service.js';
 export { FilesService } from './services/files-service.js';
 export { FileReconciliationService } from './services/file-reconciliation-service.js';
 export { StudioSettingsService, STUDIO_SETTING_DEFAULTS } from './services/studio-settings-service.js';
+export { NavigationGroupsService } from './services/navigation-groups-service.js';
 export { SchemaMetadataRepository } from './schema-metadata-repository.js';
 export { loadSchemaSnapshot, SchemaCache } from './schema.js';
 export { assertFieldType, compileFieldColumn } from './field-types.js';
