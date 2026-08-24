@@ -103,42 +103,48 @@ function providerAssistantMessage(message, toolCalls) {
 }
 
 export class AiAssistantService {
-  constructor({ config, logger = console, fetchImpl = globalThis.fetch } = {}) {
-    if (!config) throw new Error('AI assistant config is required');
+  constructor({ config = null, settingsStore = null, logger = console, fetchImpl = globalThis.fetch } = {}) {
+    if (!config && !settingsStore) throw new Error('AI assistant config or settings store is required');
     if (typeof fetchImpl !== 'function') throw new Error('AI assistant requires fetch');
     this.config = config;
+    this.settingsStore = settingsStore;
     this.logger = logger;
     this.fetchImpl = fetchImpl;
   }
 
-  status() {
+  async settings() {
+    return this.settingsStore ? this.settingsStore.readRuntime() : this.config;
+  }
+
+  async status() {
+    const config = await this.settings();
     return {
-      enabled: this.config.enabled,
-      configured: Boolean(this.config.apiKey && this.config.model),
-      model: this.config.model,
-      writes_available: this.config.writesEnabled === true,
-      max_history: this.config.maxHistory,
+      enabled: config.enabled,
+      configured: Boolean(config.apiKey && config.model),
+      model: config.model,
+      writes_available: config.writesEnabled === true,
+      max_history: config.maxHistory,
     };
   }
 
-  async #providerCompletion(messages, tools) {
+  async #providerCompletion(messages, tools, config) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
+    const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
     timeout.unref?.();
     let response;
     try {
-      response = await this.fetchImpl(`${this.config.baseUrl}/chat/completions`, {
+      response = await this.fetchImpl(`${config.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
-          authorization: `Bearer ${this.config.apiKey}`,
+          authorization: `Bearer ${config.apiKey}`,
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          model: this.config.model,
+          model: config.model,
           messages,
           tools,
           tool_choice: 'auto',
-          max_tokens: this.config.maxOutputTokens,
+          max_tokens: config.maxOutputTokens,
         }),
         signal: controller.signal,
       });
@@ -179,14 +185,17 @@ export class AiAssistantService {
     locale = 'tr',
     allowWrites = false,
   } = {}) {
-    if (!this.config.enabled) throw aiError('AI_NOT_CONFIGURED', 'Yapay Zeka is not configured on this YunCMS server');
+    const config = await this.settings();
+    if (!config.enabled || !config.apiKey || !config.model) {
+      throw aiError('AI_NOT_CONFIGURED', 'Yapay Zeka is not configured on this YunCMS server');
+    }
     if (req?.authMethod === 'public' || !req?.accountability?.user) {
       throw aiError('UNAUTHORIZED', 'Yapay Zeka requires an authenticated YunCMS account');
     }
 
-    const conversation = normalizeAiConversation(messages, this.config);
+    const conversation = normalizeAiConversation(messages, config);
     const normalizedLocale = SUPPORTED_LOCALES.has(locale) ? locale : 'tr';
-    const writesEnabled = this.config.writesEnabled === true && allowWrites === true;
+    const writesEnabled = config.writesEnabled === true && allowWrites === true;
     const tools = aiToolDefinitions({ writesEnabled, maxItems: 100 });
     const providerMessages = [
       { role: 'system', content: systemPrompt({ locale: normalizedLocale, writesEnabled }) },
@@ -194,11 +203,11 @@ export class AiAssistantService {
     ];
     const operations = [];
 
-    for (let round = 0; round <= this.config.maxToolRounds; round += 1) {
-      const assistantMessage = await this.#providerCompletion(providerMessages, tools);
+    for (let round = 0; round <= config.maxToolRounds; round += 1) {
+      const assistantMessage = await this.#providerCompletion(providerMessages, tools, config);
       const toolCalls = normalizeToolCalls(
         assistantMessage.tool_calls,
-        this.config.maxToolCallsPerRound ?? 8,
+        config.maxToolCallsPerRound ?? 8,
       );
       if (toolCalls.length === 0) {
         const content = normalizeAssistantContent(assistantMessage.content);
@@ -210,7 +219,7 @@ export class AiAssistantService {
         };
       }
 
-      if (round >= this.config.maxToolRounds) {
+      if (round >= config.maxToolRounds) {
         throw aiError('AI_TOOL_ROUND_LIMIT', 'Yapay Zeka reached the tool-call safety limit');
       }
 
@@ -228,7 +237,7 @@ export class AiAssistantService {
             writesEnabled,
             maxItems: 100,
           });
-          resultText = serializeAiToolResult(result, this.config.maxToolResultBytes);
+          resultText = serializeAiToolResult(result, config.maxToolResultBytes);
           success = !resultText.includes('AI_TOOL_RESULT_TOO_LARGE');
         } catch (error) {
           resultText = JSON.stringify(safeAiToolError(error));
