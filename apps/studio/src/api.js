@@ -202,6 +202,16 @@ export async function aiStatus() {
   return body?.data ?? null;
 }
 
+export async function aiSettings() {
+  const body = await apiRequest('/ai/settings');
+  return body?.data ?? null;
+}
+
+export async function saveAiSettings(patch) {
+  const body = await apiRequest('/ai/settings', { method: 'PATCH', body: patch });
+  return body?.data ?? null;
+}
+
 export async function aiChat(messages, { locale = 'tr', allowWrites = false } = {}) {
   const body = await apiRequest('/ai/chat', {
     method: 'POST',
@@ -211,6 +221,26 @@ export async function aiChat(messages, { locale = 'tr', allowWrites = false } = 
       allow_writes: allowWrites,
     },
   });
+  return body?.data ?? null;
+}
+
+export async function navigationGroups() {
+  const body = await apiRequest('/studio-navigation/groups');
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
+export async function createNavigationGroup(data) {
+  const body = await apiRequest('/studio-navigation/groups', { method: 'POST', body: data });
+  return body?.data ?? null;
+}
+
+export async function updateNavigationGroup(id, patch) {
+  const body = await apiRequest(`/studio-navigation/groups/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch });
+  return body?.data ?? null;
+}
+
+export async function deleteNavigationGroup(id) {
+  const body = await apiRequest(`/studio-navigation/groups/${encodeURIComponent(id)}`, { method: 'DELETE' });
   return body?.data ?? null;
 }
 
