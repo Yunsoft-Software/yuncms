@@ -1,226 +1,35 @@
 # YunCMS
 
-**A fast, programmable MySQL CMS/backend with a focused React Studio, strong RBAC and an API you can understand without reverse-engineering the product.**
+**A programmable MySQL CMS/backend with a focused React Studio, strong role-based access control, Files, extensions, AI/MCP integrations and a documented REST API.**
 
-YunCMS is an independent, Directus-inspired backend project from **Yunsoft**. The goal is not to reproduce every feature of a giant headless CMS. The goal is to make the high-value parts — dynamic collections, fields, relations, permissions, Files, authentication and extensions — clean enough to build real products on top of them.
+YunCMS is developed by **Yunsoft**. Learn more about the company at **[Yunsoft — About](https://yunsoft.com/about)**.
 
-> YunCMS is currently pre-stable (`0.1.x`). The API and Studio are moving quickly. Use the documented migration/bootstrap and managed upgrade flow, and verify the current release checklist before production deployment.
+> YunCMS is currently in the `0.1.x` pre-stable line. Use the managed backup/update flow and verify your own database, storage, proxy and authentication configuration before exposing a production installation.
 
----
+## What YunCMS provides
 
-## Why YunCMS?
+- dynamic MySQL collections and fields;
+- M2O, O2O, reverse O2M/O2O and managed M2M relations;
+- schema-driven React Studio;
+- REST CRUD for project collections;
+- field selection including `*`, `relation.*` and `*.*`;
+- filters with nested `_and` / `_or`;
+- `search`, multi-field `sort`, `limit`, `offset`;
+- `aggregate` and `groupBy`;
+- field allowlists, row filters and create/update validation rules;
+- explicit Public-role permissions;
+- user/session/API-token authentication;
+- optional OIDC, OAuth2, LDAP and SAML authentication providers;
+- local and S3-compatible Files storage;
+- permission-managed public/filtered Files use cases;
+- endpoint, hook and scheduled-job extensions;
+- optional Studio AI assistant using normal YunCMS permissions;
+- optional MCP endpoint using the same service/RBAC layer;
+- in-memory or Redis-backed permission cache and rate-limit state;
+- single-port Studio + API runtime;
+- backup, restore and managed update commands.
 
-Most applications need the same foundation:
-
-- a database schema that can evolve without writing a custom admin panel every week;
-- a usable place for operators to manage data;
-- a REST API with real filtering, sorting and pagination;
-- authentication and role-based access control;
-- file storage and previews;
-- relations that are actually enforced by the database;
-- enough extension points to add product-specific behavior without forking the core.
-
-YunCMS puts those pieces behind a deliberately small architecture:
-
-```text
-React Studio
-    │
-    ▼
-Express REST API
-    │
-    ▼
-Core services + accountability + RBAC
-    │
-    ▼
-mysql2/promise
-    │
-    ▼
-MySQL
-```
-
-No GraphQL layer. No ORM abstraction. No second SQL dialect hidden in the codebase.
-
----
-
-# What you get
-
-## Dynamic Data Model
-
-Create project collections, fields and relations from Studio or through the Schema API.
-
-Supported field families include:
-
-- short text / long text;
-- integer / bigint / decimal;
-- boolean;
-- date / datetime / timestamp;
-- JSON;
-- UUID;
-- semantic File / Image references.
-
-Relations:
-
-- many-to-one;
-- one-to-one with a physical `UNIQUE` constraint;
-- many-to-many through a managed junction collection.
-
-YunCMS uses schema locks, explicit validation and compensation logic around dynamic DDL instead of pretending MySQL DDL behaves like ordinary application transactions.
-
-## Human names without ugly database identifiers
-
-Your editors should not have to name a field `urun_fiyati` just because MySQL and REST need a stable identifier.
-
-In Studio you can write:
-
-```text
-Ürün Fiyatı
-```
-
-YunCMS suggests:
-
-```text
-urun_fiyati
-```
-
-Both are stored separately:
-
-```json
-{
-  "name": "Ürün Fiyatı",
-  "field": "urun_fiyati"
-}
-```
-
-The same applies to collections:
-
-```text
-Müşteri Talepleri  →  musteri_talepleri
-İçecek Ölçüsü      →  icecek_olcusu
-2026 Ürünleri      →  collection_2026_urunleri
-```
-
-Display names may later change without silently renaming your physical tables, columns, URLs or integration payloads.
-
-## REST-first Items API
-
-Every project collection becomes a resource:
-
-```text
-GET    /items/:collection
-GET    /items/:collection/:id
-POST   /items/:collection
-PATCH  /items/:collection/:id
-DELETE /items/:collection/:id
-```
-
-Example:
-
-```bash
-curl --get 'http://localhost:3008/items/orders' \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'fields=id,order_no,total,status,created_at' \
-  --data-urlencode 'filter={"status":{"_in":["paid","processing"]},"total":{"_gte":1000}}' \
-  --data-urlencode 'sort=-created_at' \
-  --data-urlencode 'limit=25' \
-  --data-urlencode 'offset=0'
-```
-
-The API supports:
-
-- field selection;
-- server-side filtering;
-- nested `_and` / `_or` logic;
-- equality and comparison operators;
-- `_in` / `_nin`;
-- NULL checks;
-- contains / starts-with / ends-with text search;
-- multi-column sorting;
-- limit/offset pagination;
-- direct relation expansion.
-
-See **[Items API Query Language](docs/api-query-language.md)** for the complete grammar and examples.
-
-## RBAC that is part of the query, not a UI decoration
-
-Project collection permissions support:
-
-- read;
-- create;
-- update;
-- delete;
-- field allowlists;
-- row filters;
-- create/update validation rules.
-
-User filters are combined with role filters rather than replacing them. Requesting `fields=*`, using `_or`, sorting or expanding a relation does not bypass permissions.
-
-The Public role exists but is **deny-by-default**.
-
-Selected system resources also have bounded delegation:
-
-- Users: explicit action-level delegation with protected-account/role invariants;
-- Files: explicit CRUD delegation, with an optional server-side row filter on `read`;
-- Roles: explicit CRUD delegation while Administrator/Public invariants remain service-enforced;
-- internal sessions/tokens/permissions/audit stay closed.
-
-## Files that behave like a real library
-
-YunCMS supports:
-
-- local filesystem storage;
-- S3-compatible storage;
-- upload/list/read/update/delete;
-- safe physical storage keys;
-- reconciliation tooling;
-- gallery and list views;
-- search/filter/sort/pagination;
-- full-size preview modal;
-- image, PDF, video and audio preview;
-- File/Image field pickers in Content.
-
-Branding assets are selected from Files too. Logo and favicon pickers open a searchable, paginated modal instead of dumping the entire file library into the settings form.
-
-## Studio branding
-
-Studio supports:
-
-- brand name;
-- custom logo selected from Files;
-- custom favicon selected from Files;
-- accent color;
-- Light / Dark / System theme;
-- English / Turkish default language;
-- personal language override.
-
-When no custom branding asset is selected, YunCMS falls back to Yunsoft defaults.
-
-## Extensions
-
-The extension SDK provides trusted server-side extension entry points such as:
-
-```js
-import { defineEndpoint } from '@yunsoft/yuncms-extensions-sdk';
-
-export default defineEndpoint({
-  id: 'hello',
-  handler(router, context) {
-    router.get('/', async (req, res) => {
-      res.json({
-        message: 'Hello from YunCMS',
-        user: req.accountability.user,
-      });
-    });
-  },
-});
-```
-
-Extensions reuse YunCMS services/accountability instead of making HTTP requests back into the same process.
-
----
-
-# Requirements
-
-YunCMS currently targets:
+## Requirements
 
 ```text
 Node.js 24 LTS
@@ -228,13 +37,9 @@ npm 11+
 MySQL 8-compatible server
 ```
 
-The repository intentionally rejects unsupported Node major versions rather than hoping they work.
+## Quick start
 
----
-
-# Quick start
-
-From the repository:
+From the repository/project:
 
 ```bash
 npm install
@@ -249,7 +54,7 @@ Default local URL:
 http://localhost:3008
 ```
 
-The same Express listener serves both the REST API and the built Studio.
+The same listener serves Studio and the API.
 
 The published CLI package is:
 
@@ -257,7 +62,7 @@ The published CLI package is:
 @yunsoft/yuncms
 ```
 
-Package-level commands:
+Useful CLI commands:
 
 ```text
 yuncms init
@@ -270,28 +75,28 @@ yuncms update --to <version>
 yuncms help
 ```
 
-Fresh init uses port **3008** consistently for the server, Studio origin and public auth URL.
+For initialization, backup/restore and updates, read **[Setup and CLI](docs/setup-cli.md)**.
 
-Production updates are maintenance-window based in the current V1. Stop the service supervisor first; managed update performs preflight, a mandatory verified backup, exact npm package install, target migrations, a temporary `/ready` probe and automatic rollback when a post-backup step fails. S3 object backup remains the deployment provider's responsibility.
+# First steps in Studio
 
-Development/source validation:
+After `npm start`, open the YunCMS URL and sign in with the Administrator created during initialization.
 
-```bash
-npm run dev
-npm run test:fast
-npm test
-npm run test:release
-```
+A normal first setup is:
 
-`test:release` also builds Studio and verifies publishable package contracts. Real MySQL integration checks are opt-in so ordinary source tests remain fast.
+1. open **Settings → Data Model**;
+2. create a collection;
+3. add fields and relations;
+4. open **Roles & Permissions** and decide who may read/write it;
+5. open the collection under **Content** and add records;
+6. use **Files** for images/documents that collection records should reference.
 
-Read: [Setup CLI](docs/setup-cli.md) · [Production upgrades](docs/upgrades.md)
+The detailed interface walkthrough is in **[Using YunCMS Studio](docs/studio.md)**.
 
----
+# Build a collection
 
-# Build your first collection
+You can use Studio or the Schema REST API.
 
-Use Studio, or call the Schema API directly.
+Create a collection:
 
 ```bash
 curl 'http://localhost:3008/schema/collections' \
@@ -299,14 +104,9 @@ curl 'http://localhost:3008/schema/collections' \
   -H 'Authorization: Bearer ADMIN_TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "Müşteri Talepleri",
-    "collection": "musteri_talepleri",
-    "note": "Müşterilerden gelen destek ve teklif talepleri",
-    "metadata": {
-      "icon": "inbox",
-      "sort": 10
-    },
-    "systemFields": [
+    "name":"Customer Requests",
+    "collection":"customer_requests",
+    "systemFields":[
       "created_at",
       "updated_at",
       "created_by",
@@ -318,183 +118,277 @@ curl 'http://localhost:3008/schema/collections' \
 Add a field:
 
 ```bash
-curl 'http://localhost:3008/schema/collections/musteri_talepleri/fields' \
+curl 'http://localhost:3008/schema/collections/customer_requests/fields' \
   -X POST \
   -H 'Authorization: Bearer ADMIN_TOKEN' \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "Başlık",
-    "field": "baslik",
-    "type": "string",
-    "length": 255,
-    "required": true
+    "name":"Title",
+    "field":"title",
+    "type":"string",
+    "length":255,
+    "required":true
   }'
 ```
 
-Add another:
+Create data:
 
 ```bash
-curl 'http://localhost:3008/schema/collections/musteri_talepleri/fields' \
-  -X POST \
-  -H 'Authorization: Bearer ADMIN_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "name": "Öncelik",
-    "field": "oncelik",
-    "type": "integer"
-  }'
-```
-
-Then create data through the Items API:
-
-```bash
-curl 'http://localhost:3008/items/musteri_talepleri' \
+curl 'http://localhost:3008/items/customer_requests' \
   -X POST \
   -H 'Authorization: Bearer YOUR_TOKEN' \
   -H 'Content-Type: application/json' \
-  -d '{
-    "baslik": "Yeni fiyat teklifi",
-    "oncelik": 8
-  }'
+  -d '{"title":"New quote request"}'
 ```
 
-The separation is deliberate:
+Human-readable labels and stable API/database keys are separate. Changing the label later does not silently rename the REST collection/field key.
+
+Read **[Data Model Guide](docs/data-model.md)** for field types, defaults, system fields, singletons and all relation types.
+
+# Query the Items API
+
+Every project collection has the normal CRUD surface:
 
 ```text
-Studio display name: Müşteri Talepleri
-API / MySQL key:    musteri_talepleri
+GET    /items/:collection
+GET    /items/:collection/:id
+POST   /items/:collection
+PATCH  /items/:collection/:id
+DELETE /items/:collection/:id
 ```
 
----
+## Select fields and relations
 
-# Query examples
-
-Published articles, newest first:
-
-```bash
-curl --get 'http://localhost:3008/items/articles' \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'filter={"status":{"_eq":"published"}}' \
-  --data-urlencode 'sort=-published_at'
-```
-
-Price range:
-
-```bash
-curl --get 'http://localhost:3008/items/products' \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'filter={"price":{"_gte":100,"_lte":500}}'
-```
-
-Search title:
-
-```bash
-curl --get 'http://localhost:3008/items/articles' \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'filter={"title":{"_contains":"YunCMS"}}'
-```
-
-OR condition:
-
-```bash
-curl --get 'http://localhost:3008/items/tasks' \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'filter={"_or":[{"priority":{"_gte":8}},{"featured":{"_eq":true}}]}'
-```
-
-Expand a direct relation:
-
-```bash
-curl --get 'http://localhost:3008/items/articles' \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  --data-urlencode 'fields=id,title,author_id' \
-  --data-urlencode 'expand=author_id'
-```
-
-There is a full operator table, nested filter examples and JavaScript examples in [API Query Language](docs/api-query-language.md).
-
----
-
-# Repository layout
+Specific fields:
 
 ```text
-apps/
-  studio/                 React Studio
-
-packages/
-  api/                    Express REST API
-  cli/                    @yunsoft/yuncms CLI
-  core/                   schema, auth, RBAC, Files, services
-  extensions-sdk/         extension helpers
-
-scripts/
-  verify.mjs              low-noise source/release test runner
-
-docs/                     architecture and API documentation
+GET /items/articles?fields=id,title,status
 ```
 
----
+All readable scalar fields:
 
-# Architecture principles
+```text
+GET /items/articles?fields=*
+```
 
-### Service authorization, not route-only authorization
+A relation field:
 
-Sensitive checks live in core services. A trusted extension cannot simply instantiate a service with ordinary user accountability and bypass schema/RBAC rules that only existed in Express middleware.
+```text
+GET /items/articles?fields=id,title,author_id.name
+```
 
-### No self-request architecture
+All readable fields inside a relation:
 
-Internal code does not make HTTP requests back into YunCMS to reuse functionality. Extensions and routes call the same service layer directly.
+```text
+GET /items/articles?fields=id,title,author_id.*
+```
 
-### Explicit dynamic DDL
+All readable root fields and readable first-level relations:
 
-Schema changes are serialized with an advisory lock. MySQL DDL failures and metadata failures use explicit compensation strategies. Core upgrade migrations additionally record in-progress/failed attempts so partially committed DDL is never blindly retried.
+```text
+GET /items/articles?fields=*.*
+```
 
-### Stable API identifiers
+Nested relation paths are supported within documented depth/cost limits:
 
-Human-facing labels are free to evolve; machine keys remain stable integration contracts.
+```text
+GET /items/articles?fields=id,author_id.company_id.country_id.name
+```
 
-### Fail closed
+## Filter
 
-Unknown fields, query parameters, filter operators and internal system resources are rejected instead of guessed.
+```bash
+curl --get 'http://localhost:3008/items/orders' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'filter={"status":{"_in":["paid","processing"]},"total":{"_gte":1000}}'
+```
 
----
+Supported comparison/text/null operators include:
+
+```text
+_eq  _neq  _lt  _lte  _gt  _gte
+_in  _nin  _null  _nnull
+_contains  _starts_with  _ends_with
+```
+
+Nested boolean logic uses `_and` and `_or`.
+
+## Search, sort and paginate
+
+```bash
+curl --get 'http://localhost:3008/items/customers' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'search=acme' \
+  --data-urlencode 'sort=-created_at,name' \
+  --data-urlencode 'limit=25' \
+  --data-urlencode 'offset=0'
+```
+
+## Aggregate and group
+
+```bash
+curl --get 'http://localhost:3008/items/orders' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --data-urlencode 'aggregate={"count":"*","sum":"total","avg":"total"}' \
+  --data-urlencode 'groupBy=status'
+```
+
+Supported aggregate functions are `count`, `countDistinct`, `sum`, `avg`, `min` and `max`.
+
+The complete grammar, exact limits, relation behavior and error cases are documented in **[Items API Query Language](docs/api-query-language.md)**.
+
+# Roles, permissions and Public access
+
+Access is deny-by-default. Project collection permissions can control:
+
+- `read`, `create`, `update`, `delete`;
+- readable/writable field allowlists;
+- server-side row filters;
+- prospective create/update validation.
+
+A caller's filter is combined with the permission row filter using `AND`; query parameters do not replace RBAC.
+
+The Public role follows the same explicit grant model. You can intentionally expose a collection or a filtered subset of Files without making unrelated resources public.
+
+Read **[Roles and Permissions](docs/permissions.md)**.
+
+# Files
+
+YunCMS Files supports:
+
+- gallery/list browsing in Studio;
+- local storage;
+- S3-compatible storage;
+- raw binary upload;
+- metadata edit;
+- permission-aware download;
+- image/media previews in Studio;
+- File/Image collection fields;
+- administrative storage reconciliation.
+
+Example upload:
+
+```bash
+curl 'http://localhost:3008/files?storage=local' \
+  -X POST \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/octet-stream' \
+  -H 'X-Filename: product-photo.png' \
+  -H 'X-Mimetype: image/png' \
+  --data-binary '@./product-photo.png'
+```
+
+Read **[Files and Storage](docs/files.md)**.
+
+# Authentication
+
+YunCMS supports:
+
+- email/password sessions;
+- rotating refresh credentials;
+- static API tokens;
+- logout / logout-all;
+- password reset;
+- email verification;
+- OIDC;
+- OAuth2;
+- LDAP;
+- SAML.
+
+Read **[Authentication](docs/auth.md)** and **[Configuration](docs/configuration.md)**.
+
+# Extensions
+
+Trusted JavaScript extensions can add:
+
+- `/extensions/:id` HTTP endpoints;
+- pre-mutation filters;
+- post-mutation actions;
+- startup lifecycle handlers;
+- five-field cron scheduled jobs.
+
+Scheduled jobs can run per process or in `singleton` mode using a MySQL advisory lock so only one replica performs the job.
+
+Read **[Extensions](docs/extensions.md)**.
+
+# AI assistant and MCP
+
+The optional Studio AI assistant operates through the current user's normal YunCMS accountability. Data-changing tools require both Administrator-level feature enablement and the user's selected access mode; neither grants permissions the role does not already have.
+
+Read **[AI Assistant](docs/ai-assistant.md)**.
+
+The optional MCP endpoint exposes bounded schema/data tools through the same service/RBAC layer. It is disabled by default and write tools are separately disabled by default.
+
+Read **[MCP](docs/mcp.md)**.
+
+# Configuration and Redis
+
+Single-process installations can keep permission-cache and rate-limit state in memory. Multi-replica installations can select Redis independently for:
+
+- permission cache;
+- global API rate limits;
+- authentication rate limits.
+
+Example:
+
+```env
+CACHE_STORE=redis
+API_RATE_LIMIT_STORE=redis
+AUTH_RATE_LIMIT_STORE=redis
+REDIS_URL=redis://redis.internal:6379
+REDIS_PREFIX=yuncms:production:
+REDIS_REQUIRED=true
+```
+
+The full environment-variable reference is **[Configuration](docs/configuration.md)**.
 
 # Documentation
 
-## API
+The complete user/operator/integrator index is **[docs/README.md](docs/README.md)**.
 
-- **[REST API Reference](docs/rest-api.md)** — complete endpoint map and request examples.
-- **[Items API Query Language](docs/api-query-language.md)** — fields, filters, operators, sort, pagination, expand and JavaScript examples.
-- [Authentication](docs/auth.md)
-- [Permissions / RBAC](docs/permissions.md)
-- [Files / storage](docs/files.md)
+## Getting started and administration
 
-## Architecture / operations
+- **[Documentation index](docs/README.md)**
+- **[Setup and CLI](docs/setup-cli.md)**
+- **[Using YunCMS Studio](docs/studio.md)**
+- **[Configuration](docs/configuration.md)**
+- **[Data Model Guide](docs/data-model.md)**
+- **[Studio Customization](docs/studio-customization.md)**
 
-- [Architecture](docs/architecture.md)
-- [Database & schema engine](docs/database.md)
-- [Development](docs/development.md)
-- [Extensions](docs/extensions.md)
-- [Setup CLI](docs/setup-cli.md)
-- [Production upgrades / backup / restore](docs/upgrades.md)
-- [Security](docs/security.md)
-- [Deployment](docs/deployment.md)
-- [Production readiness](docs/production-readiness.md)
-- [Production readiness test plan](docs/production-readiness-test-plan.md)
-- [Publishing](docs/publishing.md)
-- [Studio customization](docs/studio-customization.md)
+## API and integrations
 
----
+- **[REST API Reference](docs/rest-api.md)**
+- **[Items API Query Language](docs/api-query-language.md)**
+- **[Authentication](docs/auth.md)**
+- **[Roles and Permissions](docs/permissions.md)**
+- **[Files and Storage](docs/files.md)**
+- **[Extensions](docs/extensions.md)**
+- **[MCP](docs/mcp.md)**
+- **[AI Assistant](docs/ai-assistant.md)**
 
-# Current status
+## Production and operations
 
-YunCMS already has a substantial source surface, but `0.1.x` should still be treated as active development.
+- **[Deployment](docs/deployment.md)**
+- **[Upgrades / Backup / Restore](docs/upgrades.md)**
+- **[Security](docs/security.md)**
+- **[Production Readiness](docs/production-readiness.md)**
+- **[Database Operations](docs/database.md)**
+- **[Architecture Reference](docs/architecture.md)**
 
-Before calling a specific commit production-ready, run the repository release gates and the environment-specific checks tracked in `todo.md` against the actual Node 24/MySQL/storage/browser environment you intend to deploy.
+# Production notes
 
-The project intentionally keeps that distinction visible: **source-complete is not the same claim as deployment-verified**.
+For a production installation:
 
----
+1. use HTTPS behind a correctly configured reverse proxy;
+2. set `TRUST_PROXY_HOPS` to the exact trusted proxy depth;
+3. keep database, SMTP, S3, Redis and external-auth secrets outside source control;
+4. back up MySQL and local Files storage, or configure provider-level S3 backup/versioning;
+5. preserve `.yuncms/ai-settings.key` when AI provider credentials are configured;
+6. use Redis shared state where multiple API replicas require coherent cache/rate-limit behavior;
+7. start MCP read-only and AI writes disabled until permissions have been verified with representative accounts;
+8. use the managed backup/update flow for version changes.
+
+See **[Deployment](docs/deployment.md)** and **[Production Readiness](docs/production-readiness.md)**.
 
 # License
 
