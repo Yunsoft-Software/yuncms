@@ -2,16 +2,9 @@ import { useEffect, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { useI18n } from '../i18n.js';
+import { singletonDestination } from '../singleton-route.js';
 import { studioPath } from '../studio-route.js';
 import { ContentScreen } from './ContentScreen.jsx';
-
-export function singletonDestination(collection, collectionMeta, rows = []) {
-  if (!collectionMeta?.singleton) return null;
-  const primaryKey = collectionMeta.primary_key || 'id';
-  const first = rows[0];
-  if (first?.[primaryKey] != null) return studioPath.contentRecord(collection, first[primaryKey]);
-  return studioPath.contentNew(collection);
-}
 
 export function ContentRouteScreen({
   collection,
