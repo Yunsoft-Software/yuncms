@@ -1,70 +1,42 @@
 # Files and Storage
 
-YunCMS V1 coordinates file metadata in MySQL with pluggable storage drivers.
+YunCMS Files combines metadata stored in MySQL with binary objects stored by a registered storage driver. The built-in drivers are local filesystem storage and S3-compatible object storage.
 
-## Storage contract
+Files can be managed from Studio's **Files** screen or through the REST API. File/Image fields in project collections store a UUID that points to a Files record.
 
-Core file I/O drivers implement:
+## Permissions
 
-```text
-put(key, contents)
-get(key)
-delete(key)
-stat(key)
-getSignedUrl(key)   # may return null when API proxy download is used
-```
+Files is an explicitly permission-managed system resource. It is not restricted to Administrator-only use.
 
-Built-in local and S3-compatible drivers additionally implement `list()` for maintenance inventory/reconciliation. Third-party drivers may omit inventory support; reconciliation then fails explicitly with `STORAGE_INVENTORY_UNSUPPORTED` rather than pretending it can inspect the backend.
+Use the `yuncms_files` resource in role permissions to grant the actions a role needs:
 
-Configured drivers are available through the storage registry and trusted extension contexts.
+- `read` — list metadata, read metadata and download content;
+- `create` — upload files;
+- `update` — edit permitted file metadata;
+- `delete` — remove permitted files.
 
-## Local storage
+The Public role can also receive an intentional Files read grant. This is useful for public image galleries, public downloads or site assets. Public access remains deny-by-default until you create that permission.
 
-```text
-FILES_LOCAL_ROOT=.yuncms/uploads
-FILES_MAX_UPLOAD_BYTES=26214400
-```
+Files read permissions can include a row filter, so a public or normal role can expose only a bounded subset of file records rather than the entire library. The same effective read permission is enforced for `/files/:id/content`; hiding metadata while leaving the binary publicly readable is not a bypass.
 
-Physical keys are generated UUIDs. User-visible filenames never become filesystem paths.
+Administrative/system accountability can perform maintenance operations such as reconciliation.
 
-The local driver accepts only restricted single-segment keys, performs platform-aware containment checks and lists only valid regular-file storage keys during reconciliation.
+See [Roles and permissions](permissions.md).
 
-## S3-compatible storage
+## Studio Files library
 
-```text
-S3_BUCKET=
-S3_REGION=us-east-1
-S3_ENDPOINT=
-S3_ACCESS_KEY_ID=
-S3_SECRET_ACCESS_KEY=
-S3_FORCE_PATH_STYLE=false
-```
+Open **Files** in Studio to browse uploaded assets. The Files UI supports gallery-oriented browsing and media previews for supported image/media types, along with the metadata actions allowed by the current role.
 
-When `S3_BUCKET` is configured YunCMS registers an `s3` driver in addition to `local`.
+Typical workflow:
 
-The driver uses AWS SDK v3, supports custom endpoints/path-style addressing and uses the SDK credential chain when explicit credentials are absent. Inventory uses paginated `ListObjectsV2`; a truncated response without a continuation token fails explicitly.
+1. upload an asset to the selected storage driver;
+2. set a human title/filename and MIME type;
+3. preview or download it from the library;
+4. select it from a collection field whose interface is `file` or `image`.
 
-Downloads currently proxy through the authenticated API, so signed URLs are optional and return `null` in the built-in drivers.
+Deleting a Files record is a real storage operation, not merely hiding the asset from Studio.
 
-## FilesService
-
-`FilesService` is administrator/system-only in V1.
-
-It coordinates:
-
-- metadata list/read;
-- upload/storage write;
-- content read;
-- metadata update;
-- delete/storage cleanup.
-
-Upload writes the storage object before the metadata row. If metadata insert fails, YunCMS attempts to remove the new object.
-
-Delete removes metadata and then the storage object. A post-metadata storage cleanup failure raises `FILE_STORAGE_CLEANUP_FAILED` rather than hiding an orphan.
-
-File lifecycle operations emit `files.create`, `files.update` and `files.delete` for trusted hooks/audit.
-
-## REST API
+## REST endpoints
 
 ```text
 GET    /files
@@ -76,55 +48,189 @@ PATCH  /files/:id
 DELETE /files/:id
 ```
 
-Upload uses raw `application/octet-stream` plus headers:
+Authenticated requests normally send:
 
-```text
-X-Filename: <URL-encoded user-visible filename>
-X-Mimetype: application/pdf
-X-Title: optional title
+```http
+Authorization: Bearer <access-token-or-api-token>
 ```
 
-Select storage with:
+If the Public role has the required read permission, the read/content endpoints can also be used without a Bearer token.
+
+## Upload a file
+
+Upload bytes directly instead of base64-encoding them in JSON:
+
+```bash
+curl 'http://localhost:3008/files?storage=local' \
+  -X POST \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/octet-stream' \
+  -H 'X-Filename: product-photo.png' \
+  -H 'X-Mimetype: image/png' \
+  -H 'X-Title: Product photo' \
+  --data-binary '@./product-photo.png'
+```
+
+Upload headers:
+
+```text
+X-Filename: URL-encoded user-visible filename
+X-Mimetype: MIME type
+X-Title: optional human title
+```
+
+Choose a registered driver with the `storage` query parameter:
 
 ```text
 POST /files?storage=local
 POST /files?storage=s3
 ```
 
-The upload body is capped by `FILES_MAX_UPLOAD_BYTES`; overflow maps to HTTP 413.
+The request body is capped by `FILES_MAX_UPLOAD_BYTES`; an oversized body returns HTTP 413.
 
-## Inventory and reconciliation
+YunCMS generates the physical object key. User-visible filenames are metadata and do not become arbitrary filesystem paths.
 
-`FileReconciliationService` and `POST /files/reconcile` compare DB metadata with the selected storage inventory.
+## List and read metadata
 
-Default behavior is **dry-run**:
-
-```json
-{
-  "storage": "local",
-  "deleteOrphans": false,
-  "minimumAgeMs": 3600000
-}
+```bash
+curl 'http://localhost:3008/files' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
 ```
 
-The result reports:
+Read one:
 
-- metadata rows whose storage object is missing;
-- storage objects with no metadata row;
-- orphan objects eligible for guarded deletion;
+```bash
+curl 'http://localhost:3008/files/FILE_ID' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+Only records allowed by the effective Files read permission/row filter are returned.
+
+## Download content
+
+```bash
+curl 'http://localhost:3008/files/FILE_ID/content' \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  --output downloaded-file.bin
+```
+
+Built-in storage drivers currently proxy downloads through the YunCMS API. This keeps the Files permission check authoritative for both local and S3-compatible storage.
+
+## Update metadata
+
+```bash
+curl 'http://localhost:3008/files/FILE_ID' \
+  -X PATCH \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Homepage hero image"}'
+```
+
+The current role must have Files update access to the target record.
+
+## Delete
+
+```bash
+curl 'http://localhost:3008/files/FILE_ID' \
+  -X DELETE \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
+YunCMS removes the metadata and then cleans up the storage object. If metadata deletion succeeds but storage cleanup fails, the API reports `FILE_STORAGE_CLEANUP_FAILED` so operators can investigate the orphan instead of silently ignoring it.
+
+File lifecycle operations emit `files.create`, `files.update` and `files.delete` events for trusted extension/audit consumers.
+
+# Storage drivers
+
+## Local storage
+
+```env
+FILES_LOCAL_ROOT=.yuncms/uploads
+FILES_MAX_UPLOAD_BYTES=26214400
+```
+
+The default upload limit is 25 MiB.
+
+The local driver restricts physical keys to safe single-segment storage keys and checks path containment before filesystem access. If you use local storage in production, the upload directory is production data and must be included in backup/restore procedures.
+
+## S3-compatible storage
+
+```env
+S3_BUCKET=your-bucket
+S3_REGION=us-east-1
+S3_ENDPOINT=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_FORCE_PATH_STYLE=false
+```
+
+When `S3_BUCKET` is configured, YunCMS registers an `s3` driver in addition to `local`.
+
+Custom endpoints and path-style addressing allow compatible object-storage providers. If explicit access-key variables are omitted, the AWS SDK credential chain can be used where the deployment environment provides credentials.
+
+## Storage contract for extensions
+
+Built-in storage drivers implement the runtime operations needed by Files:
+
+```text
+put(key, contents)
+get(key)
+delete(key)
+stat(key)
+getSignedUrl(key)
+```
+
+Built-in local and S3 drivers also support inventory listing used by reconciliation. A storage implementation that cannot list inventory fails reconciliation explicitly rather than pretending the storage has no orphan objects.
+
+# Reconciliation
+
+`POST /files/reconcile` compares Files metadata with a storage inventory. It is an administrative maintenance operation and is dry-run by default.
+
+```bash
+curl 'http://localhost:3008/files/reconcile' \
+  -X POST \
+  -H 'Authorization: Bearer ADMIN_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "storage":"local",
+    "deleteOrphans":false,
+    "minimumAgeMs":3600000
+  }'
+```
+
+The result identifies:
+
+- metadata records whose object is missing;
+- storage objects without metadata;
+- orphan objects old enough to be eligible for cleanup;
 - objects actually deleted when destructive cleanup is requested.
 
-Safety rules:
+Safety behavior:
 
-- reconciliation requires admin/system accountability;
-- it never automatically deletes a DB metadata row because an object is missing;
-- `deleteOrphans` is false unless explicitly requested;
-- orphan deletion requires a known `modifiedAt` and an age at least the configured/requested guard;
-- default orphan age guard is one hour, protecting the upload race where storage is written before DB metadata;
-- V1 refuses inventories above 100,000 objects rather than doing an unbounded maintenance pass.
+- reconciliation never automatically deletes database metadata simply because a storage object is missing;
+- `deleteOrphans` defaults to false;
+- orphan deletion requires known modification time and the requested/default minimum age;
+- the default one-hour age guard protects the upload window where object storage is written before metadata is committed;
+- inventories above the bounded maintenance limit are rejected instead of processed without a limit.
 
-Operators should still investigate `FILE_STORAGE_CLEANUP_FAILED` and reconciliation drift instead of treating cleanup as a substitute for storage monitoring/backups.
+Treat reconciliation as a drift-repair tool, not a substitute for backups or storage monitoring.
 
-## Verification
+# Public gallery example
 
-Real filesystem permissions, Unicode names, upload limits, reconciliation race behavior and the actual production S3-compatible provider remain manual/integration checks in `todo.md`.
+For a public website gallery, a common pattern is:
+
+1. grant the Public role `read` on `yuncms_files`;
+2. add a restrictive Files row filter that matches only assets intended for public use;
+3. store those Files UUIDs in your gallery/content collection;
+4. grant Public read access to that collection too;
+5. fetch collection records and their file ids from your frontend, then request `/files/:id/content`.
+
+Do not grant unrestricted Public Files read merely because one image must be public.
+
+## Related guides
+
+- [Roles and permissions](permissions.md)
+- [Data model](data-model.md)
+- [REST API](rest-api.md)
+- [Configuration](configuration.md)
+- [Deployment](deployment.md)
