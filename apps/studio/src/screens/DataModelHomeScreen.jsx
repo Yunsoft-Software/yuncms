@@ -189,7 +189,10 @@ export function DataModelHomeScreen({ onNavigate, onCollectionsChanged }) {
         }}
         onDrop={(event) => {
           event.preventDefault();
-          if (dragging?.type === 'collection') persistCollectionDrop(dragging.id, { targetName: entry.collection });
+          if (dragging?.type === 'collection') {
+            event.stopPropagation();
+            persistCollectionDrop(dragging.id, { targetName: entry.collection });
+          }
         }}
       >
         <button
