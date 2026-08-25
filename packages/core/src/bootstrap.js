@@ -16,6 +16,7 @@ import { externalAuthFoundationMigration } from './migrations/0013-external-auth
 import { aiSettingsMigration } from './migrations/0014-ai-settings.js';
 import { navigationGroupsMigration } from './migrations/0015-navigation-groups.js';
 import { navigationGroupCollapseMigration } from './migrations/0016-navigation-group-collapse.js';
+import { mcpSettingsMigration } from './migrations/0017-mcp-settings.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -36,6 +37,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   aiSettingsMigration,
   navigationGroupsMigration,
   navigationGroupCollapseMigration,
+  mcpSettingsMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(

@@ -5,6 +5,7 @@ import {
   createMcpAccessGuard,
   createToolResult,
   READ_TOOL_NAMES,
+  requireMcpAdministrator,
   registerMcpTools,
   WRITE_TOOL_NAMES,
 } from '../src/mcp.js';
@@ -138,4 +139,22 @@ test('MCP non-browser requests are accepted only when the Host header is trusted
   let continued = false;
   guard(guardRequest({ host: 'API.EXAMPLE.TEST:3008', origin: null }), response(), () => { continued = true; });
   assert.equal(continued, true);
+});
+
+test('MCP panel settings require administrator or system accountability', () => {
+  assert.throws(
+    () => requireMcpAdministrator({ authMethod: 'public', accountability: { user: null } }),
+    (error) => error.code === 'UNAUTHORIZED',
+  );
+  assert.throws(
+    () => requireMcpAdministrator({
+      authMethod: 'session',
+      accountability: { user: 'user-1', admin: false, system: false },
+    }),
+    (error) => error.code === 'FORBIDDEN',
+  );
+  assert.doesNotThrow(() => requireMcpAdministrator({
+    authMethod: 'session',
+    accountability: { user: 'admin-1', admin: true, system: false },
+  }));
 });

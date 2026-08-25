@@ -28,6 +28,7 @@ import { loadExternalAuthConfig } from './external-auth/config.js';
 import { ExternalAuthProviderRegistry } from './external-auth/providers.js';
 import { loadExtensionRuntime } from './extensions/runtime.js';
 import { createMcpRouter } from './mcp.js';
+import { McpSettingsStore } from './mcp/settings-store.js';
 import { createAiRouter } from './routes/ai.js';
 
 loadEnvFileIfPresent();
@@ -134,7 +135,8 @@ async function start() {
   });
   const aiAssistant = new AiAssistantService({ settingsStore: aiSettingsStore, logger });
   const aiRouter = createAiRouter({ assistant: aiAssistant, settingsStore: aiSettingsStore });
-  const mcpRouter = createMcpRouter({ config, logger });
+  const mcpSettingsStore = new McpSettingsStore({ database: pool });
+  const mcpRouter = createMcpRouter({ settingsStore: mcpSettingsStore, logger });
   mailer?.setEmitter(emitter);
   registerInternalAudit({ emitter, services });
 
