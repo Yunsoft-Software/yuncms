@@ -1,3 +1,4 @@
+import { createSystemAccountability } from '@yunsoft/yuncms-core';
 import express from 'express';
 
 import { createFixedWindowRateLimit } from '../rate-limit.js';
@@ -7,10 +8,20 @@ function service(req, name) {
   const Service = req.context.services[name];
   return new Service(serviceOptionsFromRequest(req));
 }
+function systemService(req, name) {
+  const Service = req.context.services[name];
+  return new Service({
+    ...serviceOptionsFromRequest(req),
+    accountability: createSystemAccountability(),
+  });
+}
 function authService(req) { return service(req, 'AuthService'); }
 function authTokensService(req) { return service(req, 'AuthTokensService'); }
+function systemAuthTokensService(req) { return systemService(req, 'AuthTokensService'); }
 function apiTokensService(req) { return service(req, 'ApiTokensService'); }
 function usersService(req) { return service(req, 'UsersService'); }
+function systemUsersService(req) { return systemService(req, 'UsersService'); }
+function studioSettingsService(req) { return service(req, 'StudioSettingsService'); }
 function externalAuthService(req, registry) {
   const Service = req.context.services.ExternalAuthService;
   return new Service({
@@ -43,6 +54,14 @@ function requireExternalAuth(registry) {
 
 function actionUrl(config, action, token) {
   return `${config.auth.publicUrl}/?auth_action=${encodeURIComponent(action)}&token=${encodeURIComponent(token)}`;
+}
+
+function verificationMessage(config, token) {
+  const url = actionUrl(config, 'verify', token);
+  return {
+    subject: 'Verify your YunCMS email',
+    text: `Verify your YunCMS email address by opening this link:\n${url}\n\nIf you did not request this, you can ignore this message.`,
+  };
 }
 
 function noStore(req, res, next) {
@@ -98,8 +117,40 @@ export function createAuthRouter({
   });
 
   router.post('/register', actionLimit, async (req, res) => {
+    const settings = await studioSettingsService(req).readPublic();
+    const verificationRequired = settings.public_registration_require_email_verification === true;
+    const transport = verificationRequired ? requireMailer(mailer) : null;
     const data = await usersService(req).registerPublic(req.body ?? {});
-    res.status(201).json({ data });
+
+    if (verificationRequired) {
+      try {
+        const result = await systemAuthTokensService(req).createEmailVerification(data.id);
+        const message = verificationMessage(config, result.token);
+        await transport.send({ to: data.email, ...message }, {
+          accountability: req.accountability,
+          requestId: req.id,
+        });
+      } catch (error) {
+        try {
+          await systemUsersService(req).deleteOne(data.id);
+        } catch (cleanupError) {
+          logger.error?.('YunCMS public registration cleanup failed', {
+            requestId: req.id,
+            user: data.id,
+            code: cleanupError?.code,
+            message: cleanupError?.message,
+          });
+        }
+        throw error;
+      }
+    }
+
+    res.status(201).json({
+      data: {
+        ...data,
+        email_verification_required: verificationRequired,
+      },
+    });
   });
 
   router.post('/login', loginLimit, async (req, res) => {
@@ -215,12 +266,38 @@ export function createAuthRouter({
     res.status(204).end();
   });
   router.post('/email-verification/request', actionLimit, async (req, res) => {
-    const transport = requireMailer(mailer);
     if (!req.accountability?.user) {
-      const error = new Error('Authentication is required to request email verification');
-      error.code = 'UNAUTHORIZED';
-      throw error;
+      const settings = await studioSettingsService(req).readPublic();
+      if (
+        settings.public_registration_enabled !== true
+        || settings.public_registration_require_email_verification !== true
+      ) {
+        res.status(202).json({ data: { accepted: true } });
+        return;
+      }
+
+      const transport = requireMailer(mailer);
+      const result = await systemAuthTokensService(req).requestEmailVerification(req.body?.email);
+      if (result) {
+        try {
+          const message = verificationMessage(config, result.token);
+          await transport.send({ to: result.user.email, ...message }, {
+            accountability: req.accountability,
+            requestId: req.id,
+          });
+        } catch (error) {
+          logger.error?.('YunCMS public email verification mail delivery failed', {
+            requestId: req.id,
+            code: error?.code,
+            message: error?.message,
+          });
+        }
+      }
+      res.status(202).json({ data: { accepted: true } });
+      return;
     }
+
+    const transport = requireMailer(mailer);
     const userId = req.body?.user ?? req.accountability.user;
     const user = await usersService(req).readOne(userId);
     if (!user) {
@@ -229,8 +306,11 @@ export function createAuthRouter({
       throw error;
     }
     const result = await authTokensService(req).createEmailVerification(userId);
-    const url = actionUrl(config, 'verify', result.token);
-    await transport.send({ to: user.email, subject: 'Verify your YunCMS email', text: `Verify your YunCMS email address by opening this link:\n${url}\n\nIf you did not request this, you can ignore this message.` }, { accountability: req.accountability, requestId: req.id });
+    const message = verificationMessage(config, result.token);
+    await transport.send({ to: user.email, ...message }, {
+      accountability: req.accountability,
+      requestId: req.id,
+    });
     res.status(202).json({ data: { accepted: true } });
   });
   router.post('/email-verification/confirm', actionLimit, async (req, res) => {
