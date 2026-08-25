@@ -268,10 +268,7 @@ export function createAuthRouter({
   router.post('/email-verification/request', actionLimit, async (req, res) => {
     if (!req.accountability?.user) {
       const settings = await studioSettingsService(req).readPublic();
-      if (
-        settings.public_registration_enabled !== true
-        || settings.public_registration_require_email_verification !== true
-      ) {
+      if (settings.public_registration_require_email_verification !== true) {
         res.status(202).json({ data: { accepted: true } });
         return;
       }
