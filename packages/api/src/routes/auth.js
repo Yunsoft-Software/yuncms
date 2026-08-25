@@ -97,6 +97,11 @@ export function createAuthRouter({
     res.json({ data: externalAuthRegistry?.publicProviders?.() ?? [] });
   });
 
+  router.post('/register', actionLimit, async (req, res) => {
+    const data = await usersService(req).registerPublic(req.body ?? {});
+    res.status(201).json({ data });
+  });
+
   router.post('/login', loginLimit, async (req, res) => {
     const result = await authService(req).login({ email: req.body?.email, password: req.body?.password, ip: req.ip ?? null, userAgent: req.get('user-agent') ?? null });
     res.json({ data: result });
