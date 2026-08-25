@@ -22,6 +22,13 @@ function positiveInteger(value, code, label, { max = Number.MAX_SAFE_INTEGER } =
   return parsed;
 }
 
+function resolveSpawnCommand(command, platform = process.platform) {
+  if (platform === 'win32' && (command === 'npm' || command === 'npx')) {
+    return `${command}.cmd`;
+  }
+  return command;
+}
+
 export function resolveCommandTimeoutMs(env = process.env, explicitTimeoutMs = null) {
   const value = explicitTimeoutMs ?? env.YUNCMS_CLI_COMMAND_TIMEOUT_MS ?? DEFAULT_COMMAND_TIMEOUT_MS;
   return positiveInteger(
@@ -57,6 +64,7 @@ function spawnCapturedProcess(spawnProcess, command, args, options) {
 export async function runCapturedProcess(command, args = [], {
   cwd = process.cwd(),
   env = process.env,
+  platform = process.platform,
   spawnProcess = spawn,
   maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
   timeoutMs = null,
@@ -75,10 +83,11 @@ export async function runCapturedProcess(command, args = [], {
     'Command output limit',
     { max: 16 * 1024 * 1024 },
   );
+  const resolvedCommand = resolveSpawnCommand(command, platform);
 
   const child = spawnCapturedProcess(
     spawnProcess,
-    command,
+    resolvedCommand,
     args,
     {
       cwd,
@@ -146,7 +155,7 @@ export async function runCapturedProcess(command, args = [], {
           return;
         }
         error.code ||= 'COMMAND_START_FAILED';
-        error.command = command;
+        error.command = resolvedCommand;
         error.args = [...args];
         reject(error);
       });
