@@ -102,7 +102,7 @@ function managedSettings(row) {
 }
 
 export class StudioSettingsService extends BaseService {
-  async readSettingsRow() {
+  async #readSettingsRow() {
     const [rows] = await this.database.query(
       `SELECT brand_name, logo_url, logo_file, favicon_file, accent_color, theme, default_locale,
               public_registration_enabled, public_registration_role, updated_at
@@ -120,12 +120,12 @@ export class StudioSettingsService extends BaseService {
   }
 
   async readPublic() {
-    return publicSettings(await this.readSettingsRow());
+    return publicSettings(await this.#readSettingsRow());
   }
 
   async readOne() {
     assertManager(this.accountability);
-    return managedSettings(await this.readSettingsRow());
+    return managedSettings(await this.#readSettingsRow());
   }
 
   async readImageAssetContent(settingKey, label) {
