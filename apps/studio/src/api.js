@@ -212,6 +212,16 @@ export async function saveAiSettings(patch) {
   return body?.data ?? null;
 }
 
+export async function mcpSettings() {
+  const body = await apiRequest('/mcp/settings');
+  return body?.data ?? null;
+}
+
+export async function saveMcpSettings(patch) {
+  const body = await apiRequest('/mcp/settings', { method: 'PATCH', body: patch });
+  return body?.data ?? null;
+}
+
 export async function aiChat(messages, {
   locale = 'tr',
   allowWrites = false,
