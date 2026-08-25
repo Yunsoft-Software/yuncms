@@ -31,12 +31,15 @@ export function LoginScreen({ onAuthenticated }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetMode, setResetMode] = useState(false);
   const [registerMode, setRegisterMode] = useState(false);
+  const [verificationPending, setVerificationPending] = useState(false);
   const [providers, setProviders] = useState([]);
   const [ldapProviderId, setLdapProviderId] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const registrationEnabled = settings.public_registration_enabled === true;
+  const registrationRequiresEmailVerification =
+    settings.public_registration_require_email_verification === true;
 
   const ldapProvider = useMemo(
     () => providers.find((provider) => provider.id === ldapProviderId && provider.driver === 'ldap') ?? null,
@@ -56,6 +59,7 @@ export function LoginScreen({ onAuthenticated }) {
   useEffect(() => {
     if (registrationEnabled) return;
     setRegisterMode(false);
+    setVerificationPending(false);
     setConfirmPassword('');
   }, [registrationEnabled]);
 
@@ -85,6 +89,7 @@ export function LoginScreen({ onAuthenticated }) {
     setSubmitting(true);
     try {
       if (resetMode) {
+        setVerificationPending(false);
         await apiRequest('/auth/password-reset/request', {
           method: 'POST',
           body: { email },
@@ -98,23 +103,51 @@ export function LoginScreen({ onAuthenticated }) {
           setError(t('auth.passwordMismatch'));
           return;
         }
-        await apiRequest('/auth/register', {
+        const response = await apiRequest('/auth/register', {
           method: 'POST',
           body: { email, password },
         }, { retryAuth: false });
+        const verificationRequired = response?.data?.email_verification_required === true;
         setRegisterMode(false);
         setPassword('');
         setConfirmPassword('');
-        setNotice(t('auth.registrationComplete'));
+        setVerificationPending(verificationRequired);
+        setNotice(verificationRequired
+          ? t('auth.registrationVerificationSent')
+          : t('auth.registrationComplete'));
         return;
       }
 
       const session = ldapProvider
         ? await loginWithProvider(ldapProvider.id, email, password)
         : await login(email, password);
+      setVerificationPending(false);
       onAuthenticated(session);
     } catch (requestError) {
-      setError(requestError.message || (resetMode ? t('auth.requestFailed') : t('auth.signInFailed')));
+      if (requestError?.code === 'EMAIL_NOT_VERIFIED') {
+        setVerificationPending(true);
+        setError(t('auth.emailNotVerified'));
+      } else {
+        setVerificationPending(false);
+        setError(requestError.message || (resetMode ? t('auth.requestFailed') : t('auth.signInFailed')));
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function resendVerification() {
+    setSubmitting(true);
+    setError('');
+    setNotice('');
+    try {
+      await apiRequest('/auth/email-verification/request', {
+        method: 'POST',
+        body: { email },
+      }, { retryAuth: false });
+      setNotice(t('auth.verificationResent'));
+    } catch (requestError) {
+      setError(requestError.message || t('auth.requestFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -122,12 +155,14 @@ export function LoginScreen({ onAuthenticated }) {
 
   function beginBrowserProvider(provider) {
     setError('');
+    setVerificationPending(false);
     window.location.assign(externalLoginUrl(provider.id, '/'));
   }
 
   function chooseLdapProvider(provider) {
     setResetMode(false);
     setRegisterMode(false);
+    setVerificationPending(false);
     setLdapProviderId(provider.id);
     setEmail('');
     setPassword('');
@@ -139,6 +174,7 @@ export function LoginScreen({ onAuthenticated }) {
   function switchRegisterMode(nextMode) {
     setRegisterMode(nextMode);
     setResetMode(false);
+    setVerificationPending(false);
     setLdapProviderId('');
     setPassword('');
     setConfirmPassword('');
@@ -178,7 +214,10 @@ export function LoginScreen({ onAuthenticated }) {
                 autoComplete="username"
                 type={ldapProvider ? 'text' : 'email'}
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setVerificationPending(false);
+                }}
                 required
               />
             </label>
@@ -222,12 +261,29 @@ export function LoginScreen({ onAuthenticated }) {
                     : t('auth.signIn')}
             </button>
 
+            {verificationPending
+              && registrationEnabled
+              && registrationRequiresEmailVerification
+              && !registerMode
+              && !resetMode
+              && !ldapProvider && (
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={submitting || !email}
+                onClick={resendVerification}
+              >
+                {t('auth.resendVerification')}
+              </button>
+            )}
+
             {!ldapProvider && !registerMode && (
               <button
                 className="text-button"
                 type="button"
                 onClick={() => {
                   setResetMode((current) => !current);
+                  setVerificationPending(false);
                   setError('');
                   setNotice('');
                 }}
