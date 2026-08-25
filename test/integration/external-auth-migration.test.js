@@ -40,7 +40,7 @@ async function countById(pool, table, id) {
   return Number(rows[0]?.count ?? 0);
 }
 
-test('real MySQL applies 0013 once and preserves pre-0013 auth state with replay-safe transactions', {
+test('real MySQL applies 0013 and every later migration once while preserving pre-0013 auth state', {
   skip: !ENABLED,
   timeout: 90_000,
 }, async () => {
@@ -62,7 +62,10 @@ test('real MySQL applies 0013 once and preserves pre-0013 auth state with replay
     await resetDatabaseObjects({ config: config.database });
     pool = createDatabasePool(config.database);
 
-    const preExternalAuth = CORE_MIGRATIONS.slice(0, -1);
+    const externalAuthIndex = CORE_MIGRATIONS.findIndex(({ id }) => id === '0013-external-auth-foundation');
+    assert.notEqual(externalAuthIndex, -1);
+    const preExternalAuth = CORE_MIGRATIONS.slice(0, externalAuthIndex);
+    const externalAuthAndLater = CORE_MIGRATIONS.slice(externalAuthIndex);
     const preUpgrade = await applyMigrations(pool, preExternalAuth);
     assert.deepEqual(preUpgrade.newlyApplied, preExternalAuth.map((migration) => migration.id));
 
@@ -86,7 +89,7 @@ test('real MySQL applies 0013 once and preserves pre-0013 auth state with replay
     const session = await new SessionsService({ accountability: system, database: pool }).createForUser(user);
 
     const upgraded = await bootstrapDatabase(pool);
-    assert.deepEqual(upgraded.newlyApplied, ['0013-external-auth-foundation']);
+    assert.deepEqual(upgraded.newlyApplied, externalAuthAndLater.map((migration) => migration.id));
     await assertDatabaseCompatible(pool);
     const restarted = await bootstrapDatabase(pool);
     assert.deepEqual(restarted.newlyApplied, []);
