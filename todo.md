@@ -79,7 +79,17 @@ In Studio, open **Settings → MCP Connection**, keep authentication enabled, ke
 - [ ] Sign in as an Administrator and verify the MCP settings screen in desktop/mobile light and dark themes; save/reload preserves every field, non-admin navigation hides the entry, and warnings appear for write tools or Public access.
 - [ ] Behind the real reverse proxy, save the forwarded public Host in **Allowed Host values**; arbitrary Host values remain rejected.
 
-## 5. Core browser / security smoke
+## 5. Public registration runtime / browser gate
+
+Use Node 24 with the branch dependencies installed and a disposable MySQL database.
+
+- [ ] Run `npm run test:fast` and `npm test`; remove this item only when the new core/API/Studio registration regressions and the existing suite all pass without GitHub Actions.
+- [ ] Bootstrap an existing pre-0018 database and verify migration `0018-public-registration-settings` adds the default-off settings without changing existing users/roles.
+- [ ] In Studio as Administrator, verify **Settings → Branding & Appearance → Public Registration** on desktop/mobile light and dark themes: only normal non-admin/non-Public roles are selectable, save/reload preserves the selection, and disabling registration removes the sign-up option from Login.
+- [ ] Verify a non-admin cannot read the managed registration role or mutate the setting, while the public `/studio-settings` response exposes only the boolean enablement needed by Login.
+- [ ] Verify `/auth/register` returns 403 while disabled, creates an active user with exactly the configured normal role while enabled, rejects client-supplied role/status, rejects an Administrator/Public/stale configured role, rate-limits repeated attempts, and duplicate email handling remains bounded.
+
+## 6. Core browser / security smoke
 
 - [ ] Delegated Roles/Users permissions never permit Administrator/Public escalation, Administrator mutation or protected/in-use role deletion.
 - [ ] Image/PDF/video/audio previews work after access-token refresh and gallery thumbnails use contain-style rendering.
@@ -89,7 +99,7 @@ In Studio, open **Settings → MCP Connection**, keep authentication enabled, ke
 - [ ] Behind actual TLS proxy verify exact `TRUST_PROXY_HOPS`, client-IP bucketing and HTTPS-only HSTS.
 - [ ] If S3-compatible storage is used, verify upload/list/content/delete/reconciliation/branding against the real provider with redacted errors.
 
-## 6. Managed backup / restore / update release gate
+## 7. Managed backup / restore / update release gate
 
 Follow `docs/codex-managed-upgrade-verification.md` in a disposable Node 24 + MySQL environment. GitHub Actions are not part of this gate.
 
