@@ -90,6 +90,7 @@ function publicSettings(row) {
     theme: row.theme,
     default_locale: row.default_locale,
     public_registration_enabled: Boolean(row.public_registration_enabled),
+    public_registration_require_email_verification: Boolean(row.public_registration_require_email_verification),
     updated_at: row.updated_at ?? null,
   };
 }
@@ -105,7 +106,8 @@ export class StudioSettingsService extends BaseService {
   async #readSettingsRow() {
     const [rows] = await this.database.query(
       `SELECT brand_name, logo_url, logo_file, favicon_file, accent_color, theme, default_locale,
-              public_registration_enabled, public_registration_role, updated_at
+              public_registration_enabled, public_registration_role,
+              public_registration_require_email_verification, updated_at
        FROM yuncms_studio_settings
        WHERE id = 1
        LIMIT 1`,
@@ -199,6 +201,7 @@ export class StudioSettingsService extends BaseService {
       'default_locale',
       'public_registration_enabled',
       'public_registration_role',
+      'public_registration_require_email_verification',
     ]);
     if (keys.length === 0 || keys.some((key) => !allowed.has(key))) {
       throw invalid('Studio settings patch contains unsupported properties');
@@ -262,6 +265,13 @@ export class StudioSettingsService extends BaseService {
       assignments.push('public_registration_role = ?');
       params.push(normalizedRegistrationRole);
     }
+    if (Object.hasOwn(patch, 'public_registration_require_email_verification')) {
+      assignments.push('public_registration_require_email_verification = ?');
+      params.push(normalizeBoolean(
+        patch.public_registration_require_email_verification,
+        'Public registration email verification requirement',
+      ) ? 1 : 0);
+    }
 
     params.push(1);
     await this.database.query(
@@ -282,4 +292,5 @@ export const STUDIO_SETTING_DEFAULTS = Object.freeze({
   default_locale: 'en',
   public_registration_enabled: false,
   public_registration_role: null,
+  public_registration_require_email_verification: false,
 });
