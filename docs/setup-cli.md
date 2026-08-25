@@ -1,154 +1,248 @@
-# YunCMS CLI
+# YunCMS Setup and CLI
 
-This document describes the current Node.js 24 CLI behavior.
+YunCMS is distributed through npm as `@yunsoft/yuncms`. Normal users do **not** need to clone or fork the source repository.
 
-## Runtime
+## Requirements
 
-The CLI accepts Node.js 24.x only. Unsupported majors fail with `UNSUPPORTED_NODE_VERSION` before command execution.
+- Node.js 24 LTS
+- npm 11+
+- MySQL 8-compatible server
 
-`.env` is loaded through the Node.js runtime; no `dotenv` dependency is required.
+The CLI accepts Node.js 24.x only. Unsupported major versions fail before command execution.
+
+## Fastest installation: run from npm with `npx`
+
+Create a directory for the installation and run the published package directly:
+
+```bash
+mkdir my-yuncms
+cd my-yuncms
+npx --yes @yunsoft/yuncms init
+```
+
+Then start YunCMS:
+
+```bash
+npx --yes @yunsoft/yuncms start
+```
+
+Open:
+
+```text
+http://localhost:3008
+```
+
+The same port serves both Studio and the REST API.
+
+`npx` downloads the npm package when it is not already available locally and executes its `yuncms` binary. The YunCMS process still uses your current directory as the project directory; `.env`, local Files and local `extensions/` are therefore kept in your project directory, not in the npm cache.
+
+### What `init` does
+
+`init` is interactive. It:
+
+1. validates Node.js 24;
+2. creates `.env` when one does not already exist;
+3. asks for MySQL host, port, database, username, password and TLS preference;
+4. writes `.env` with restrictive permissions where supported;
+5. verifies MySQL connectivity;
+6. applies missing core database migrations;
+7. checks whether an Administrator already exists;
+8. asks for the first Administrator email/password when needed;
+9. creates that Administrator exactly once;
+10. prints the API and Studio addresses.
+
+Rerunning `init` reuses the existing `.env`, safely checks migrations again and does not silently create another initial Administrator.
+
+## Recommended long-lived installation
+
+The direct remote `npx` form is useful for first setup and evaluation. For a persistent server, record YunCMS in the project's own `package.json` so the installed version is explicit and the managed update command can operate on the project dependency.
+
+From the YunCMS project directory:
+
+```bash
+npm init -y
+npm install @yunsoft/yuncms
+npx yuncms init
+npx yuncms start
+```
+
+After that installation, use the shorter local form:
+
+```bash
+npx yuncms <command>
+```
+
+`npx yuncms` resolves the binary from the project's installed `@yunsoft/yuncms` dependency.
 
 ## Commands
 
-### `yuncms init`
+### `init`
 
-Interactive first-run setup:
-
-1. validates Node 24;
-2. creates `.env` only when it does not already exist;
-3. asks for MySQL connection details with secret-safe password input;
-4. writes `.env` with exclusive-create behavior and mode `0600`;
-5. verifies MySQL connectivity;
-6. runs bootstrap migrations;
-7. checks for an existing administrator;
-8. when needed, asks for admin email/password + confirmation;
-9. creates/reuses the Administrator role and creates the first admin exactly once;
-10. prints API/Studio addresses and next steps.
-
-Rerunning `init` reuses the existing `.env`, reruns safe bootstrap checks and never silently creates a second initial administrator.
-
-### `yuncms bootstrap`
-
-Non-interactive/environment-driven database bootstrap:
+Remote package form:
 
 ```bash
-yuncms bootstrap
+npx --yes @yunsoft/yuncms init
 ```
 
-It validates connectivity, obtains the bootstrap advisory lock, applies missing core migrations, reports schema version and closes the pool on success or failure.
-
-The migration runner records both successful migrations and active/failed attempts. If a DDL migration partially executes and fails, YunCMS refuses a blind retry and normal API compatibility startup with `DATABASE_MIGRATION_RECOVERY_REQUIRED`; restore the verified pre-upgrade backup instead.
-
-`bootstrap` does not create the first admin; use interactive `init` for that current workflow.
-
-### `yuncms start`
+Locally installed package form:
 
 ```bash
-yuncms start
+npx yuncms init
 ```
 
-The CLI resolves the installed `@yunsoft/yuncms-api` server entry and spawns it with the caller's current working directory and environment. This keeps project `.env`, extension discovery and relative local-storage paths rooted in the user's project rather than the CLI package directory.
+Use this for the first interactive database and Administrator setup.
 
-Signals are forwarded to the API child so the API can run its graceful HTTP/MySQL shutdown path.
-
-### `yuncms backup`
-
-Create a verified pre-upgrade/disaster-recovery snapshot while the service supervisor is stopped:
+### `bootstrap`
 
 ```bash
-yuncms backup
+npx yuncms bootstrap
+```
+
+Runs non-interactive, environment-driven database bootstrap. It validates connectivity, obtains the bootstrap advisory lock, applies missing core migrations, reports the schema version and closes the database pool on completion.
+
+`bootstrap` does not create the first Administrator. Use `init` for the initial interactive setup.
+
+### `start`
+
+```bash
+npx yuncms start
+```
+
+Starts the installed YunCMS API package using the current directory as the project root. That means project `.env`, local storage and local extension discovery are resolved from the directory where the command is executed.
+
+Signals are forwarded to the API process so graceful HTTP/MySQL shutdown can run normally.
+
+### `backup`
+
+Stop the normal service supervisor first, then run:
+
+```bash
+npx yuncms backup
 ```
 
 Optional destination:
 
 ```bash
-yuncms backup --output /srv/backups/yuncms-2026-08-22
+npx yuncms backup --output /srv/backups/yuncms-2026-08-25
 ```
 
-The command refuses to snapshot while the configured local YunCMS health endpoint is reachable. It streams `mysqldump` through gzip, verifies the gzip stream end-to-end, and snapshots `.env`, package metadata, local uploads and local `extensions/` when present.
+The command refuses to create its normal consistent snapshot while the configured local YunCMS health endpoint is reachable. It:
 
-S3 objects are not copied; provider-side object backup/versioning is required.
+- streams `mysqldump` through gzip;
+- verifies the gzip stream;
+- snapshots `.env`;
+- snapshots project package metadata;
+- snapshots local uploads;
+- snapshots local `extensions/` when present.
 
-### `yuncms restore`
+S3 objects are not copied by this command. Use provider-side versioning/snapshots or another verified S3 backup method.
 
-Restore is intentionally destructive and requires explicit confirmation:
+### `restore`
+
+Restore is destructive and requires explicit confirmation:
 
 ```bash
-yuncms restore /srv/backups/yuncms-2026-08-22 --yes
+npx yuncms restore /srv/backups/yuncms-2026-08-25 --yes
 ```
 
-The recorded database target must match the current host/port/database unless the operator explicitly uses:
+By default the recorded database host/port/database must match the current target. To intentionally restore to a different database target:
 
 ```bash
-yuncms restore /srv/backups/yuncms-2026-08-22 --yes --allow-different-database-target
+npx yuncms restore /srv/backups/yuncms-2026-08-25 --yes --allow-different-database-target
 ```
 
-Restore resets current tables/views first, then imports the dump and restores project assets. This prevents tables created only by a failed migration from surviving an old dump import.
+Restore resets current tables/views before importing the saved database, then restores project assets.
 
-If package metadata was restored, synchronize installed dependencies before starting the service: use `npm ci` when the snapshot contains `package-lock.json`, otherwise use `npm install`. The restore command prints this required follow-up because it restores package files without mutating `node_modules`.
-
-### `yuncms update`
-
-Inspect without modifying project state:
+If package files were restored, synchronize dependencies before starting YunCMS:
 
 ```bash
-yuncms update --dry-run
+npm ci
 ```
 
-Update to the latest published release:
+when `package-lock.json` exists, otherwise:
 
 ```bash
-yuncms update
+npm install
 ```
 
-Pin an exact/registry-resolvable release:
+### `update`
+
+Managed update is intended for a persistent installation whose `package.json` declares `@yunsoft/yuncms`.
+
+Inspect the target without changing project state:
 
 ```bash
-yuncms update --to 0.2.0
+npx yuncms update --dry-run
 ```
 
-The managed update flow requires project `package.json` to declare `@yunsoft/yuncms`. It performs target-package/migration preflight, requires the service to be stopped, creates a mandatory verified backup, installs the target package, runs the **newly installed** CLI's bootstrap, launches a temporary runtime, requires `/ready`, and then stops that verification runtime.
-
-If installation, migration or readiness verification fails after backup creation, YunCMS attempts to restore the database/project snapshot, reinstall the old dependency graph and verify the restored runtime. A rollback failure is surfaced as `UPDATE_ROLLBACK_FAILED` and the backup is preserved.
-
-There is no `--no-backup` update mode.
-
-S3 installations require explicit acknowledgement after provider-side recovery has been verified:
+Update to the latest registry release:
 
 ```bash
-yuncms update --to 0.2.0 --allow-unverified-s3
+npx yuncms update
 ```
 
-Read [Production upgrades](upgrades.md) before using this in production.
+Update to a specific version:
 
-### `yuncms help`
+```bash
+npx yuncms update --to 0.2.0
+```
 
-Advertises the implemented `init`, `bootstrap`, `start`, `backup`, `restore`, `update` and help commands.
+The managed update flow:
 
-## Local workspace forms
+1. inspects the target package and migration compatibility;
+2. requires the normal service supervisor to be stopped;
+3. creates a mandatory verified backup;
+4. installs the target npm package;
+5. runs the newly installed CLI's database bootstrap;
+6. starts a temporary runtime;
+7. requires `/ready` to pass;
+8. stops the temporary verification runtime.
 
-During repository development the equivalent root/workspace scripts can be used. The public package-level target remains:
+If a post-backup installation, migration or readiness step fails, YunCMS attempts to restore the database/project snapshot, reinstall the old dependency graph and verify the restored runtime.
 
-```text
+There is no `--no-backup` managed update mode.
+
+For S3-backed installations, provider-side recovery must be verified separately. Read [Upgrades / Backup / Restore](upgrades.md) before production updates.
+
+### `help`
+
+```bash
+npx yuncms help
+```
+
+Lists the implemented commands and options.
+
+## Which command form should I use?
+
+For a first run without installing anything into the project:
+
+```bash
+npx --yes @yunsoft/yuncms init
+npx --yes @yunsoft/yuncms start
+```
+
+For a normal persistent installation after `npm install @yunsoft/yuncms`:
+
+```bash
 npx yuncms init
-npx yuncms bootstrap
 npx yuncms start
 npx yuncms backup
 npx yuncms update --dry-run
 ```
 
-Real registry, MySQL, `mysqldump`/`mysql`, process-supervisor and rollback smoke tests are environment-dependent release gates. They must be verified before calling a release production-upgrade tested.
+The source repository is only needed when you intend to develop YunCMS itself or contribute code. It is not part of the normal installation path.
 
-## Environment
+## Environment configuration
 
-`.env.example` documents the current runtime variables for:
+`.env.example` and [Configuration](configuration.md) document the current runtime variables for:
 
-- API host/port/Studio origin;
+- API host/port and Studio origin;
 - MySQL;
-- local/S3 storage;
+- Redis and cache/rate-limit stores;
+- local and S3-compatible Files storage;
 - SMTP;
-- authentication rate limits;
-- audit cleanup defaults;
-- logging.
+- external authentication providers;
+- MCP;
+- logging and operational limits.
 
-The init env writer escapes values and rejects newline/null-byte content before writing secrets.
+The init env writer rejects newline/null-byte content before writing secrets.
