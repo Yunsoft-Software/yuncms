@@ -119,4 +119,4 @@ Retention cleanup is explicit, admin-only and batched. Retention environment def
 
 ## Production verification
 
-Source controls are not a substitute for execution. `todo.md` contains the real MySQL, SMTP, S3/reconciliation, auth replay, RBAC/validation, relation expansion, concurrency, logging-redaction, security-header and graceful-shutdown checks required before release.
+Source controls are not a substitute for execution. Complete the real MySQL, SMTP, S3/reconciliation, auth replay, RBAC/validation, relation expansion, concurrency, logging-redaction, security-header and graceful-shutdown checks in [Production Readiness](production-readiness.md) before exposing a deployment.

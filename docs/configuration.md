@@ -136,11 +136,13 @@ Pressure protection can reject new API work when the process exceeds configured 
 ## Local Files storage
 
 ```env
-FILES_LOCAL_ROOT=.yuncms/uploads
+FILES_LOCAL_ROOT=uploads
 FILES_MAX_UPLOAD_BYTES=26214400
 ```
 
 `FILES_LOCAL_ROOT` is relative to the project working directory unless you use an absolute path. Back it up together with the database when local storage contains production assets.
+
+`yuncms init` creates `uploads/` and writes that explicit project-local value. If the variable is omitted entirely, the core runtime fallback remains `.yuncms/uploads`; production deployments should set it explicitly to avoid ambiguity.
 
 `FILES_MAX_UPLOAD_BYTES` defaults to 25 MiB.
 

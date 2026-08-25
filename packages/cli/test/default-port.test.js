@@ -27,6 +27,7 @@ test('.env.example matches the clean-install 3008 contract and contains no legac
   assert.match(envExample, /^PORT=3008$/m);
   assert.match(envExample, /^STUDIO_ORIGIN=http:\/\/localhost:3008$/m);
   assert.match(envExample, /^AUTH_PUBLIC_URL=http:\/\/localhost:3008$/m);
+  assert.match(envExample, /^FILES_LOCAL_ROOT=uploads$/m);
   assert.doesNotMatch(envExample, /(?:^|[^0-9])(8055|5173)(?:[^0-9]|$)/);
 });
 
@@ -42,4 +43,6 @@ test('operator documentation uses the single-port 3008 runtime contract', () => 
 
   assert.doesNotMatch(documentation, /(?:^|[^0-9])(8055|5173)(?:[^0-9]|$)/);
   assert.match(documentation, /http:\/\/localhost:3008/);
+  assert.match(documentation, /^FILES_LOCAL_ROOT=uploads$/m);
+  assert.doesNotMatch(documentation, /^FILES_LOCAL_ROOT=\.yuncms\/uploads$/m);
 });

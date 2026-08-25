@@ -93,7 +93,7 @@ Default favicon/icon:
 https://yunsoft.com/light-icon.png
 ```
 
-`apps/studio/index.html` references this icon immediately so the browser does not wait for React/settings hydration before it has a favicon. When Studio settings load and `favicon_file` is configured, `StudioSettingsProvider` switches the favicon to the API-backed `/studio-settings/favicon` asset.
+The default icon is available immediately during page load. When Studio settings load and `favicon_file` is configured, Studio switches to the Files-backed `/studio-settings/favicon` asset.
 
 A custom Files-backed logo replaces the Yunsoft logo artwork. The small `Powered by Yunsoft` / copyright footer is independent and remains visible.
 
@@ -133,7 +133,7 @@ personal browser preference -> server default_locale -> English fallback
 
 The personal preference is stored in browser local storage. Changing it does not alter the project-wide default for other users.
 
-Static translation keys used by Studio source are scanned by `apps/studio/test/localization.test.js`; EN/TR dictionaries must have identical coverage. Dynamic field/action/Data Model tab labels are also checked explicitly.
+English and Turkish cover the same Studio interface. Dynamic field, action and Data Model labels follow the active personal language where translations are available.
 
 ---
 

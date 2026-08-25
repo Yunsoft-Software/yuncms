@@ -285,9 +285,12 @@ Database/file metadata backup is not the same as object backup. For S3-compatibl
 
 Do not pass `--allow-unverified-s3` merely to bypass the guard; use it only after recovery of object storage has been verified outside YunCMS.
 
-## Verification runbooks
+## Verification runbook
 
-Before calling this exact source state production-verified, complete the pending gates in `todo.md` and follow:
+Before calling an upgrade production-verified:
 
-- `docs/codex-managed-upgrade-verification.md` for the original end-to-end managed-upgrade gate;
-- `docs/codex-managed-upgrade-hardening.md` for format-2 integrity, maintenance-startup, timeout and first-transition/multi-instance edge cases.
+1. restore the latest backup in a disposable staging environment;
+2. run the managed update with the same database/storage topology used in production;
+3. verify `/ready`, Administrator login, representative role access, Files reads/writes and critical integrations;
+4. confirm the rollback/restore procedure while the staging evidence is still available;
+5. complete the upgrade and backup sections in [Production Readiness](production-readiness.md).

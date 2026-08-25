@@ -2,6 +2,24 @@
 
 YunCMS stores project content in MySQL collections. A collection has a stable API/database key, a human-readable display name, fields and optional relations. Studio's **Data Model** screen is the normal place to build and maintain this structure; the same operations are also available through the schema REST API.
 
+![YunCMS Data Model with navigation folders, ordering and visibility controls](assets/screenshots/studio-data-model.png)
+
+## Understand the Data Model list
+
+The landing screen combines schema navigation with Content-menu presentation:
+
+- **Create collection** adds a MySQL-backed project collection;
+- **Create folder** adds a presentation-only navigation group;
+- the collection icon and name open its fields/relations/settings;
+- the `1` control toggles supported single-item presentation;
+- the eye controls whether the collection appears under Content;
+- a crossed-out eye means the collection is hidden from Content;
+- the six-dot handle reorders a collection/folder or moves a collection into a folder.
+
+Dragging near the top or bottom edge of a row changes order. Dropping over the highlighted center of a folder moves the collection into that folder. The helper text under the list summarizes the same behavior in Studio.
+
+Folders, order and visibility are interface metadata. They never grant data access; Roles & Permissions remains authoritative.
+
 ## Collection names and API keys
 
 Keep the human label separate from the machine key:
@@ -24,6 +42,8 @@ A collection can also carry a note, navigation/display metadata, visibility sett
 3. Enter a display name and confirm or edit the generated API key.
 4. Select any system fields you want YunCMS to maintain automatically.
 5. Create the collection, then add normal fields and relations.
+
+After creation, return to the landing list when you want to place the collection in a folder, change its order or hide it from Content. Open the collection itself when you want to change fields, relations or collection settings.
 
 Use stable lowercase API keys such as `orders`, `customer_requests` and `invoice_lines`. Treat an API key as part of your integration contract after external applications begin using it.
 
@@ -212,6 +232,8 @@ Permissions still apply to the underlying collection and record.
 Collection visibility in Studio is presentation, not authorization. Hiding a collection from navigation does not grant or revoke API access; roles and permissions remain authoritative.
 
 Studio supports organizing visible collections into navigation groups and saving their order/collapse presentation. A user still sees only the sections and data their effective access permits.
+
+Use a hidden collection for internal/junction/supporting data that should not clutter Content. The row remains visible in Data Model, appears dimmed and uses the crossed-out eye so Administrators can restore it without guessing where it went.
 
 ## Changing schema safely
 

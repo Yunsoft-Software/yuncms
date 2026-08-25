@@ -8,6 +8,8 @@ After starting YunCMS, open the configured URL, usually:
 http://localhost:3008
 ```
 
+If this is your first installation, complete [Getting Started](getting-started.md) before using this page as a feature reference.
+
 ## Sign in
 
 The login screen supports normal email/password authentication and displays any configured external authentication providers. When an Administrator enables public registration, it also exposes account creation and the optional verification-resend flow.
@@ -28,6 +30,12 @@ The main sidebar is task-oriented:
 
 The visible navigation is not an authorization boundary. Roles and permissions decide what a user can actually read or change.
 
+On narrow screens, Studio replaces the desktop sidebar with an **Open menu** button. Opening it exposes the same sections, account status and language controls without changing the current page.
+
+<p align="center">
+  <img src="assets/screenshots/studio-mobile-menu.png" alt="YunCMS mobile navigation menu" width="360">
+</p>
+
 ## Organize collections
 
 Data Model lets you organize content navigation with one-level folders and ordering. Folders affect presentation only; they do not create database tables or relations.
@@ -44,6 +52,8 @@ A hidden collection can still be accessed through the API if the caller's role h
 # Content
 
 Select a collection directly from **Content** to work with its records.
+
+![YunCMS Content workspace](assets/screenshots/studio-content.png)
 
 The generic content screen provides:
 
@@ -68,6 +78,12 @@ Only operations allowed by your effective role are available. If an API permissi
 
 Required fields and write-field restrictions are validated by the API. System fields such as creation/update timestamps and users are filled automatically when configured for the collection.
 
+On mobile, records become readable cards rather than forcing the desktop table into a narrow viewport:
+
+<p align="center">
+  <img src="assets/screenshots/studio-mobile-content.png" alt="YunCMS mobile content cards" width="360">
+</p>
+
 ## Edit a record
 
 Open a row/record, change permitted values and save. Role field allowlists and row filters are applied again on update; viewing a page in Studio does not bypass them.
@@ -89,6 +105,8 @@ For the full relation model, including reverse and M2M querying, see [Data model
 # Data Model
 
 Open **Settings → Data Model** to create and maintain project collections.
+
+![YunCMS Data Model navigation editor](assets/screenshots/studio-data-model.png)
 
 ## Collections
 
@@ -144,6 +162,8 @@ Destructive M2M removal explicitly warns that junction link records are removed 
 
 Open **Files** for the media/file library.
 
+![YunCMS Files gallery](assets/screenshots/studio-files.png)
+
 The library supports:
 
 - gallery view;
@@ -181,6 +201,8 @@ Protected Administrator/account invariants remain enforced by the API. Delegated
 # Roles & Permissions
 
 Open **Settings → Roles & Permissions** to control access.
+
+![YunCMS collection permission matrix](assets/screenshots/studio-permissions.png)
 
 The normal workflow is role-first:
 
@@ -236,10 +258,16 @@ See [AI assistant](ai-assistant.md) before enabling data-changing tools.
 
 # Running Studio
 
-A standard source/project installation uses one public listener:
+A normal installed project uses one public listener:
 
 ```bash
-npm start
+npx yuncms start
+```
+
+The generated process-manager entry is equivalent for hosted deployments:
+
+```bash
+node start.js
 ```
 
 The Studio build is served by the YunCMS API process, so normal production deployment does not require a separate frontend web server/port.

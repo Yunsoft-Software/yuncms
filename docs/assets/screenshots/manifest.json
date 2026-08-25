@@ -1,0 +1,13 @@
+{
+  "yuncmsVersion": "0.1.14",
+  "capturedAt": "2026-08-26",
+  "source": "public npm installation on http://127.0.0.1:3008",
+  "files": [
+    "studio-content.png",
+    "studio-data-model.png",
+    "studio-files.png",
+    "studio-permissions.png",
+    "studio-mobile-content.png",
+    "studio-mobile-menu.png"
+  ]
+}

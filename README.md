@@ -6,6 +6,38 @@ YunCMS is developed by **Yunsoft**. Learn more about the company at **[Yunsoft �
 
 > YunCMS is currently in the `0.1.x` pre-stable line. Use the managed backup/update flow and verify your own database, storage, proxy and authentication configuration before exposing a production installation.
 
+## See YunCMS in action
+
+<p align="center">
+  <img src="docs/assets/screenshots/studio-content.png" alt="YunCMS Content workspace showing grouped collections and product records" width="100%">
+</p>
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/assets/screenshots/studio-data-model.png" alt="YunCMS Data Model with folders, drag handles and visibility controls">
+      <br><strong>Model and organize content</strong><br>Create MySQL-backed collections, group the Content menu, drag to reorder and hide internal collections without changing their permissions.
+    </td>
+    <td width="50%">
+      <img src="docs/assets/screenshots/studio-files.png" alt="YunCMS Files gallery">
+      <br><strong>Manage files visually</strong><br>Upload, preview, search and manage local or S3-compatible assets through the same role-aware Studio.
+    </td>
+  </tr>
+</table>
+
+These screenshots were captured from the current published package. New users should follow the **[15-minute Getting Started guide](docs/getting-started.md)**; administrators can jump directly to **[Using Studio](docs/studio.md)**.
+
+## Choose your path
+
+| I want to… | Start here |
+| --- | --- |
+| Install YunCMS and create my first collection | [Getting Started](docs/getting-started.md) |
+| Understand Content, Files, Data Model and users | [Using YunCMS Studio](docs/studio.md) |
+| Design fields and relations | [Data Model Guide](docs/data-model.md) |
+| Configure roles and safe public access | [Roles and Permissions](docs/permissions.md) |
+| Connect a frontend or integration | [REST API](docs/rest-api.md) and [Items Query Language](docs/api-query-language.md) |
+| Deploy, back up and update a server | [Deployment](docs/deployment.md), [Production Readiness](docs/production-readiness.md) and [Upgrades](docs/upgrades.md) |
+
 ## What YunCMS provides
 
 - dynamic MySQL collections and fields;
@@ -93,6 +125,8 @@ npx --yes @yunsoft/yuncms start
 ```
 
 For initialization, backup/restore and updates, read **[Setup and CLI](docs/setup-cli.md)**.
+
+For a complete first project—from installation through a collection, restricted role and API request—use **[Getting Started](docs/getting-started.md)**.
 
 # First steps in Studio
 
@@ -367,6 +401,7 @@ The complete user/operator/integrator index is **[docs/README.md](docs/README.md
 ## Getting started and administration
 
 - **[Documentation index](docs/README.md)**
+- **[Getting Started](docs/getting-started.md)**
 - **[Setup and CLI](docs/setup-cli.md)**
 - **[Using YunCMS Studio](docs/studio.md)**
 - **[Configuration](docs/configuration.md)**

@@ -2,6 +2,20 @@
 
 YunCMS authorization is role-based and enforced inside services, not only in Studio. A permission is scoped to a role, a collection/resource and an action. Public access uses the same explicit permission model and is deny-by-default.
 
+![YunCMS collection permission matrix](assets/screenshots/studio-permissions.png)
+
+## Recommended Studio workflow
+
+1. Open **Settings → Roles & Permissions**.
+2. Select an existing role or choose **Create**.
+3. Turn on `Read`, `Create`, `Update` or `Delete` for simple unrestricted action access.
+4. Open the permission page only when the action needs field, row or write restrictions.
+5. Save the restriction and test it with a real account assigned to the role.
+
+The matrix distinguishes **Allowed** from **Off** at a glance. An enabled action with advanced rules is still enabled, but its field/filter/validation scope limits what the API accepts or returns.
+
+Start with the smallest role that can complete the job. Avoid testing only as Administrator because Administrator bypass does not reveal missing ordinary-role grants.
+
 ## Accountability
 
 Every service call runs with explicit accountability.

@@ -41,17 +41,20 @@ The same port serves both Studio and the REST API.
 `init` is interactive. It:
 
 1. validates Node.js 24;
-2. creates `.env` when one does not already exist;
-3. asks for MySQL host, port, database, username, password and TLS preference;
-4. writes `.env` with restrictive permissions where supported;
-5. verifies MySQL connectivity;
-6. applies missing core database migrations;
-7. checks whether an Administrator already exists;
-8. asks for the first Administrator email/password when needed;
-9. creates that Administrator exactly once;
-10. prints the API and Studio addresses.
+2. creates the project scaffold (`uploads/`, `extensions/`, examples and `start.js`) without overwriting existing files;
+3. creates `.env` when one does not already exist;
+4. asks for MySQL host, port, database, username, password and TLS preference;
+5. writes `.env` with restrictive permissions where supported;
+6. verifies MySQL connectivity;
+7. applies missing core database migrations;
+8. checks whether an Administrator already exists;
+9. asks for the first Administrator email/password when needed;
+10. creates that Administrator exactly once;
+11. prints the API and Studio addresses.
 
 Rerunning `init` reuses the existing `.env`, safely checks migrations again and does not silently create another initial Administrator.
+
+For a guided walkthrough of the generated files and first Studio workflow, continue with [Getting Started](getting-started.md).
 
 ## Recommended long-lived installation
 

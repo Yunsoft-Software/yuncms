@@ -4,6 +4,8 @@ YunCMS Files combines metadata stored in MySQL with binary objects stored by a r
 
 Files can be managed from Studio's **Files** screen or through the REST API. File/Image fields in project collections store a UUID that points to a Files record.
 
+![YunCMS Files gallery](assets/screenshots/studio-files.png)
+
 ## Permissions
 
 Files is an explicitly permission-managed system resource. It is not restricted to Administrator-only use.
@@ -33,6 +35,8 @@ Typical workflow:
 2. set a human title/filename and MIME type;
 3. preview or download it from the library;
 4. select it from a collection field whose interface is `file` or `image`.
+
+Use the search box and file-type filter to narrow a large library. Gallery view emphasizes previews; list view is useful when filenames and metadata matter more than thumbnails. The current role determines whether Upload, Edit, Download and Delete actions are available.
 
 Deleting a Files record is a real storage operation, not merely hiding the asset from Studio.
 
@@ -145,11 +149,13 @@ File lifecycle operations emit `files.create`, `files.update` and `files.delete`
 ## Local storage
 
 ```env
-FILES_LOCAL_ROOT=.yuncms/uploads
+FILES_LOCAL_ROOT=uploads
 FILES_MAX_UPLOAD_BYTES=26214400
 ```
 
 The default upload limit is 25 MiB.
+
+Projects created by `yuncms init` use the generated project-local `uploads/` directory. The core runtime fallback is `.yuncms/uploads` only when `FILES_LOCAL_ROOT` is omitted entirely; keep an explicit value in production so operators and backup jobs agree on the location.
 
 The local driver restricts physical keys to safe single-segment storage keys and checks path containment before filesystem access. If you use local storage in production, the upload directory is production data and must be included in backup/restore procedures.
 

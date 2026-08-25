@@ -1,9 +1,31 @@
 # YunCMS Documentation
 
-This directory is the user, administrator, operator and integration reference for YunCMS. Start with the section that matches what you are trying to do.
+This is the user, administrator, operator and integration reference for YunCMS. You do not need to read it in file order: choose the outcome you want, complete the linked guide and return here for the next task.
+
+## New to YunCMS?
+
+Follow [Getting Started](getting-started.md) from an empty directory to a running Studio, first collection, restricted role and authenticated API request.
+
+<p align="center">
+  <img src="assets/screenshots/studio-content.png" alt="YunCMS Content workspace" width="100%">
+</p>
+
+## Find the right guide
+
+| Your goal | Read this | What you will learn |
+| --- | --- | --- |
+| Evaluate or install YunCMS | [Getting Started](getting-started.md) | Requirements, npm installation, first collection, editor role and first API call. |
+| Operate the browser interface | [Using Studio](studio.md) | Content, Data Model, Files, users, permissions, branding, AI and mobile navigation. |
+| Configure the server | [Configuration](configuration.md) | MySQL, Files, SMTP, Redis, auth providers, rate limits and deployment URLs. |
+| Build a data model | [Data Model](data-model.md) | Fields, system fields, relations, singletons, groups, ordering and visibility. |
+| Secure access | [Roles and Permissions](permissions.md) | Deny-by-default actions, fields, row filters, validation and Public access. |
+| Connect an application | [REST API](rest-api.md) | Authentication, CRUD, schema, Files and system endpoints. |
+| Query content safely | [Items Query Language](api-query-language.md) | Fields, relations, filters, search, sorting, pagination and aggregation. |
+| Put YunCMS in production | [Production Readiness](production-readiness.md) | Preflight checklist, backups, storage, proxy, security and upgrade verification. |
 
 ## Start here
 
+- [Getting Started](getting-started.md) — install YunCMS and complete a guided first project in about 15 minutes.
 - [Setup and CLI](setup-cli.md) — create a project, configure MySQL, bootstrap the Administrator account, start the server, back up, restore and update.
 - [Using Studio](studio.md) — sign in, manage content, build collections, work with Files, users, roles, permissions, appearance and the built-in AI assistant.
 - [Configuration](configuration.md) — server, MySQL, Redis, rate limits, Files/S3, SMTP, external authentication and MCP settings.
@@ -26,6 +48,18 @@ This directory is the user, administrator, operator and integration reference fo
 - [Studio customization](studio-customization.md) — project name, logo, favicon, accent color, theme and navigation presentation.
 - [Public registration](public-registration.md) — configure controlled account signup from Branding & Appearance.
 - [Using Studio](studio.md) — content operations, Data Model, Files, users, roles and permissions.
+
+## Visual tour
+
+| Content | Data Model |
+| --- | --- |
+| ![Content records](assets/screenshots/studio-content.png) | ![Data Model navigation editor](assets/screenshots/studio-data-model.png) |
+| Search, filter, sort and edit records with role-aware actions. | Group collections, drag to reorder and use the crossed eye for hidden collections. |
+
+| Files | Permissions |
+| --- | --- |
+| ![Files gallery](assets/screenshots/studio-files.png) | ![Permission matrix](assets/screenshots/studio-permissions.png) |
+| Preview and manage local or S3-compatible assets. | Grant simple actions or open advanced field/row/write restrictions. |
 
 ## Operations
 
