@@ -14,6 +14,7 @@ import {
 
 import { writeEnvFile } from './env-file.js';
 import { createInteractivePrompts } from './prompts.js';
+import { ensureProjectScaffold } from './project-scaffold.js';
 
 export async function collectEnvironment(prompts) {
   const DB_HOST = await prompts.line('MySQL host', { defaultValue: '127.0.0.1' });
@@ -29,6 +30,7 @@ export async function collectEnvironment(prompts) {
     PORT: String(DEFAULT_SERVER_PORT),
     STUDIO_ORIGIN: studioUrl,
     AUTH_PUBLIC_URL: studioUrl,
+    FILES_LOCAL_ROOT: 'uploads',
     DB_HOST,
     DB_PORT,
     DB_DATABASE,
@@ -61,6 +63,11 @@ export async function runInitCommand({
 } = {}) {
   const envPath = join(cwd, '.env');
   const workingEnv = { ...env };
+  const scaffold = await ensureProjectScaffold({ cwd });
+
+  if (scaffold.created.length > 0) {
+    output.log?.(`Created project scaffold: ${scaffold.created.join(', ')}`);
+  }
 
   if (!existsSync(envPath)) {
     output.log?.('YunCMS setup: database configuration');
