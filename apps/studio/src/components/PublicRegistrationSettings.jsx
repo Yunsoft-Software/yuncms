@@ -104,7 +104,7 @@ export function PublicRegistrationSettings() {
           <input
             type="checkbox"
             checked={enabled}
-            disabled={!role || !selectedRoleExists}
+            disabled={!enabled && (!role || !selectedRoleExists)}
             onChange={(event) => { setEnabled(event.target.checked); setNotice(''); }}
           />
           <small>{t('registration.enabledHint')}</small>
