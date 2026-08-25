@@ -26,6 +26,7 @@ import {
 } from '@yunsoft/yuncms-core';
 import { createApp } from '../../packages/api/src/app.js';
 import { createMcpRouter, READ_TOOL_NAMES, WRITE_TOOL_NAMES } from '../../packages/api/src/mcp.js';
+import { McpSettingsStore } from '../../packages/api/src/mcp/settings-store.js';
 
 const ENABLED = process.env.YUNCMS_TEST_MYSQL === '1';
 const DESTRUCTIVE = process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE === '1';
@@ -95,20 +96,6 @@ function rawMcpPost(port, { host, origin = null, token = null } = {}) {
   });
 }
 
-function mcpConfig(env, { writesEnabled, allowedHost }) {
-  return loadConfig({
-    ...env,
-    API_RATE_LIMIT_ENABLED: 'false',
-    MCP_ENABLED: 'true',
-    MCP_WRITES_ENABLED: writesEnabled ? 'true' : 'false',
-    MCP_REQUIRE_AUTHENTICATION: 'true',
-    MCP_ALLOWED_HOSTS: allowedHost,
-    MCP_ALLOWED_ORIGINS: 'http://studio.integration.test',
-    MCP_MAX_ITEMS: '100',
-    MCP_MAX_RESULT_BYTES: '10000',
-  });
-}
-
 async function connectClient(port, token, { origin = null } = {}) {
   const headers = {};
   if (origin) headers.origin = origin;
@@ -133,7 +120,7 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
   skip: !ENABLED,
   timeout: 90_000,
 }, async () => {
-  const baseConfig = loadConfig(process.env);
+  const baseConfig = loadConfig({ ...process.env, API_RATE_LIMIT_ENABLED: 'false' });
   requireDisposableDatabase(baseConfig);
   const pool = createDatabasePool(baseConfig.database);
   const token = suffix();
@@ -143,6 +130,7 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
   const schemaCache = new SchemaCache({ versionCheckTtlMs: 0 });
   const emitter = new HookEmitter({ logger: { error() {} } });
   const logger = { info() {}, warn() {}, error() {} };
+  const mcpSettingsStore = new McpSettingsStore({ database: pool });
   let roleId = null;
   let userId = null;
   let apiTokenId = null;
@@ -245,18 +233,23 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
 
     const readPort = await availablePort();
     const trustedReadHost = `127.0.0.1:${readPort}`;
-    const readConfig = mcpConfig(process.env, {
-      writesEnabled: false,
-      allowedHost: trustedReadHost,
+    await mcpSettingsStore.update({
+      enabled: true,
+      writes_enabled: false,
+      require_authentication: true,
+      allowed_hosts: [trustedReadHost],
+      allowed_origins: ['http://studio.integration.test'],
+      max_items: 100,
+      max_result_bytes: 10_000,
     });
     const readApp = createApp({
       pool,
-      config: readConfig,
+      config: baseConfig,
       serviceRegistry: createCoreServiceRegistry(),
       schemaCache,
       emitter,
       logger,
-      mcpRouter: createMcpRouter({ config: readConfig, logger }),
+      mcpRouter: createMcpRouter({ settingsStore: mcpSettingsStore, logger }),
     });
     server = await listen(readApp, readPort);
     const port = server.address().port;
@@ -352,8 +345,6 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
 
     await client.close();
     client = null;
-    await closeServer(server);
-    server = null;
 
     for (const grant of [
       {
@@ -406,21 +397,7 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
       }, { extensionId: 'integration.audit', priority: 1000 });
     }
 
-    const writePort = await availablePort();
-    const writeConfig = mcpConfig(process.env, {
-      writesEnabled: true,
-      allowedHost: `127.0.0.1:${writePort}`,
-    });
-    const writeApp = createApp({
-      pool,
-      config: writeConfig,
-      serviceRegistry: createCoreServiceRegistry(),
-      schemaCache,
-      emitter,
-      logger,
-      mcpRouter: createMcpRouter({ config: writeConfig, logger }),
-    });
-    server = await listen(writeApp, writePort);
+    await mcpSettingsStore.update({ writes_enabled: true });
     client = await connectClient(server.address().port, generatedToken.token, {
       origin: 'http://studio.integration.test',
     });
@@ -477,6 +454,15 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
   } finally {
     if (client) await client.close().catch(() => {});
     if (server) await closeServer(server).catch(() => {});
+    await mcpSettingsStore.update({
+      enabled: false,
+      writes_enabled: false,
+      require_authentication: true,
+      allowed_origins: [],
+      allowed_hosts: [],
+      max_items: 100,
+      max_result_bytes: 1_000_000,
+    }).catch(() => {});
     await pool.query('DELETE FROM yuncms_audit_log WHERE collection = ?', [collection]).catch(() => {});
     if (apiTokenId) await pool.query('DELETE FROM yuncms_api_tokens WHERE id = ?', [apiTokenId]).catch(() => {});
     if (userId) await pool.query('DELETE FROM yuncms_sessions WHERE user = ?', [userId]).catch(() => {});

@@ -327,10 +327,55 @@ export function createMcpAccessGuard(mcpConfig = {}) {
   };
 }
 
-export function createMcpRouter({ config, logger = console } = {}) {
-  if (!config?.mcp?.enabled) return null;
+export function requireMcpAdministrator(req) {
+  if (req?.authMethod === 'public' || !req?.accountability?.user) {
+    const error = new Error('MCP settings require an authenticated YunCMS account');
+    error.code = 'UNAUTHORIZED';
+    throw error;
+  }
+  if (req.accountability?.admin === true || req.accountability?.system === true) return;
+  const error = new Error('MCP settings require administrator access');
+  error.code = 'FORBIDDEN';
+  throw error;
+}
+
+export function createMcpRouter({ settingsStore, logger = console } = {}) {
+  if (!settingsStore) throw new Error('MCP settings store is required');
   const router = express.Router();
-  router.use(createMcpAccessGuard(config.mcp));
+
+  router.get('/settings', async (req, res, next) => {
+    try {
+      requireMcpAdministrator(req);
+      return res.json({ data: await settingsStore.readAdmin(), request_id: req.id });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.patch('/settings', async (req, res, next) => {
+    try {
+      requireMcpAdministrator(req);
+      return res.json({ data: await settingsStore.update(req.body ?? {}), request_id: req.id });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.use(async (req, res, next) => {
+    try {
+      const mcpConfig = await settingsStore.readRuntime();
+      if (!mcpConfig.enabled) {
+        return res.status(404).json({
+          errors: [{ code: 'MCP_DISABLED', message: 'MCP is disabled', request_id: req.id ?? null }],
+        });
+      }
+      req.mcpConfig = mcpConfig;
+      return createMcpAccessGuard(mcpConfig)(req, res, next);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   router.all('/', (req, res, next) => {
     if (req.method === 'POST') return next();
     res.set('allow', 'POST');
@@ -344,7 +389,7 @@ export function createMcpRouter({ config, logger = console } = {}) {
       code: error?.code ?? null,
     });
     const handler = createMcpHandler(
-      () => createRequestMcpServer(req, config.mcp),
+      () => createRequestMcpServer(req, req.mcpConfig),
       { legacy: 'stateless', onerror: reportError },
     );
     const nodeHandler = toNodeHandler(handler, { onerror: reportError });

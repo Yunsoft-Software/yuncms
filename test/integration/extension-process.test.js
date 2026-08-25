@@ -152,7 +152,6 @@ function serverEnv(config, storageRoot) {
     FILES_LOCAL_ROOT: storageRoot,
     API_RATE_LIMIT_ENABLED: 'false',
     PRESSURE_LIMIT_ENABLED: 'false',
-    MCP_ENABLED: 'false',
     LOG_LEVEL: 'warn',
   };
 }

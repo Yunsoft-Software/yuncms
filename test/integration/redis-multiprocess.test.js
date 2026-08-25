@@ -209,7 +209,6 @@ test('two API processes share Redis permission invalidation and rate-limit state
       RATE_LIMIT_FAILURE_MODE: 'required',
       TRUST_PROXY_HOPS: '1',
       PRESSURE_LIMIT_ENABLED: 'false',
-      MCP_ENABLED: 'false',
       LOG_LEVEL: 'warn',
     };
     const processA = startApi(portA, { ...sharedEnv, STUDIO_ORIGIN: `http://127.0.0.1:${portA}` });
