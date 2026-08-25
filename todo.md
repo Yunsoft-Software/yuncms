@@ -81,12 +81,15 @@ In Studio, open **Settings → MCP Connection**, keep authentication enabled, ke
 
 ## 5. Public registration runtime / browser gate
 
-Use Node 24 with the branch dependencies installed and a disposable MySQL database.
+Use Node 24 with the branch dependencies installed, a disposable MySQL database and a non-production SMTP inbox when testing email verification.
 
-- [ ] Bootstrap an existing pre-0018 database and verify migration `0018-public-registration-settings` adds the default-off settings without changing existing users/roles.
-- [ ] In Studio as Administrator, verify **Settings → Branding & Appearance → Public Registration** on desktop/mobile light and dark themes: only normal non-admin/non-Public roles are selectable, save/reload preserves the selection, and disabling registration removes the sign-up option from Login.
-- [ ] Verify a non-admin cannot read the managed registration role or mutate the setting, while the public `/studio-settings` response exposes only the boolean enablement needed by Login.
-- [ ] Verify `/auth/register` returns 403 while disabled, creates an active user with exactly the configured normal role while enabled, rejects client-supplied role/status, rejects an Administrator/Public/stale configured role, rate-limits repeated attempts, and duplicate email handling remains bounded.
+- [ ] Bootstrap an existing pre-0018 database and verify migrations `0018-public-registration-settings` and `0019-public-registration-email-verification` apply cleanly, default both public registration and required email verification to off, and do not change existing users/roles.
+- [ ] In Studio as Administrator, verify **Settings → Branding & Appearance → Public Registration** on desktop/mobile light and dark themes: only normal non-admin/non-Public roles are selectable, enablement/role/email-verification settings survive save/reload, and disabling registration removes the sign-up option from Login.
+- [ ] Verify a non-admin cannot read the managed registration role or mutate the setting, while public `/studio-settings` exposes only registration enablement plus the email-verification boolean needed by Login; the configured role id must remain private.
+- [ ] With email verification **off**, verify `/auth/register` creates an active user with exactly the configured normal role, sets `email_verified_at`, allows normal local sign-in, rejects client-supplied role/status, rejects Administrator/Public/stale configured roles, rate-limits repeated attempts, and duplicate email handling remains bounded.
+- [ ] With email verification **on** and SMTP configured, register a new account and verify `email_verified_at` remains null, one verification email is delivered, correct local credentials return `EMAIL_NOT_VERIFIED`, the one-time link marks the address verified, and the same credentials then sign in normally.
+- [ ] Verify anonymous `POST /auth/email-verification/request` is rate-limited, returns the same accepted shape for unknown/already-verified/unverified addresses, replaces older unused verification tokens, and the Studio resend button works without exposing whether an account exists.
+- [ ] With verification enabled but SMTP not configured, verify registration fails before inserting a user. Simulate SMTP delivery failure after creation and verify YunCMS removes the just-created partial account or clearly reports any cleanup failure without leaking credentials/tokens.
 
 ## 6. Core browser / security smoke
 
