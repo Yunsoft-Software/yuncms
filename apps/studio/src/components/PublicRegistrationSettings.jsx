@@ -11,6 +11,7 @@ export function PublicRegistrationSettings() {
   const [roles, setRoles] = useState([]);
   const [enabled, setEnabled] = useState(false);
   const [role, setRole] = useState('');
+  const [requireEmailVerification, setRequireEmailVerification] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -29,6 +30,9 @@ export function PublicRegistrationSettings() {
         setRoles(eligibleRoles);
         setEnabled(settings.public_registration_enabled === true);
         setRole(settings.public_registration_role || '');
+        setRequireEmailVerification(
+          settings.public_registration_require_email_verification === true,
+        );
         setAvailable(true);
       })
       .catch((requestError) => {
@@ -58,6 +62,7 @@ export function PublicRegistrationSettings() {
       await saveSettings({
         public_registration_enabled: enabled,
         public_registration_role: role || null,
+        public_registration_require_email_verification: requireEmailVerification,
       });
       setNotice(t('registration.saved'));
     } catch (requestError) {
@@ -108,6 +113,19 @@ export function PublicRegistrationSettings() {
             onChange={(event) => { setEnabled(event.target.checked); setNotice(''); }}
           />
           <small>{t('registration.enabledHint')}</small>
+        </label>
+
+        <label className="field-label">
+          <span>{t('registration.requireEmailVerification')}</span>
+          <input
+            type="checkbox"
+            checked={requireEmailVerification}
+            onChange={(event) => {
+              setRequireEmailVerification(event.target.checked);
+              setNotice('');
+            }}
+          />
+          <small>{t('registration.requireEmailVerificationHint')}</small>
         </label>
 
         <div className="form-actions">
