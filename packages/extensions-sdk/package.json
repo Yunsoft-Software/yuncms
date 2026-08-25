@@ -1,6 +1,6 @@
 {
   "name": "@yunsoft/yuncms-extensions-sdk",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Extension authoring helpers for YunCMS endpoints and hooks.",
   "license": "MIT",
   "type": "module",
