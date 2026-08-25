@@ -8,10 +8,18 @@ const appearanceSource = await readFile(new URL('../src/screens/AppearanceScreen
 const loginSource = await readFile(new URL('../src/screens/LoginScreen.jsx', import.meta.url), 'utf8');
 const panelSource = await readFile(new URL('../src/components/PublicRegistrationSettings.jsx', import.meta.url), 'utf8');
 
-test('public registration defaults closed and only accepts an explicit true flag', () => {
-  assert.equal(normalizeStudioSettings({}).public_registration_enabled, false);
+test('public registration and email verification default closed and require explicit true flags', () => {
+  const defaults = normalizeStudioSettings({});
+  assert.equal(defaults.public_registration_enabled, false);
+  assert.equal(defaults.public_registration_require_email_verification, false);
   assert.equal(normalizeStudioSettings({ public_registration_enabled: 1 }).public_registration_enabled, false);
+  assert.equal(normalizeStudioSettings({
+    public_registration_require_email_verification: 1,
+  }).public_registration_require_email_verification, false);
   assert.equal(normalizeStudioSettings({ public_registration_enabled: true }).public_registration_enabled, true);
+  assert.equal(normalizeStudioSettings({
+    public_registration_require_email_verification: true,
+  }).public_registration_require_email_verification, true);
 });
 
 test('Studio settings and login source wire the guarded public registration flow', () => {
@@ -20,8 +28,13 @@ test('Studio settings and login source wire the guarded public registration flow
   assert.match(panelSource, /!entry\.admin && !entry\.public/);
   assert.match(panelSource, /public_registration_enabled/);
   assert.match(panelSource, /public_registration_role/);
+  assert.match(panelSource, /public_registration_require_email_verification/);
   assert.match(loginSource, /settings\.public_registration_enabled === true/);
+  assert.match(loginSource, /settings\.public_registration_require_email_verification === true/);
   assert.match(loginSource, /\/auth\/register/);
+  assert.match(loginSource, /\/auth\/email-verification\/request/);
+  assert.match(loginSource, /EMAIL_NOT_VERIFIED/);
+  assert.match(loginSource, /auth\.resendVerification/);
   assert.match(loginSource, /registerMode/);
   assert.match(loginSource, /auth\.confirmPassword/);
 });
