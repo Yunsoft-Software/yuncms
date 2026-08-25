@@ -37,16 +37,18 @@ npm 11+
 MySQL 8-compatible server
 ```
 
-## Quick start
+## Quick start — no clone or fork required
 
-From the repository/project:
+Create an empty directory and run the published npm package directly with `npx`:
 
 ```bash
-npm install
-npm run init
-npm run bootstrap
-npm start
+mkdir my-yuncms
+cd my-yuncms
+npx --yes @yunsoft/yuncms init
+npx --yes @yunsoft/yuncms start
 ```
+
+`init` interactively asks for the MySQL connection and first Administrator account, creates the project `.env`, verifies the database and applies the required migrations. The current directory becomes the YunCMS project directory, so `.env`, local Files and local extensions live there rather than inside the npm cache.
 
 Default local URL:
 
@@ -56,30 +58,44 @@ http://localhost:3008
 
 The same listener serves Studio and the API.
 
-The published CLI package is:
+### Persistent npm installation
 
-```text
-@yunsoft/yuncms
+The direct `npx` flow above is enough to initialize and run YunCMS without cloning this repository. For a long-lived installation that should record YunCMS in its own `package.json` and use the managed `yuncms update` flow, install the package once in that project directory:
+
+```bash
+npm init -y
+npm install @yunsoft/yuncms
+npx yuncms init
+npx yuncms start
 ```
 
-Useful CLI commands:
+After a local install, `npx yuncms ...` uses the project dependency instead of downloading a temporary copy.
 
-```text
-yuncms init
-yuncms bootstrap
-yuncms start
-yuncms backup
-yuncms restore /path/to/backup --yes
-yuncms update --dry-run
-yuncms update --to <version>
-yuncms help
+Useful commands:
+
+```bash
+npx yuncms init
+npx yuncms bootstrap
+npx yuncms start
+npx yuncms backup
+npx yuncms restore /path/to/backup --yes
+npx yuncms update --dry-run
+npx yuncms update --to <version>
+npx yuncms help
+```
+
+If the package is not installed locally, use the full remote form instead, for example:
+
+```bash
+npx --yes @yunsoft/yuncms init
+npx --yes @yunsoft/yuncms start
 ```
 
 For initialization, backup/restore and updates, read **[Setup and CLI](docs/setup-cli.md)**.
 
 # First steps in Studio
 
-After `npm start`, open the YunCMS URL and sign in with the Administrator created during initialization.
+After starting YunCMS, open `http://localhost:3008` and sign in with the Administrator created during initialization.
 
 A normal first setup is:
 
