@@ -19,6 +19,7 @@ test('clean install has one shared default port and it is 3008', async () => {
   assert.equal(env.PORT, '3008');
   assert.equal(env.STUDIO_ORIGIN, 'http://localhost:3008');
   assert.equal(env.AUTH_PUBLIC_URL, 'http://localhost:3008');
+  assert.equal(env.FILES_LOCAL_ROOT, 'uploads');
 });
 
 test('.env.example matches the clean-install 3008 contract and contains no legacy dev ports', () => {
