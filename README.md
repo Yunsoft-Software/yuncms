@@ -19,6 +19,7 @@ YunCMS is developed by **Yunsoft**. Learn more about the company at **[Yunsoft â
 - field allowlists, row filters and create/update validation rules;
 - explicit Public-role permissions;
 - user/session/API-token authentication;
+- optional Administrator-managed public registration with a fixed normal role and email verification;
 - optional OIDC, OAuth2, LDAP and SAML authentication providers;
 - local and S3-compatible Files storage;
 - permission-managed public/filtered Files use cases;
@@ -306,12 +307,13 @@ YunCMS supports:
 - logout / logout-all;
 - password reset;
 - email verification;
+- optional public self-registration with a server-controlled role;
 - OIDC;
 - OAuth2;
 - LDAP;
 - SAML.
 
-Read **[Authentication](docs/auth.md)** and **[Configuration](docs/configuration.md)**.
+Read **[Authentication](docs/auth.md)**, **[Public Registration](docs/public-registration.md)** and **[Configuration](docs/configuration.md)**.
 
 # Extensions
 
@@ -376,6 +378,7 @@ The complete user/operator/integrator index is **[docs/README.md](docs/README.md
 - **[REST API Reference](docs/rest-api.md)**
 - **[Items API Query Language](docs/api-query-language.md)**
 - **[Authentication](docs/auth.md)**
+- **[Public Registration](docs/public-registration.md)**
 - **[Roles and Permissions](docs/permissions.md)**
 - **[Files and Storage](docs/files.md)**
 - **[Extensions](docs/extensions.md)**

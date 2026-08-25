@@ -88,6 +88,16 @@ A request without a Bearer token is not treated as Administrator. It resolves to
 
 This applies to normal Items reads and to system resources that explicitly support delegated/Public permissions, including Files.
 
+## Public registration
+
+Public registration is disabled by default. An Administrator can select one normal non-Administrator, non-Public role and enable signup under **Settings → Branding & Appearance → Public Registration**. Clients cannot choose their own role or account status.
+
+```text
+POST /auth/register
+```
+
+Optional required email verification keeps a new account from local sign-in until its one-time verification link is confirmed. Verification resend remains non-enumerating and rate-limited. See [Public registration](public-registration.md) for the full Studio, API, SMTP and failure contract.
+
 ## Password reset
 
 Request a reset:

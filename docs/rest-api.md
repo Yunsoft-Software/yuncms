@@ -176,9 +176,10 @@ POST /auth/logout-all
 
 `/auth/logout` and `/auth/logout-all` require a session access token, not a static API token.
 
-## Password reset and email verification
+## Public registration, password reset and email verification
 
 ```text
+POST /auth/register
 POST /auth/password-reset/request
 POST /auth/password-reset/confirm
 POST /auth/email-verification/request
@@ -186,6 +187,8 @@ POST /auth/email-verification/confirm
 ```
 
 Password-reset request responses intentionally do not reveal whether an account exists.
+
+Public registration is disabled by default, accepts only email/password credentials and assigns the Administrator-configured normal role. Email-verification resend responses are also non-enumerating. See [Public registration](public-registration.md).
 
 ## API tokens
 

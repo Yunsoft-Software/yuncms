@@ -10,7 +10,7 @@ http://localhost:3008
 
 ## Sign in
 
-The login screen supports normal email/password authentication and displays any configured external authentication providers.
+The login screen supports normal email/password authentication and displays any configured external authentication providers. When an Administrator enables public registration, it also exposes account creation and the optional verification-resend flow.
 
 If you forget a local password, use the password-reset option. Reset and verification links return to Studio and are completed against the normal authentication API.
 
@@ -220,6 +220,12 @@ Logo and favicon assets point to YunCMS Files records rather than arbitrary unva
 
 See [Studio customization](studio-customization.md).
 
+## Public registration
+
+Administrators configure default-off public signup under **Branding & Appearance → Public Registration**. A normal authenticated role must be selected before signup can be enabled; Administrator and Public roles are never eligible. Email verification can be required when SMTP is configured.
+
+See [Public registration](public-registration.md) before enabling signup.
+
 # AI assistant
 
 When configured by an Administrator, the Studio AI assistant can help inspect schema/content and, when explicitly allowed, perform bounded data operations through YunCMS services.
@@ -265,4 +271,5 @@ Check `AUTH_PROVIDERS` and the provider configuration, then verify `/auth/provid
 - [Roles and permissions](permissions.md)
 - [Files](files.md)
 - [Authentication](auth.md)
+- [Public registration](public-registration.md)
 - [AI assistant](ai-assistant.md)

@@ -289,6 +289,12 @@ The identity-provider certificate must be PEM. Clock skew must be an integer fro
 
 See [Authentication](auth.md) for login behavior and account-linking security.
 
+## Public registration
+
+Public registration is configured in **Studio → Settings → Branding & Appearance**, not with environment variables. It is disabled by default and requires an explicit normal role. Optional required email verification uses the SMTP and `AUTH_PUBLIC_URL` configuration described above.
+
+See [Public registration](public-registration.md) for the complete contract.
+
 ## MCP
 
 MCP is not configured through environment variables. An Administrator manages it in **Studio → Settings → MCP Connection**. The database-backed settings control endpoint enablement, write tools, authentication, exact Host/Origin allowlists and result limits. Changes apply without restarting YunCMS.
@@ -354,5 +360,6 @@ Configure the reverse proxy/load balancer separately and set `TRUST_PROXY_HOPS` 
 - [Deployment](deployment.md)
 - [Security](security.md)
 - [Authentication](auth.md)
+- [Public registration](public-registration.md)
 - [Files](files.md)
 - [MCP](mcp.md)

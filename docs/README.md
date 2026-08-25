@@ -14,6 +14,7 @@ This directory is the user, administrator, operator and integration reference fo
 - [REST API reference](rest-api.md) — endpoint catalogue, authentication, CRUD, schema, Files, users, roles, permissions, audit, AI, MCP and extension endpoints.
 - [Items query language](api-query-language.md) — `fields`, `*`, `*.*`, nested relations, `filter`, `search`, `sort`, `limit`, `offset`, `aggregate`, `groupBy`, `expand`, limits and examples.
 - [Authentication](auth.md) — sessions, refresh rotation, API tokens, password reset, email verification, OIDC, OAuth2, LDAP and SAML.
+- [Public registration](public-registration.md) — default-off signup, role assignment, optional email verification and resend behavior.
 - [Roles and permissions](permissions.md) — Public access, action grants, row filters, field allowlists, validation rules and system-resource delegation.
 - [Files](files.md) — upload/download, gallery use, local and S3-compatible storage, public/filtered file access and reconciliation.
 - [Extensions](extensions.md) — endpoint extensions, hooks, lifecycle events, scheduled jobs and the extension SDK.
@@ -23,6 +24,7 @@ This directory is the user, administrator, operator and integration reference fo
 ## Studio administration
 
 - [Studio customization](studio-customization.md) — project name, logo, favicon, accent color, theme and navigation presentation.
+- [Public registration](public-registration.md) — configure controlled account signup from Branding & Appearance.
 - [Using Studio](studio.md) — content operations, Data Model, Files, users, roles and permissions.
 
 ## Operations
