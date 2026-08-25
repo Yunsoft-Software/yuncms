@@ -17,6 +17,7 @@ const SETTINGS_ROW = {
   default_locale: 'en',
   public_registration_enabled: 0,
   public_registration_role: null,
+  public_registration_require_email_verification: 0,
   updated_at: null,
 };
 
@@ -41,6 +42,7 @@ test('public accountability can read only safe Studio settings', async () => {
     theme: 'system',
     default_locale: 'en',
     public_registration_enabled: false,
+    public_registration_require_email_verification: false,
     updated_at: null,
   });
 });
@@ -52,6 +54,7 @@ test('administrator can read registration role while public settings do not expo
         ...SETTINGS_ROW,
         public_registration_enabled: 1,
         public_registration_role: REGISTRATION_ROLE_ID,
+        public_registration_require_email_verification: 1,
       }], []];
     },
   };
@@ -65,8 +68,36 @@ test('administrator can read registration role while public settings do not expo
   });
 
   assert.equal((await admin.readOne()).public_registration_role, REGISTRATION_ROLE_ID);
+  assert.equal((await admin.readOne()).public_registration_require_email_verification, true);
   assert.equal((await publicService.readPublic()).public_registration_role, undefined);
   assert.equal((await publicService.readPublic()).public_registration_enabled, true);
+  assert.equal((await publicService.readPublic()).public_registration_require_email_verification, true);
+});
+
+test('administrator can toggle registration email verification independently', async () => {
+  const calls = [];
+  const database = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (sql.includes('UPDATE yuncms_studio_settings')) return [{ affectedRows: 1 }, []];
+      if (sql.includes('FROM yuncms_studio_settings')) {
+        return [[{
+          ...SETTINGS_ROW,
+          public_registration_require_email_verification: 1,
+        }], []];
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  const service = new StudioSettingsService({
+    database,
+    accountability: createAccountability({ user: 'admin-1', role: 'admin-role', admin: true }),
+  });
+
+  const result = await service.updateOne({ public_registration_require_email_verification: true });
+  assert.equal(result.public_registration_require_email_verification, true);
+  const update = calls.find(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'));
+  assert.deepEqual(update.params, [1, 1]);
 });
 
 test('registration cannot be enabled without a normal authenticated role', async () => {
