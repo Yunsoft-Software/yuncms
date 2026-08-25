@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { BrandAssetPicker } from '../components/BrandAssetPicker.jsx';
+import { PublicRegistrationSettings } from '../components/PublicRegistrationSettings.jsx';
 import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/StudioBrand.jsx';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
@@ -73,104 +74,108 @@ export function AppearanceScreen() {
 
   return (
     <div className="appearance-layout">
-      <form className="panel appearance-form" onSubmit={handleSave}>
-        <div className="panel-header appearance-heading">
-          <div>
-            <p className="eyebrow">{t('appearance.branding')}</p>
-            <h2>{t('section.appearanceTitle')}</h2>
-            <p>{t('section.appearanceDescription')}</p>
-          </div>
-          <button className="secondary-button" type="button" onClick={resetBranding}>
-            {t('appearance.resetYunsoft')}
-          </button>
-        </div>
-
-        {loadError && <div className="notice-banner" role="status">{t('appearance.loadWarning')}</div>}
-        {error && <div className="error-banner" role="alert">{error}</div>}
-        {notice && <div className="notice-banner" role="status">{notice}</div>}
-
-        <div className="appearance-grid">
-          <label className="field-label">
-            <span>{t('appearance.brandName')}</span>
-            <input
-              value={form.brand_name || ''}
-              maxLength={100}
-              onChange={(event) => update('brand_name', event.target.value)}
-              required
-            />
-            <small>{t('appearance.brandNameHint')}</small>
-          </label>
-
-          <div className="appearance-brand-assets">
-            <BrandAssetPicker
-              kind="logo"
-              value={form.logo_file || null}
-              onChange={(fileId) => update('logo_file', fileId)}
-            />
-            <BrandAssetPicker
-              kind="favicon"
-              value={form.favicon_file || null}
-              onChange={(fileId) => update('favicon_file', fileId)}
-            />
+      <div className="form-stack">
+        <form className="panel appearance-form" onSubmit={handleSave}>
+          <div className="panel-header appearance-heading">
+            <div>
+              <p className="eyebrow">{t('appearance.branding')}</p>
+              <h2>{t('section.appearanceTitle')}</h2>
+              <p>{t('section.appearanceDescription')}</p>
+            </div>
+            <button className="secondary-button" type="button" onClick={resetBranding}>
+              {t('appearance.resetYunsoft')}
+            </button>
           </div>
 
-          <label className="field-label">
-            <span>{t('appearance.accentColor')}</span>
-            <div className="color-field">
+          {loadError && <div className="notice-banner" role="status">{t('appearance.loadWarning')}</div>}
+          {error && <div className="error-banner" role="alert">{error}</div>}
+          {notice && <div className="notice-banner" role="status">{notice}</div>}
+
+          <div className="appearance-grid">
+            <label className="field-label">
+              <span>{t('appearance.brandName')}</span>
               <input
-                type="color"
-                value={form.accent_color || DEFAULT_STUDIO_SETTINGS.accent_color}
-                onChange={(event) => update('accent_color', event.target.value)}
-                aria-label={t('appearance.accentColor')}
-              />
-              <input
-                value={form.accent_color || ''}
-                pattern="#[0-9A-Fa-f]{6}"
-                maxLength={7}
-                onChange={(event) => update('accent_color', event.target.value)}
+                value={form.brand_name || ''}
+                maxLength={100}
+                onChange={(event) => update('brand_name', event.target.value)}
                 required
               />
+              <small>{t('appearance.brandNameHint')}</small>
+            </label>
+
+            <div className="appearance-brand-assets">
+              <BrandAssetPicker
+                kind="logo"
+                value={form.logo_file || null}
+                onChange={(fileId) => update('logo_file', fileId)}
+              />
+              <BrandAssetPicker
+                kind="favicon"
+                value={form.favicon_file || null}
+                onChange={(fileId) => update('favicon_file', fileId)}
+              />
             </div>
-          </label>
 
-          <label className="field-label">
-            <span>{t('appearance.theme')}</span>
-            <select value={form.theme || 'system'} onChange={(event) => update('theme', event.target.value)}>
-              <option value="system">{t('appearance.themeSystem')}</option>
-              <option value="light">{t('appearance.themeLight')}</option>
-              <option value="dark">{t('appearance.themeDark')}</option>
-            </select>
-          </label>
+            <label className="field-label">
+              <span>{t('appearance.accentColor')}</span>
+              <div className="color-field">
+                <input
+                  type="color"
+                  value={form.accent_color || DEFAULT_STUDIO_SETTINGS.accent_color}
+                  onChange={(event) => update('accent_color', event.target.value)}
+                  aria-label={t('appearance.accentColor')}
+                />
+                <input
+                  value={form.accent_color || ''}
+                  pattern="#[0-9A-Fa-f]{6}"
+                  maxLength={7}
+                  onChange={(event) => update('accent_color', event.target.value)}
+                  required
+                />
+              </div>
+            </label>
 
-          <label className="field-label">
-            <span>{t('appearance.defaultLanguage')}</span>
-            <select
-              value={form.default_locale || 'en'}
-              onChange={(event) => update('default_locale', event.target.value)}
-            >
-              <option value="en">{t('appearance.english')}</option>
-              <option value="tr">{t('appearance.turkish')}</option>
-            </select>
-            <small>{t('appearance.defaultLanguageHint')}</small>
-          </label>
+            <label className="field-label">
+              <span>{t('appearance.theme')}</span>
+              <select value={form.theme || 'system'} onChange={(event) => update('theme', event.target.value)}>
+                <option value="system">{t('appearance.themeSystem')}</option>
+                <option value="light">{t('appearance.themeLight')}</option>
+                <option value="dark">{t('appearance.themeDark')}</option>
+              </select>
+            </label>
 
-          <div className="field-label appearance-personal-language">
-            <span>{t('appearance.currentLanguage')}</span>
-            <LanguageSwitcher />
-            {localeOverride && (
-              <button className="text-button" type="button" onClick={useDefaultLocale}>
-                {t('appearance.followDefault')}
-              </button>
-            )}
+            <label className="field-label">
+              <span>{t('appearance.defaultLanguage')}</span>
+              <select
+                value={form.default_locale || 'en'}
+                onChange={(event) => update('default_locale', event.target.value)}
+              >
+                <option value="en">{t('appearance.english')}</option>
+                <option value="tr">{t('appearance.turkish')}</option>
+              </select>
+              <small>{t('appearance.defaultLanguageHint')}</small>
+            </label>
+
+            <div className="field-label appearance-personal-language">
+              <span>{t('appearance.currentLanguage')}</span>
+              <LanguageSwitcher />
+              {localeOverride && (
+                <button className="text-button" type="button" onClick={useDefaultLocale}>
+                  {t('appearance.followDefault')}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="form-actions">
-          <button className="primary-button" type="submit" disabled={saving}>
-            {saving ? t('common.saving') : t('common.save')}
-          </button>
-        </div>
-      </form>
+          <div className="form-actions">
+            <button className="primary-button" type="submit" disabled={saving}>
+              {saving ? t('common.saving') : t('common.save')}
+            </button>
+          </div>
+        </form>
+
+        <PublicRegistrationSettings />
+      </div>
 
       <aside className="panel appearance-preview" aria-label={t('appearance.preview')}>
         <p className="eyebrow">{t('appearance.preview')}</p>
