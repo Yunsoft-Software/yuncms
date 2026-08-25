@@ -26,6 +26,8 @@ The `0.1.7` package family was published on 2026-08-23 after a clean published `
 
 The `0.1.10` package family was published on 2026-08-24 with persisted administrator AI settings/write modes and the Directus-like Data Model folder, ordering, collapse and pointer drag/drop pass. Node 24 release gates, all nine real MySQL/API integration files, local tarball installation, live Studio interaction checks and a clean public-registry install passed. All four `latest` tags, registry SHA1/integrity values and exact internal `0.1.10` dependency pins were verified anonymously. Detailed evidence is recorded in [`release-evidence-0.1.10.md`](release-evidence-0.1.10.md).
 
+The `0.1.13` package family was published on 2026-08-25 after the compact Content/pagination GitHub updates were integrated into both release branches. Node 24 fast/full/release gates passed on both final branch trees, all nine real MySQL/API integration files passed with isolated Redis, and a clean public-registry installation resolved CLI/API/core to `0.1.13`. All four `latest` tags and exact internal dependency pins were verified anonymously. Detailed evidence is recorded in [`release-evidence-0.1.13.md`](release-evidence-0.1.13.md).
+
 ## Naming direction
 
 Keep the product and executable command simple:
