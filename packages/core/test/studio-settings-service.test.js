@@ -6,6 +6,7 @@ import { StudioSettingsService } from '../src/services/studio-settings-service.j
 
 const LOGO_FILE_ID = '123e4567-e89b-42d3-a456-426614174000';
 const FAVICON_FILE_ID = '223e4567-e89b-42d3-a456-426614174001';
+const REGISTRATION_ROLE_ID = '323e4567-e89b-42d3-a456-426614174002';
 const SETTINGS_ROW = {
   brand_name: 'YunCMS',
   logo_url: 'https://yunsoft.com/light-logo.png',
@@ -14,10 +15,12 @@ const SETTINGS_ROW = {
   accent_color: '#2563eb',
   theme: 'system',
   default_locale: 'en',
+  public_registration_enabled: 0,
+  public_registration_role: null,
   updated_at: null,
 };
 
-test('public accountability can read only safe Studio appearance settings', async () => {
+test('public accountability can read only safe Studio settings', async () => {
   const database = {
     async query(sql) {
       assert.match(sql, /FROM yuncms_studio_settings/);
@@ -29,7 +32,66 @@ test('public accountability can read only safe Studio appearance settings', asyn
     accountability: createPublicAccountability({ role: 'public-role' }),
   });
 
-  assert.deepEqual(await service.readPublic(), SETTINGS_ROW);
+  assert.deepEqual(await service.readPublic(), {
+    brand_name: 'YunCMS',
+    logo_url: 'https://yunsoft.com/light-logo.png',
+    logo_file: null,
+    favicon_file: null,
+    accent_color: '#2563eb',
+    theme: 'system',
+    default_locale: 'en',
+    public_registration_enabled: false,
+    updated_at: null,
+  });
+});
+
+test('administrator can read registration role while public settings do not expose it', async () => {
+  const database = {
+    async query() {
+      return [[{
+        ...SETTINGS_ROW,
+        public_registration_enabled: 1,
+        public_registration_role: REGISTRATION_ROLE_ID,
+      }], []];
+    },
+  };
+  const admin = new StudioSettingsService({
+    database,
+    accountability: createAccountability({ user: 'admin-1', role: 'admin-role', admin: true }),
+  });
+  const publicService = new StudioSettingsService({
+    database,
+    accountability: createPublicAccountability(),
+  });
+
+  assert.equal((await admin.readOne()).public_registration_role, REGISTRATION_ROLE_ID);
+  assert.equal((await publicService.readPublic()).public_registration_role, undefined);
+  assert.equal((await publicService.readPublic()).public_registration_enabled, true);
+});
+
+test('registration cannot be enabled without a normal authenticated role', async () => {
+  const database = {
+    async query(sql, params = []) {
+      if (sql.includes('FROM yuncms_studio_settings')) return [[SETTINGS_ROW], []];
+      if (sql.includes('FROM yuncms_roles')) {
+        return [[{ id: params[0], admin: 1, public: 0 }], []];
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  const service = new StudioSettingsService({
+    database,
+    accountability: createAccountability({ user: 'admin-1', role: 'admin-role', admin: true }),
+  });
+
+  await assert.rejects(
+    service.updateOne({ public_registration_enabled: true }),
+    (error) => error.code === 'INVALID_PAYLOAD',
+  );
+  await assert.rejects(
+    service.updateOne({ public_registration_role: REGISTRATION_ROLE_ID }),
+    (error) => error.code === 'INVALID_PAYLOAD' && /Administrator roles/.test(error.message),
+  );
 });
 
 test('non-admin accountability cannot mutate Studio settings before database access', async () => {
