@@ -19,6 +19,7 @@ import './routed-pages.css';
 import './mobile-responsive.css';
 import './navigation-model.css';
 import './ai.css';
+import './mcp.css';
 
 if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 window.scrollTo({ top: 0, left: 0, behavior: 'instant' });

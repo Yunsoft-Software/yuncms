@@ -16,6 +16,7 @@ import { ContentRouteScreen } from './screens/ContentRouteScreen.jsx';
 import { DataModelScreen } from './screens/DataModelScreen.jsx';
 import { FilesScreen } from './screens/FilesScreen.jsx';
 import { LoginScreen } from './screens/LoginScreen.jsx';
+import { McpScreen } from './screens/McpScreen.jsx';
 import { RolesPermissionsScreen } from './screens/RolesPermissionsScreen.jsx';
 import { UsersScreen } from './screens/UsersScreen.jsx';
 
@@ -23,6 +24,7 @@ const settingsSections = [
   { id: 'data-model', labelKey: 'nav.dataModel', icon: 'model' },
   { id: 'users', labelKey: 'nav.users', icon: 'users' },
   { id: 'roles', labelKey: 'nav.roles', icon: 'roles' },
+  { id: 'mcp', labelKey: 'nav.mcp', icon: 'mcp', adminOnly: true },
   { id: 'appearance', labelKey: 'nav.appearance', icon: 'appearance' },
 ];
 
@@ -33,6 +35,7 @@ function sectionCopy(section, t) {
     roles: ['section.rolesTitle', 'section.rolesDescription'],
     files: ['section.filesTitle', 'section.filesDescription'],
     ai: ['section.aiTitle', 'section.aiDescription'],
+    mcp: ['section.mcpTitle', 'section.mcpDescription'],
     appearance: ['section.appearanceTitle', 'section.appearanceDescription'],
   };
   const keys = copy[section];
@@ -245,6 +248,9 @@ export function App() {
     if (section === 'roles') return <RolesPermissionsScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'files') return <FilesScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'ai') return <AiScreen />;
+    if (section === 'mcp') return session?.user?.admin
+      ? <McpScreen />
+      : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;
     if (section === 'appearance') return <AppearanceScreen />;
     return (
       <ContentRouteScreen
@@ -256,7 +262,7 @@ export function App() {
         onOpenDataModel={() => navigateStudio(studioPath.dataModel())}
       />
     );
-  }, [activeContentCollection, contentCollection, contentTitle, route, section, session?.user?.id]);
+  }, [activeContentCollection, contentCollection, contentTitle, route, section, session?.user?.admin, session?.user?.id, t]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -283,6 +289,7 @@ export function App() {
       roles: studioPath.roles(),
       files: studioPath.files(),
       ai: studioPath.ai(),
+      mcp: studioPath.mcp(),
       appearance: studioPath.appearance(),
       content: studioPath.content(contentCollection || contentCollections[0]?.collection || ''),
     };
@@ -412,7 +419,7 @@ export function App() {
                 collapsed={navigationCollapsed}
                 onToggle={() => toggleGroup('settings')}
               >
-                {settingsSections.map((item) => (
+                {settingsSections.filter((item) => !item.adminOnly || session.user?.admin).map((item) => (
                   <button
                     key={item.id}
                     className={`nav-item nav-item-child ${section === item.id ? 'active' : ''}`}

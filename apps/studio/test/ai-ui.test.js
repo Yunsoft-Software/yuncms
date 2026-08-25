@@ -47,7 +47,7 @@ test('AI settings form never pre-fills or renders the saved API key', () => {
 });
 
 test('Yapay Zeka UI never exposes MCP terminology to Studio users', () => {
-  for (const source of [appSource, screenSource, settingsSource, trSource]) {
+  for (const source of [screenSource, settingsSource, trSource]) {
     assert.doesNotMatch(source, /\bMCP\b/i);
     assert.doesNotMatch(source, /\/mcp/);
   }

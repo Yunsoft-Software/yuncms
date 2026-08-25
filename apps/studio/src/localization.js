@@ -4,13 +4,15 @@ import { EN as BASE_EN } from './locales/en.js';
 import { TR as BASE_TR } from './locales/tr.js';
 import { NAVIGATION_EN } from './locales/navigation-en.js';
 import { NAVIGATION_TR } from './locales/navigation-tr.js';
+import { MCP_EN } from './locales/mcp-en.js';
+import { MCP_TR } from './locales/mcp-tr.js';
 import { UI_EN } from './locales/ui-en.js';
 import { UI_TR } from './locales/ui-tr.js';
 import { UX_EN } from './locales/ux-en.js';
 import { UX_TR } from './locales/ux-tr.js';
 
-export const EN = Object.freeze({ ...BASE_EN, ...UI_EN, ...UX_EN, ...AI_EN, ...NAVIGATION_EN });
-export const TR = Object.freeze({ ...BASE_TR, ...UI_TR, ...UX_TR, ...AI_TR, ...NAVIGATION_TR });
+export const EN = Object.freeze({ ...BASE_EN, ...UI_EN, ...UX_EN, ...AI_EN, ...MCP_EN, ...NAVIGATION_EN });
+export const TR = Object.freeze({ ...BASE_TR, ...UI_TR, ...UX_TR, ...AI_TR, ...MCP_TR, ...NAVIGATION_TR });
 
 const DICTIONARIES = Object.freeze({ en: EN, tr: TR });
 
