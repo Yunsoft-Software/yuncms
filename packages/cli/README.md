@@ -8,6 +8,16 @@ npx yuncms init
 npx yuncms start
 ```
 
+`init` creates the project `.env`, an `uploads/` directory, a Plesk-compatible `start.js`, a 200-response health endpoint example under `extensions/health/`, and a minimal hook example under `extensions/example-hook/`. Existing project files are preserved and are not overwritten by the scaffold.
+
+The generated health extension is available at `/extensions/health`. The core `/health` and `/ready` routes remain unchanged.
+
+For Plesk, keep `@yunsoft/yuncms` installed locally and use the generated `start.js` as the application startup file. The same entry can be checked manually with:
+
+```bash
+node start.js
+```
+
 Production maintenance commands:
 
 ```bash
