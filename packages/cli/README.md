@@ -15,7 +15,9 @@ npx --yes @yunsoft/yuncms start
 
 `init` creates the project `.env`, asks for MySQL connection details, applies the required database migrations and creates the first Administrator account.
 
-The current directory is used as the YunCMS project directory, including local Files and local `extensions/`.
+The current directory is used as the YunCMS project directory. Initialization also creates an `uploads/` directory, a Plesk-compatible `start.js`, a 200-response health endpoint example under `extensions/health/`, and a minimal hook example under `extensions/example-hook/`. Existing project files are preserved and are not overwritten by the scaffold.
+
+The generated health extension is available at `/extensions/health`. The core `/health` and `/ready` routes remain unchanged.
 
 ## Persistent project dependency
 
@@ -29,6 +31,12 @@ npx yuncms start
 ```
 
 Once installed locally, `npx yuncms ...` resolves the project's pinned package version.
+
+For Plesk, install `@yunsoft/yuncms` locally and use the generated `start.js` as the application startup file. The same entry can be checked manually with:
+
+```bash
+node start.js
+```
 
 Production maintenance commands:
 
