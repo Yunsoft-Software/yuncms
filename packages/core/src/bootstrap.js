@@ -17,6 +17,7 @@ import { aiSettingsMigration } from './migrations/0014-ai-settings.js';
 import { navigationGroupsMigration } from './migrations/0015-navigation-groups.js';
 import { navigationGroupCollapseMigration } from './migrations/0016-navigation-group-collapse.js';
 import { mcpSettingsMigration } from './migrations/0017-mcp-settings.js';
+import { publicRegistrationSettingsMigration } from './migrations/0018-public-registration-settings.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -38,6 +39,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   navigationGroupsMigration,
   navigationGroupCollapseMigration,
   mcpSettingsMigration,
+  publicRegistrationSettingsMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(
