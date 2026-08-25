@@ -269,26 +269,35 @@ test('external auth foundation migration remains a required compatibility gate',
   assert.match(source, /UNIQUE KEY uq_yuncms_auth_transaction_state \(state_hash\)/);
 });
 
-test('AI, navigation and MCP settings extend the required compatibility gate', () => {
+test('AI, navigation, MCP and registration settings extend the required compatibility gate', () => {
   const aiSettings = CORE_MIGRATIONS.find(({ id }) => id === '0014-ai-settings');
   const navigationGroups = CORE_MIGRATIONS.find(({ id }) => id === '0015-navigation-groups');
   const navigationGroupCollapse = CORE_MIGRATIONS.find(({ id }) => id === '0016-navigation-group-collapse');
   const mcpSettings = CORE_MIGRATIONS.find(({ id }) => id === '0017-mcp-settings');
+  const publicRegistrationSettings = CORE_MIGRATIONS.find(({ id }) => id === '0018-public-registration-settings');
+  const publicRegistrationEmailVerification = CORE_MIGRATIONS.find(({ id }) => id === '0019-public-registration-email-verification');
   assert.ok(aiSettings);
   assert.ok(navigationGroups);
   assert.ok(navigationGroupCollapse);
   assert.ok(mcpSettings);
+  assert.ok(publicRegistrationSettings);
+  assert.ok(publicRegistrationEmailVerification);
   assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0014-ai-settings'));
   assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0015-navigation-groups'));
   assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0016-navigation-group-collapse'));
   assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0017-mcp-settings'));
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0018-public-registration-settings'));
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0019-public-registration-email-verification'));
   assert.match(aiSettings.statements.join('\n'), /CREATE TABLE yuncms_ai_settings/);
   assert.match(navigationGroups.statements.join('\n'), /CREATE TABLE yuncms_navigation_groups/);
   assert.match(navigationGroupCollapse.statements.join('\n'), /ADD COLUMN collapse VARCHAR\(16\)/);
   assert.match(mcpSettings.statements.join('\n'), /CREATE TABLE yuncms_mcp_settings/);
   assert.match(mcpSettings.statements.join('\n'), /allowed_origins JSON NOT NULL/);
   assert.match(mcpSettings.statements.join('\n'), /allowed_hosts JSON NOT NULL/);
-  assert.equal(CORE_MIGRATIONS.at(-1).id, '0017-mcp-settings');
+  assert.match(publicRegistrationSettings.statements.join('\n'), /public_registration_enabled TINYINT\(1\)/);
+  assert.match(publicRegistrationSettings.statements.join('\n'), /public_registration_role CHAR\(36\)/);
+  assert.match(publicRegistrationEmailVerification.statements.join('\n'), /public_registration_require_email_verification TINYINT\(1\)/);
+  assert.equal(CORE_MIGRATIONS.at(-1).id, '0019-public-registration-email-verification');
 });
 
 test('advisory lock uses one connection and always releases it', async () => {

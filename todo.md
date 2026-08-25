@@ -83,7 +83,6 @@ In Studio, open **Settings → MCP Connection**, keep authentication enabled, ke
 
 Use Node 24 with the branch dependencies installed and a disposable MySQL database.
 
-- [ ] Run `npm run test:fast` and `npm test`; remove this item only when the new core/API/Studio registration regressions and the existing suite all pass without GitHub Actions.
 - [ ] Bootstrap an existing pre-0018 database and verify migration `0018-public-registration-settings` adds the default-off settings without changing existing users/roles.
 - [ ] In Studio as Administrator, verify **Settings → Branding & Appearance → Public Registration** on desktop/mobile light and dark themes: only normal non-admin/non-Public roles are selectable, save/reload preserves the selection, and disabling registration removes the sign-up option from Login.
 - [ ] Verify a non-admin cannot read the managed registration role or mutate the setting, while the public `/studio-settings` response exposes only the boolean enablement needed by Login.
