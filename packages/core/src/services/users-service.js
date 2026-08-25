@@ -7,6 +7,7 @@ import { resolveSystemResourceAccess } from './system-resource-access.js';
 
 const USER_STATUSES = new Set(['active', 'suspended', 'disabled']);
 const USER_UPDATE_KEYS = new Set(['email', 'role', 'status']);
+const PUBLIC_REGISTRATION_KEYS = new Set(['email', 'password']);
 
 function normalizeEmail(email) {
   if (typeof email !== 'string') {
@@ -193,7 +194,11 @@ export class UsersService extends BaseService {
       throw forbidden('Public registration role is invalid');
     }
 
-    if (input.role != null || input.status != null) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      throw invalid('Public registration payload must be an object');
+    }
+    const keys = Object.keys(input);
+    if (keys.some((key) => !PUBLIC_REGISTRATION_KEYS.has(key))) {
       throw invalid('Public registration accepts email and password only');
     }
 
