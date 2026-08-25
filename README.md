@@ -333,7 +333,7 @@ The optional Studio AI assistant operates through the current user's normal YunC
 
 Read **[AI Assistant](docs/ai-assistant.md)**.
 
-The optional MCP endpoint exposes bounded schema/data tools through the same service/RBAC layer. It is disabled by default and write tools are separately disabled by default.
+The optional MCP endpoint exposes bounded schema/data tools through the same service/RBAC layer. It is disabled and read-only by default; Administrators configure it under **Settings → MCP Connection** without editing `.env` or restarting YunCMS.
 
 Read **[MCP](docs/mcp.md)**.
 

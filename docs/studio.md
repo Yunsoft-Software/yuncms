@@ -24,7 +24,7 @@ The main sidebar is task-oriented:
 
 - **Content** — project collections that are visible in the content menu;
 - **Library / Files** — uploaded assets;
-- **Settings** — Data Model, Users, Roles & Permissions and other administrative settings available to the current account.
+- **Settings** — Data Model, Users, Roles & Permissions, Branding & Appearance and Administrator-only MCP settings available to the current account.
 
 The visible navigation is not an authorization boundary. Roles and permissions decide what a user can actually read or change.
 

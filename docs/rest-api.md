@@ -546,7 +546,7 @@ When enabled, MCP is mounted under:
 /mcp
 ```
 
-MCP requests reuse YunCMS services, Items query limits and RBAC. Writes are separately controlled through MCP configuration.
+MCP requests reuse YunCMS services, Items query limits and RBAC. Administrators manage endpoint access, authentication, Host/Origin boundaries, writes and result limits in Studio.
 
 See [`mcp.md`](mcp.md) for transport, tools, authentication, origin/host controls and write configuration.
 

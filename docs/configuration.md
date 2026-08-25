@@ -291,22 +291,7 @@ See [Authentication](auth.md) for login behavior and account-linking security.
 
 ## MCP
 
-MCP is disabled by default:
-
-```env
-MCP_ENABLED=false
-MCP_WRITES_ENABLED=false
-MCP_REQUIRE_AUTHENTICATION=true
-MCP_MAX_ITEMS=100
-MCP_MAX_RESULT_BYTES=1000000
-MCP_ALLOWED_ORIGINS=http://localhost:3008
-MCP_ALLOWED_HOSTS=localhost:3008
-```
-
-- `MCP_WRITES_ENABLED=false` keeps create/update/delete tools unregistered.
-- `MCP_REQUIRE_AUTHENTICATION=true` requires a normal session/API token.
-- `MCP_ALLOWED_ORIGINS` is a comma-separated list of exact HTTP/HTTPS origins.
-- `MCP_ALLOWED_HOSTS` is a comma-separated list of exact host or `host:port` values.
+MCP is not configured through environment variables. An Administrator manages it in **Studio → Settings → MCP Connection**. The database-backed settings control endpoint enablement, write tools, authentication, exact Host/Origin allowlists and result limits. Changes apply without restarting YunCMS.
 
 See [MCP](mcp.md) before exposing this endpoint outside a trusted network.
 

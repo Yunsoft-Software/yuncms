@@ -242,7 +242,8 @@ The source repository is only needed when you intend to develop YunCMS itself or
 - local and S3-compatible Files storage;
 - SMTP;
 - external authentication providers;
-- MCP;
 - logging and operational limits.
+
+MCP and the built-in AI assistant are configured after sign-in through their Administrator settings screens in Studio.
 
 The init env writer rejects newline/null-byte content before writing secrets.
