@@ -226,4 +226,4 @@ The MySQL integration DB must be disposable and its name must contain `test`, `c
 
 A single-instance YunCMS V1 can be considered production-ready **after** all applicable release/environment gates pass on the target deployment. Source review alone is insufficient evidence for the MySQL server, S3 provider, SMTP provider, browser build/runtime, reverse proxy or backup/restore behavior.
 
-At the end of this source pass, no additional source-level release blocker was identified. Remaining unchecked `todo.md` items are environment/provider/browser verification, not hidden implementation claims.
+Record the result of each applicable environment/provider/browser check for the target deployment. A successful check from another machine or provider is useful evidence, but it does not replace verification against the production database, storage, SMTP, proxy and authentication configuration.

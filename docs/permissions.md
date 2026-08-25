@@ -1,157 +1,37 @@
 # Roles and Permissions
 
-This document describes RBAC behavior implemented on branch `21-08-2026`.
+YunCMS authorization is role-based and enforced inside services, not only in Studio. A permission is scoped to a role, a collection/resource and an action. Public access uses the same explicit permission model and is deny-by-default.
+
+![YunCMS collection permission matrix](assets/screenshots/studio-permissions.png)
+
+## Recommended Studio workflow
+
+1. Open **Settings → Roles & Permissions**.
+2. Select an existing role or choose **Create**.
+3. Turn on `Read`, `Create`, `Update` or `Delete` for simple unrestricted action access.
+4. Open the permission page only when the action needs field, row or write restrictions.
+5. Save the restriction and test it with a real account assigned to the role.
+
+The matrix distinguishes **Allowed** from **Off** at a glance. An enabled action with advanced rules is still enabled, but its field/filter/validation scope limits what the API accepts or returns.
+
+Start with the smallest role that can complete the job. Avoid testing only as Administrator because Administrator bypass does not reveal missing ordinary-role grants.
 
 ## Accountability
 
-Authorization starts from explicit accountability passed to services.
+Every service call runs with explicit accountability.
 
-Important invariants:
+Core rules:
 
-- `null` user/role never means administrator;
-- role-less public accountability is not granted item access;
-- system/admin bypass is explicit;
-- session/API-token authentication resolves the user's current role before service execution;
-- trusted extensions that instantiate services with request service options inherit the same accountability and permission cache.
+- a missing user/role never means Administrator;
+- Administrator/system bypass is explicit;
+- session and API-token authentication resolve the user's current role before service execution;
+- unauthenticated requests resolve to Public accountability;
+- endpoint extensions that use request service options inherit the same accountability and permission cache;
+- generic Items access never becomes an unguarded path into internal system tables.
 
-## RolesService
+## Roles
 
-Roles use the same explicit permission engine as other permission-managed resources. `yuncms_roles` starts with no grant for Public or ordinary roles, but an administrator may explicitly grant `read`, `create`, `update` or `delete`. Admin/system accountability bypasses the permission lookup as before.
-
-Role mutation still keeps data-integrity and escalation invariants separate from the grant itself:
-
-- one role cannot be both admin and public;
-- only one public role may exist;
-- MySQL also enforces the one-public-role rule;
-- a delegated role manager cannot mint a new Administrator or Public role as a side effect of ordinary Roles create access;
-- Administrator/Public roles cannot be deleted through the ordinary delegated role API;
-- roles still referenced by users cannot be deleted through an unsafe shortcut.
-
-These are record semantics, not role-type permission locks. Normal role CRUD becomes available whenever the exact permission row exists.
-
-## Permission records
-
-A permission is scoped to:
-
-```text
-role + collection + action
-```
-
-Actions:
-
-- `create`
-- `read`
-- `update`
-- `delete`
-
-A normal project-collection permission may contain:
-
-- field allowlist;
-- server-side row filter;
-- create/update prospective-record validation JSON.
-
-Filters and validations use the same allowlisted field/operator language as the generic query layer.
-
-## Permission-managed system resources
-
-Core migration `0007-system-permission-resources` registers a deliberately small set of system resources in schema metadata. Migration `0011-role-permission-actions` expands Roles to the same explicit CRUD-grant model. Migration `0012-files-read-filters` adds a narrowly scoped read-filter capability to Files. This does **not** expose generic `/items/yuncms_*` CRUD; specialized services remain the execution path.
-
-| Resource | Explicitly grantable actions | Advanced field/row rules |
-| --- | --- | --- |
-| `yuncms_users` | read, create, update, delete | No; action-level only |
-| `yuncms_files` | read, create, update, delete | `read` may have a server-side row filter; other actions remain action-level only |
-| `yuncms_roles` | read, create, update, delete | No; action-level only |
-
-Everything else under the system schema stays non-delegatable unless it is explicitly registered in a future migration. In particular, permission records themselves are not a delegatable system resource.
-
-Public and ordinary roles follow the same model: **deny by default, explicit grant to enable**. There is no separate blanket rule that says “Public can never access this permission-managed resource” or “custom roles can only read Roles.” This allows intentional cases such as a public image gallery backed by `yuncms_files:read`, or a narrowly trusted role-management client backed by explicit Roles actions.
-
-Additional safety rules:
-
-- no Public/custom system-resource access exists until an administrator creates the exact permission row;
-- grants cannot expose non-permission-managed system collections;
-- a delegated user manager cannot assign the Administrator role, cannot move itself or another user to a different non-admin role, and cannot modify/delete Administrator accounts;
-- the Public role cannot be assigned to an authenticated user;
-- delegated Roles create cannot create Administrator/Public roles;
-- Administrator/Public roles retain protected deletion semantics;
-- Permissions management itself remains administrator/system-only;
-- generic `ItemsService` refuses system collections and requires the dedicated service.
-
-For Files, an explicit `read` grant without a filter intentionally preserves the existing all-Files read behavior. Add a filter when only a subset should be visible, for example by title, uploader, MIME type or another registered Files schema field. The Files service applies that filter consistently to list, single-record and content reads; a file outside the permitted scope is returned as not found and its storage object is not read.
-
-The `filter-read` system permission mode is deliberately narrow: it does not allow field allowlists or validation rules, and row filters are rejected on create/update/delete grants.
-
-The Studio permission matrix shows explicitly permission-managed system resources and every action their metadata exposes. Public uses the same matrix as other non-admin roles rather than receiving an artificial blanket lock.
-
-## Resolution and process-local cache
-
-`PermissionsService.resolve(action, collection)`:
-
-1. gives explicit admin/system accountability full access;
-2. denies non-admin accountability without a role;
-3. for system collections, requires explicit `permissionManaged` registration and an allowed action;
-4. resolves the exact role/collection/action row, including for Public;
-5. denies missing permission rows;
-6. rejects malformed metadata;
-7. caches resolved decisions in the configured cache store.
-
-The default cache store is a bounded process-local memory store. Default permission-cache TTL is 30 seconds and default capacity is 5,000 entries. Permission create/update/delete clears the local cache immediately. `CACHE_ENABLED=false` disables it.
-
-The cache API is asynchronous and store-agnostic so a shared Redis adapter can be added without changing permission resolution code. Redis is **not** currently wired as a runtime store; `CACHE_STORE=memory` is the only accepted runtime value. For a single YunCMS process this is sufficient. Multi-process/container deployments still need a shared cache/invalidation and shared rate-limit store before relying on cache coherence across instances.
-
-## Field and row enforcement
-
-`ItemsService` enforces project-collection permissions inside the service layer.
-
-Reads:
-
-- selected fields must be readable;
-- sort/filter fields must be readable;
-- permission row filter is compiled against the full collection schema;
-- caller filter is compiled against the caller-visible schema;
-- both filters are combined with `AND`.
-
-Writes:
-
-- payload fields must exist, be writable and belong to the action field allowlist;
-- update/delete also apply the permission row filter;
-- bulk update/delete additionally require an explicit non-empty caller filter;
-- system-managed accountability fields are generated by the service and cannot be supplied or directly changed by callers.
-
-## Create/update validation
-
-Validation is evaluated against the **prospective final record**, not merely the incoming patch.
-
-Create:
-
-- generated primary key + provided values + known schema defaults + system-managed accountability values form the candidate record;
-- the candidate must satisfy the permission validation rule before insert.
-
-Update:
-
-- current persisted row is loaded within the allowed update scope;
-- patch plus generated `updated_at`/`updated_by` values form the candidate final row;
-- validation runs against that final row before update.
-
-Bulk update:
-
-- candidate rows are inspected before mutation;
-- V1 refuses to validate more than 5,000 matching rows in one call rather than silently skipping validation.
-
-A validation failure returns `VALIDATION_FAILED`; the bulk guard returns `VALIDATION_BULK_LIMIT`.
-
-## Relation expansion
-
-Direct to-one expansion also honors RBAC:
-
-- source relation field must be visible under source read permission;
-- `fields=*.*`, `relation.*` and `relation.field` use the same permission-aware direct relation engine as legacy `expand`;
-- target records are loaded through `ItemsService` with the same accountability;
-- target field allowlists/row filters remain effective;
-- target primary/lookup keys needed for relation matching stay internal when their field allowlist hides them;
-- inaccessible targets resolve to `null` rather than bypassing target restrictions.
-
-## Management REST
+Roles can be created and managed from Studio or through:
 
 ```text
 GET    /roles
@@ -159,7 +39,145 @@ POST   /roles
 GET    /roles/:id
 PATCH  /roles/:id
 DELETE /roles/:id
+```
 
+Normal roles do not receive data access merely because they exist. Create permission rows for the actions/resources they need.
+
+Protected invariants remain in force even when role management itself is delegated:
+
+- one role cannot be both Administrator and Public;
+- only one Public role may exist;
+- delegated role creation cannot mint an Administrator or Public role;
+- protected Administrator/Public roles cannot be deleted through ordinary delegated role management;
+- a role still referenced by users cannot be removed through an unsafe shortcut;
+- the Public role cannot be assigned to an authenticated user.
+
+## Permission records
+
+A permission is scoped to:
+
+```text
+role + collection/resource + action
+```
+
+Actions:
+
+```text
+create
+read
+update
+delete
+```
+
+Project-collection permissions can additionally contain:
+
+- a field allowlist;
+- a server-side row filter;
+- prospective-record validation for create/update.
+
+Permission filters/validation use the same bounded filter language documented in [Items query language](api-query-language.md).
+
+## Deny by default
+
+If no matching permission exists, the request is denied. This applies equally to ordinary roles and Public.
+
+For example, making a collection visible in Studio does not make it public. To expose a public articles collection, grant the Public role `read` on `articles` and optionally restrict rows/fields.
+
+## Read permissions
+
+A read permission can restrict both fields and rows.
+
+Example intent:
+
+- Public may read only `id`, `title`, `slug`, `published_at`;
+- Public may only see rows whose `status` is `published`.
+
+The server applies the permission row filter first and combines it with the caller's own `filter` using `AND`. A caller cannot use `_or` or another query expression to widen the role's permitted data.
+
+Fields used by caller `fields`, `filter`, `sort`, search and aggregate operations are checked against effective readability. Hidden fields are not silently used to broaden a query.
+
+## Create/update field allowlists
+
+A create or update permission can restrict which fields the caller may write. Payload keys outside that allowlist are rejected.
+
+System-managed fields such as `created_at`, `updated_at`, `created_by` and `updated_by` are generated by YunCMS and cannot be supplied to bypass accountability tracking.
+
+## Row filters on writes
+
+Update and delete also respect the permission row filter. A user cannot update/delete a record they would not be permitted to target under that action's scope.
+
+Bulk update/delete additionally require an explicit non-empty caller filter so a missing filter cannot accidentally become an entire-collection mutation.
+
+## Create/update validation
+
+Validation runs against the prospective final record rather than only the incoming JSON patch.
+
+For create, YunCMS evaluates the candidate record containing generated primary key, provided fields, known defaults and system-managed values.
+
+For update, the service loads the currently permitted row, applies the patch plus generated update metadata, then validates the resulting candidate before mutation.
+
+A failed rule returns `VALIDATION_FAILED`. Large bulk validation is bounded; requests beyond the supported candidate limit fail instead of silently skipping validation.
+
+## Relation permissions
+
+Relation expansion never creates a side door around RBAC.
+
+For a request such as:
+
+```text
+GET /items/articles?fields=id,title,author_id.name,tags.name
+```
+
+YunCMS checks:
+
+1. the source collection read permission;
+2. visibility of the source relation field/alias;
+3. read permission on each relation target;
+4. target row filters;
+5. target field allowlists;
+6. for managed M2M, the required junction read scope as well.
+
+The same rules apply to `*.*`, `relation.*`, nested relation fields and `expand`.
+
+A to-one target outside the permitted target scope resolves as inaccessible/`null` rather than being returned through the source record. To-many results contain only permitted rows.
+
+## Permission-managed system resources
+
+Selected system resources use dedicated services but can be explicitly delegated:
+
+| Resource | Grantable actions | Additional rules |
+| --- | --- | --- |
+| `yuncms_users` | read, create, update, delete | action-level delegation; protected Administrator/user-assignment invariants remain enforced |
+| `yuncms_files` | read, create, update, delete | read can use a server-side row filter |
+| `yuncms_roles` | read, create, update, delete | action-level delegation; protected role invariants remain enforced |
+
+This does not enable generic `/items/yuncms_*` CRUD. Dedicated user/file/role services remain authoritative.
+
+Permission records themselves remain privileged administration data and are not exposed as an ordinary delegatable system collection.
+
+### Delegated user management
+
+A user manager with explicit `yuncms_users` actions still cannot use that grant to escalate privileges. Protected behavior includes restrictions around Administrator accounts/role assignment, moving users across unsafe role boundaries and assigning the Public role to an authenticated user.
+
+### Public/filtered Files
+
+A Public `yuncms_files:read` permission is valid when intentionally configured. This allows use cases such as public image galleries.
+
+Add a Files row filter when only a subset should be exposed. The Files service applies the filter consistently to:
+
+```text
+GET /files
+GET /files/:id
+GET /files/:id/content
+```
+
+A file outside the permitted scope is not fetched from storage just because the caller guessed its id.
+
+See [Files](files.md).
+
+## Permission administration API
+
+```text
 GET    /permissions
 POST   /permissions
 GET    /permissions/:id
@@ -167,8 +185,73 @@ PATCH  /permissions/:id
 DELETE /permissions/:id
 ```
 
-The Studio exposes administrator role/permission management plus the permission matrix used to grant ordinary/Public access to permission-managed resources.
+Studio exposes a role/permission matrix so administrators can manage collection and explicitly permission-managed system resources without editing raw database rows.
 
-## Remaining verification
+## Permission cache
 
-Source-level enforcement and regression coverage exist. The guarded real MySQL/API suite covers filtered Public Files and two-process Redis permission invalidation; deployment-specific provider, proxy and TLS checks remain in `todo.md` until executed against the target environment.
+Resolved permission decisions can be cached:
+
+```env
+CACHE_ENABLED=true
+CACHE_STORE=memory
+CACHE_TTL_MS=30000
+CACHE_MAX_ENTRIES=5000
+```
+
+Supported stores:
+
+```text
+memory
+redis
+```
+
+Permission create/update/delete invalidates relevant cached state. The default in-memory store is appropriate for a simple single-process installation.
+
+For multiple replicas, configure shared Redis state when you want permission-cache invalidation to be coherent between processes:
+
+```env
+CACHE_STORE=redis
+REDIS_URL=redis://redis.internal:6379
+REDIS_PREFIX=yuncms:production:
+```
+
+See [Configuration](configuration.md) for Redis readiness/failure-mode settings and shared API/auth rate-limit stores.
+
+## Public role examples
+
+### Public articles
+
+Grant:
+
+```text
+role: Public
+collection: articles
+action: read
+fields: id,title,slug,published_at
+filter: {"status":{"_eq":"published"}}
+```
+
+Then unauthenticated clients can query only the permitted shape/scope:
+
+```text
+GET /items/articles?fields=id,title,slug&sort=-published_at
+```
+
+### Public image gallery
+
+Grant Public read on your gallery collection and a filtered `yuncms_files:read` permission for the assets intended to be public. Do not grant all Files access merely because the frontend needs several images.
+
+## Administrator vs delegated management
+
+Administrator/system accountability has explicit privileged access. Delegated management is intentionally narrower: granting CRUD on users, roles or files enables that resource operation, but does not remove protected security invariants or grant permission-record administration.
+
+This distinction allows practical back-office roles without turning every manager into Administrator.
+
+## Related guides
+
+- [Items query language](api-query-language.md)
+- [Files](files.md)
+- [Authentication](auth.md)
+- [Data model](data-model.md)
+- [Security](security.md)
+- [Configuration](configuration.md)

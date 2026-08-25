@@ -2,7 +2,7 @@
 
 YunCMS V1 targets Node.js 24 LTS with a MySQL 8-compatible server.
 
-> YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com) and remains under active development. Treat every deployment as your own operational responsibility: test upgrades in staging, keep verified backups and review [`todo.md`](../todo.md) for outstanding environment checks. Use YunCMS at your own risk; it is provided under the MIT License without warranty.
+> YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com) and remains under active development. Treat every deployment as your own operational responsibility: test upgrades in staging, keep verified backups and complete the [Production Readiness](production-readiness.md) checklist. YunCMS is provided under the MIT License without warranty.
 
 ## Required runtime pieces
 
@@ -73,7 +73,7 @@ When multiple API instances run, local disks are not shared automatically. Use s
 
 Set `S3_BUCKET` to register the `s3` driver. Custom endpoint/path-style settings support providers such as self-hosted S3-compatible services.
 
-Verify the exact production provider from `todo.md`; compatibility claims should not replace real provider testing.
+Verify the exact production provider in staging; compatibility claims should not replace real provider testing.
 
 ## File reconciliation
 
@@ -185,11 +185,11 @@ DB_DATABASE=yuncms_test \
 npm run test:release
 ```
 
-See `docs/testing.md` and `docs/production-readiness.md` for the complete gate and current source-audit status.
+See [Production Readiness](production-readiness.md) for the complete operator gate.
 
 ## Release gate
 
-Do not call a deployment production-ready because source code exists. Complete applicable `todo.md` checks for:
+Do not call a deployment production-ready because the package starts successfully. Complete the applicable [Production Readiness](production-readiness.md) checks for:
 
 - dependency install/lockfile/tests/build;
 - bootstrap idempotency and migration `0005` on upgrades;

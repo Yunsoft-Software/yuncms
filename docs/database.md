@@ -1,6 +1,6 @@
 # Database and Schema Engine
 
-This document describes behavior implemented on branch `16-08-2026`. Planned or environment-dependent verification stays in `plan.md` / `todo.md` rather than being described as proven.
+This document explains the MySQL and schema behavior available in the current YunCMS release. Use it together with the deployment and production-readiness guides when preparing a real environment.
 
 ## Database scope
 
@@ -13,7 +13,7 @@ The pool disables multi-statements. Dynamic identifiers are validated/quoted sep
 After configuring `.env`:
 
 ```bash
-npm run bootstrap
+npx yuncms bootstrap
 ```
 
 The CLI checks the supported Node runtime, verifies MySQL connectivity, obtains the `yuncms:bootstrap` advisory lock and applies required core migrations.
@@ -183,7 +183,7 @@ Authenticated and explicit public accountability are already wired into the API.
 
 ## Required real-MySQL verification
 
-The GitHub connector environment cannot truthfully prove MySQL DDL, advisory-lock, compensation or concurrent behavior. `todo.md` contains exact checks for:
+Before production, run the release integration gate against a disposable MySQL 8 database and verify:
 
 - bootstrap/idempotency;
 - collection/field creation;
@@ -193,4 +193,4 @@ The GitHub connector environment cannot truthfully prove MySQL DDL, advisory-loc
 - concurrent schema lock behavior;
 - CRUD/RBAC/auth/extension integration.
 
-Do not mark those verification-dependent milestone items complete until they run against a disposable MySQL 8 database.
+Do not use a production database for destructive integration checks. The database name must contain `test`, `ci` or `dev`, and both destructive-test opt-ins documented in [Production Readiness](production-readiness.md) must be set.
