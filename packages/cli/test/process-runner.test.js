@@ -37,6 +37,25 @@ test('command runner captures bounded output from a successful process', async (
   assert.equal(result.code, 0);
 });
 
+test('command runner resolves npm and npx through Windows command shims', async () => {
+  for (const command of ['npm', 'npx']) {
+    const child = fakeChild();
+    let spawnedCommand = null;
+    const promise = runCapturedProcess(command, ['--version'], {
+      platform: 'win32',
+      timeoutMs: 1_000,
+      spawnProcess(actualCommand) {
+        spawnedCommand = actualCommand;
+        queueMicrotask(() => child.emit('exit', 0, null));
+        return child;
+      },
+    });
+
+    await promise;
+    assert.equal(spawnedCommand, `${command}.cmd`);
+  }
+});
+
 test('command runner terminates a timed-out process and reports COMMAND_TIMEOUT', async () => {
   const signals = [];
   const child = fakeChild({
