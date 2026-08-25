@@ -12,6 +12,8 @@ export const DEFAULT_STUDIO_SETTINGS = Object.freeze({
   accent_color: '#2563eb',
   theme: 'system',
   default_locale: 'en',
+  public_registration_enabled: false,
+  public_registration_require_email_verification: false,
 });
 
 const LOCALE_KEY = 'yuncms.studio.locale';
@@ -40,6 +42,9 @@ export function normalizeStudioSettings(value = {}) {
     default_locale: LOCALES.has(value.default_locale)
       ? value.default_locale
       : DEFAULT_STUDIO_SETTINGS.default_locale,
+    public_registration_enabled: value.public_registration_enabled === true,
+    public_registration_require_email_verification:
+      value.public_registration_require_email_verification === true,
     updated_at: value.updated_at ?? null,
   };
 }

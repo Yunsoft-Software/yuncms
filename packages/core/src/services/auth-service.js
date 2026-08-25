@@ -13,6 +13,12 @@ function invalidLogin() {
   return error;
 }
 
+function emailNotVerified() {
+  const error = new Error('Email verification is required before sign in');
+  error.code = 'EMAIL_NOT_VERIFIED';
+  return error;
+}
+
 function invalidToken() {
   const error = new Error('Invalid or expired authentication token');
   error.code = 'INVALID_CREDENTIALS';
@@ -93,6 +99,23 @@ export class AuthService extends BaseService {
         reason: 'invalid_credentials',
       }, { ip });
       throw invalidLogin();
+    }
+
+    if (!user.email_verified_at) {
+      const [settingsRows] = await this.database.query(
+        `SELECT public_registration_require_email_verification
+         FROM yuncms_studio_settings
+         WHERE id = 1
+         LIMIT 1`,
+      );
+      if (settingsRows[0]?.public_registration_require_email_verification) {
+        await this.action('auth.login.failed', {
+          method: 'local',
+          reason: 'email_not_verified',
+          user: user.id,
+        }, { ip });
+        throw emailNotVerified();
+      }
     }
 
     const tokens = await this.createSessionsService().createForUser(user, { ip, userAgent });

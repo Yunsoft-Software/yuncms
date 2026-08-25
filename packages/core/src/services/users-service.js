@@ -7,6 +7,7 @@ import { resolveSystemResourceAccess } from './system-resource-access.js';
 
 const USER_STATUSES = new Set(['active', 'suspended', 'disabled']);
 const USER_UPDATE_KEYS = new Set(['email', 'role', 'status']);
+const PUBLIC_REGISTRATION_KEYS = new Set(['email', 'password']);
 
 function normalizeEmail(email) {
   if (typeof email !== 'string') {
@@ -26,6 +27,12 @@ function normalizeEmail(email) {
 function forbidden(message) {
   const error = new Error(message);
   error.code = 'FORBIDDEN';
+  return error;
+}
+
+function invalid(message) {
+  const error = new Error(message);
+  error.code = 'INVALID_PAYLOAD';
   return error;
 }
 
@@ -151,6 +158,63 @@ export class UsersService extends BaseService {
 
     const user = await this.#readOneUnsafe(id);
     await this.action('users.create', { key: id, item: user });
+    return user;
+  }
+
+  async registerPublic(input = {}) {
+    if (this.accountability.public !== true) {
+      throw forbidden('Public registration is available only to unauthenticated requests');
+    }
+
+    const [settingsRows] = await this.database.query(
+      `SELECT public_registration_enabled, public_registration_role,
+              public_registration_require_email_verification
+       FROM yuncms_studio_settings
+       WHERE id = 1
+       LIMIT 1`,
+    );
+    const settings = settingsRows[0];
+    if (!settings) {
+      const error = new Error('Studio settings are missing; run YunCMS bootstrap');
+      error.code = 'DATABASE_MIGRATION_REQUIRED';
+      throw error;
+    }
+    if (!settings.public_registration_enabled) {
+      throw forbidden('Public registration is disabled');
+    }
+    if (!settings.public_registration_role) {
+      throw forbidden('Public registration has no assigned user role');
+    }
+
+    const [roleRows] = await this.database.query(
+      'SELECT id, admin, public FROM yuncms_roles WHERE id = ? LIMIT 1',
+      [settings.public_registration_role],
+    );
+    const role = roleRows[0];
+    if (!role || role.admin || role.public) {
+      throw forbidden('Public registration role is invalid');
+    }
+
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      throw invalid('Public registration payload must be an object');
+    }
+    const keys = Object.keys(input);
+    if (keys.some((key) => !PUBLIC_REGISTRATION_KEYS.has(key))) {
+      throw invalid('Public registration accepts email and password only');
+    }
+
+    const email = normalizeEmail(input.email);
+    const passwordHash = await hashPassword(input.password);
+    const id = randomUUID();
+    const verifiedAt = settings.public_registration_require_email_verification ? null : new Date();
+    await this.database.query(
+      `INSERT INTO yuncms_users (id, email, password_hash, role, status, email_verified_at)
+       VALUES (?, ?, ?, ?, 'active', ?)`,
+      [id, email, passwordHash, role.id, verifiedAt],
+    );
+
+    const user = await this.#readOneUnsafe(id);
+    await this.action('users.create', { key: id, item: user, publicRegistration: true });
     return user;
   }
 

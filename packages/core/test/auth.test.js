@@ -122,3 +122,47 @@ test('login returns generic invalid credentials for wrong password', async () =>
     (error) => error.code === 'INVALID_CREDENTIALS' && error.message === 'Invalid email or password',
   );
 });
+
+test('login rejects an unverified email when public registration verification is required', async () => {
+  const encoded = await hashPassword('actual-password', {
+    N: 1024,
+    r: 8,
+    p: 1,
+    keyLength: 32,
+    maxmem: 16 * 1024 * 1024,
+  });
+  let sessionQuery = false;
+  const database = {
+    async query(sql) {
+      const normalized = sql.replace(/\s+/g, ' ').trim();
+      if (normalized.startsWith('SELECT u.id, u.email, u.password_hash')) {
+        return [[{
+          id: 'user-unverified',
+          email: 'unverified@example.com',
+          password_hash: encoded,
+          role: 'role-1',
+          role_name: 'Content Editor',
+          status: 'active',
+          email_verified_at: null,
+          role_admin: 0,
+          role_public: 0,
+        }], []];
+      }
+      if (normalized.startsWith('SELECT public_registration_require_email_verification')) {
+        return [[{ public_registration_require_email_verification: 1 }], []];
+      }
+      if (normalized.includes('yuncms_sessions')) sessionQuery = true;
+      throw new Error(`Unexpected query: ${normalized}`);
+    },
+  };
+  const service = new AuthService({
+    accountability: createPublicAccountability(),
+    database,
+  });
+
+  await assert.rejects(
+    service.login({ email: 'unverified@example.com', password: 'actual-password' }),
+    (error) => error.code === 'EMAIL_NOT_VERIFIED',
+  );
+  assert.equal(sessionQuery, false);
+});

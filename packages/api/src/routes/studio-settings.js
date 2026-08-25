@@ -26,6 +26,10 @@ export function createStudioSettingsRouter() {
     sendImageAsset(res, await settingsService(req).readFaviconContent());
   });
 
+  router.get('/admin', async (req, res) => {
+    res.json({ data: await settingsService(req).readOne() });
+  });
+
   router.get('/', async (req, res) => {
     res.json({ data: await settingsService(req).readPublic() });
   });

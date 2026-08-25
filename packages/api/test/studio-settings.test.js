@@ -93,6 +93,8 @@ test('anonymous Studio can read safe display settings before login', async () =>
       accent_color: '#2563eb',
       theme: 'system',
       default_locale: 'en',
+      public_registration_enabled: false,
+      public_registration_require_email_verification: false,
       updated_at: null,
     });
   });
