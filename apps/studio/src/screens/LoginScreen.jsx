@@ -59,7 +59,6 @@ export function LoginScreen({ onAuthenticated }) {
   useEffect(() => {
     if (registrationEnabled) return;
     setRegisterMode(false);
-    setVerificationPending(false);
     setConfirmPassword('');
   }, [registrationEnabled]);
 
@@ -262,7 +261,6 @@ export function LoginScreen({ onAuthenticated }) {
             </button>
 
             {verificationPending
-              && registrationEnabled
               && registrationRequiresEmailVerification
               && !registerMode
               && !resetMode
