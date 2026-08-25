@@ -68,6 +68,18 @@ function normalizeLocale(value) {
   return normalized;
 }
 
+function normalizeBoolean(value, label) {
+  if (value === true || value === false) return value;
+  throw invalid(`${label} must be a boolean`);
+}
+
+function normalizeRegistrationRole(value) {
+  if (value == null || value === '') return null;
+  const normalized = String(value).trim();
+  if (!UUID_PATTERN.test(normalized)) throw invalid('Public registration role id must be a UUID');
+  return normalized;
+}
+
 function publicSettings(row) {
   return {
     brand_name: row.brand_name,
@@ -77,14 +89,23 @@ function publicSettings(row) {
     accent_color: row.accent_color,
     theme: row.theme,
     default_locale: row.default_locale,
+    public_registration_enabled: Boolean(row.public_registration_enabled),
     updated_at: row.updated_at ?? null,
   };
 }
 
+function managedSettings(row) {
+  return {
+    ...publicSettings(row),
+    public_registration_role: row.public_registration_role ?? null,
+  };
+}
+
 export class StudioSettingsService extends BaseService {
-  async readPublic() {
+  async readSettingsRow() {
     const [rows] = await this.database.query(
-      `SELECT brand_name, logo_url, logo_file, favicon_file, accent_color, theme, default_locale, updated_at
+      `SELECT brand_name, logo_url, logo_file, favicon_file, accent_color, theme, default_locale,
+              public_registration_enabled, public_registration_role, updated_at
        FROM yuncms_studio_settings
        WHERE id = 1
        LIMIT 1`,
@@ -95,12 +116,16 @@ export class StudioSettingsService extends BaseService {
       error.code = 'DATABASE_MIGRATION_REQUIRED';
       throw error;
     }
-    return publicSettings(row);
+    return row;
+  }
+
+  async readPublic() {
+    return publicSettings(await this.readSettingsRow());
   }
 
   async readOne() {
     assertManager(this.accountability);
-    return this.readPublic();
+    return managedSettings(await this.readSettingsRow());
   }
 
   async readImageAssetContent(settingKey, label) {
@@ -147,14 +172,52 @@ export class StudioSettingsService extends BaseService {
     }
   }
 
+  async validateRegistrationRole(roleId) {
+    if (!roleId) return;
+    const [roles] = await this.database.query(
+      'SELECT id, admin, public FROM yuncms_roles WHERE id = ? LIMIT 1',
+      [roleId],
+    );
+    const role = roles[0];
+    if (!role) throw invalid('Selected public registration role does not exist');
+    if (role.admin) throw invalid('Administrator roles cannot be used for public registration');
+    if (role.public) throw invalid('The unauthenticated public role cannot be used for registered users');
+  }
+
   async updateOne(patch = {}) {
     assertManager(this.accountability);
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw invalid('Studio settings patch must be an object');
 
     const keys = Object.keys(patch);
-    const allowed = new Set(['brand_name', 'logo_url', 'logo_file', 'favicon_file', 'accent_color', 'theme', 'default_locale']);
+    const allowed = new Set([
+      'brand_name',
+      'logo_url',
+      'logo_file',
+      'favicon_file',
+      'accent_color',
+      'theme',
+      'default_locale',
+      'public_registration_enabled',
+      'public_registration_role',
+    ]);
     if (keys.length === 0 || keys.some((key) => !allowed.has(key))) {
       throw invalid('Studio settings patch contains unsupported properties');
+    }
+
+    let normalizedRegistrationEnabled;
+    let normalizedRegistrationRole;
+    if (Object.hasOwn(patch, 'public_registration_enabled') || Object.hasOwn(patch, 'public_registration_role')) {
+      const current = await this.readOne();
+      normalizedRegistrationEnabled = Object.hasOwn(patch, 'public_registration_enabled')
+        ? normalizeBoolean(patch.public_registration_enabled, 'Public registration enabled')
+        : current.public_registration_enabled;
+      normalizedRegistrationRole = Object.hasOwn(patch, 'public_registration_role')
+        ? normalizeRegistrationRole(patch.public_registration_role)
+        : current.public_registration_role;
+      await this.validateRegistrationRole(normalizedRegistrationRole);
+      if (normalizedRegistrationEnabled && !normalizedRegistrationRole) {
+        throw invalid('A non-administrator role must be selected before public registration can be enabled');
+      }
     }
 
     const assignments = [];
@@ -191,13 +254,21 @@ export class StudioSettingsService extends BaseService {
       assignments.push('default_locale = ?');
       params.push(normalizeLocale(patch.default_locale));
     }
+    if (Object.hasOwn(patch, 'public_registration_enabled')) {
+      assignments.push('public_registration_enabled = ?');
+      params.push(normalizedRegistrationEnabled ? 1 : 0);
+    }
+    if (Object.hasOwn(patch, 'public_registration_role')) {
+      assignments.push('public_registration_role = ?');
+      params.push(normalizedRegistrationRole);
+    }
 
     params.push(1);
     await this.database.query(
       `UPDATE yuncms_studio_settings SET ${assignments.join(', ')} WHERE id = ?`,
       params,
     );
-    return this.readPublic();
+    return this.readOne();
   }
 }
 
@@ -209,4 +280,6 @@ export const STUDIO_SETTING_DEFAULTS = Object.freeze({
   accent_color: '#2563eb',
   theme: 'system',
   default_locale: 'en',
+  public_registration_enabled: false,
+  public_registration_role: null,
 });
