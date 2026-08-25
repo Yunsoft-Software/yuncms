@@ -30,6 +30,13 @@ function assertPositiveTtl(ttlMs) {
   }
 }
 
+function assertVerificationManager(accountability) {
+  if (accountability.system === true || accountability.admin === true) return;
+  const error = new Error('Email verification lookup requires administrator accountability');
+  error.code = 'FORBIDDEN';
+  throw error;
+}
+
 export class AuthTokensService extends BaseService {
   async createForUser(userId, type, { ttlMs = DEFAULT_TTL_MS[type] } = {}) {
     if (!TOKEN_TYPES[type]) {
@@ -160,6 +167,28 @@ export class AuthTokensService extends BaseService {
       throw error;
     }
     return this.createForUser(userId, 'verify', options);
+  }
+
+  async requestEmailVerification(email, options = {}) {
+    assertVerificationManager(this.accountability);
+
+    let normalized;
+    try {
+      normalized = normalizeEmail(email);
+    } catch {
+      return null;
+    }
+
+    const user = await readAuthenticationUserByEmail(this.database, normalized);
+    if (!user || user.status !== 'active' || user.email_verified_at) return null;
+    const result = await this.createForUser(user.id, 'verify', options);
+    return {
+      ...result,
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+    };
   }
 
   async verifyEmail(token) {
