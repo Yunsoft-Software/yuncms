@@ -50,6 +50,8 @@ Anonymous registry verification confirmed all four `latest` tags resolve to `0.1
 
 A clean public-registry installation resolved CLI/API/core to `0.1.14`, the installed `yuncms help` command completed successfully, and the installed scaffold generated every expected runtime/example file.
 
+The public-registry package was also initialized in the isolated local test installation and launched on port `3008` through its generated `start.js`. The core health route and generated extension health route both returned `200`, the example hook and endpoint loaded, the Studio login screen rendered in the browser, and an administrator login/logout smoke test passed. The service was left running from the published `0.1.14` package for local inspection.
+
 ## Remaining environment-specific checks
 
 The pending real SMTP/provider, production reverse-proxy/TLS, provider-specific S3 and authenticated manual browser/visual checks remain in `todo.md`. They were not represented as completed by this release evidence.
