@@ -3,20 +3,13 @@ import { useI18n } from '../i18n.js';
 const DEFAULT_PAGE_SIZES = [10, 25, 50, 100];
 
 function paginationItems(page, totalPages) {
-  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  if (totalPages <= 9) return Array.from({ length: totalPages }, (_, index) => index + 1);
 
-  const pages = new Set([1, totalPages, page - 2, page - 1, page, page + 1, page + 2]);
-  const sorted = [...pages]
-    .filter((value) => value >= 1 && value <= totalPages)
-    .sort((left, right) => left - right);
-
-  const items = [];
-  sorted.forEach((value, index) => {
-    const previous = sorted[index - 1];
-    if (previous && value - previous > 1) items.push(`ellipsis-${previous}-${value}`);
-    items.push(value);
-  });
-  return items;
+  if (page <= 4) return [1, 2, 3, 4, 5, 'ellipsis-right', totalPages];
+  if (page >= totalPages - 3) {
+    return [1, 'ellipsis-left', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+  return [1, 'ellipsis-left', page - 1, page, page + 1, 'ellipsis-right', totalPages];
 }
 
 export function Pagination({
@@ -48,11 +41,23 @@ export function Pagination({
   return (
     <nav className={`pagination ${compact ? 'pagination-compact' : ''}`} aria-label={t('pagination.aria', { label })}>
       <div className="pagination-summary" aria-live="polite">
-        <strong>{start}–{end}</strong>
-        <span>{t('pagination.ofTotal', { total: normalizedTotal, label })}</span>
+        <span><strong>{start}–{end}</strong> {t('pagination.ofTotal', { total: normalizedTotal, label })}</span>
+        <span className="pagination-page-status" title={t('pagination.pageOf', { page: currentPage, totalPages })}>
+          {currentPage} / {totalPages}
+        </span>
       </div>
 
       <div className="pagination-controls">
+        <button
+          className="pagination-button pagination-arrow pagination-jump"
+          type="button"
+          disabled={currentPage <= 1 || loading}
+          onClick={() => changePage(1)}
+          aria-label={t('pagination.page', { page: 1 })}
+          title={t('pagination.page', { page: 1 })}
+        >
+          «
+        </button>
         <button
           className="pagination-button pagination-arrow"
           type="button"
@@ -90,6 +95,16 @@ export function Pagination({
         >
           ›
         </button>
+        <button
+          className="pagination-button pagination-arrow pagination-jump"
+          type="button"
+          disabled={currentPage >= totalPages || loading}
+          onClick={() => changePage(totalPages)}
+          aria-label={t('pagination.page', { page: totalPages })}
+          title={t('pagination.page', { page: totalPages })}
+        >
+          »
+        </button>
       </div>
 
       {onPageSizeChange && (
@@ -119,3 +134,5 @@ export function paginateClientItems(items, page, pageSize) {
     items: items.slice(start, start + normalizedPageSize),
   };
 }
+
+export { paginationItems };
