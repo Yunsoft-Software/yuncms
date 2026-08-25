@@ -1,6 +1,6 @@
 {
   "name": "@yunsoft/yuncms-core",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Core services, schema, authentication, permissions and storage primitives for YunCMS.",
   "license": "MIT",
   "type": "module",
