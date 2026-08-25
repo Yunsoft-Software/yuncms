@@ -2,65 +2,59 @@
 
 YunCMS exposes an optional Model Context Protocol endpoint for agents that need to inspect schema and work with collection data through the same service/RBAC layer as REST.
 
-The endpoint is intentionally disabled by default.
+MCP is disabled, authenticated and read-only by default. All MCP configuration is stored in YunCMS and managed by an Administrator in **Studio → Settings → MCP Connection**. `MCP_*` environment variables are not part of the runtime configuration contract.
 
-## Enable
+## Configure in Studio
 
-```env
-MCP_ENABLED=true
+The MCP settings screen controls:
+
+- whether `POST /mcp` is enabled;
+- whether create, update and delete tools are registered;
+- whether clients must authenticate with a YunCMS access token;
+- exact allowed Host and browser Origin values;
+- maximum items per read and maximum serialized tool-result size.
+
+Saved changes apply to the next MCP request without restarting the API process.
+
+Before enabling the endpoint, add at least one exact Host value. Use `host` or `host:port`, not a URL. For example:
+
+```text
+api.example.com
+localhost:3008
 ```
 
-Default security posture:
+Allowed browser origins must be exact `http` or `https` origins:
 
-```env
-MCP_WRITES_ENABLED=false
-MCP_REQUIRE_AUTHENTICATION=true
-MCP_MAX_ITEMS=100
-MCP_MAX_RESULT_BYTES=1000000
+```text
+https://studio.example.com
+https://agent.example.com
 ```
 
-Browser origins default to the configured Studio origin. Request hosts default to the host (including port when present) derived from the Studio origin:
-
-```env
-MCP_ALLOWED_ORIGINS=https://studio.example.com,https://agent.example.com
-MCP_ALLOWED_HOSTS=api.example.com
-```
-
-`MCP_ALLOWED_ORIGINS` accepts exact `http`/`https` origins. `MCP_ALLOWED_HOSTS` accepts exact host or `host:port` values, not URLs.
-
-Both checks are intentional. Origin validation protects browser-originated MCP requests, while Host validation also protects non-browser MCP clients and helps prevent DNS-rebinding attacks against an MCP listener. When YunCMS is behind a reverse proxy, configure `MCP_ALLOWED_HOSTS` for the public Host header actually forwarded to YunCMS.
+Origin validation protects browser-originated MCP requests. Host validation also applies to non-browser clients and helps prevent DNS-rebinding attacks against the listener. Behind a reverse proxy, save the public Host header actually forwarded to YunCMS.
 
 ## Transport
 
-MCP is mounted at:
+The Streamable HTTP endpoint is:
 
 ```text
 POST /mcp
 ```
 
-The current implementation uses stateless Streamable HTTP semantics: every POST gets a fresh MCP server/transport instance and YunCMS does not depend on an in-memory MCP session.
+The current implementation is stateless: every POST gets a fresh MCP server/transport instance and YunCMS does not depend on an in-memory MCP session. GET/SSE/session-style transport is not part of the current contract.
 
-GET/SSE/session-style transport is not part of the current contract.
+When disabled, the runtime endpoint returns `404` with `MCP_DISABLED`; the Administrator settings route remains available.
 
 ## Authentication
 
-By default the endpoint requires ordinary YunCMS authentication:
+With **Require YunCMS authentication** enabled, clients send an ordinary session access token or API token:
 
 ```http
 Authorization: Bearer <session-access-token-or-api-token>
 ```
 
-The resolved YunCMS accountability is passed into every service used by MCP tools. MCP does not create an administrator identity and does not call YunCMS HTTP endpoints from inside the same process.
+The resolved YunCMS accountability is passed into every service used by MCP tools. MCP does not create an Administrator identity and does not call YunCMS HTTP endpoints from inside the same process.
 
-Setting:
-
-```env
-MCP_REQUIRE_AUTHENTICATION=false
-```
-
-allows Public accountability instead. This should only be used when the Public role has intentionally bounded permissions suitable for the exposed tools.
-
-Host and Origin validation still apply even when Public MCP access is explicitly enabled.
+An Administrator may explicitly disable authentication. Requests then use Public accountability, so the Public role must contain only the deliberately exposed collections, fields, rows and actions. Host and Origin validation continue to apply.
 
 ## Read tools
 
@@ -72,8 +66,6 @@ Lists non-system collections the current identity may read.
 
 Returns the readable collection shape, direct relation metadata and whether create/update/delete are allowed for the current identity.
 
-Input:
-
 ```json
 {
   "collection": "articles"
@@ -83,8 +75,6 @@ Input:
 ### `items.read_many`
 
 Reads collection rows through the normal query and relation-expansion layer.
-
-Example input:
 
 ```json
 {
@@ -100,9 +90,7 @@ Example input:
 }
 ```
 
-Supported arguments mirror the implemented Items query layer: `fields`, `expand`, scalar `filter`, `search`, scalar `sort`, `aggregate`, `groupBy`, `limit`, and `offset`.
-
-MCP applies its own maximum item count on top of core query limits.
+Supported arguments mirror the implemented Items query layer: `fields`, `expand`, scalar `filter`, `search`, scalar `sort`, `aggregate`, `groupBy`, `limit`, and `offset`. The panel’s maximum-item setting applies on top of core query limits.
 
 ### `items.read_one`
 
@@ -118,52 +106,34 @@ Reads one item by id with normal field/relation selection.
 
 ## Write tools
 
-Write tools are not registered unless explicitly enabled:
-
-```env
-MCP_WRITES_ENABLED=true
-```
-
-Available tools then include:
+Write tools are absent unless an Administrator enables **Data-changing tools**:
 
 - `items.create`
 - `items.update`
 - `items.delete`
 
-These call `ItemsService` directly with the request accountability. Normal create/update/delete permissions, field allowlists, validation rules, row filters, system-field behavior, hooks, and audit behavior remain authoritative.
+These call `ItemsService` directly with the request accountability. Normal create/update/delete permissions, field allowlists, validation rules, row filters, system-field behavior, hooks and audit behavior remain authoritative. Delete is marked destructive in MCP tool metadata.
 
-Delete is marked destructive in MCP tool metadata.
+Enabling the tools does not grant permissions by itself. A client can only perform actions allowed to the connected YunCMS user or, when authentication is disabled, to the Public role.
 
 ## Result limits
 
-Serialized MCP tool results are capped by:
-
-```env
-MCP_MAX_RESULT_BYTES=1000000
-```
-
-Oversized results return a bounded `MCP_RESULT_TOO_LARGE` tool error instead of returning an arbitrarily large payload.
-
-To-many relation expansion also retains the core relation-row and query-cost limits documented in [`api-query-language.md`](api-query-language.md).
+The serialized result byte limit is configured in the panel. Oversized results return a bounded `MCP_RESULT_TOO_LARGE` tool error. To-many relation expansion also retains the core relation-row and query-cost limits documented in [`api-query-language.md`](api-query-language.md).
 
 ## Failure behavior
 
-Known safe query/permission errors are returned to the tool caller with their bounded YunCMS code/message. Unexpected internal errors are normalized to `INTERNAL_ERROR`; raw stack traces and secrets are not returned as tool content.
+Known safe query and permission errors are returned with their bounded YunCMS code/message. Unexpected internal errors become `INTERNAL_ERROR`; raw stack traces and secrets are not returned as tool content.
 
-Invalid MCP hosts fail with `MCP_HOST_FORBIDDEN`. Invalid browser origins fail with `MCP_ORIGIN_FORBIDDEN`. These checks happen before MCP tool execution.
+Invalid request hosts fail with `MCP_HOST_FORBIDDEN`. Invalid browser origins fail with `MCP_ORIGIN_FORBIDDEN`. These checks happen before tool execution.
 
-## Recommended production configuration
+## Recommended production setup
 
-Start read-only:
+Start from the panel with:
 
-```env
-MCP_ENABLED=true
-MCP_WRITES_ENABLED=false
-MCP_REQUIRE_AUTHENTICATION=true
-MCP_ALLOWED_HOSTS=api.example.com
-MCP_ALLOWED_ORIGINS=https://studio.example.com
-```
+- MCP enabled;
+- data-changing tools disabled;
+- YunCMS authentication required;
+- only the deployed API Host and required browser origins allowed;
+- a dedicated normal YunCMS user/API token whose role contains only the collections and actions the integration needs.
 
-Use a dedicated normal YunCMS user/API token whose role contains only the collections/actions the agent needs. Do not give an agent Administrator merely to make MCP work.
-
-Before enabling write tools in production, complete the MCP real-runtime checks in `todo.md`.
+Do not give an integration Administrator merely to make MCP work. Before enabling write tools in production, complete the real-runtime checks in `todo.md`.

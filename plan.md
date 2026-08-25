@@ -1,6 +1,6 @@
 # YunCMS Live Development Plan
 
-> Branch baseline: `22-08-2026`.
+> Branch baseline: `24-08-2026`.
 >
 > This is a **remaining source-work checklist**. Completed implementation history has been removed. Environment-dependent execution/verification belongs only in `todo.md`.
 
@@ -9,6 +9,7 @@ Engineering rules live in [`AGENTS.md`](AGENTS.md) and apply to every item below
 ## 0. Current Studio usability pass
 
 - [x] Move Yapay Zeka provider/model/write/limit configuration from environment variables into administrator-managed persisted settings in Studio without exposing the saved API key back to clients.
+- [x] Move MCP enablement, authentication, host/origin, write-tool and result-limit configuration from environment variables into administrator-managed persisted settings in Studio, applying updates without a server restart.
 - [ ] Complete the existing collection `singleton` metadata contract so Studio exposes it, Content bypasses the list page, and service-layer creates cannot produce a second singleton item.
 - [x] Replace the Data Model collection landing page with a compact Directus-like list: inline visibility toggle, dimmed hidden rows, six-dot drag handle, native drag/drop ordering, and navigation-only parent groups.
 - [x] Make Content a focused navigation mode: entering Content shows only the content collection/group tree plus a clear way back to the main Studio modules.

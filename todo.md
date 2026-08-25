@@ -2,7 +2,7 @@
 
 This file contains **only verification that still requires deployment infrastructure, provider credentials or an exact Node/browser/multi-process/proxy environment**. Source implementation work belongs in `plan.md`.
 
-Branch baseline: `22-08-2026`.
+Branch baseline: `24-08-2026`.
 
 Remove a checklist item when it passes; do not keep completed `[x]` history here.
 
@@ -74,19 +74,10 @@ Use non-production test tenants/directories. Never commit provider client secret
 
 Use an MCP v2 client against `POST /mcp` for external integrations that need the protocol endpoint.
 
-Start read-only:
+In Studio, open **Settings → MCP Connection**, keep authentication enabled, keep write tools disabled, add the deployed API Host and any browser origins, then enable the endpoint.
 
-```env
-MCP_ENABLED=true
-MCP_WRITES_ENABLED=false
-MCP_REQUIRE_AUTHENTICATION=true
-MCP_ALLOWED_HOSTS=localhost:3008
-MCP_ALLOWED_ORIGINS=http://localhost:3008
-MCP_MAX_ITEMS=100
-MCP_MAX_RESULT_BYTES=1000000
-```
-
-- [ ] Behind the real reverse proxy, configure `MCP_ALLOWED_HOSTS` to the forwarded public Host; arbitrary Host values remain rejected.
+- [ ] Sign in as an Administrator and verify the MCP settings screen in desktop/mobile light and dark themes; save/reload preserves every field, non-admin navigation hides the entry, and warnings appear for write tools or Public access.
+- [ ] Behind the real reverse proxy, save the forwarded public Host in **Allowed Host values**; arbitrary Host values remain rejected.
 
 ## 5. Core browser / security smoke
 
