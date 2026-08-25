@@ -167,7 +167,8 @@ export class UsersService extends BaseService {
     }
 
     const [settingsRows] = await this.database.query(
-      `SELECT public_registration_enabled, public_registration_role
+      `SELECT public_registration_enabled, public_registration_role,
+              public_registration_require_email_verification
        FROM yuncms_studio_settings
        WHERE id = 1
        LIMIT 1`,
@@ -205,7 +206,7 @@ export class UsersService extends BaseService {
     const email = normalizeEmail(input.email);
     const passwordHash = await hashPassword(input.password);
     const id = randomUUID();
-    const verifiedAt = new Date();
+    const verifiedAt = settings.public_registration_require_email_verification ? null : new Date();
     await this.database.query(
       `INSERT INTO yuncms_users (id, email, password_hash, role, status, email_verified_at)
        VALUES (?, ?, ?, ?, 'active', ?)`,
