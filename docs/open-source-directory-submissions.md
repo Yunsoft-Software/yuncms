@@ -8,6 +8,57 @@ The decision rule is conservative: submit only when YunCMS fits the list, satisf
 
 Snapshot totals: **41 targets reviewed**, **8 upstream submissions opened**, **2 correct-fit targets blocked by their submission path**, **15 future eligibility targets**, and **16 dormant or out-of-scope targets rejected**.
 
+## Follow-up review — 2026-09-03
+
+No previous target was resubmitted or nudged during this review. Cumulative outreach is now **10 upstream submissions**: **9 pull requests and 1 issue**, with **1 merged/live** and **9 awaiting maintainer review**.
+
+### Current YunCMS evidence
+
+| Check | Verified result |
+| --- | --- |
+| Repository age | Created 2026-08-16; approximately 18 days old |
+| npm release | `@yunsoft/yuncms` `0.1.14` |
+| npm adoption | [`2,218 downloads`](https://api.npmjs.org/downloads/point/2026-08-17:2026-09-03/@yunsoft/yuncms) from 2026-08-17 through 2026-09-03; the npm last-week window reported 1,504 |
+| GitHub adoption | 2 stars, 0 forks |
+| Release maturity | No GitHub tag/release; README still accurately identifies `0.1.x` as pre-stable |
+| Public branch | Remote `main` already contains `0.1.14`, the current documentation and the screenshot walkthroughs |
+| Repository presentation | GitHub About now has a product description, the npm package homepage and 16 product-specific topics covering CMS, MySQL, Node.js, React, REST, RBAC, self-hosting and MCP |
+
+### Rechecked previous submissions
+
+| Submission | Status on 2026-09-03 | Action taken |
+| --- | --- | --- |
+| [`OSSDrop/OSSDrop#20`](https://github.com/OSSDrop/OSSDrop/pull/20) | Merged on 2026-08-26; [live YunCMS listing](https://ossdrop.com/tool/yuncms) returns HTTP 200 | None; completed |
+| [`dalisoft/awesome-cms#28`](https://github.com/dalisoft/awesome-cms/pull/28) | Open and mergeable; no comments, reviews or checks | None |
+| [`ishanvyas22/awesome-open-source-systems#31`](https://github.com/ishanvyas22/awesome-open-source-systems/pull/31) | Open and mergeable; no maintainer interaction | None |
+| [`songtianlun/selfhost-hub#28`](https://github.com/songtianlun/selfhost-hub/pull/28) | Open and mergeable; no maintainer interaction. A later PR was merged without a request on this one | None |
+| [`sfermigier/awesome-foss-alternatives#55`](https://github.com/sfermigier/awesome-foss-alternatives/pull/55) | Open and mergeable; no maintainer interaction | None |
+| [`automata/awesome-jamstack#149`](https://github.com/automata/awesome-jamstack/pull/149) | Open and mergeable; no maintainer interaction | None |
+| [`BolajiAyodeji/awesome-jamstack#48`](https://github.com/BolajiAyodeji/awesome-jamstack/pull/48) | Open and mergeable; both Socket checks pass; maintainer review required | None |
+| [`AwesomeHomelab/awesome-homelab#130`](https://github.com/AwesomeHomelab/awesome-homelab/issues/130) | Open with no comments, labels or metadata request | None |
+
+None of the still-open submissions has a failed check, requested change or missing-metadata notice that justifies a repeat submission or reminder.
+
+### New submissions
+
+| Target | Why it fits | Submission and validation |
+| --- | --- | --- |
+| [`TensorBlock/awesome-mcp-servers`](https://github.com/TensorBlock/awesome-mcp-servers) | Exact `Content Management Systems` category; YunCMS exposes a documented, tested Streamable HTTP MCP endpoint with seven RBAC-aware schema/data tools. No age, star or hosted-endpoint gate is published, and several external submissions were merged on the review date. | Open [PR #2150](https://github.com/TensorBlock/awesome-mcp-servers/pull/2150), mergeable and awaiting review. The target repository's `npm test` passed 77 tests, `npm run typecheck` passed and `npm run catalog:build` produced 7,829 entries with 0 errors. The generated record inferred both install commands, `streamable-http`, bearer auth, 7 tools and MIT. |
+| [`SimoMay/find-oss`](https://github.com/SimoMay/find-oss) | Exact Contentful-alternatives CMS table beside Directus and Strapi; no published numeric threshold or self-submission ban. A recent outside project submission was approved and merged in about 3.5 hours. | Open [PR #8](https://github.com/SimoMay/find-oss/pull/8), mergeable and awaiting review. One table row only; the PR discloses maintainer affiliation and the `0.1.x` pre-stable state. |
+
+### Newly reviewed but not submitted
+
+| Target | Decision |
+| --- | --- |
+| [`punkpeye/awesome-mcp-servers`](https://github.com/punkpeye/awesome-mcp-servers) | Strong audience, but the current PR workflow requires a Glama listing, a completed quality evaluation and a Glama score badge. Glama requires a runnable Docker/introspection setup for a self-hosted server. Reconsider only after YunCMS naturally has that packaging and passes the evaluation; do not add Docker solely for directory eligibility. |
+| [`georgezouq/awesome-saas`](https://github.com/georgezouq/awesome-saas) | Has a `CMS & Website` section and recent merges, but the section is mainly hosted site/SaaS tools rather than self-hosted CMS backends; a newer CMS submission is still open. Editorial fit is weaker than the two submitted targets. |
+| [`chenz24/openawesome`](https://github.com/chenz24/openawesome) | Structural fit, but more than 20 submissions are waiting and there is almost no demonstrated closure activity. |
+| [`Kalypsokichu-code/awesome-selfhosted-picks`](https://github.com/Kalypsokichu-code/awesome-selfhosted-picks) | YunCMS meets the visible criteria, but all recent contribution PRs remain open with no acceptance signal. |
+| [`furudo-erika/awesome-supabase-alternatives`](https://github.com/furudo-erika/awesome-supabase-alternatives) | Adjacent category, but the contribution guidance is incomplete and the only visible submission remains open. |
+| [`github/explore`](https://github.com/github/explore) | Topic collections would be attractive, but the repository explicitly rejects self-promotion. |
+| [`turhobr/selfhost.directory`](https://github.com/turhobr/selfhost.directory), [`Arnon-hs/open-source`](https://github.com/Arnon-hs/open-source) | Automated catalogs without a documented direct project-intake path; no issue was opened merely to advertise YunCMS. |
+| Other MCP lists reviewed | `wong2/awesome-mcp-servers` had no recent merge signal; several other forks had stale or heavily backlogged queues. TensorBlock was the only new MCP directory combining exact category fit with a clean current intake path. |
+
 ## YunCMS evidence at the snapshot date
 
 | Check | Evidence | Result |
@@ -30,7 +81,7 @@ GitHub requires contributors without upstream write access to push the change to
 
 | Upstream repository | Published requirements and fit | Positive notes | Negative / caution notes | Action |
 | --- | --- | --- | --- | --- |
-| [`OSSDrop/OSSDrop`](https://github.com/OSSDrop/OSSDrop) | The [guide](https://github.com/OSSDrop/OSSDrop/blob/main/CONTRIBUTING.md) requires a public repository, OSI license, honest description no longer than 140 characters, one category and one project per PR. YunCMS passes. | Active directory; explicitly accepts owner submissions; no age/star threshold. | No CMS category; `web-apis` is the closest valid category and the PR explains the choice. | Open upstream [PR #20](https://github.com/OSSDrop/OSSDrop/pull/20). |
+| [`OSSDrop/OSSDrop`](https://github.com/OSSDrop/OSSDrop) | The [guide](https://github.com/OSSDrop/OSSDrop/blob/main/CONTRIBUTING.md) requires a public repository, OSI license, honest description no longer than 140 characters, one category and one project per PR. YunCMS passes. | Active directory; explicitly accepts owner submissions; no age/star threshold. | No CMS category; `web-apis` is the closest valid category and the PR explains the choice. | [PR #20](https://github.com/OSSDrop/OSSDrop/pull/20) merged; [listing is live](https://ossdrop.com/tool/yuncms). |
 | [`dalisoft/awesome-cms`](https://github.com/dalisoft/awesome-cms) | The [guide](https://github.com/dalisoft/awesome-cms/blob/master/CONTRIBUTING.md) requires relevant, verified, license-respecting changes. YunCMS fits the Headless CMS table and its React/Node.js, MIT and MCP fields are verifiable. | Exact CMS audience; table exposes MCP and framework information; accepted a CMS in 2026. | Small audience. Pre-stable status is disclosed in the PR body, without adding a warning icon to the name. | Open upstream [PR #28](https://github.com/dalisoft/awesome-cms/pull/28). |
 | [`ishanvyas22/awesome-open-source-systems`](https://github.com/ishanvyas22/awesome-open-source-systems) | README invites open-source systems and has an exact `Content Management Systems (CMS)` section. No age/star gate is published. | Active in 2026; a CMS addition was merged in March 2026. | The repository has pre-existing awesome-lint findings, but the YunCMS line adds no cited finding. | Open upstream [PR #31](https://github.com/ishanvyas22/awesome-open-source-systems/pull/31). |
 | [`songtianlun/selfhost-hub`](https://github.com/songtianlun/selfhost-hub) | README welcomes new self-hosted services; the catalog has an exact English CMS category and accepts project-owner submissions. YunCMS front matter matches current entries. | Actively merged external catalog additions in August 2026; dedicated self-hosted audience. | Full build performs repository-wide GitHub metadata calls and hit HTTP 429 locally. The new front matter itself parsed and passed required-field checks. | Open upstream [PR #28](https://github.com/songtianlun/selfhost-hub/pull/28). |
@@ -91,7 +142,7 @@ GitHub requires contributors without upstream write access to push the change to
 
 | Upstream target | Source fork branch | Entry | Current status |
 | --- | --- | --- | --- |
-| [`OSSDrop/OSSDrop#20`](https://github.com/OSSDrop/OSSDrop/pull/20) | `raichubuilds/OSSDrop:add-yuncms` | `web-apis` JSON object | Open, cross-repository, mergeable; local JSON/validator passed. |
+| [`OSSDrop/OSSDrop#20`](https://github.com/OSSDrop/OSSDrop/pull/20) | `raichubuilds/OSSDrop:add-yuncms` | `web-apis` JSON object | Merged 2026-08-26; [live listing](https://ossdrop.com/tool/yuncms) verified 2026-09-03. |
 | [`dalisoft/awesome-cms#28`](https://github.com/dalisoft/awesome-cms/pull/28) | `raichubuilds/awesome-cms:add-yuncms` | Headless CMS table row, no warning icon | Open, cross-repository, mergeable; Prettier passed. |
 | [`ishanvyas22/awesome-open-source-systems#31`](https://github.com/ishanvyas22/awesome-open-source-systems/pull/31) | `raichubuilds/awesome-open-source-systems:add-yuncms` | CMS README item | Open, cross-repository, clean merge state. |
 | [`songtianlun/selfhost-hub#28`](https://github.com/songtianlun/selfhost-hub/pull/28) | `raichubuilds/selfhost-hub:add-yuncms` | English CMS catalog front matter | Open, cross-repository, clean merge state; schema parse passed. |
@@ -99,6 +150,8 @@ GitHub requires contributors without upstream write access to push the change to
 | [`automata/awesome-jamstack#149`](https://github.com/automata/awesome-jamstack/pull/149) | `raichubuilds/awesome-jamstack-automata:add-yuncms` | CMS README item | Open, cross-repository, clean merge state; target baseline lint debt disclosed. |
 | [`BolajiAyodeji/awesome-jamstack#48`](https://github.com/BolajiAyodeji/awesome-jamstack/pull/48) | `raichubuilds/awesome-jamstack-bolaji:add-yuncms` | Useful Tools README item | Open, cross-repository, mergeable; both security checks passed. |
 | [`AwesomeHomelab/awesome-homelab#130`](https://github.com/AwesomeHomelab/awesome-homelab/issues/130) | Not applicable; target requires issue submission | CMS app request | Open upstream issue with runtime, no-Docker and pre-stable disclosures. |
+| [`TensorBlock/awesome-mcp-servers#2150`](https://github.com/TensorBlock/awesome-mcp-servers/pull/2150) | `raichubuilds/awesome-mcp-servers:add-yuncms` | Content Management Systems catalog entry with MCP metadata | Open, cross-repository, mergeable; 77 tests, typecheck and 0-error catalog build passed. |
+| [`SimoMay/find-oss#8`](https://github.com/SimoMay/find-oss/pull/8) | `raichubuilds/find-oss:add-yuncms` | Contentful-alternatives CMS table row | Open, cross-repository, mergeable; maintainer affiliation and pre-stable status disclosed. |
 | [`n370/awesome-headless-cms`](https://github.com/n370/awesome-headless-cms) | [`raichubuilds/awesome-headless-cms:add-yuncms`](https://github.com/raichubuilds/awesome-headless-cms/tree/add-yuncms) | Tools README item | Prepared only; no PR until the required upstream lint gate can pass. |
 
 ## Future review checklist
