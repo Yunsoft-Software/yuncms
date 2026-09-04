@@ -28,6 +28,7 @@ import './command-palette.css';
 import './content-workbench-next.css';
 import './files-next.css';
 import './data-model-next.css';
+import './schema-graph.css';
 import './access-next.css';
 import './ai-next.css';
 import './auth-settings-next.css';
