@@ -242,7 +242,7 @@ export function AppRail() {
             return (
               <button
                 key={item.id}
-                className={`studio-app-rail-button ${active ? 'active' : ''}`
+                className={`studio-app-rail-button ${active ? 'active' : ''}`}
                 type="button"
                 aria-current={active ? 'page' : undefined}
                 title={item.label}
