@@ -17,10 +17,10 @@ test('Files opens assets in the shared inspector without replacing the list rout
   assert.match(inspectorCss, /\.file-inspector-meta/);
 });
 
-test('Files workspace drag and drop stages a file before upload', () => {
+test('Files workspace drag and drop stages all dropped files before upload', () => {
   assert.match(filesSource, /handleLibraryDrop/);
-  assert.match(filesSource, /event\.dataTransfer\.files\?\.\[0\]/);
-  assert.match(filesSource, /setSelectedFile\(file\)/);
+  assert.match(filesSource, /const dropped = event\.dataTransfer\.files/);
+  assert.match(filesSource, /stageFiles\(dropped\)/);
   assert.match(filesSource, /studioPath\.newFile\(\)/);
   assert.match(filesSource, /file-library-drop-overlay/);
   assert.doesNotMatch(filesSource, /handleLibraryDrop[\s\S]{0,400}method:\s*'POST'/);
