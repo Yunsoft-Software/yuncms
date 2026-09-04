@@ -27,16 +27,48 @@ See [Roles and permissions](permissions.md).
 
 ## Studio Files library
 
-Open **Files** in Studio to browse uploaded assets. The Files UI supports gallery-oriented browsing and media previews for supported image/media types, along with the metadata actions allowed by the current role.
+Open **Files** in Studio to browse uploaded assets. The Files workbench is designed as an asset browser: gallery view prioritizes previews while list view gives more room to filenames and storage metadata.
+
+The category rail provides live counts for:
+
+- all files;
+- uploads from the last 7 days;
+- images;
+- video;
+- audio;
+- PDF files;
+- other file types.
+
+The recent category is calculated from `uploaded_at` and is only a view filter. It does not change or tag the underlying Files record.
+
+Use search to match title, download filename, MIME type or storage metadata. Sorting and pagination apply to the filtered library.
+
+Selecting an asset opens a quick inspector with its preview and metadata without replacing the current library. Use the full detail action when you need the dedicated file route or metadata editor.
+
+### Uploading from Studio
+
+You can choose multiple files or drop files onto the usable Files workspace. Dropping files stages them for upload; YunCMS does not silently upload a dropped file before you explicitly start the upload.
+
+The upload queue uses the existing one-file upload endpoint for each queued file and reports real request states:
+
+- queued;
+- uploading;
+- done;
+- failed.
+
+If only some files fail, successful items remain successful and failed items stay available for retry. Studio does not display a synthetic percentage when the request layer has no byte-level progress value.
 
 Typical workflow:
 
-1. upload an asset to the selected storage driver;
-2. set a human title/filename and MIME type;
-3. preview or download it from the library;
-4. select it from a collection field whose interface is `file` or `image`.
+1. choose files or drop them onto the Files workspace;
+2. review the staged upload queue;
+3. start the upload;
+4. retry any failed queue items if necessary;
+5. set human-facing title/download filename metadata when needed;
+6. preview or download assets from the library;
+7. select an asset from a collection field whose interface is `file` or `image`.
 
-Use the search box and file-type filter to narrow a large library. Gallery view emphasizes previews; list view is useful when filenames and metadata matter more than thumbnails. The current role determines whether Upload, Edit, Download and Delete actions are available.
+The current role determines whether Upload, Edit, Download and Delete actions are available.
 
 Deleting a Files record is a real storage operation, not merely hiding the asset from Studio.
 
