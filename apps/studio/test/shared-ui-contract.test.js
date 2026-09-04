@@ -39,6 +39,19 @@ test('shared component files are exposed from one components entry point', () =>
   assert.deepEqual(missing, [], `Export shared components from components/index.js: ${missing.join(', ')}`);
 });
 
+test('screens consume shared UI only through components/index.js', () => {
+  const violations = [];
+  const directComponentImport = /from\s+['"]\.\.\/components\/(?!index\.js)[^'"]+['"]/g;
+
+  for (const file of sourceFiles(SCREENS)) {
+    const source = readFileSync(file, 'utf8');
+    if (directComponentImport.test(source)) violations.push(basename(file));
+    directComponentImport.lastIndex = 0;
+  }
+
+  assert.deepEqual(violations, [], `Import shared UI through components/index.js: ${violations.join(', ')}`);
+});
+
 test('screens do not implement their own modal/dialog primitives', () => {
   const violations = [];
   for (const file of sourceFiles(SCREENS)) {
