@@ -45,5 +45,8 @@
 @import './auth-settings-next.css';
 @import './users-mcp-next.css';
 
+/* Kinetic visual language shared by every Studio workspace. */
+@import './studio-kinetic.css';
+
 /* Explicit fallbacks for shell state in browsers without :has(). */
 @import './studio-compat.css';

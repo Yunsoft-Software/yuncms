@@ -37,6 +37,7 @@ test('Studio AI client uses built-in chat and administrator settings routes', ()
   assert.match(screenSource, /AI_ACCESS_MODES\.READ/);
   assert.match(screenSource, /AI_ACCESS_MODES\.WRITE/);
   assert.match(screenSource, /AI_ACCESS_MODES\.FULL/);
+  assert.match(screenSource, /\{ready && \(\s*<div className="ai-chat-shell">/);
 });
 
 test('AI settings form never pre-fills or renders the saved API key', () => {

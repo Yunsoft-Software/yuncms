@@ -12,6 +12,7 @@ test('Content exposes column visibility through the shared view options componen
   assert.match(contentSource, /DataViewOptions/);
   assert.match(contentSource, /visibleColumnKeys/);
   assert.match(contentSource, /visibleTableFields/);
+  assert.match(contentSource, /defaultContentColumnKeys\(tableFields\)/);
   assert.match(contentSource, /toggleVisibleColumn/);
   assert.match(optionsSource, /onToggleColumn/);
   assert.match(optionsSource, /disabled=\{onlyVisible\}/);

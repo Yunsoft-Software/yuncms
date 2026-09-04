@@ -10,7 +10,7 @@ import {
   RelationPicker,
   useConfirmDialog,
 } from '../components/index.js';
-import { contentTableFields, isFileField, isImageField } from '../field-ui.js';
+import { contentTableFields, defaultContentColumnKeys, isFileField, isImageField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
 import { studioPath } from '../studio-route.js';
@@ -571,7 +571,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
 
   const tableFields = useMemo(() => contentTableFields(fields), [fields]);
   useEffect(() => {
-    setVisibleColumnKeys(tableFields.map((field) => field.field));
+    setVisibleColumnKeys(defaultContentColumnKeys(tableFields));
   }, [tableFields]);
   const visibleTableFields = useMemo(
     () => tableFields.filter((field) => visibleColumnKeys.includes(field.field)),
@@ -749,15 +749,24 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   return (
     <div className="screen-stack">
       <section className="panel toolbar-panel content-toolbar">
-        <div>
+        <div className="content-hero-grid" aria-hidden="true" />
+        <div className="content-hero-orbit content-hero-orbit-large" aria-hidden="true" />
+        <div className="content-hero-orbit content-hero-orbit-small" aria-hidden="true" />
+        <div className="content-hero-copy">
           <p className="eyebrow">{t('visibility.collection')}</p>
           <h2>{visibleCollectionName}</h2>
           {visibleCollectionName !== collection && <code className="schema-machine-key">{collection}</code>}
           <p>{meta?.total_count != null ? t('content.matchingRecords', { count: meta.total_count }) : t('app.contentDescription')}</p>
         </div>
-        <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.contentNew(collection))}>
-          {t('content.newRecord')}
-        </button>
+        <div className="content-hero-side">
+          <div className="content-hero-stats" aria-label={t('content.dataControls', { collection: visibleCollectionName })}>
+            <span><small>{t('content.records')}</small><strong>{meta?.total_count ?? '—'}</strong></span>
+            <span><small>{t('dataModel.fields')}</small><strong>{fields.length}</strong></span>
+          </div>
+          <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.contentNew(collection))}>
+            {t('content.newRecord')}
+          </button>
+        </div>
       </section>
 
       {!schemaLoading && (

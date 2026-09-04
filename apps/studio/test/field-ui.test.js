@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   contentTableFields,
+  defaultContentColumnKeys,
   fieldCreationPayload,
   fieldDisplayType,
   fileAcceptForField,
@@ -71,5 +72,13 @@ test('content table prioritizes project and file fields over managed accountabil
     'attachment',
     'created_at',
     'updated_at',
+  ]);
+  assert.deepEqual(defaultContentColumnKeys(contentTableFields(fields)), [
+    'id',
+    'title',
+    'price',
+    'published_at',
+    'cover_image',
+    'attachment',
   ]);
 });

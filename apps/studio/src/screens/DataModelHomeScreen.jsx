@@ -446,6 +446,31 @@ export function DataModelHomeScreen({ onNavigate, onCollectionsChanged }) {
 
   return (
     <section className="navigation-model-screen">
+      <section className="navigation-model-hero">
+        <div className="navigation-model-hero-grid" aria-hidden="true" />
+        <div className="navigation-model-hero-orbit" aria-hidden="true" />
+        <div className="navigation-model-hero-copy">
+          <p className="eyebrow">{t('nav.dataModel')}</p>
+          <h1>{t('section.dataModelTitle')}</h1>
+          <p>{t('section.dataModelDescription')}</p>
+        </div>
+        <div className="navigation-model-hero-side">
+          <div className="navigation-model-hero-stats">
+            <span><small>{t('dataModel.collectionsLower')}</small><strong>{collectionCount}</strong></span>
+            <span><small>{t('navigation.folders')}</small><strong>{model.groups.length}</strong></span>
+          </div>
+          <div className="navigation-toolbar-actions">
+            <button className="secondary-button" type="button" onClick={openCreateGroup}>
+              <CollectionIcon name="folder" size={16} />
+              {t('navigation.createGroup')}
+            </button>
+            <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.newCollection())}>
+              {t('navigation.createCollection')}
+            </button>
+          </div>
+        </div>
+      </section>
+
       <div className="navigation-model-toolbar">
         <div className="navigation-search-wrap">
           <input
@@ -454,15 +479,6 @@ export function DataModelHomeScreen({ onNavigate, onCollectionsChanged }) {
             placeholder={t('navigation.search')}
             onChange={(event) => setSearch(event.target.value)}
           />
-        </div>
-        <div className="navigation-toolbar-actions">
-          <button className="secondary-button" type="button" onClick={openCreateGroup}>
-            <CollectionIcon name="folder" size={16} />
-            {t('navigation.createGroup')}
-          </button>
-          <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.newCollection())}>
-            {t('navigation.createCollection')}
-          </button>
         </div>
       </div>
 

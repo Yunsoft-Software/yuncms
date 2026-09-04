@@ -203,7 +203,8 @@ export function AiScreen() {
         </div>
       )}
 
-      <div className="ai-chat-shell">
+      {ready && (
+        <div className="ai-chat-shell">
         <div className="ai-thread" aria-live="polite">
           {messages.length === 0 && ready && (
             <div className="ai-welcome">
@@ -309,7 +310,8 @@ export function AiScreen() {
           </div>
           <small className="ai-composer-hint">{t('ai.composerHint')}</small>
         </div>
-      </div>
+        </div>
+      )}
     </section>
   );
 }
