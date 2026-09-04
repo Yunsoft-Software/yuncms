@@ -310,14 +310,14 @@ The redesign is planned in incremental stages so existing Studio behavior stays 
 
 - [x] unify semantic visual tokens;
 - [x] establish the compact application shell;
-- [ ] remove duplicated routine page headings;
+- [x] remove duplicated routine page headings;
 - [x] consolidate common controls and interaction states.
 
 ### Content
 
 - [x] compact content header and toolbar;
 - [x] filter popover or sheet;
-- [ ] improved table value rendering;
+- [x] improved table value rendering;
 - [x] selection and bulk-action foundation;
 - [x] quick record inspector.
 
@@ -338,16 +338,16 @@ The redesign is planned in incremental stages so existing Studio behavior stays 
 ### Access
 
 - [x] compact role navigation;
-- [ ] permission matrix states;
+- [x] permission matrix states;
 - [x] visual field and rule editing;
 - [x] advanced raw JSON view.
 
 ### Navigation and polish
 
 - [x] command palette;
-- [ ] unified motion feedback;
+- [x] unified motion feedback;
 - [ ] responsive and reduced-motion pass;
-- [ ] public Studio documentation refresh;
+- [x] public Studio documentation refresh;
 - [ ] updated screenshots for the README and documentation.
 
 ## Compatibility
