@@ -107,12 +107,32 @@ function lookupLabel(lookup, value) {
   return label == null || label === '' ? String(value) : String(label);
 }
 
-function renderValue(field, record, relationLookups) {
+function renderValue(field, record, relationLookups, t, locale) {
   const value = record[field.field];
   const lookup = relationLookups[field.field];
   if (lookup) return lookupLabel(lookup, value);
-  if (value == null) return '—';
-  if (typeof value === 'object') return JSON.stringify(value);
+  if (value == null || value === '') return <span className="content-value-empty">—</span>;
+  if (field.type === 'boolean') {
+    return (
+      <span className={`content-value-boolean ${value ? 'is-true' : 'is-false'}`}>
+        <span aria-hidden="true">{value ? '✓' : '—'}</span>
+        {t(value ? 'common.yes' : 'common.no')}
+      </span>
+    );
+  }
+  if (['date', 'datetime', 'timestamp'].includes(field.type)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      const formatter = new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-US', field.type === 'date'
+        ? { dateStyle: 'medium' }
+        : { dateStyle: 'medium', timeStyle: 'short' });
+      return <time className="content-value-date" dateTime={date.toISOString()}>{formatter.format(date)}</time>;
+    }
+  }
+  if (field.field === 'status' || field.field.endsWith('_status')) {
+    return <span className="content-value-status">{String(value)}</span>;
+  }
+  if (typeof value === 'object') return <code className="content-value-json">{JSON.stringify(value)}</code>;
   return String(value);
 }
 
@@ -303,7 +323,7 @@ function RecordForm({
 }
 
 export function ContentScreen({ collection, collectionLabel = '', onOpenDataModel, route = {}, onNavigate }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const requestVersion = useRef(0);
   const schemaLoadingRef = useRef(true);
@@ -979,7 +999,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                         <td key={field.field}>
                           {isFileField(field) ? (
                             <FileValuePreview field={field} value={record[field.field]} files={files} t={t} />
-                          ) : renderValue(field, record, relationLookups)}
+                          ) : renderValue(field, record, relationLookups, t, locale)}
                         </td>
                       ))}
                       <td className="row-actions">
@@ -1001,7 +1021,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                   <header>
                     <div>
                       <small>{primaryField ? fieldLabel(primaryField) : t('content.records')}</small>
-                      <strong>{primaryField ? renderValue(primaryField, record, relationLookups) : record.id}</strong>
+                      <strong>{primaryField ? renderValue(primaryField, record, relationLookups, t, locale) : record.id}</strong>
                     </div>
                     <code>{record.id}</code>
                   </header>
@@ -1009,7 +1029,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                     {mobileRecordFields.slice(1).map((field) => (
                       <div key={field.field}>
                         <dt>{fieldLabel(field)}</dt>
-                        <dd>{isFileField(field) ? <FileValuePreview field={field} value={record[field.field]} files={files} t={t} /> : renderValue(field, record, relationLookups)}</dd>
+                        <dd>{isFileField(field) ? <FileValuePreview field={field} value={record[field.field]} files={files} t={t} /> : renderValue(field, record, relationLookups, t, locale)}</dd>
                       </div>
                     ))}
                   </dl>
@@ -1073,4 +1093,4 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   );
 }
 
-export { buildItemsPath, fieldLabel };
+export { buildItemsPath, fieldLabel, renderValue };
