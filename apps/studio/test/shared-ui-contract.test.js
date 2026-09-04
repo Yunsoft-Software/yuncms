@@ -39,13 +39,13 @@ test('shared component files are exposed from one components entry point', () =>
   assert.deepEqual(missing, [], `Export shared components from components/index.js: ${missing.join(', ')}`);
 });
 
-test('screens consume shared UI only through components/index.js', () => {
+test('Studio consumers use shared UI only through components/index.js', () => {
   const violations = [];
-  const directComponentImport = /from\s+['"]\.\.\/components\/(?!index\.js)[^'"]+['"]/g;
+  const directComponentImport = /from\s+['"](?:\.\.\/|\.\/)components\/(?!index\.js)[^'"]+['"]/g;
 
-  for (const file of sourceFiles(SCREENS)) {
+  for (const file of sourceFiles(SRC).filter((path) => !path.startsWith(`${COMPONENTS}/`))) {
     const source = readFileSync(file, 'utf8');
-    if (directComponentImport.test(source)) violations.push(basename(file));
+    if (directComponentImport.test(source)) violations.push(file.replace(`${SRC}/`, ''));
     directComponentImport.lastIndex = 0;
   }
 
@@ -61,6 +61,13 @@ test('screens do not implement their own modal/dialog primitives', () => {
     }
   }
   assert.deepEqual(violations, [], `Move dialogs into shared components: ${violations.join(', ')}`);
+});
+
+test('Studio shell no longer renders the duplicate generic page header', () => {
+  const appSource = readFileSync(resolve(SRC, 'App.jsx'), 'utf8');
+  assert.match(appSource, /from '\.\/components\/index\.js'/);
+  assert.doesNotMatch(appSource, /className="page-header"/);
+  assert.doesNotMatch(appSource, /function sectionCopy/);
 });
 
 test('Studio bootstrap consumes cross-cutting UI from the shared entry point', () => {
