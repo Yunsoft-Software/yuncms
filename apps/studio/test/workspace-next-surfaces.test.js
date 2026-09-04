@@ -4,16 +4,16 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 const SRC = resolve(import.meta.dirname, '../src');
-const mainSource = readFileSync(resolve(SRC, 'main.jsx'), 'utf8');
+const studioCss = readFileSync(resolve(SRC, 'studio.css'), 'utf8');
 const filesCss = readFileSync(resolve(SRC, 'files-next.css'), 'utf8');
 const schemaCss = readFileSync(resolve(SRC, 'data-model-next.css'), 'utf8');
 const accessCss = readFileSync(resolve(SRC, 'access-next.css'), 'utf8');
 
 test('Studio loads the dedicated Files, Data Model and Access workspace layers after the base redesign', () => {
-  assert.match(mainSource, /import '\.\/files-next\.css';/);
-  assert.match(mainSource, /import '\.\/data-model-next\.css';/);
-  assert.match(mainSource, /import '\.\/access-next\.css';/);
-  assert.ok(mainSource.indexOf("./studio-next.css") < mainSource.indexOf("./files-next.css"));
+  for (const stylesheet of ['files-next.css', 'data-model-next.css', 'access-next.css']) {
+    assert.match(studioCss, new RegExp(`@import './${stylesheet.replace('.', '\\.')}'`));
+  }
+  assert.ok(studioCss.indexOf("@import './studio-next.css';") < studioCss.indexOf("@import './files-next.css';"));
 });
 
 test('Files presents an asset grid and a metadata-oriented detail workspace', () => {
