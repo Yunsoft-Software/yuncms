@@ -1,8 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.jsx';
-import { StudioNextFrame } from './components/AppRail.jsx';
-import { DialogProvider } from './components/DialogProvider.jsx';
+import { DialogProvider, StudioNextFrame } from './components/index.js';
 import { StudioSettingsProvider } from './contexts/StudioSettingsContext.jsx';
 import './styles.css';
 import './ui-improvements.css';
