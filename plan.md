@@ -34,7 +34,7 @@ This file is the source of truth for implementation and release status. Detailed
 - [x] Prevent the permission collection grid from inheriting the legacy two-column layout and clipping action controls.
 - [x] Add regression coverage for responsive breakpoints, tablet record cards, toolbar sizing, permission layout and action contrast.
 - [x] Verify 390, 768, 1024 and 1440 pixel layouts in a real browser across light and dark themes with no horizontal overflow or console errors.
-- [ ] Pass the complete and release test suites, including real MySQL/API integration and npm package dry runs.
+- [x] Pass the complete and release test suites, including real MySQL/API integration and npm package dry runs.
 - [ ] Publish the public npm packages and verify `latest` resolves to 0.1.16 for each package.
 
 ## After this release
