@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiRequest } from '../api.js';
-import { useConfirmDialog } from '../components/DialogProvider.jsx';
-import { FileFieldControl, FileValuePreview } from '../components/FileFieldControl.jsx';
-import { Pagination } from '../components/Pagination.jsx';
+import {
+  FileFieldControl,
+  FileValuePreview,
+  Inspector,
+  Pagination,
+  RelationPicker,
+  useConfirmDialog,
+} from '../components/index.js';
 import { contentTableFields, isFileField, isImageField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
@@ -153,7 +158,19 @@ function buildItemsPath({ collection, fields, search, filters, sortField, sortDi
   return `/items/${encodeURIComponent(collection)}?${params.toString()}`;
 }
 
-function RecordForm({ collection, collectionLabel, fields, relationLookups, files, record, onFileUploaded, onSaved, onCancel }) {
+function RecordForm({
+  collection,
+  collectionLabel,
+  fields,
+  relationLookups,
+  files,
+  record,
+  onFileUploaded,
+  onSaved,
+  onCancel,
+  onOpenFull,
+  compact = false,
+}) {
   const { t } = useI18n();
   const editable = useMemo(() => fields.filter((field) => !field.readonly), [fields]);
   const [values, setValues] = useState({});
@@ -193,7 +210,7 @@ function RecordForm({ collection, collectionLabel, fields, relationLookups, file
   }
 
   return (
-    <form className="panel form-panel record-editor" onSubmit={submit}>
+    <form className={`panel form-panel record-editor ${compact ? 'record-editor-compact' : ''}`} onSubmit={submit}>
       <div className="panel-heading">
         <div>
           <p className="eyebrow">{record?.id ? t('content.editRecord') : t('content.newRecord')}</p>
@@ -208,9 +225,6 @@ function RecordForm({ collection, collectionLabel, fields, relationLookups, file
         {editable.map((field) => {
           const relationLookup = relationLookups[field.field];
           const currentValue = values[field.field] ?? '';
-          const hasCurrentOption = relationLookup?.items.some(
-            (entry) => String(entry[relationLookup.keyField]) === String(currentValue),
-          );
           const label = fieldLabel(field);
 
           return (
@@ -227,20 +241,18 @@ function RecordForm({ collection, collectionLabel, fields, relationLookups, file
                   onChange={(value) => setValues((current) => ({ ...current, [field.field]: value }))}
                 />
               ) : relationLookup ? (
-                <select
+                <RelationPicker
                   value={currentValue}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.field]: event.target.value }))}
+                  items={relationLookup.items}
+                  keyField={relationLookup.keyField}
+                  labelField={relationLookup.labelField}
                   required={Boolean(field.required)}
-                >
-                  <option value="">{field.required ? t('content.select') : t('common.none')}</option>
-                  {currentValue && !hasCurrentOption && (
-                    <option value={currentValue}>{t('content.unknownValue', { value: currentValue })}</option>
-                  )}
-                  {relationLookup.items.map((item) => {
-                    const value = item[relationLookup.keyField];
-                    return <option key={String(value)} value={String(value)}>{lookupLabel(relationLookup, value)}</option>;
-                  })}
-                </select>
+                  placeholder={field.required ? t('content.select') : t('common.none')}
+                  searchPlaceholder={t('content.relationSearch')}
+                  emptyLabel={t('content.relationEmpty')}
+                  noneLabel={t('common.none')}
+                  onChange={(value) => setValues((current) => ({ ...current, [field.field]: value }))}
+                />
               ) : field.type === 'boolean' ? (
                 <input
                   type="checkbox"
@@ -276,6 +288,11 @@ function RecordForm({ collection, collectionLabel, fields, relationLookups, file
 
       {error && <div className="error-banner" role="alert">{error}</div>}
       <div className="form-actions">
+        {compact && onOpenFull && (
+          <button className="secondary-button" type="button" onClick={onOpenFull}>
+            {t('content.openFullEditor')}
+          </button>
+        )}
         <button className="primary-button" type="submit" disabled={saving}>
           {saving ? t('common.saving') : t('content.saveRecord')}
         </button>
@@ -295,6 +312,8 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
+  const [inspectedRecord, setInspectedRecord] = useState(null);
+  const [selectedRecordIds, setSelectedRecordIds] = useState(() => new Set());
   const [loadedRecordKey, setLoadedRecordKey] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -308,6 +327,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   const [schemaLoading, setSchemaLoading] = useState(true);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const creating = route.view === 'new';
   const editing = route.view === 'record' ? editingRecord : null;
   const routeRecordKey = route.view === 'record' ? `${collection}:${route.recordId}` : '';
@@ -397,8 +417,14 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
       });
       const response = await apiRequest(path);
       if (version !== requestVersion.current) return;
-      setItems(response?.data ?? []);
+      const nextItems = response?.data ?? [];
+      setItems(nextItems);
       setMeta(response?.meta ?? null);
+      setSelectedRecordIds(new Set());
+      setInspectedRecord((current) => {
+        if (!current) return null;
+        return nextItems.find((record) => String(record.id) === String(current.id)) ?? current;
+      });
     } catch (requestError) {
       if (version !== requestVersion.current) return;
       setError(requestError.message || t('content.dataLoadError'));
@@ -417,6 +443,8 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
 
   useEffect(() => {
     setEditingRecord(null);
+    setInspectedRecord(null);
+    setSelectedRecordIds(new Set());
     setSearchInput('');
     setSearch('');
     setFilters([]);
@@ -425,6 +453,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     setSortField('');
     setSortDirection('asc');
     setOffset(0);
+    setNotice('');
     loadCollectionSchema(collection);
   }, [collection]);
 
@@ -448,10 +477,6 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   }, [collection, route.recordId, route.view]);
 
   useEffect(() => {
-    // The collection-change effect above starts the schema request in the same
-    // effect flush. The ref closes the one-render window before the loading
-    // state update is visible, so stale fields cannot start an item request and
-    // invalidate the schema request version.
     if (!collection || schemaLoading || schemaLoadingRef.current || fields.length === 0) return;
     loadItems(collection, fields);
   }, [collection, fields, filters, offset, pageSize, schemaLoading, search, sortDirection, sortField]);
@@ -466,11 +491,13 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     });
     if (!accepted) return;
     setError('');
+    setNotice('');
     try {
       await apiRequest(
         `/items/${encodeURIComponent(collection)}/${encodeURIComponent(record.id)}`,
         { method: 'DELETE' },
       );
+      if (String(inspectedRecord?.id) === String(record.id)) setInspectedRecord(null);
       if (items.length === 1 && offset > 0) {
         setOffset(Math.max(0, offset - pageSize));
       } else {
@@ -478,6 +505,43 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
       }
     } catch (requestError) {
       setError(requestError.message || t('content.deleteError'));
+    }
+  }
+
+  async function removeSelectedRecords() {
+    const selected = items.filter((record) => selectedRecordIds.has(String(record.id)));
+    if (selected.length === 0) return;
+    const accepted = await requestConfirmation({
+      title: t('content.bulkDeleteTitle'),
+      description: t('content.bulkDeleteDescription', {
+        count: selected.length,
+        collection: collectionLabel || collection,
+      }),
+      confirmLabel: t('content.bulkDelete'),
+      tone: 'danger',
+    });
+    if (!accepted) return;
+
+    setError('');
+    setNotice('');
+    const results = await Promise.allSettled(selected.map((record) => apiRequest(
+      `/items/${encodeURIComponent(collection)}/${encodeURIComponent(record.id)}`,
+      { method: 'DELETE' },
+    )));
+    const failed = results.filter((result) => result.status === 'rejected').length;
+    setSelectedRecordIds(new Set());
+    if (inspectedRecord && selected.some((record) => String(record.id) === String(inspectedRecord.id))) {
+      setInspectedRecord(null);
+    }
+    if (failed > 0) {
+      setError(t('content.bulkDeletePartial', { failed, count: selected.length }));
+    } else {
+      setNotice(t('content.bulkDeleteSuccess', { count: selected.length }));
+    }
+    if (failed === 0 && selected.length === items.length && offset > 0) {
+      setOffset(Math.max(0, offset - pageSize));
+    } else {
+      await loadItems();
     }
   }
 
@@ -493,6 +557,24 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   const totalCount = Number(meta?.total_count ?? 0);
   const currentPage = Math.floor(offset / pageSize) + 1;
   const hasActiveControls = Boolean(search || filters.length > 0 || sortField);
+  const selectedCount = selectedRecordIds.size;
+  const allPageSelected = items.length > 0 && items.every((record) => selectedRecordIds.has(String(record.id)));
+
+  function toggleRecordSelection(recordId) {
+    const key = String(recordId);
+    setSelectedRecordIds((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function togglePageSelection() {
+    setSelectedRecordIds(allPageSelected
+      ? new Set()
+      : new Set(items.map((record) => String(record.id))));
+  }
 
   function updateFilterField(fieldName) {
     const field = filterableFields.find((entry) => entry.field === fieldName) ?? null;
@@ -716,18 +798,19 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                     .map((file) => <option key={file.id} value={file.id}>{file.title || file.filename_download}</option>)}
                 </select>
               ) : relationLookups[filterDraft.field] ? (
-                <select
+                <RelationPicker
                   value={filterDraft.value}
+                  items={relationLookups[filterDraft.field].items}
+                  keyField={relationLookups[filterDraft.field].keyField}
+                  labelField={relationLookups[filterDraft.field].labelField}
                   disabled={!selectedFilterField}
-                  onChange={(event) => setFilterDraft((current) => ({ ...current, value: event.target.value }))}
-                >
-                  <option value="">{t('content.chooseRecord')}</option>
-                  {relationLookups[filterDraft.field].items.map((item) => {
-                    const lookup = relationLookups[filterDraft.field];
-                    const value = item[lookup.keyField];
-                    return <option key={String(value)} value={String(value)}>{lookupLabel(lookup, value)}</option>;
-                  })}
-                </select>
+                  required
+                  placeholder={t('content.chooseRecord')}
+                  searchPlaceholder={t('content.relationSearch')}
+                  emptyLabel={t('content.relationEmpty')}
+                  noneLabel={t('common.none')}
+                  onChange={(value) => setFilterDraft((current) => ({ ...current, value }))}
+                />
               ) : selectedFilterField?.type === 'boolean' ? (
                 <select
                   value={filterDraft.value}
@@ -776,6 +859,16 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
       )}
 
       {error && <div className="error-banner" role="alert">{error}</div>}
+      {notice && <div className="notice-banner" role="status">{notice}</div>}
+      {selectedCount > 0 && (
+        <div className="content-bulk-bar" role="region" aria-label={t('content.selectedCount', { count: selectedCount })}>
+          <strong>{t('content.selectedCount', { count: selectedCount })}</strong>
+          <div>
+            <button className="text-button" type="button" onClick={() => setSelectedRecordIds(new Set())}>{t('common.cancel')}</button>
+            <button className="danger-button" type="button" onClick={removeSelectedRecords}>{t('content.bulkDelete')}</button>
+          </div>
+        </div>
+      )}
       {schemaLoading ? (
         <section className="panel"><p>{t('content.loadingCollection')}</p></section>
       ) : !itemsLoading && totalCount === 0 && !hasActiveControls ? (
@@ -794,6 +887,14 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
             <table>
               <thead>
                 <tr>
+                  <th className="content-selection-column">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      onChange={togglePageSelection}
+                      aria-label={t('content.selectPage')}
+                    />
+                  </th>
                   {tableFields.map((field) => (
                     <th
                       key={field.field}
@@ -803,7 +904,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                       <button className="sort-header-button" type="button" onClick={() => toggleColumnSort(field.field)}>
                         <span>{fieldLabel(field)}</span>
                         <span className="sort-indicator" aria-hidden="true">
-                          {sortField === field.field ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
+                          {sortField === field.field ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
                         </span>
                       </button>
                     </th>
@@ -812,21 +913,40 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                 </tr>
               </thead>
               <tbody>
-                {items.map((record) => (
-                  <tr key={record.id}>
-                    {tableFields.map((field) => (
-                      <td key={field.field}>
-                        {isFileField(field) ? (
-                          <FileValuePreview field={field} value={record[field.field]} files={files} t={t} />
-                        ) : renderValue(field, record, relationLookups)}
+                {items.map((record) => {
+                  const selected = selectedRecordIds.has(String(record.id));
+                  return (
+                    <tr
+                      key={record.id}
+                      className={`content-row-open ${selected ? 'content-row-selected' : ''}`}
+                      onClick={(event) => {
+                        if (event.target.closest?.('button, input, a, select, textarea, label')) return;
+                        setInspectedRecord(record);
+                      }}
+                    >
+                      <td className="content-selection-column">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleRecordSelection(record.id)}
+                          aria-label={t('content.selectRecord', { id: record.id })}
+                        />
                       </td>
-                    ))}
-                    <td className="row-actions">
-                      <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.contentRecord(collection, record.id))}>{t('common.edit')}</button>
-                      <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>
-                    </td>
-                  </tr>
-                ))}
+                      {tableFields.map((field) => (
+                        <td key={field.field}>
+                          {isFileField(field) ? (
+                            <FileValuePreview field={field} value={record[field.field]} files={files} t={t} />
+                          ) : renderValue(field, record, relationLookups)}
+                        </td>
+                      ))}
+                      <td className="row-actions">
+                        <button className="text-button" type="button" onClick={() => setInspectedRecord(record)}>{t('content.quickEdit')}</button>
+                        <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.contentRecord(collection, record.id))}>{t('common.edit')}</button>
+                        <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -851,6 +971,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                     ))}
                   </dl>
                   <div className="mobile-card-actions">
+                    <button className="secondary-button" type="button" onClick={() => setInspectedRecord(record)}>{t('content.quickEdit')}</button>
                     <button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.contentRecord(collection, record.id))}>{t('common.edit')}</button>
                     <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>
                   </div>
@@ -873,6 +994,38 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
           />
         </section>
       )}
+
+      <Inspector
+        open={Boolean(inspectedRecord)}
+        title={inspectedRecord ? `${visibleCollectionName} · ${inspectedRecord.id}` : visibleCollectionName}
+        description={t('content.quickEdit')}
+        closeLabel={t('studio.inspectorClose')}
+        onClose={() => setInspectedRecord(null)}
+      >
+        {inspectedRecord && (
+          <RecordForm
+            compact
+            collection={collection}
+            collectionLabel={collectionLabel}
+            fields={fields}
+            relationLookups={relationLookups}
+            files={files}
+            record={inspectedRecord}
+            onFileUploaded={registerUploadedFile}
+            onCancel={() => setInspectedRecord(null)}
+            onOpenFull={() => {
+              const recordId = inspectedRecord.id;
+              setInspectedRecord(null);
+              onNavigate?.(studioPath.contentRecord(collection, recordId));
+            }}
+            onSaved={async (saved) => {
+              if (saved) setInspectedRecord(saved);
+              setNotice(t('common.saved'));
+              await loadItems();
+            }}
+          />
+        )}
+      </Inspector>
     </div>
   );
 }
