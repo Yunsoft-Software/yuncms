@@ -16,6 +16,7 @@ export { Inspector } from './Inspector.jsx';
 export { Modal } from './Modal.jsx';
 export { Pagination, paginateClientItems } from './Pagination.jsx';
 export { PublicRegistrationSettings } from './PublicRegistrationSettings.jsx';
+export { RelationDiagram } from './RelationDiagram.jsx';
 export { RelationPicker } from './RelationPicker.jsx';
 export { RuleBuilder, parseSimpleRules, rulesToFilter } from './RuleBuilder.jsx';
 export { SchemaGraph } from './SchemaGraph.jsx';
