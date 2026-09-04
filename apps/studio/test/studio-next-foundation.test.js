@@ -4,9 +4,11 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 const SRC = resolve(import.meta.dirname, '../src');
-const mainSource = readFileSync(resolve(SRC, 'main.jsx'), 'utf8');
+const studioCss = readFileSync(resolve(SRC, 'studio.css'), 'utf8');
 const tokensCss = readFileSync(resolve(SRC, 'studio-next-tokens.css'), 'utf8');
 const authCss = readFileSync(resolve(SRC, 'auth-settings-next.css'), 'utf8');
+const compatCss = readFileSync(resolve(SRC, 'studio-compat.css'), 'utf8');
+const railSource = readFileSync(resolve(SRC, 'components/AppRail.jsx'), 'utf8');
 const aiCss = readFileSync(resolve(SRC, 'ai-next.css'), 'utf8');
 
 test('semantic Studio tokens cover workspace borders, state colors, focus and motion', () => {
@@ -28,7 +30,7 @@ test('semantic Studio tokens cover workspace borders, state colors, focus and mo
 });
 
 test('workspace-specific CSS loads after the semantic token bridge', () => {
-  const tokenIndex = mainSource.indexOf("./studio-next-tokens.css");
+  const tokenIndex = studioCss.indexOf("@import './studio-next-tokens.css';");
   assert.ok(tokenIndex > -1);
   for (const file of [
     './content-workbench-next.css',
@@ -38,12 +40,15 @@ test('workspace-specific CSS loads after the semantic token bridge', () => {
     './ai-next.css',
     './auth-settings-next.css',
   ]) {
-    assert.ok(mainSource.indexOf(file) > tokenIndex, `${file} should load after tokens`);
+    assert.ok(studioCss.indexOf(`@import '${file}';`) > tokenIndex, `${file} should load after tokens`);
   }
+  assert.ok(studioCss.indexOf("@import './studio-compat.css';") > studioCss.indexOf("@import './auth-settings-next.css';"));
 });
 
 test('sign-in removes application navigation and becomes a dedicated responsive surface', () => {
-  assert.match(authCss, /studio-next-frame:has\(\.auth-layout\) > \.studio-app-rail[\s\S]*display:\s*none/);
+  assert.match(railSource, /authSurface \? 'auth-surface' : ''/);
+  assert.match(railSource, /!authSurface && <AppRail \/>/);
+  assert.match(compatCss, /\.studio-next-frame\.auth-surface[\s\S]*display:\s*block/);
   assert.match(authCss, /\.auth-shell[\s\S]*grid-template-columns/);
   assert.match(authCss, /@media \(max-width: 680px\)/);
 });
