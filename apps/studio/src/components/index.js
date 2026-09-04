@@ -1,4 +1,3 @@
-export { ActionMenu } from './ActionMenu.jsx';
 export { AiSettingsPanel } from './AiSettingsPanel.jsx';
 export { AppRail, StudioNextFrame } from './AppRail.jsx';
 export { BrandAssetPicker } from './BrandAssetPicker.jsx';
