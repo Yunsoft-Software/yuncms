@@ -4,6 +4,7 @@ export { BrandAssetPicker } from './BrandAssetPicker.jsx';
 export { CollectionIcon } from './CollectionIcon.jsx';
 export { CollectionIconPicker } from './CollectionIconPicker.jsx';
 export { CommandPalette } from './CommandPalette.jsx';
+export { DataViewOptions } from './DataViewOptions.jsx';
 export { DialogProvider, useConfirmDialog } from './DialogProvider.jsx';
 export { FieldBuilder } from './FieldBuilder.jsx';
 export { FieldTypeIcon } from './FieldTypeIcon.jsx';
