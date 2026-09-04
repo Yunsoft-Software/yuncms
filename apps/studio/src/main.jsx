@@ -23,6 +23,7 @@ import './ai.css';
 import './mcp.css';
 import './content-density.css';
 import './studio-next.css';
+import './content-workbench-next.css';
 
 if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
