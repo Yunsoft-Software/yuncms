@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiBlob, apiRequest } from '../api.js';
-import { useConfirmDialog } from '../components/DialogProvider.jsx';
-import { FilePreview } from '../components/FilePreview.jsx';
-import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
+import {
+  FilePreview,
+  Inspector,
+  Pagination,
+  paginateClientItems,
+  useConfirmDialog,
+} from '../components/index.js';
 import { useI18n } from '../i18n.js';
 import { studioPath } from '../studio-route.js';
 
@@ -84,6 +88,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
   const requestConfirmation = useConfirmDialog();
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [inspectedFile, setInspectedFile] = useState(null);
   const [view, setView] = useState('grid');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -104,7 +109,12 @@ export function FilesScreen({ route = {}, onNavigate }) {
     setError('');
     try {
       const response = await apiRequest('/files');
-      setFiles(response?.data ?? []);
+      const nextFiles = response?.data ?? [];
+      setFiles(nextFiles);
+      setInspectedFile((current) => {
+        if (!current) return null;
+        return nextFiles.find((file) => String(file.id) === String(current.id)) ?? null;
+      });
     } catch (requestError) {
       setError(requestError.message || t('files.loadError'));
     } finally {
@@ -173,6 +183,15 @@ export function FilesScreen({ route = {}, onNavigate }) {
     if (file) setSelectedFile(file);
   }
 
+  function handleLibraryDrop(event) {
+    event.preventDefault();
+    setDropActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    setSelectedFile(file);
+    onNavigate?.(studioPath.newFile());
+  }
+
   async function download(file) {
     setError('');
     try {
@@ -234,6 +253,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
     try {
       await apiRequest(`/files/${encodeURIComponent(file.id)}`, { method: 'DELETE' });
       if (editingFile?.id === file.id) setEditingFile(null);
+      if (inspectedFile?.id === file.id) setInspectedFile(null);
       setNotice(t('files.deletedNotice'));
       await load();
       if (route.view === 'detail') onNavigate?.(studioPath.files());
@@ -289,7 +309,22 @@ export function FilesScreen({ route = {}, onNavigate }) {
   }
 
   return (
-    <div className="screen-stack">
+    <div
+      className={`screen-stack file-library-workspace ${dropActive ? 'drop-active' : ''}`}
+      onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }}
+      onDragOver={(event) => { event.preventDefault(); setDropActive(true); }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setDropActive(false);
+      }}
+      onDrop={handleLibraryDrop}
+    >
+      {dropActive && (
+        <div className="file-library-drop-overlay" aria-hidden="true">
+          <strong>{t('files.uploadFile')}</strong>
+          <span>{t('files.dragDrop')}</span>
+        </div>
+      )}
+
       <section className="panel library-toolbar workspace-toolbar library-header-panel">
         <div className="workspace-toolbar-heading">
           <div>
@@ -362,7 +397,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
                   <button
                     className="file-preview-open-button"
                     type="button"
-                    onClick={() => onNavigate?.(studioPath.file(file.id))}
+                    onClick={() => setInspectedFile(file)}
                     aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}
                   >
                     <FilePreview file={file} label={fileTypeLabel(file, t)} alt={fileDisplayName(file, t)} />
@@ -378,7 +413,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
                     <span>{formatBytes(file.filesize)}</span>
                   </div>
                   <div className="file-card-actions">
-                    <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.file(file.id))}>{t('files.preview')}</button>
+                    <button className="text-button" type="button" onClick={() => setInspectedFile(file)}>{t('files.preview')}</button>
                     <button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button>
                     <button className="text-button" type="button" onClick={() => { beginEdit(file); onNavigate?.(studioPath.file(file.id)); }}>{t('common.edit')}</button>
                     <button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button>
@@ -407,7 +442,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
                   <tr key={file.id}>
                     <td>
                       <div className="file-list-name">
-                        <button className="file-list-thumb file-preview-open-button" type="button" onClick={() => onNavigate?.(studioPath.file(file.id))} aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}>
+                        <button className="file-list-thumb file-preview-open-button" type="button" onClick={() => setInspectedFile(file)} aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}>
                           <FilePreview file={file} label={fileTypeLabel(file, t)} />
                         </button>
                         <span><strong>{fileDisplayName(file, t)}</strong><small>{file.filename_download}</small></span>
@@ -418,7 +453,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
                     <td>{file.storage}</td>
                     <td>{file.uploaded_at ? new Date(file.uploaded_at).toLocaleString(dateLocale) : '—'}</td>
                     <td className="row-actions">
-                      <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.file(file.id))}>{t('files.preview')}</button>
+                      <button className="text-button" type="button" onClick={() => setInspectedFile(file)}>{t('files.preview')}</button>
                       <button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button>
                       <button className="text-button" type="button" onClick={() => { beginEdit(file); onNavigate?.(studioPath.file(file.id)); }}>{t('common.edit')}</button>
                       <button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button>
@@ -440,6 +475,35 @@ export function FilesScreen({ route = {}, onNavigate }) {
         </section>
       )}
 
+      <Inspector
+        open={Boolean(inspectedFile)}
+        title={inspectedFile ? fileDisplayName(inspectedFile, t) : t('files.fileDetails')}
+        description={inspectedFile?.filename_download || ''}
+        closeLabel={t('studio.inspectorClose')}
+        onClose={() => setInspectedFile(null)}
+        actions={inspectedFile && (
+          <>
+            <button className="secondary-button" type="button" onClick={() => download(inspectedFile)}>{t('files.download')}</button>
+            <button className="primary-button" type="button" onClick={() => {
+              const fileId = inspectedFile.id;
+              setInspectedFile(null);
+              onNavigate?.(studioPath.file(fileId));
+            }}>{t('files.fileDetails')}</button>
+          </>
+        )}
+      >
+        {inspectedFile && (
+          <div className="file-inspector-content">
+            <div className="file-inspector-preview"><FilePreview file={inspectedFile} label={fileTypeLabel(inspectedFile, t)} alt={fileDisplayName(inspectedFile, t)} /></div>
+            <dl className="file-inspector-meta">
+              <div><dt>{t('common.type')}</dt><dd>{inspectedFile.mimetype || fileTypeLabel(inspectedFile, t)}</dd></div>
+              <div><dt>{t('files.size')}</dt><dd>{formatBytes(inspectedFile.filesize)}</dd></div>
+              <div><dt>{t('files.storage')}</dt><dd>{inspectedFile.storage || '—'}</dd></div>
+              <div><dt>{t('files.uploaded')}</dt><dd>{inspectedFile.uploaded_at ? new Date(inspectedFile.uploaded_at).toLocaleString(dateLocale) : '—'}</dd></div>
+            </dl>
+          </div>
+        )}
+      </Inspector>
     </div>
   );
 }
