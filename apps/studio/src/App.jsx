@@ -335,7 +335,7 @@ export function App() {
               setSidebarCollapsed((value) => !value);
             }}
           >
-            <SidebarIcon name="collapse" />
+            <SidebarIcon name={mobileLayout ? (mobileNavOpen ? 'close' : 'menu') : 'collapse'} />
             <span className="mobile-menu-label">{mobileNavOpen ? t('nav.closeMenu') : t('nav.openMenu')}</span>
           </button>
         </div>

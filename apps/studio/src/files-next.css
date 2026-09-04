@@ -419,11 +419,20 @@
   box-shadow: none;
 }
 
-.file-upload-page {
+.studio-next-app .panel.file-upload-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 18px;
   padding: 0;
   border: 0;
   background: transparent;
   box-shadow: none;
+}
+
+.studio-next-app .file-upload-page > div:first-child {
+  max-width: none;
 }
 
 .file-upload-page .workspace-section-heading {
@@ -438,7 +447,7 @@
   place-items: center;
   align-content: center;
   gap: 14px;
-  margin-top: 18px;
+  margin-top: 0;
   padding: 28px;
   border: 1px dashed var(--ui-border-strong);
   border-radius: 12px;

@@ -11,11 +11,11 @@
   background: color-mix(in srgb, var(--ui-success) 7%, var(--ui-surface-hover));
 }
 
-.permission-action-row:has(.permission-toggle:not(.enabled)) > div:first-child small {
+.permission-action-row:has(.permission-toggle:not(.enabled)) .permission-action-meta small {
   color: var(--ui-text-tertiary);
 }
 
-.permission-action-row:has(.permission-toggle.enabled) > div:first-child small {
+.permission-action-row:has(.permission-toggle.enabled) .permission-action-meta small {
   color: var(--ui-text-secondary);
   font-weight: 650;
 }
@@ -24,7 +24,7 @@
   background: var(--ui-surface-subtle);
 }
 
-.permission-action-row:has(.protected-permission) > div:first-child {
+.permission-action-row:has(.protected-permission) .permission-action-meta {
   opacity: .72;
 }
 
@@ -38,7 +38,7 @@
   font-weight: 800;
 }
 
-.permission-action-row > div:first-child small {
+.permission-action-meta small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -50,7 +50,7 @@
 }
 
 @media (max-width: 900px) {
-  .permission-action-row > div:first-child small {
+  .permission-action-meta small {
     white-space: normal;
   }
 }

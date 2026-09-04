@@ -16,6 +16,13 @@ export const UI_EN = Object.freeze({
   'nav.studioSections': 'Studio sections',
 
   'auth.signInDescription': 'Use your YunCMS account. Available Studio actions are enforced by your role and permissions.',
+  'auth.brandKicker': 'YunCMS workspace',
+  'auth.brandTitle': 'Your content. Your rules.',
+  'auth.brandDescription': 'Shape the schema, publish content and control access from one focused workspace built around your own backend.',
+  'auth.brandCapabilities': 'Workspace capabilities',
+  'auth.brandSchema': 'Schema',
+  'auth.brandContent': 'Content',
+  'auth.brandAccess': 'Access',
   'section.usersDescription': 'Manage users, roles and account status within your granted access.',
 
   'fieldType.string': 'Short text',

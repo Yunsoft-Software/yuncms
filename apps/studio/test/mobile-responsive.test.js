@@ -23,7 +23,9 @@ test('Studio mobile shell resets page scroll and never inherits the desktop coll
   assert.match(css, /grid-template-rows: auto minmax\(0, 1fr\)/);
   assert.match(css, /\.sidebar-brand-row,[\s\S]*justify-content: space-between/);
   assert.match(css, /\.main-content > \.page-header[\s\S]*display: none/);
-  assert.match(css, /\.mobile-menu-label[\s\S]*display: inline/);
+  assert.match(app, /mobileLayout \? \(mobileNavOpen \? 'close' : 'menu'\) : 'collapse'/);
+  assert.match(css, /\.mobile-menu-label[\s\S]*display: none/);
+  assert.match(css, /\.sidebar \.sidebar-collapse-button,[\s\S]*width: 40px/);
   assert.match(brand, /studio-brand-fallback-full/);
   assert.match(brand, /studio-brand-fallback-compact/);
 });

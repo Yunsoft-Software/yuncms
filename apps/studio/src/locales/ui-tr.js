@@ -16,6 +16,13 @@ export const UI_TR = Object.freeze({
   'nav.studioSections': 'Studio bölümleri',
 
   'auth.signInDescription': 'YunCMS hesabınızla giriş yapın. Kullanabileceğiniz Studio işlemleri rol ve izinleriniz tarafından belirlenir.',
+  'auth.brandKicker': 'YunCMS çalışma alanı',
+  'auth.brandTitle': 'İçeriğin. Kuralların.',
+  'auth.brandDescription': 'Şemayı şekillendirin, içeriği yayınlayın ve erişimi kendi backend’iniz için tasarlanmış tek bir çalışma alanından yönetin.',
+  'auth.brandCapabilities': 'Çalışma alanı yetenekleri',
+  'auth.brandSchema': 'Şema',
+  'auth.brandContent': 'İçerik',
+  'auth.brandAccess': 'Erişim',
   'section.usersDescription': 'Size verilen erişim kapsamında kullanıcıları, rolleri ve hesap durumlarını yönetin.',
 
   'fieldType.string': 'Kısa metin',

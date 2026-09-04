@@ -37,6 +37,36 @@ export function StudioBrand({ compact = false, previewSettings = null }) {
   );
 }
 
+export function AuthBrandPanel() {
+  const { t } = useI18n();
+
+  return (
+    <div className="auth-branding">
+      <div className="auth-branding-head">
+        <StudioBrand />
+        <LanguageSwitcher compact />
+      </div>
+      <div className="auth-brand-showcase">
+        <div className="auth-brand-visual" aria-hidden="true">
+          <span className="auth-brand-orbit auth-brand-orbit-one" />
+          <span className="auth-brand-orbit auth-brand-orbit-two" />
+          <div className="auth-brand-logo-stage"><StudioBrand /></div>
+        </div>
+        <div className="auth-brand-copy">
+          <p className="eyebrow">{t('auth.brandKicker')}</p>
+          <h2>{t('auth.brandTitle')}</h2>
+          <p>{t('auth.brandDescription')}</p>
+          <div className="auth-brand-capabilities" aria-label={t('auth.brandCapabilities')}>
+            <span>{t('auth.brandSchema')}</span>
+            <span>{t('auth.brandContent')}</span>
+            <span>{t('auth.brandAccess')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function YunsoftFooter({ compact = false }) {
   const { t } = useI18n();
   return (

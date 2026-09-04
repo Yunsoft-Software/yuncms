@@ -8,7 +8,7 @@ import {
   loginWithProvider,
   apiRequest,
 } from '../api.js';
-import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/index.js';
+import { AuthBrandPanel, YunsoftFooter } from '../components/index.js';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
 
@@ -195,10 +195,7 @@ export function LoginScreen({ onAuthenticated }) {
   return (
     <main className="auth-layout">
       <div className="auth-shell">
-        <div className="auth-branding">
-          <StudioBrand />
-          <LanguageSwitcher compact />
-        </div>
+        <AuthBrandPanel />
         <section className="auth-card" aria-labelledby="login-title">
           <div>
             <p className="eyebrow">YunCMS {t('app.studio')}</p>
