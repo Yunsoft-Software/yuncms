@@ -190,7 +190,7 @@ Editor             READ       CREATE      UPDATE      DELETE
 ──────────────────────────────────────────────────────────────
 Products             ✓           ✓           ◐           —
 Orders               ✓           —           ◐           —
-Customers            ✓           ✓           ✓           —
+Customers             ✓           ✓           ✓           —
 Files                ✓           ✓           —           —
 ```
 
@@ -308,43 +308,43 @@ The redesign is planned in incremental stages so existing Studio behavior stays 
 
 ### Foundation
 
-- [ ] unify semantic visual tokens;
-- [ ] establish the compact application shell;
+- [x] unify semantic visual tokens;
+- [x] establish the compact application shell;
 - [ ] remove duplicated routine page headings;
-- [ ] consolidate common controls and interaction states.
+- [x] consolidate common controls and interaction states.
 
 ### Content
 
-- [ ] compact content header and toolbar;
-- [ ] filter popover or sheet;
+- [x] compact content header and toolbar;
+- [x] filter popover or sheet;
 - [ ] improved table value rendering;
-- [ ] selection and bulk-action foundation;
-- [ ] quick record inspector.
+- [x] selection and bulk-action foundation;
+- [x] quick record inspector.
 
 ### Files
 
-- [ ] contextual file navigation;
-- [ ] stronger asset browser layout;
-- [ ] workspace drag-and-drop state;
-- [ ] file inspector.
+- [x] contextual file navigation;
+- [x] stronger asset browser layout;
+- [x] workspace drag-and-drop state;
+- [x] file inspector.
 
 ### Data Model
 
-- [ ] field type icon system;
-- [ ] compact collection and field workspace;
-- [ ] schema graph;
-- [ ] clearer relation preview and creation flow.
+- [x] field type icon system;
+- [x] compact collection and field workspace;
+- [x] schema graph;
+- [x] clearer relation preview and creation flow.
 
 ### Access
 
-- [ ] compact role navigation;
+- [x] compact role navigation;
 - [ ] permission matrix states;
-- [ ] visual field and rule editing;
-- [ ] advanced raw JSON view.
+- [x] visual field and rule editing;
+- [x] advanced raw JSON view.
 
 ### Navigation and polish
 
-- [ ] command palette;
+- [x] command palette;
 - [ ] unified motion feedback;
 - [ ] responsive and reduced-motion pass;
 - [ ] public Studio documentation refresh;
