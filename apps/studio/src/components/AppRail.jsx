@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { apiRequest } from '../api.js';
 import { useI18n } from '../i18n.js';
+import { displaySchemaName } from '../schema-name.js';
 import { navigateStudio, readStudioRoute, studioPath } from '../studio-route.js';
 import { CommandPalette } from './CommandPalette.jsx';
 import { SidebarIcon } from './SidebarIcon.jsx';
@@ -41,10 +43,22 @@ function commandForCurrentRoute(route, t) {
   return null;
 }
 
+function collectionCommands(collections, t) {
+  return collections
+    .filter((collection) => !collection.system && !collection.hidden)
+    .map((collection) => ({
+      id: `collection-${collection.collection}`,
+      icon: 'content',
+      label: `${t('nav.content')}: ${displaySchemaName(collection, 'collection')} · ${collection.collection}`,
+      path: () => studioPath.content(collection.collection),
+    }));
+}
+
 export function AppRail() {
   const { t } = useI18n();
   const [route, setRoute] = useState(() => readStudioRoute());
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [collections, setCollections] = useState([]);
 
   useEffect(() => {
     const update = () => {
@@ -58,6 +72,15 @@ export function AppRail() {
       window.removeEventListener('popstate', update);
     };
   }, []);
+
+  useEffect(() => {
+    if (!paletteOpen || document.querySelector('.auth-layout')) return undefined;
+    let cancelled = false;
+    apiRequest('/schema/collections')
+      .then((response) => { if (!cancelled) setCollections(response?.data ?? []); })
+      .catch(() => { if (!cancelled) setCollections([]); });
+    return () => { cancelled = true; };
+  }, [paletteOpen]);
 
   useEffect(() => {
     function handleShortcut(event) {
@@ -105,8 +128,9 @@ export function AppRail() {
     return [
       ...(contextual ? [{ ...contextual, id: `action-${contextual.id}` }] : []),
       ...destinations.map((destination) => ({ ...destination, id: `nav-${destination.id}` })),
+      ...collectionCommands(collections, t),
     ];
-  }, [destinations, route, t]);
+  }, [collections, destinations, route, t]);
 
   return (
     <>
@@ -168,4 +192,4 @@ export function StudioNextFrame({ children }) {
   );
 }
 
-export { commandForCurrentRoute, currentDestination, isEditableTarget };
+export { collectionCommands, commandForCurrentRoute, currentDestination, isEditableTarget };
