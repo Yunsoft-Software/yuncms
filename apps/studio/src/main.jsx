@@ -30,6 +30,7 @@ import './data-model-next.css';
 import './access-next.css';
 import './ai-next.css';
 import './auth-settings-next.css';
+import './users-mcp-next.css';
 
 if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
