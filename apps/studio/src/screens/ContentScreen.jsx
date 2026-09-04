@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import {
+  DataViewOptions,
   FileFieldControl,
   FileValuePreview,
   Inspector,
@@ -314,6 +315,8 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   const [editingRecord, setEditingRecord] = useState(null);
   const [inspectedRecord, setInspectedRecord] = useState(null);
   const [selectedRecordIds, setSelectedRecordIds] = useState(() => new Set());
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState([]);
+  const [density, setDensity] = useState('comfortable');
   const [loadedRecordKey, setLoadedRecordKey] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -445,6 +448,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     setEditingRecord(null);
     setInspectedRecord(null);
     setSelectedRecordIds(new Set());
+    setVisibleColumnKeys([]);
     setSearchInput('');
     setSearch('');
     setFilters([]);
@@ -546,10 +550,17 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   }
 
   const tableFields = useMemo(() => contentTableFields(fields), [fields]);
-  const mobileRecordFields = useMemo(() => {
-    const preferred = tableFields.filter((field) => field.field !== 'id');
-    return (preferred.length > 0 ? preferred : tableFields).slice(0, 4);
+  useEffect(() => {
+    setVisibleColumnKeys(tableFields.map((field) => field.field));
   }, [tableFields]);
+  const visibleTableFields = useMemo(
+    () => tableFields.filter((field) => visibleColumnKeys.includes(field.field)),
+    [tableFields, visibleColumnKeys],
+  );
+  const mobileRecordFields = useMemo(() => {
+    const preferred = visibleTableFields.filter((field) => field.field !== 'id');
+    return (preferred.length > 0 ? preferred : visibleTableFields).slice(0, 4);
+  }, [visibleTableFields]);
   const filterableFields = useMemo(() => fields.filter((field) => !field.hidden && field.type !== 'json'), [fields]);
   const selectedFilterField = filterableFields.find((field) => field.field === filterDraft.field) ?? null;
   const filterOperators = operatorsForField(selectedFilterField, relationLookups[filterDraft.field]);
@@ -574,6 +585,16 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
     setSelectedRecordIds(allPageSelected
       ? new Set()
       : new Set(items.map((record) => String(record.id))));
+  }
+
+  function toggleVisibleColumn(fieldKey) {
+    setVisibleColumnKeys((current) => {
+      if (current.includes(fieldKey)) {
+        if (current.length <= 1) return current;
+        return current.filter((key) => key !== fieldKey);
+      }
+      return [...current, fieldKey];
+    });
   }
 
   function updateFilterField(fieldName) {
@@ -754,15 +775,37 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
             </label>
           </div>
 
-          <button
-            className="secondary-button mobile-filter-toggle"
-            type="button"
-            aria-expanded={mobileFiltersOpen}
-            onClick={() => setMobileFiltersOpen((value) => !value)}
-          >
-            <span>{t('content.filters')}</span>
-            <small>{t('content.filterCount', { count: filters.length })}</small>
-          </button>
+          <div className="content-view-control-group">
+            <button
+              className="secondary-button mobile-filter-toggle"
+              type="button"
+              aria-expanded={mobileFiltersOpen}
+              onClick={() => setMobileFiltersOpen((value) => !value)}
+            >
+              <span>{t('content.filters')}</span>
+              <small>{t('content.filterCount', { count: filters.length })}</small>
+            </button>
+            <DataViewOptions
+              columns={tableFields.map((field) => ({
+                key: field.field,
+                label: fieldLabel(field),
+                secondary: field.field,
+              }))}
+              visibleKeys={visibleColumnKeys}
+              density={density}
+              onToggleColumn={toggleVisibleColumn}
+              onDensityChange={setDensity}
+              labels={{
+                trigger: t('content.viewOptions'),
+                title: t('content.viewOptionsTitle'),
+                columns: t('content.columns'),
+                density: t('content.density'),
+                compact: t('content.densityCompact'),
+                comfortable: t('content.densityComfortable'),
+                relaxed: t('content.densityRelaxed'),
+              }}
+            />
+          </div>
 
           <form className={`filter-builder ${mobileFiltersOpen ? 'mobile-open' : ''}`} onSubmit={addFilter}>
             <label className="field-label compact-control filter-field-control">
@@ -882,7 +925,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
           <button className="text-button" type="button" onClick={clearControls}>{t('content.resetView')}</button>
         </section>
       ) : (
-        <section className={`table-panel ${itemsLoading ? 'is-loading' : ''}`} aria-busy={itemsLoading}>
+        <section className={`table-panel content-table-density-${density} ${itemsLoading ? 'is-loading' : ''}`} aria-busy={itemsLoading}>
           <div className="table-scroll">
             <table>
               <thead>
@@ -895,7 +938,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                       aria-label={t('content.selectPage')}
                     />
                   </th>
-                  {tableFields.map((field) => (
+                  {visibleTableFields.map((field) => (
                     <th
                       key={field.field}
                       aria-sort={sortField === field.field ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
@@ -932,7 +975,7 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
                           aria-label={t('content.selectRecord', { id: record.id })}
                         />
                       </td>
-                      {tableFields.map((field) => (
+                      {visibleTableFields.map((field) => (
                         <td key={field.field}>
                           {isFileField(field) ? (
                             <FileValuePreview field={field} value={record[field.field]} files={files} t={t} />
