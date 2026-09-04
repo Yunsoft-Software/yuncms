@@ -53,11 +53,17 @@ test('mobile data-model controls use page-sized selectors without horizontal car
   assert.match(css, /\.relation-type-card[\s\S]*width: 100%/);
 });
 
-test('mobile stylesheet is loaded last and public-role numeric flags cannot leak into the UI', () => {
+test('mobile stylesheet stays in the centralized cascade and public-role numeric flags cannot leak into the UI', () => {
   const main = source('main.jsx');
+  const studioCss = source('studio.css');
   const roles = source('screens/RolesPermissionsScreen.jsx');
 
-  assert.match(main, /import '\.\/routed-pages\.css';\s*import '\.\/mobile-responsive\.css';/);
+  assert.match(main, /import '\.\/studio\.css';/);
+  const routedIndex = studioCss.indexOf("@import './routed-pages.css';");
+  const mobileIndex = studioCss.indexOf("@import './mobile-responsive.css';");
+  const semanticIndex = studioCss.indexOf("@import './studio-next.css';");
+  assert.ok(routedIndex > -1 && mobileIndex > routedIndex);
+  assert.ok(semanticIndex > mobileIndex, 'semantic Studio layers should override the legacy mobile baseline when needed');
   assert.match(main, /window\.history\.scrollRestoration = 'manual'/);
   assert.match(main, /window\.scrollTo\(\{ top: 0, left: 0, behavior: 'instant' \}\)/);
   assert.match(roles, /Boolean\(selectedRole\.public\)/);
