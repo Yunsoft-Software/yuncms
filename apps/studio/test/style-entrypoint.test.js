@@ -20,7 +20,12 @@ test('Studio stylesheet entry point keeps semantic workbench surfaces centralize
     'schema-graph.css',
     'access-next.css',
     'rule-builder.css',
+    'studio-compat.css',
   ]) {
     assert.match(studioCss, new RegExp(`@import './${stylesheet.replace('.', '\\.')}'`));
   }
+  assert.ok(
+    studioCss.lastIndexOf("@import './studio-compat.css';") > studioCss.lastIndexOf("@import './auth-settings-next.css';"),
+    'compatibility fallbacks should load after semantic/auth surfaces',
+  );
 });
