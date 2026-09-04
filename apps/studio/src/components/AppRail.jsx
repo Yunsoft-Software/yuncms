@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { useI18n } from '../i18n.js';
@@ -184,9 +184,32 @@ export function AppRail() {
 }
 
 export function StudioNextFrame({ children }) {
+  const [route, setRoute] = useState(() => readStudioRoute());
+  const [authSurface, setAuthSurface] = useState(false);
+
+  useEffect(() => {
+    const updateRoute = () => setRoute(readStudioRoute());
+    window.addEventListener('hashchange', updateRoute);
+    window.addEventListener('popstate', updateRoute);
+    return () => {
+      window.removeEventListener('hashchange', updateRoute);
+      window.removeEventListener('popstate', updateRoute);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const updateAuthSurface = () => setAuthSurface(Boolean(document.querySelector('.auth-layout')));
+    updateAuthSurface();
+    const observer = new MutationObserver(updateAuthSurface);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+
+  const section = route.section || 'content';
+
   return (
-    <div className="studio-next-frame">
-      <AppRail />
+    <div className={`studio-next-frame section-${section} ${authSurface ? 'auth-surface' : ''}`}>
+      {!authSurface && <AppRail />}
       <div className="studio-next-app">{children}</div>
     </div>
   );
