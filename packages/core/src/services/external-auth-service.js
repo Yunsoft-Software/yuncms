@@ -59,6 +59,7 @@ function publicUser(user) {
     email: user.email,
     role: user.role ?? null,
     role_name: user.role_name ?? null,
+    admin: Boolean(user.role_admin ?? user.admin),
     status: user.status,
     email_verified_at: user.email_verified_at ?? null,
   };
