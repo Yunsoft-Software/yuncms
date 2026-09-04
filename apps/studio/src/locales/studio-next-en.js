@@ -60,4 +60,12 @@ export const STUDIO_NEXT_EN = Object.freeze({
   'files.retryFailed': 'Retry failed',
   'files.uploadedCount': '{count} files uploaded.',
   'files.uploadPartial': '{failed} of {count} files could not be uploaded. Failed files remain in the queue.',
+  'dataModel.relationPreview': 'Relation preview',
+  'dataModel.relationResult': 'Result',
+  'dataModel.relationMany': 'Many',
+  'dataModel.relationOne': 'One',
+  'dataModel.relationCollectionRole': 'Collection',
+  'dataModel.relationRelated': 'Related',
+  'dataModel.relationJunctionPending': 'junction',
+  'dataModel.relationFieldPending': 'field',
 });
