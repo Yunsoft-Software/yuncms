@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 
-import { BrandAssetPicker } from '../components/BrandAssetPicker.jsx';
-import { PublicRegistrationSettings } from '../components/PublicRegistrationSettings.jsx';
-import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/StudioBrand.jsx';
+import {
+  BrandAssetPicker,
+  LanguageSwitcher,
+  PublicRegistrationSettings,
+  StudioBrand,
+  YunsoftFooter,
+} from '../components/index.js';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
 import {
