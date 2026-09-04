@@ -49,6 +49,8 @@ export const STUDIO_NEXT_EN = Object.freeze({
   'roles.ruleCondition': 'Condition',
   'roles.ruleValue': 'Value',
   'roles.ruleNoValue': 'No value required',
+  'files.categories': 'Library',
+  'files.recent': 'Last 7 days',
   'files.uploadQueue': 'Upload queue',
   'files.queueQueued': 'Queued',
   'files.queueUploading': 'Uploading',
