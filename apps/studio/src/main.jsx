@@ -25,6 +25,7 @@ import './studio-next.css';
 import './studio-next-tokens.css';
 import './command-palette.css';
 import './content-workbench-next.css';
+import './content-inspector-next.css';
 import './files-next.css';
 import './data-model-next.css';
 import './schema-graph.css';
