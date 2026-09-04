@@ -123,7 +123,7 @@ function CommandPalette({ commands, open, onClose, t }) {
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={t('common.search')}
+        aria-label={t('studio.commandPalette')}
       >
         <div className="studio-command-search">
           <SidebarIcon name="content" size={16} />
@@ -132,8 +132,8 @@ function CommandPalette({ commands, open, onClose, t }) {
             type="search"
             value={query}
             onChange={(event) => { setQuery(event.target.value); setActiveIndex(0); }}
-            placeholder={t('common.search')}
-            aria-label={t('common.search')}
+            placeholder={t('studio.commandPlaceholder')}
+            aria-label={t('studio.commandPalette')}
           />
           <kbd>Esc</kbd>
         </div>
@@ -151,7 +151,7 @@ function CommandPalette({ commands, open, onClose, t }) {
               <span>{command.label}</span>
             </button>
           ))}
-          {visibleCommands.length === 0 && <p className="studio-command-empty">{t('common.noResults')}</p>}
+          {visibleCommands.length === 0 && <p className="studio-command-empty">{t('studio.commandNoResults')}</p>}
         </div>
         <footer className="studio-command-footer">
           <span><kbd>↑</kbd><kbd>↓</kbd></span>
@@ -242,7 +242,7 @@ export function AppRail() {
             return (
               <button
                 key={item.id}
-                className={`studio-app-rail-button ${active ? 'active' : ''}`}
+                className={`studio-app-rail-button ${active ? 'active' : ''}`
                 type="button"
                 aria-current={active ? 'page' : undefined}
                 title={item.label}
@@ -258,8 +258,8 @@ export function AppRail() {
         <button
           className="studio-app-rail-command"
           type="button"
-          title={t('common.search')}
-          aria-label={t('common.search')}
+          title={t('studio.commandShortcut')}
+          aria-label={t('studio.commandShortcut')}
           aria-expanded={paletteOpen}
           onClick={() => setPaletteOpen(true)}
         >
