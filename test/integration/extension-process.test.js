@@ -178,8 +178,7 @@ test('real schema mutations emit ordered post-success events and compensate a fa
   const pool = createDatabasePool(config.database);
   const runId = suffix();
   const eventsTable = safeName('it_schema_events', runId);
-  const controlTable = safeName('it_schema_fail', runId);
-  const triggerName = safeName('it_schema_trigger', runId);
+  const failureConstraint = safeName('it_schema_check', runId);
   const names = {
     left: safeName('it_evt_left', runId),
     right: safeName('it_evt_right', runId),
@@ -187,13 +186,12 @@ test('real schema mutations emit ordered post-success events and compensate a fa
     junction: safeName('it_evt_join', runId),
   };
   const quotedEvents = quoteIdentifier(eventsTable, 'integration events table');
-  const quotedControl = quoteIdentifier(controlTable, 'integration control table');
-  const quotedTrigger = quoteIdentifier(triggerName, 'integration trigger');
+  const quotedFailureConstraint = quoteIdentifier(failureConstraint, 'integration check constraint');
   const storageRoot = await mkdtemp(join(tmpdir(), 'yuncms-extension-storage-'));
   let projectRoot;
   let processInfo;
   let admin;
-  let triggerCreated = false;
+  let failureConstraintCreated = false;
 
   try {
     await bootstrapDatabase(pool);
@@ -283,25 +281,12 @@ export default {
     ]);
 
     await pool.query(
-      `CREATE TABLE ${quotedControl} (collection_name VARCHAR(191) NOT NULL, field_name VARCHAR(191) NOT NULL) ENGINE=InnoDB`,
-    );
-    await pool.query(
-      `INSERT INTO ${quotedControl} (collection_name, field_name) VALUES (?, ?)`,
+      `ALTER TABLE yuncms_fields
+       ADD CONSTRAINT ${quotedFailureConstraint}
+       CHECK (NOT (collection = ? AND field = ?))`,
       [names.left, 'compensated'],
     );
-    await pool.query(
-      `CREATE TRIGGER ${quotedTrigger} BEFORE INSERT ON yuncms_fields
-       FOR EACH ROW
-       BEGIN
-         IF EXISTS (
-           SELECT 1 FROM ${quotedControl}
-           WHERE collection_name = NEW.collection AND field_name = NEW.field
-         ) THEN
-           SIGNAL SQLSTATE '45000';
-         END IF;
-       END`,
-    );
-    triggerCreated = true;
+    failureConstraintCreated = true;
 
     const failed = await jsonRequest(port, token, `/schema/collections/${names.left}/fields`, {
       method: 'POST', body: { field: 'compensated', type: 'string', required: false },
@@ -325,9 +310,8 @@ export default {
     );
     assert.deepEqual(metadataFields, []);
 
-    await pool.query(`DROP TRIGGER ${quotedTrigger}`);
-    triggerCreated = false;
-    await pool.query(`DROP TABLE ${quotedControl}`);
+    await pool.query(`ALTER TABLE yuncms_fields DROP CHECK ${quotedFailureConstraint}`);
+    failureConstraintCreated = false;
 
     assert.equal((await jsonRequest(port, token, `/schema/relations/m2m/${names.junction}?destructive=true`, { method: 'DELETE' })).response.status, 204);
     assert.equal((await jsonRequest(port, token, `/schema/relations/o2o/${names.one}/one_id`, { method: 'DELETE' })).response.status, 204);
@@ -339,8 +323,9 @@ export default {
   } finally {
     let cleanupError = null;
     try { await stopApi(processInfo); } catch (error) { cleanupError ??= error; }
-    if (triggerCreated) await pool.query(`DROP TRIGGER IF EXISTS ${quotedTrigger}`).catch(() => {});
-    await pool.query(`DROP TABLE IF EXISTS ${quotedControl}`).catch(() => {});
+    if (failureConstraintCreated) {
+      await pool.query(`ALTER TABLE yuncms_fields DROP CHECK ${quotedFailureConstraint}`).catch(() => {});
+    }
     for (const collection of [names.junction, names.left, names.right, names.one]) {
       const quoted = quoteIdentifier(collection, 'integration collection');
       await pool.query(`DROP TABLE IF EXISTS ${quoted}`).catch(() => {});
