@@ -2,9 +2,13 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 
 import { API_URL, apiRequest, health, logout, navigationGroups, readSession, subscribeSession } from './api.js';
 import { collectionUi, sortContentCollections } from './collection-ui.js';
-import { CollectionIcon } from './components/CollectionIcon.jsx';
-import { LanguageSwitcher, StudioBrand, YunsoftFooter } from './components/StudioBrand.jsx';
-import { SidebarIcon } from './components/SidebarIcon.jsx';
+import {
+  CollectionIcon,
+  LanguageSwitcher,
+  SidebarIcon,
+  StudioBrand,
+  YunsoftFooter,
+} from './components/index.js';
 import { useI18n } from './i18n.js';
 import { buildNavigationModel } from './navigation-model.js';
 import { displaySchemaName } from './schema-name.js';
@@ -27,20 +31,6 @@ const settingsSections = [
   { id: 'mcp', labelKey: 'nav.mcp', icon: 'mcp', adminOnly: true },
   { id: 'appearance', labelKey: 'nav.appearance', icon: 'appearance' },
 ];
-
-function sectionCopy(section, t) {
-  const copy = {
-    'data-model': ['section.dataModelTitle', 'section.dataModelDescription'],
-    users: ['section.usersTitle', 'section.usersDescription'],
-    roles: ['section.rolesTitle', 'section.rolesDescription'],
-    files: ['section.filesTitle', 'section.filesDescription'],
-    ai: ['section.aiTitle', 'section.aiDescription'],
-    mcp: ['section.mcpTitle', 'section.mcpDescription'],
-    appearance: ['section.appearanceTitle', 'section.appearanceDescription'],
-  };
-  const keys = copy[section];
-  return keys ? keys.map((key) => t(key)) : ['', ''];
-}
 
 function readAuthAction() {
   const params = new URLSearchParams(window.location.search);
@@ -236,11 +226,6 @@ export function App() {
   const contentTitle = activeContentCollection
     ? displaySchemaName(activeContentCollection, 'collection')
     : contentCollection;
-  const [title, description] = section === 'content'
-    ? [contentTitle || t('nav.content'), contentCollection
-      ? t('app.contentDescription')
-      : t('app.contentEmpty')]
-    : sectionCopy(section, t);
 
   const activeScreen = useMemo(() => {
     if (section === 'data-model') return <DataModelScreen route={route} onNavigate={navigateStudio} onCollectionsChanged={loadNavigationCollections} />;
@@ -458,14 +443,6 @@ export function App() {
       </aside>
 
       <main className={`main-content section-${section} route-${route.view || 'list'}`}>
-        <header className="page-header">
-          <div>
-            <p className="eyebrow">YunCMS {t('app.studio')}</p>
-            <h1>{title}</h1>
-            <p className="lede">{description}</p>
-          </div>
-        </header>
-
         {activeScreen}
       </main>
     </div>
