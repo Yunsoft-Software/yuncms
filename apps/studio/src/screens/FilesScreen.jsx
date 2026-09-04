@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { apiBlob, apiRequest } from '../api.js';
 import {
+  FileCategoryRail,
   FilePreview,
   Inspector,
   Pagination,
@@ -14,6 +15,7 @@ import { studioPath } from '../studio-route.js';
 
 const FILE_TYPE_OPTIONS = [
   ['all', 'files.allTypes'],
+  ['recent', 'files.recent'],
   ['image', 'files.images'],
   ['video', 'files.video'],
   ['audio', 'files.audio'],
@@ -31,6 +33,7 @@ const FILE_SORT_OPTIONS = [
 ];
 
 const FILE_PAGE_SIZES = [12, 24, 48, 96];
+const RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 function formatBytes(value) {
   const bytes = Number(value || 0);
@@ -64,6 +67,13 @@ function fileCategory(file) {
   if (mimetype.startsWith('audio/')) return 'audio';
   if (mimetype === 'application/pdf' || extension === 'pdf') return 'pdf';
   return 'other';
+}
+
+function isRecentFile(file, now = Date.now()) {
+  if (!file?.uploaded_at) return false;
+  const uploadedAt = new Date(file.uploaded_at).getTime();
+  if (!Number.isFinite(uploadedAt)) return false;
+  return uploadedAt <= now && uploadedAt >= now - RECENT_WINDOW_MS;
 }
 
 function fileDisplayName(file, t) {
@@ -138,10 +148,31 @@ export function FilesScreen({ route = {}, onNavigate }) {
     load();
   }, []);
 
+  const categoryCounts = useMemo(() => {
+    const counts = { all: files.length, recent: 0, image: 0, video: 0, audio: 0, pdf: 0, other: 0 };
+    const now = Date.now();
+    files.forEach((file) => {
+      counts[fileCategory(file)] += 1;
+      if (isRecentFile(file, now)) counts.recent += 1;
+    });
+    return counts;
+  }, [files]);
+
+  const categoryItems = useMemo(() => FILE_TYPE_OPTIONS.map(([value, key]) => ({
+    value,
+    label: t(key),
+    count: categoryCounts[value] || 0,
+  })), [categoryCounts, t]);
+
   const visibleFiles = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const now = Date.now();
     return files
-      .filter((file) => typeFilter === 'all' || fileCategory(file) === typeFilter)
+      .filter((file) => {
+        if (typeFilter === 'all') return true;
+        if (typeFilter === 'recent') return isRecentFile(file, now);
+        return fileCategory(file) === typeFilter;
+      })
       .filter((file) => !query || [file.title, file.filename_download, file.mimetype, file.storage]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query)))
@@ -388,6 +419,16 @@ export function FilesScreen({ route = {}, onNavigate }) {
         </div>
       )}
 
+      <FileCategoryRail
+        items={categoryItems}
+        value={typeFilter}
+        label={t('files.categories')}
+        onChange={(value) => {
+          setTypeFilter(value);
+          setPage(1);
+        }}
+      />
+
       <section className="panel library-toolbar workspace-toolbar library-header-panel">
         <div className="workspace-toolbar-heading">
           <div>
@@ -415,7 +456,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
               aria-label={t('files.searchFiles')}
             />
           </label>
-          <label className="field-label">
+          <label className="field-label file-type-fallback">
             <span>{t('files.fileType')}</span>
             <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
               {FILE_TYPE_OPTIONS.map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}
@@ -457,24 +498,13 @@ export function FilesScreen({ route = {}, onNavigate }) {
             {pageFiles.map((file) => (
               <article className="file-card" key={file.id}>
                 <div className="file-preview">
-                  <button
-                    className="file-preview-open-button"
-                    type="button"
-                    onClick={() => setInspectedFile(file)}
-                    aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}
-                  >
+                  <button className="file-preview-open-button" type="button" onClick={() => setInspectedFile(file)} aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}>
                     <FilePreview file={file} label={fileTypeLabel(file, t)} alt={fileDisplayName(file, t)} />
                   </button>
                 </div>
                 <div className="file-card-body">
-                  <div className="file-card-title">
-                    <strong title={fileDisplayName(file, t)}>{fileDisplayName(file, t)}</strong>
-                    <small title={file.filename_download}>{file.filename_download}</small>
-                  </div>
-                  <div className="file-meta-row">
-                    <span>{fileTypeLabel(file, t)}</span>
-                    <span>{formatBytes(file.filesize)}</span>
-                  </div>
+                  <div className="file-card-title"><strong title={fileDisplayName(file, t)}>{fileDisplayName(file, t)}</strong><small title={file.filename_download}>{file.filename_download}</small></div>
+                  <div className="file-meta-row"><span>{fileTypeLabel(file, t)}</span><span>{formatBytes(file.filesize)}</span></div>
                   <div className="file-card-actions">
                     <button className="text-button" type="button" onClick={() => setInspectedFile(file)}>{t('files.preview')}</button>
                     <button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button>
@@ -485,15 +515,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
               </article>
             ))}
           </div>
-          <Pagination
-            page={paged.page}
-            pageSize={pageSize}
-            totalItems={visibleFiles.length}
-            pageSizeOptions={FILE_PAGE_SIZES}
-            itemLabel={t('files.files')}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-          />
+          <Pagination page={paged.page} pageSize={pageSize} totalItems={visibleFiles.length} pageSizeOptions={FILE_PAGE_SIZES} itemLabel={t('files.files')} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
         </section>
       ) : (
         <section className="table-panel">
@@ -503,38 +525,18 @@ export function FilesScreen({ route = {}, onNavigate }) {
               <tbody>
                 {pageFiles.map((file) => (
                   <tr key={file.id}>
-                    <td>
-                      <div className="file-list-name">
-                        <button className="file-list-thumb file-preview-open-button" type="button" onClick={() => setInspectedFile(file)} aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}>
-                          <FilePreview file={file} label={fileTypeLabel(file, t)} />
-                        </button>
-                        <span><strong>{fileDisplayName(file, t)}</strong><small>{file.filename_download}</small></span>
-                      </div>
-                    </td>
+                    <td><div className="file-list-name"><button className="file-list-thumb file-preview-open-button" type="button" onClick={() => setInspectedFile(file)} aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}><FilePreview file={file} label={fileTypeLabel(file, t)} /></button><span><strong>{fileDisplayName(file, t)}</strong><small>{file.filename_download}</small></span></div></td>
                     <td>{file.mimetype || fileTypeLabel(file, t)}</td>
                     <td>{formatBytes(file.filesize)}</td>
                     <td>{file.storage}</td>
                     <td>{file.uploaded_at ? new Date(file.uploaded_at).toLocaleString(dateLocale) : '—'}</td>
-                    <td className="row-actions">
-                      <button className="text-button" type="button" onClick={() => setInspectedFile(file)}>{t('files.preview')}</button>
-                      <button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button>
-                      <button className="text-button" type="button" onClick={() => { beginEdit(file); onNavigate?.(studioPath.file(file.id)); }}>{t('common.edit')}</button>
-                      <button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button>
-                    </td>
+                    <td className="row-actions"><button className="text-button" type="button" onClick={() => setInspectedFile(file)}>{t('files.preview')}</button><button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button><button className="text-button" type="button" onClick={() => { beginEdit(file); onNavigate?.(studioPath.file(file.id)); }}>{t('common.edit')}</button><button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <Pagination
-            page={paged.page}
-            pageSize={pageSize}
-            totalItems={visibleFiles.length}
-            pageSizeOptions={FILE_PAGE_SIZES}
-            itemLabel={t('files.files')}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-          />
+          <Pagination page={paged.page} pageSize={pageSize} totalItems={visibleFiles.length} pageSizeOptions={FILE_PAGE_SIZES} itemLabel={t('files.files')} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
         </section>
       )}
 
@@ -544,31 +546,12 @@ export function FilesScreen({ route = {}, onNavigate }) {
         description={inspectedFile?.filename_download || ''}
         closeLabel={t('studio.inspectorClose')}
         onClose={() => setInspectedFile(null)}
-        actions={inspectedFile && (
-          <>
-            <button className="secondary-button" type="button" onClick={() => download(inspectedFile)}>{t('files.download')}</button>
-            <button className="primary-button" type="button" onClick={() => {
-              const fileId = inspectedFile.id;
-              setInspectedFile(null);
-              onNavigate?.(studioPath.file(fileId));
-            }}>{t('files.fileDetails')}</button>
-          </>
-        )}
+        actions={inspectedFile && (<><button className="secondary-button" type="button" onClick={() => download(inspectedFile)}>{t('files.download')}</button><button className="primary-button" type="button" onClick={() => { const fileId = inspectedFile.id; setInspectedFile(null); onNavigate?.(studioPath.file(fileId)); }}>{t('files.fileDetails')}</button></>)}
       >
-        {inspectedFile && (
-          <div className="file-inspector-content">
-            <div className="file-inspector-preview"><FilePreview file={inspectedFile} label={fileTypeLabel(inspectedFile, t)} alt={fileDisplayName(inspectedFile, t)} /></div>
-            <dl className="file-inspector-meta">
-              <div><dt>{t('common.type')}</dt><dd>{inspectedFile.mimetype || fileTypeLabel(inspectedFile, t)}</dd></div>
-              <div><dt>{t('files.size')}</dt><dd>{formatBytes(inspectedFile.filesize)}</dd></div>
-              <div><dt>{t('files.storage')}</dt><dd>{inspectedFile.storage || '—'}</dd></div>
-              <div><dt>{t('files.uploaded')}</dt><dd>{inspectedFile.uploaded_at ? new Date(inspectedFile.uploaded_at).toLocaleString(dateLocale) : '—'}</dd></div>
-            </dl>
-          </div>
-        )}
+        {inspectedFile && <div className="file-inspector-content"><div className="file-inspector-preview"><FilePreview file={inspectedFile} label={fileTypeLabel(inspectedFile, t)} alt={fileDisplayName(inspectedFile, t)} /></div><dl className="file-inspector-meta"><div><dt>{t('common.type')}</dt><dd>{inspectedFile.mimetype || fileTypeLabel(inspectedFile, t)}</dd></div><div><dt>{t('files.size')}</dt><dd>{formatBytes(inspectedFile.filesize)}</dd></div><div><dt>{t('files.storage')}</dt><dd>{inspectedFile.storage || '—'}</dd></div><div><dt>{t('files.uploaded')}</dt><dd>{inspectedFile.uploaded_at ? new Date(inspectedFile.uploaded_at).toLocaleString(dateLocale) : '—'}</dd></div></dl></div>}
       </Inspector>
     </div>
   );
 }
 
-export { makeQueueItems };
+export { isRecentFile, makeQueueItems };
