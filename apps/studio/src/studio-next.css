@@ -281,6 +281,10 @@
   gap: 10px;
 }
 
+.studio-next-app .workspace-toolbar {
+  justify-content: stretch;
+}
+
 .studio-next-app .workspace-toolbar-heading h2,
 .studio-next-app .toolbar-panel h2,
 .studio-next-app .data-model-detail-heading h2,
@@ -333,6 +337,10 @@
 .studio-next-app .danger-button {
   padding: 6px 8px;
   font-size: 12px;
+}
+
+.studio-next-app .danger-button {
+  color: var(--ui-danger);
 }
 
 .studio-next-app .data-controls-panel {
@@ -466,7 +474,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .studio-next-frame {
     grid-template-columns: minmax(0, 1fr);
     padding-bottom: 58px;

@@ -50,7 +50,7 @@ test('content workspace renders collection identity and real record and field co
 });
 
 test('kinetic motion is responsive and respects reduced-motion preference', () => {
-  assert.match(kineticCss, /@media \(max-width: 760px\)/);
+  assert.match(kineticCss, /@media \(max-width: 900px\)/);
   assert.match(kineticCss, /@media \(max-width: 420px\)/);
   assert.match(kineticCss, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(kineticCss, /\.section-content \.content-toolbar,[\s\S]*animation:\s*none !important/);

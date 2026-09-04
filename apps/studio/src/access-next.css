@@ -319,6 +319,7 @@
 
 .permission-collection-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   margin-top: 10px;
   overflow: hidden;
@@ -463,7 +464,7 @@
   border-color: transparent;
   background: transparent;
   font-size: 10px;
-  opacity: .34;
+  opacity: .72;
   transition: opacity var(--motion-fast) var(--ease-ui), background var(--motion-fast) var(--ease-ui);
 }
 

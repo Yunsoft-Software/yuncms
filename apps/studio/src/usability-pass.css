@@ -447,7 +447,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .pagination {
     grid-template-columns: 1fr;
     gap: 10px;

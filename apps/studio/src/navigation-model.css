@@ -448,7 +448,7 @@
   padding-left: 31px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .navigation-model-toolbar {
     align-items: stretch;
     flex-direction: column;

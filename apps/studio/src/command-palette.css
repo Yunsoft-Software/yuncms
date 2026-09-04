@@ -202,7 +202,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .studio-app-rail-command {
     display: none;
   }

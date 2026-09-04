@@ -5,6 +5,7 @@ import test from 'node:test';
 
 const SRC = resolve(import.meta.dirname, '../src');
 const studioCss = readFileSync(resolve(SRC, 'studio.css'), 'utf8');
+const shellCss = readFileSync(resolve(SRC, 'studio-next.css'), 'utf8');
 const filesCss = readFileSync(resolve(SRC, 'files-next.css'), 'utf8');
 const schemaCss = readFileSync(resolve(SRC, 'data-model-next.css'), 'utf8');
 const accessCss = readFileSync(resolve(SRC, 'access-next.css'), 'utf8');
@@ -21,7 +22,8 @@ test('Files presents an asset grid and a metadata-oriented detail workspace', ()
   assert.match(filesCss, /\.file-card-actions[\s\S]*opacity:\s*0/);
   assert.match(filesCss, /\.file-card:focus-within[\s\S]*--ui-focus-ring/);
   assert.match(filesCss, /\.file-detail-page[\s\S]*grid-template-areas/);
-  assert.match(filesCss, /@media \(max-width: 760px\)/);
+  assert.match(filesCss, /@media \(max-width: 900px\)/);
+  assert.match(shellCss, /\.studio-next-app \.workspace-toolbar\s*\{[\s\S]*justify-content:\s*stretch/);
 });
 
 test('Data Model separates collection navigation from the schema workbench', () => {

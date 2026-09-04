@@ -848,7 +848,7 @@ button:focus-visible {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .studio-shell,
   .studio-shell.sidebar-collapsed {
     grid-template-columns: 1fr;
