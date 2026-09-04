@@ -1,0 +1,57 @@
+.content-value-empty {
+  color: var(--ui-text-tertiary);
+}
+
+.content-value-boolean,
+.content-value-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  max-width: 100%;
+  padding: 2px 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.content-value-boolean.is-true {
+  border-color: color-mix(in srgb, var(--ui-success) 24%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-success) 8%, var(--ui-surface));
+  color: var(--ui-success);
+}
+
+.content-value-boolean.is-false {
+  color: var(--ui-text-tertiary);
+}
+
+.content-value-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content-value-date {
+  color: var(--ui-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.content-value-json {
+  display: inline-block;
+  max-width: min(320px, 42vw);
+  overflow: hidden;
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.mobile-record-card .content-value-json {
+  max-width: 100%;
+}
