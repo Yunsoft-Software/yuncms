@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { collectionMetadataPatch, collectionUi } from '../collection-ui.js';
-import { CollectionIcon } from '../components/CollectionIcon.jsx';
-import { CollectionIconPicker } from '../components/CollectionIconPicker.jsx';
-import { useConfirmDialog } from '../components/DialogProvider.jsx';
-import { FieldBuilder } from '../components/FieldBuilder.jsx';
-import { FieldTypeIcon } from '../components/FieldTypeIcon.jsx';
-import { SchemaGraph } from '../components/SchemaGraph.jsx';
+import {
+  CollectionIcon,
+  CollectionIconPicker,
+  FieldBuilder,
+  FieldTypeIcon,
+  RelationDiagram,
+  SchemaGraph,
+  useConfirmDialog,
+} from '../components/index.js';
 import {
   createEmptyFieldForm,
   fieldCreationPayload,
@@ -502,6 +505,19 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
     inspectorHint: t('studio.schemaGraphInspectorHint'),
     noDescription: t('dataModel.noDescription'),
   };
+  const relationPreviewLabels = {
+    preview: t('dataModel.relationPreview'),
+    result: t('dataModel.relationResult'),
+    many: t('dataModel.relationMany'),
+    one: t('dataModel.relationOne'),
+    collection: t('dataModel.relationCollectionRole'),
+    related: t('dataModel.relationRelated'),
+    junctionPending: t('dataModel.relationJunctionPending'),
+    fieldPending: t('dataModel.relationFieldPending'),
+    chooseCollection: t('dataModel.chooseCollection'),
+    chooseField: t('dataModel.chooseField'),
+    onDelete: t('dataModel.ifTargetDeleted'),
+  };
 
   return (
     <div className="data-model-v2 routed-resource-page">
@@ -766,19 +782,38 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
                       </div>}
 
                       {view === 'new-relation' && (relationMode === 'm2m' ? (
-                        <form className="relation-v2-form" onSubmit={createM2M}>
-                          <label className="field-label"><span>{t('dataModel.junctionName')}</span><input value={m2mForm.junctionCollection} onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: schemaKeyFromName(event.target.value, 'collection') }))} placeholder="article_tags" required /></label>
-                          <label className="field-label"><span>{t('dataModel.firstCollection')}</span><select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
-                          <label className="field-label"><span>{t('dataModel.secondCollection')}</span><select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
-                          <button className="primary-button" type="submit">{t('dataModel.createJunction')}</button>
-                        </form>
+                        <div className="relation-v2-form-with-preview">
+                          <form className="relation-v2-form" onSubmit={createM2M}>
+                            <label className="field-label"><span>{t('dataModel.junctionName')}</span><input value={m2mForm.junctionCollection} onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: schemaKeyFromName(event.target.value, 'collection') }))} placeholder="article_tags" required /></label>
+                            <label className="field-label"><span>{t('dataModel.firstCollection')}</span><select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
+                            <label className="field-label"><span>{t('dataModel.secondCollection')}</span><select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
+                            <button className="primary-button" type="submit">{t('dataModel.createJunction')}</button>
+                          </form>
+                          <RelationDiagram
+                            kind="m2m"
+                            leftCollection={m2mForm.leftCollection}
+                            rightCollection={m2mForm.rightCollection}
+                            junctionCollection={m2mForm.junctionCollection}
+                            labels={relationPreviewLabels}
+                          />
+                        </div>
                       ) : (
-                        <form className="relation-v2-form" onSubmit={createDirectRelation}>
-                          <label className="field-label"><span>{t('dataModel.fieldIn', { collection: displaySchemaName(selectedCollection, 'collection') })}</span><select value={directForm.manyField} onChange={(event) => setDirectForm((current) => ({ ...current, manyField: event.target.value }))} required><option value="">{t('dataModel.chooseField')}</option>{relationFields.map((field) => <option key={field.field} value={field.field}>{displaySchemaName(field, 'field')} ({field.field})</option>)}</select></label>
-                          <label className="field-label"><span>{t('dataModel.targetCollection')}</span><select value={directForm.oneCollection} onChange={(event) => setDirectForm((current) => ({ ...current, oneCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
-                          <label className="field-label"><span>{t('dataModel.ifTargetDeleted')}</span><select value={directForm.onDelete} onChange={(event) => setDirectForm((current) => ({ ...current, onDelete: event.target.value }))}><option value="RESTRICT">{t('dataModel.preventDeletion')}</option><option value="CASCADE">{t('dataModel.deleteLinked')}</option><option value="SET NULL">{t('dataModel.clearField')}</option></select></label>
-                          <button className="primary-button" type="submit" disabled={relationFields.length === 0}>{t(relationMode === 'o2o' ? 'dataModel.createO2O' : 'dataModel.createRelation')}</button>
-                        </form>
+                        <div className="relation-v2-form-with-preview">
+                          <form className="relation-v2-form" onSubmit={createDirectRelation}>
+                            <label className="field-label"><span>{t('dataModel.fieldIn', { collection: displaySchemaName(selectedCollection, 'collection') })}</span><select value={directForm.manyField} onChange={(event) => setDirectForm((current) => ({ ...current, manyField: event.target.value }))} required><option value="">{t('dataModel.chooseField')}</option>{relationFields.map((field) => <option key={field.field} value={field.field}>{displaySchemaName(field, 'field')} ({field.field})</option>)}</select></label>
+                            <label className="field-label"><span>{t('dataModel.targetCollection')}</span><select value={directForm.oneCollection} onChange={(event) => setDirectForm((current) => ({ ...current, oneCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
+                            <label className="field-label"><span>{t('dataModel.ifTargetDeleted')}</span><select value={directForm.onDelete} onChange={(event) => setDirectForm((current) => ({ ...current, onDelete: event.target.value }))}><option value="RESTRICT">{t('dataModel.preventDeletion')}</option><option value="CASCADE">{t('dataModel.deleteLinked')}</option><option value="SET NULL">{t('dataModel.clearField')}</option></select></label>
+                            <button className="primary-button" type="submit" disabled={relationFields.length === 0}>{t(relationMode === 'o2o' ? 'dataModel.createO2O' : 'dataModel.createRelation')}</button>
+                          </form>
+                          <RelationDiagram
+                            kind={relationMode}
+                            leftCollection={selected}
+                            leftField={directForm.manyField}
+                            rightCollection={directForm.oneCollection}
+                            onDelete={directForm.onDelete}
+                            labels={relationPreviewLabels}
+                          />
+                        </div>
                       ))}
                     </>
                   )}
