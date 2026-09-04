@@ -24,6 +24,7 @@ import './content-density.css';
 import './studio-next.css';
 import './studio-next-tokens.css';
 import './command-palette.css';
+import './data-view-options.css';
 import './content-workbench-next.css';
 import './content-inspector-next.css';
 import './files-next.css';
