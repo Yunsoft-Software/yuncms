@@ -4,12 +4,14 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 const SRC = resolve(import.meta.dirname, '../src');
-const mainSource = readFileSync(resolve(SRC, 'main.jsx'), 'utf8');
+const studioCss = readFileSync(resolve(SRC, 'studio.css'), 'utf8');
 const css = readFileSync(resolve(SRC, 'users-mcp-next.css'), 'utf8');
 
 test('Users and MCP workspace layer is loaded after shared Studio tokens', () => {
-  assert.match(mainSource, /import '\.\/users-mcp-next\.css';/);
-  assert.ok(mainSource.indexOf('./studio-next-tokens.css') < mainSource.indexOf('./users-mcp-next.css'));
+  const tokenIndex = studioCss.indexOf("@import './studio-next-tokens.css';");
+  const usersMcpIndex = studioCss.indexOf("@import './users-mcp-next.css';");
+  assert.ok(tokenIndex > -1);
+  assert.ok(usersMcpIndex > tokenIndex);
 });
 
 test('Users uses one dense identity table with responsive detail controls', () => {
