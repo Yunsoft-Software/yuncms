@@ -1,3 +1,10 @@
+.content-view-control-group {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .data-view-options {
   position: relative;
 }
@@ -115,6 +122,18 @@
 }
 
 @media (max-width: 760px) {
+  .content-view-control-group {
+    align-items: stretch;
+  }
+
+  .content-view-control-group > * {
+    flex: 1 1 auto;
+  }
+
+  .data-view-options-trigger {
+    width: 100%;
+  }
+
   .data-view-options-popover {
     position: fixed;
     inset: auto 10px 68px;
