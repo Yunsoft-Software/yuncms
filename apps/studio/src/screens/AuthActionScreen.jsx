@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { apiRequest } from '../api.js';
-import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/StudioBrand.jsx';
+import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/index.js';
 import { useI18n } from '../i18n.js';
 
 export function AuthActionScreen({ action, token, onDone }) {
