@@ -8,6 +8,7 @@ const screenSource = await readFile(new URL('../src/screens/AiScreen.jsx', impor
 const settingsSource = await readFile(new URL('../src/components/AiSettingsPanel.jsx', import.meta.url), 'utf8');
 const routeSource = await readFile(new URL('../src/studio-route.js', import.meta.url), 'utf8');
 const mainSource = await readFile(new URL('../src/main.jsx', import.meta.url), 'utf8');
+const studioCss = await readFile(new URL('../src/studio.css', import.meta.url), 'utf8');
 const cssSource = await readFile(new URL('../src/ai.css', import.meta.url), 'utf8');
 const trSource = await readFile(new URL('../src/locales/ai-tr.js', import.meta.url), 'utf8');
 
@@ -54,7 +55,8 @@ test('Yapay Zeka UI never exposes MCP terminology to Studio users', () => {
 });
 
 test('Yapay Zeka styling uses Studio theme variables and is loaded by the app', () => {
-  assert.match(mainSource, /import '\.\/ai\.css'/);
+  assert.match(mainSource, /import '\.\/studio\.css'/);
+  assert.match(studioCss, /@import '\.\/ai\.css';/);
   assert.match(cssSource, /var\(--studio-surface\)/);
   assert.match(cssSource, /\.ai-settings-panel/);
   assert.match(cssSource, /:root\[data-theme="dark"\]/);
