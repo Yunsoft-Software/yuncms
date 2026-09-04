@@ -49,6 +49,8 @@ export const STUDIO_NEXT_TR = Object.freeze({
   'roles.ruleCondition': 'Koşul',
   'roles.ruleValue': 'Değer',
   'roles.ruleNoValue': 'Değer gerekmiyor',
+  'files.categories': 'Kütüphane',
+  'files.recent': 'Son 7 gün',
   'files.uploadQueue': 'Yükleme kuyruğu',
   'files.queueQueued': 'Sırada',
   'files.queueUploading': 'Yükleniyor',
