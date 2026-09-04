@@ -53,3 +53,12 @@ test('command palette is a shared component with keyboard focus handling', () =>
   assert.match(appRailSource, /event\.key\.toLowerCase\(\) === 'k'/);
   assert.match(appRailSource, /event\.key === '\/'/);
 });
+
+test('command palette loads visible project collections and keeps failures non-blocking', () => {
+  assert.match(appRailSource, /function collectionCommands\(/);
+  assert.match(appRailSource, /!collection\.system && !collection\.hidden/);
+  assert.match(appRailSource, /apiRequest\('\/schema\/collections'\)/);
+  assert.match(appRailSource, /\.catch\(\(\) => \{ if \(!cancelled\) setCollections\(\[\]\); \}\)/);
+  assert.match(appRailSource, /displaySchemaName\(collection, 'collection'\)/);
+  assert.match(appRailSource, /studioPath\.content\(collection\.collection\)/);
+});
