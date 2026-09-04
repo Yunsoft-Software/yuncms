@@ -32,6 +32,7 @@ import './files-inspector-next.css';
 import './upload-queue.css';
 import './data-model-next.css';
 import './schema-graph.css';
+import './relation-diagram.css';
 import './access-next.css';
 import './rule-builder.css';
 import './ai-next.css';
