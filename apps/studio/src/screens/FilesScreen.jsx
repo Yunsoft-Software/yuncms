@@ -5,6 +5,7 @@ import {
   FilePreview,
   Inspector,
   Pagination,
+  UploadQueue,
   paginateClientItems,
   useConfirmDialog,
 } from '../components/index.js';
@@ -83,11 +84,22 @@ function compareFiles(left, right, sort, t) {
   return sort === 'name-desc' ? -result : result;
 }
 
+function makeQueueItems(fileList) {
+  const stamp = Date.now();
+  return Array.from(fileList || []).map((file, index) => ({
+    id: `${stamp}-${index}-${file.name}-${file.size}`,
+    file,
+    status: 'queued',
+    error: '',
+    sizeLabel: formatBytes(file.size),
+  }));
+}
+
 export function FilesScreen({ route = {}, onNavigate }) {
   const { locale, t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const [files, setFiles] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadQueue, setUploadQueue] = useState([]);
   const [inspectedFile, setInspectedFile] = useState(null);
   const [view, setView] = useState('grid');
   const [search, setSearch] = useState('');
@@ -141,54 +153,91 @@ export function FilesScreen({ route = {}, onNavigate }) {
   const pageFiles = paged.items;
   const routedFile = files.find((file) => String(file.id) === String(route.fileId)) ?? null;
   const hasActiveFilters = Boolean(search.trim() || typeFilter !== 'all' || sort !== 'newest');
+  const pendingUploads = uploadQueue.filter((item) => item.status === 'queued' || item.status === 'failed');
+  const hasFailedUploads = uploadQueue.some((item) => item.status === 'failed');
 
   useEffect(() => {
     setPage(1);
   }, [search, sort, typeFilter]);
 
+  function stageFiles(fileList) {
+    const next = makeQueueItems(fileList);
+    if (next.length === 0) return;
+    setUploadQueue((current) => [...current, ...next]);
+    setError('');
+    setNotice('');
+  }
+
+  function updateQueueItem(id, patch) {
+    setUploadQueue((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+  function removeQueueItem(id) {
+    if (uploading) return;
+    setUploadQueue((current) => current.filter((item) => item.id !== id));
+  }
+
   async function upload(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    if (!selectedFile) return;
+    const targets = uploadQueue.filter((item) => item.status === 'queued' || item.status === 'failed');
+    if (targets.length === 0) return;
     setUploading(true);
     setError('');
     setNotice('');
-    try {
-      await apiRequest('/files', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/octet-stream',
-          'x-filename': encodeURIComponent(selectedFile.name),
-          'x-mimetype': selectedFile.type || 'application/octet-stream',
-        },
-        body: selectedFile,
-      });
-      setSelectedFile(null);
-      form.reset();
+    let completed = 0;
+    let failed = 0;
+
+    for (const item of targets) {
+      updateQueueItem(item.id, { status: 'uploading', error: '' });
+      try {
+        await apiRequest('/files', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/octet-stream',
+            'x-filename': encodeURIComponent(item.file.name),
+            'x-mimetype': item.file.type || 'application/octet-stream',
+          },
+          body: item.file,
+        });
+        completed += 1;
+        updateQueueItem(item.id, { status: 'done', error: '' });
+      } catch (requestError) {
+        failed += 1;
+        updateQueueItem(item.id, {
+          status: 'failed',
+          error: requestError.message || t('files.uploadError'),
+        });
+      }
+    }
+
+    setUploading(false);
+    if (completed > 0) {
       setPage(1);
-      setNotice(t('files.uploadedNotice'));
       await load();
+    }
+    if (failed === 0) {
+      setNotice(t('files.uploadedCount', { count: completed }));
+      setUploadQueue([]);
+      form.reset();
       onNavigate?.(studioPath.files());
-    } catch (requestError) {
-      setError(requestError.message || t('files.uploadError'));
-    } finally {
-      setUploading(false);
+    } else {
+      setError(t('files.uploadPartial', { failed, count: targets.length }));
     }
   }
 
   function handleDrop(event) {
     event.preventDefault();
     setDropActive(false);
-    const file = event.dataTransfer.files?.[0];
-    if (file) setSelectedFile(file);
+    stageFiles(event.dataTransfer.files);
   }
 
   function handleLibraryDrop(event) {
     event.preventDefault();
     setDropActive(false);
-    const file = event.dataTransfer.files?.[0];
-    if (!file) return;
-    setSelectedFile(file);
+    const dropped = event.dataTransfer.files;
+    if (!dropped?.length) return;
+    stageFiles(dropped);
     onNavigate?.(studioPath.newFile());
   }
 
@@ -276,13 +325,27 @@ export function FilesScreen({ route = {}, onNavigate }) {
       <div className="screen-stack routed-form-page">
         <nav className="page-breadcrumbs" aria-label={t('nav.files')}><button type="button" onClick={() => onNavigate?.(studioPath.files())}>{t('nav.files')}</button><span aria-hidden="true">/</span><strong>{t('files.addFile')}</strong></nav>
         {error && <div className="error-banner" role="alert">{error}</div>}
+        {notice && <div className="notice-banner" role="status">{notice}</div>}
         <form className="panel file-upload-panel file-upload-page" onSubmit={upload}>
-          <div className="workspace-section-heading"><div><p className="eyebrow">{t('files.upload')}</p><h2>{t('files.addFile')}</h2><p>{t('files.dropDescription')}</p></div><button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.files())}>{t('common.cancel')}</button></div>
+          <div className="workspace-section-heading"><div><p className="eyebrow">{t('files.upload')}</p><h2>{t('files.addFile')}</h2><p>{t('files.dropDescription')}</p></div><button className="secondary-button" type="button" disabled={uploading} onClick={() => onNavigate?.(studioPath.files())}>{t('common.cancel')}</button></div>
           <div className={`file-dropzone ${dropActive ? 'active' : ''}`} onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDropActive(false)} onDrop={handleDrop}>
-            <input id="file-upload-page-input" type="file" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} />
-            <label htmlFor="file-upload-page-input" className="file-picker-label"><strong>{selectedFile ? selectedFile.name : t('files.chooseFile')}</strong><span>{selectedFile ? formatBytes(selectedFile.size) : t('files.dragDrop')}</span></label>
-            <button className="primary-button" type="submit" disabled={!selectedFile || uploading}>{uploading ? t('files.uploading') : t('files.upload')}</button>
+            <input id="file-upload-page-input" type="file" multiple onChange={(event) => { stageFiles(event.target.files); event.target.value = ''; }} />
+            <label htmlFor="file-upload-page-input" className="file-picker-label"><strong>{uploadQueue.length > 0 ? t('files.selectedFiles', { count: uploadQueue.length }) : t('files.chooseFile')}</strong><span>{t('files.dragDrop')}</span></label>
+            <button className="primary-button" type="submit" disabled={pendingUploads.length === 0 || uploading}>{uploading ? t('files.uploading') : hasFailedUploads ? t('files.retryFailed') : t('files.uploadSelected')}</button>
           </div>
+          <UploadQueue
+            items={uploadQueue}
+            onRemove={removeQueueItem}
+            labels={{
+              title: t('files.uploadQueue'),
+              queued: t('files.queueQueued'),
+              uploading: t('files.queueUploading'),
+              done: t('files.queueDone'),
+              failed: t('files.queueFailed'),
+              remove: t('files.queueRemove'),
+              untitled: t('files.untitled'),
+            }}
+          />
         </form>
       </div>
     );
@@ -507,3 +570,5 @@ export function FilesScreen({ route = {}, onNavigate }) {
     </div>
   );
 }
+
+export { makeQueueItems };
