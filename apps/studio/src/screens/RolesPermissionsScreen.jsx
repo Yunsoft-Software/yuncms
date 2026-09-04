@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
-import { useConfirmDialog } from '../components/DialogProvider.jsx';
-import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
+import { Pagination, RuleBuilder, paginateClientItems, useConfirmDialog } from '../components/index.js';
 import { useI18n } from '../i18n.js';
 import { studioPath } from '../studio-route.js';
 import {
@@ -54,6 +53,40 @@ function isRestricted(permission) {
     || permission.filter
     || permission.validation
   ));
+}
+
+function ruleBuilderLabels(t, title, description) {
+  return {
+    title,
+    description,
+    rawMode: t('roles.advancedJson'),
+    visualMode: t('roles.visualRules'),
+    complexJson: t('roles.complexRuleNotice'),
+    invalidJson: t('roles.invalidRuleJson'),
+    addRule: t('roles.addRule'),
+    removeRule: t('roles.removeRule'),
+    empty: t('roles.noRestrictions'),
+    field: t('roles.ruleField'),
+    operator: t('roles.ruleCondition'),
+    value: t('roles.ruleValue'),
+    noValue: t('roles.ruleNoValue'),
+    rawLabel: t('roles.advancedJson'),
+    trueLabel: t('common.yes'),
+    falseLabel: t('common.no'),
+    operators: {
+      _eq: t('content.opEquals'),
+      _neq: t('content.opDoesNotEqual'),
+      _contains: t('content.opContains'),
+      _starts_with: t('content.opStartsWith'),
+      _ends_with: t('content.opEndsWith'),
+      _gt: t('content.opGreaterThan'),
+      _gte: t('content.opGreaterEqual'),
+      _lt: t('content.opLessThan'),
+      _lte: t('content.opLessEqual'),
+      _null: t('content.opEmpty'),
+      _nnull: t('content.opNotEmpty'),
+    },
+  };
 }
 
 export function RolesPermissionsScreen({ route = {}, onNavigate }) {
@@ -554,8 +587,29 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
                                 {!advancedForm.allFields && <div className="field-choice-grid">{advancedFields.map((field) => <label className="field-choice" key={field.field}><input type="checkbox" checked={advancedForm.fields.includes(field.field)} onChange={() => toggleAdvancedField(field.field)} /><span><strong>{field.name || field.field}</strong><small>{field.field} · {field.type}</small></span></label>)}</div>}
                               </div>
                               <div className="schema-create-card form-stack">
-                                <label className="field-label"><span>{t('roles.rowFilter')}</span><small>{t('roles.rowFilterDescription')}</small><textarea rows="8" value={advancedForm.filter} onChange={(event) => setAdvancedForm((current) => ({ ...current, filter: event.target.value }))} placeholder='{"status":{"_eq":"active"}}' /></label>
-                                <label className="field-label"><span>{t('roles.validation')}</span><small>{supportsValidation(route.action) ? t('roles.validationWriteDescription') : t('roles.validationUnsupported')}</small><textarea rows="8" value={advancedForm.validation} disabled={!supportsValidation(route.action)} onChange={(event) => setAdvancedForm((current) => ({ ...current, validation: event.target.value }))} placeholder='{"status":{"_in":["draft","active"]}}' /></label>
+                                <div className="permission-rule-builder-stack">
+                                  <div className="permission-rule-builder-card">
+                                    <RuleBuilder
+                                      value={advancedForm.filter}
+                                      fields={advancedFields}
+                                      onChange={(filter) => setAdvancedForm((current) => ({ ...current, filter }))}
+                                      labels={ruleBuilderLabels(t, t('roles.rowFilter'), t('roles.visualRuleDescription'))}
+                                    />
+                                  </div>
+                                  <div className="permission-rule-builder-card">
+                                    <RuleBuilder
+                                      value={advancedForm.validation}
+                                      fields={advancedFields}
+                                      disabled={!supportsValidation(route.action)}
+                                      onChange={(validation) => setAdvancedForm((current) => ({ ...current, validation }))}
+                                      labels={ruleBuilderLabels(
+                                        t,
+                                        t('roles.validation'),
+                                        supportsValidation(route.action) ? t('roles.validationWriteDescription') : t('roles.validationUnsupported'),
+                                      )}
+                                    />
+                                  </div>
+                                </div>
                                 <div className="form-actions"><button className="primary-button" type="submit" disabled={savingAdvanced}>{savingAdvanced ? t('common.saving') : t('roles.saveRules')}</button></div>
                               </div>
                             </form>
