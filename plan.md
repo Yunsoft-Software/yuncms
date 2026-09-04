@@ -37,6 +37,19 @@ This file is the source of truth for implementation and release status. Detailed
 - [x] Pass the complete and release test suites, including real MySQL/API integration and npm package dry runs.
 - [x] Publish the public npm packages and verify `latest` resolves to 0.1.16 for each package.
 
+## 0.1.17 — contextual permissions and Studio visual QA
+
+- [x] Add parameterized `$CURRENT_USER`, `$CURRENT_ROLE`, `$NOW` and signed `$NOW(...)` filter values without weakening deny-by-default accountability.
+- [x] Apply dynamic values consistently to API filters, permission filters, relation reads, Files scopes and create/update validation.
+- [x] Expose supported dynamic values in the Studio visual rule builder and document YunCMS' deliberate V1 scope.
+- [x] Replace the clipped permission cards with a Directus-inspired collection-by-action matrix across desktop, tablet and mobile layouts.
+- [x] Replace the wrapped mobile “Open menu” control with a compact, accessible navigation trigger.
+- [x] Visually inspect every Studio workspace in light and dark themes at desktop, tablet and mobile sizes, then correct release-blocking layout defects.
+- [x] Replace the empty split sign-in surface with a responsive, project-logo-aware brand panel and keep auth action screens consistent.
+- [x] Correct the routed upload workspace so its heading, dropzone and queue use the full content width.
+- [x] Pass the fast, complete and release suites, including real MySQL/API integration and npm package dry runs.
+- [ ] Publish the public npm packages and verify `latest` resolves to 0.1.17 for each package.
+
 ## After this release
 
 - [ ] Complete only the environment-dependent verification items that remain in `todo.md` when the relevant environment is available.
