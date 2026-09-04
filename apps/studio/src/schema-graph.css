@@ -1,0 +1,387 @@
+/* Read-only schema graph. Nodes are ordinary buttons; edges are SVG paths. */
+
+.data-model-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.data-model-heading-actions .secondary-button,
+.data-model-heading-actions .primary-button {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.data-model-heading-actions .secondary-button[aria-current='page'] {
+  border-color: color-mix(in srgb, var(--ui-accent) 28%, var(--ui-border));
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+}
+
+.schema-graph-workspace {
+  min-width: 0;
+}
+
+.schema-graph-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.schema-graph-toolbar h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -.015em;
+}
+
+.schema-graph-toolbar p {
+  margin: 4px 0 0;
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+}
+
+.schema-graph-system-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.schema-graph-system-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.schema-graph-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 294px;
+  min-height: 560px;
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface);
+}
+
+.schema-graph-scroll {
+  min-width: 0;
+  overflow: auto;
+  background:
+    linear-gradient(var(--ui-border-soft) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, var(--ui-border-soft) 1px, transparent 1px) 0 0 / 24px 24px,
+    var(--ui-surface-subtle);
+}
+
+.schema-graph-canvas {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.schema-graph-edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.schema-graph-edge {
+  fill: none;
+  stroke: var(--ui-border-strong);
+  stroke-width: 1.35;
+  opacity: .58;
+  transition:
+    stroke var(--motion-ui) var(--ease-ui),
+    opacity var(--motion-ui) var(--ease-ui);
+}
+
+.schema-graph-edge.kind-o2o {
+  stroke-dasharray: 5 3;
+}
+
+.schema-graph-edge.kind-m2m {
+  stroke-width: 1.8;
+}
+
+.schema-graph-edge.related {
+  stroke: color-mix(in srgb, var(--ui-accent) 72%, var(--ui-border-strong));
+  opacity: .82;
+}
+
+.schema-graph-edge.dimmed {
+  opacity: .1;
+}
+
+.schema-graph-node {
+  position: absolute;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 9px;
+  padding: 10px 11px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 9px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ui-overlay) 7%, transparent);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-ui) var(--ease-ui),
+    background var(--motion-ui) var(--ease-ui),
+    opacity var(--motion-ui) var(--ease-ui),
+    transform var(--motion-ui) var(--ease-out),
+    box-shadow var(--motion-ui) var(--ease-ui);
+}
+
+.schema-graph-node:hover,
+.schema-graph-node:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--ui-accent) 44%, var(--ui-border-strong));
+  outline: 0;
+}
+
+.schema-graph-node.active {
+  border-color: var(--ui-accent);
+  background: var(--ui-surface-selected);
+  box-shadow: 0 0 0 2px var(--ui-focus-ring), 0 5px 18px color-mix(in srgb, var(--ui-overlay) 9%, transparent);
+}
+
+.schema-graph-node.dimmed {
+  opacity: .38;
+}
+
+.schema-graph-node-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  grid-row: 1 / span 2;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-secondary);
+}
+
+.schema-graph-node-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.schema-graph-node-copy strong,
+.schema-graph-node-copy code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schema-graph-node-copy strong {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.schema-graph-node-copy code {
+  color: var(--ui-text-tertiary);
+  font-size: 9px;
+}
+
+.schema-graph-node > small {
+  grid-column: 2;
+  align-self: end;
+  color: var(--ui-text-tertiary);
+  font-size: 9px;
+}
+
+.schema-graph-inspector {
+  min-width: 0;
+  padding: 14px;
+  border-left: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.schema-graph-inspector-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.schema-graph-inspector-heading > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.schema-graph-inspector-heading strong,
+.schema-graph-inspector-heading code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schema-graph-inspector-heading strong {
+  font-size: 12px;
+}
+
+.schema-graph-inspector-heading code {
+  color: var(--ui-text-tertiary);
+  font-size: 9px;
+}
+
+.schema-graph-inspector > p,
+.schema-graph-inspector-empty p {
+  margin: 10px 0 12px;
+  color: var(--ui-text-secondary);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.schema-graph-inspector dl {
+  display: grid;
+  gap: 0;
+  margin: 0 0 12px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+}
+
+.schema-graph-inspector dl > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.schema-graph-inspector dl > div:last-child {
+  border-bottom: 0;
+}
+
+.schema-graph-inspector dt,
+.schema-graph-inspector dd {
+  margin: 0;
+  font-size: 9.5px;
+}
+
+.schema-graph-inspector dt {
+  color: var(--ui-text-tertiary);
+}
+
+.schema-graph-inspector dd {
+  color: var(--ui-text);
+  font-weight: 680;
+}
+
+.schema-graph-relation-list {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.schema-graph-relation-list > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 6px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: var(--ui-surface-subtle);
+}
+
+.schema-graph-relation-list span {
+  grid-row: 1 / span 2;
+  color: var(--ui-accent);
+  font-size: 8.5px;
+  font-weight: 760;
+}
+
+.schema-graph-relation-list code,
+.schema-graph-relation-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schema-graph-relation-list code {
+  font-size: 9px;
+}
+
+.schema-graph-relation-list small {
+  color: var(--ui-text-tertiary);
+  font-size: 8.5px;
+}
+
+.schema-graph-inspector .primary-button {
+  width: 100%;
+}
+
+.schema-graph-inspector-empty {
+  padding: 10px 2px;
+}
+
+.schema-graph-inspector-empty strong {
+  font-size: 11px;
+}
+
+.field-icon .field-type-icon-svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 980px) {
+  .schema-graph-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .schema-graph-inspector {
+    border-top: 1px solid var(--ui-border);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .data-model-collections-heading {
+    align-items: flex-start;
+  }
+
+  .data-model-heading-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .schema-graph-toolbar {
+    display: grid;
+  }
+
+  .schema-graph-system-toggle {
+    justify-self: start;
+  }
+
+  .schema-graph-layout {
+    min-height: 460px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schema-graph-edge,
+  .schema-graph-node {
+    transition: none;
+  }
+
+  .schema-graph-node:hover,
+  .schema-graph-node:focus-visible {
+    transform: none;
+  }
+}
