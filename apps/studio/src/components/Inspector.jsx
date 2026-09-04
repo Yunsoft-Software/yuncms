@@ -10,7 +10,16 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
-export function Inspector({ open, title, description, children, actions, onClose, className = '' }) {
+export function Inspector({
+  open,
+  title,
+  description,
+  children,
+  actions,
+  onClose,
+  closeLabel = 'Close',
+  className = '',
+}) {
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef(null);
@@ -57,7 +66,7 @@ export function Inspector({ open, title, description, children, actions, onClose
 
   return createPortal(
     <div className="studio-inspector-layer">
-      <button className="studio-inspector-scrim" type="button" aria-label="Close inspector" onClick={onClose} />
+      <button className="studio-inspector-scrim" type="button" aria-label={closeLabel} onClick={onClose} />
       <aside
         ref={panelRef}
         className={`studio-inspector ${className}`.trim()}
@@ -73,7 +82,7 @@ export function Inspector({ open, title, description, children, actions, onClose
             <h2 id={titleId}>{title}</h2>
             {description && <p id={descriptionId}>{description}</p>}
           </div>
-          <button className="text-button studio-inspector-close" type="button" onClick={onClose} aria-label="Close inspector">×</button>
+          <button className="text-button studio-inspector-close" type="button" onClick={onClose} aria-label={closeLabel}>×</button>
         </header>
         <div className="studio-inspector-body">{children}</div>
         {actions && <footer className="studio-inspector-actions">{actions}</footer>}
