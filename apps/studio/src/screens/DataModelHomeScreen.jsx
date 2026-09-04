@@ -8,9 +8,7 @@ import {
   updateNavigationGroup,
 } from '../api.js';
 import { collectionMetadataPatch, collectionUi } from '../collection-ui.js';
-import { CollectionIcon } from '../components/CollectionIcon.jsx';
-import { useConfirmDialog } from '../components/DialogProvider.jsx';
-import { SidebarIcon } from '../components/SidebarIcon.jsx';
+import { CollectionIcon, SidebarIcon, useConfirmDialog } from '../components/index.js';
 import { useI18n } from '../i18n.js';
 import {
   buildNavigationModel,
