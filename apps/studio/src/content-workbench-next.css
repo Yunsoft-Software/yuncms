@@ -1,0 +1,281 @@
+.section-content .screen-stack {
+  gap: 10px;
+}
+
+.section-content .content-toolbar {
+  min-height: 52px;
+  align-items: flex-end;
+  padding: 2px 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.section-content .content-toolbar > div {
+  display: grid;
+  gap: 2px;
+}
+
+.section-content .content-toolbar .eyebrow {
+  display: none;
+}
+
+.section-content .content-toolbar h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -.025em;
+}
+
+.section-content .content-toolbar p {
+  margin: 0;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.section-content .content-toolbar .schema-machine-key {
+  width: fit-content;
+  margin-top: 2px;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+}
+
+.section-content .data-controls-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "primary filter-toggle"
+    "filters filters"
+    "active active";
+  gap: 9px 10px;
+  align-items: end;
+  padding: 10px 11px;
+  border-radius: var(--ui-radius-surface);
+  background: var(--ui-surface);
+}
+
+.section-content .content-data-controls-main {
+  grid-area: primary;
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) minmax(140px, .65fr) minmax(122px, .55fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.section-content .content-data-controls-main .field-label,
+.section-content .filter-builder .field-label {
+  gap: 4px;
+  margin: 0;
+}
+
+.section-content .content-data-controls-main .field-label > span,
+.section-content .filter-builder .field-label > span {
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .025em;
+}
+
+.section-content .content-data-controls-main input,
+.section-content .content-data-controls-main select,
+.section-content .filter-builder input,
+.section-content .filter-builder select,
+.section-content .filter-builder .control-placeholder {
+  min-height: 34px;
+}
+
+.section-content .mobile-filter-toggle {
+  grid-area: filter-toggle;
+  min-width: 92px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  align-self: end;
+  padding: 7px 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.section-content .mobile-filter-toggle:hover {
+  border-color: var(--ui-border-accent);
+  background: var(--ui-surface-hover);
+  color: var(--ui-text);
+}
+
+.section-content .mobile-filter-toggle small {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding-inline: 5px;
+  border-radius: 5px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-tertiary);
+  font-size: 9px;
+}
+
+.section-content .mobile-filter-toggle[aria-expanded="true"] {
+  border-color: var(--ui-border-accent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-text);
+}
+
+.section-content .mobile-filter-toggle[aria-expanded="true"] small {
+  background: var(--ui-surface);
+  color: var(--ui-accent);
+}
+
+.section-content .filter-builder {
+  grid-area: filters;
+  display: none;
+  grid-template-columns: minmax(150px, .75fr) minmax(160px, .75fr) minmax(200px, 1.2fr) auto;
+  gap: 8px;
+  align-items: end;
+  padding: 10px;
+  border: 1px solid var(--ui-border-soft);
+  border-radius: 8px;
+  background: var(--ui-surface-subtle);
+}
+
+.section-content .filter-builder.mobile-open {
+  display: grid;
+  animation: content-filter-enter var(--ui-motion-base) ease both;
+}
+
+.section-content .filter-add-button {
+  min-height: 34px;
+}
+
+.section-content .active-controls-row {
+  grid-area: active;
+  min-height: 26px;
+  padding-top: 2px;
+}
+
+.section-content .filter-chip-list {
+  gap: 5px;
+}
+
+.section-content .filter-chip {
+  min-height: 26px;
+  padding: 4px 6px;
+  border-color: var(--ui-border-soft);
+  background: var(--ui-surface-subtle);
+  font-size: 10px;
+}
+
+.section-content .controls-hint {
+  padding-left: 2px;
+  font-size: 10px;
+}
+
+.section-content .table-panel {
+  border-radius: 9px;
+}
+
+.section-content .table-panel th:first-child,
+.section-content .table-panel td:first-child {
+  padding-left: 14px;
+}
+
+.section-content .table-panel th:last-child,
+.section-content .table-panel td:last-child {
+  padding-right: 10px;
+}
+
+.section-content .row-actions {
+  opacity: .45;
+  transition: opacity var(--ui-motion-fast) ease;
+}
+
+.section-content tbody tr:hover .row-actions,
+.section-content .row-actions:focus-within {
+  opacity: 1;
+}
+
+.section-content .table-panel.is-loading tbody {
+  opacity: .58;
+}
+
+@keyframes content-filter-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 980px) {
+  .section-content .content-data-controls-main {
+    grid-template-columns: minmax(180px, 1.3fr) minmax(130px, .7fr) minmax(116px, .6fr);
+  }
+
+  .section-content .filter-builder {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .section-content .filter-add-button {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 760px) {
+  .section-content .content-toolbar {
+    min-height: 0;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 2px 4px;
+  }
+
+  .section-content .content-toolbar .primary-button {
+    width: 100%;
+  }
+
+  .section-content .data-controls-panel {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "primary"
+      "filter-toggle"
+      "filters"
+      "active";
+    align-items: stretch;
+  }
+
+  .section-content .content-data-controls-main,
+  .section-content .filter-builder {
+    grid-template-columns: 1fr;
+  }
+
+  .section-content .mobile-filter-toggle {
+    width: 100%;
+  }
+
+  .section-content .filter-add-button {
+    width: 100%;
+  }
+
+  .section-content .row-actions {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-content .filter-builder.mobile-open {
+    animation: none;
+  }
+
+  .section-content .row-actions {
+    transition: none;
+  }
+}
