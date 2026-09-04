@@ -38,6 +38,7 @@
 @import './schema-graph.css';
 @import './relation-diagram.css';
 @import './access-next.css';
+@import './access-matrix-states.css';
 @import './rule-builder.css';
 @import './ai-next.css';
 @import './auth-settings-next.css';
