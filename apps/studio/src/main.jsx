@@ -28,6 +28,7 @@ import './data-view-options.css';
 import './content-workbench-next.css';
 import './content-inspector-next.css';
 import './files-next.css';
+import './files-inspector-next.css';
 import './data-model-next.css';
 import './schema-graph.css';
 import './access-next.css';
