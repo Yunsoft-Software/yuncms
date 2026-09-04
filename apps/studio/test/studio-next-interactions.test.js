@@ -26,7 +26,8 @@ test('schema graph has a reserved route that does not consume normal collection 
 });
 
 test('Data Model wires a read-only graph from existing collection and relation APIs', () => {
-  assert.match(dataModelSource, /import \{ SchemaGraph \} from '\.\.\/components\/SchemaGraph\.jsx';/);
+  assert.match(dataModelSource, /SchemaGraph,[\s\S]*from '\.\.\/components\/index\.js';/);
+  assert.doesNotMatch(dataModelSource, /components\/SchemaGraph\.jsx/);
   assert.match(dataModelSource, /showGraph = view === 'graph'/);
   assert.match(dataModelSource, /apiRequest\('\/schema\/relations'\)/);
   assert.match(dataModelSource, /<SchemaGraph/);
