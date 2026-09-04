@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
-import { useConfirmDialog } from '../components/DialogProvider.jsx';
-import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
+import { Pagination, paginateClientItems, useConfirmDialog } from '../components/index.js';
 import { useI18n } from '../i18n.js';
 import { studioPath } from '../studio-route.js';
 
