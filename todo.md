@@ -4,7 +4,6 @@ These checks require a local checkout and browser environment. Complete them bef
 
 - [ ] Run the Studio test suite and confirm the shell, workspace, command palette, schema graph, shared-component, file-category, upload-queue, permission-rule and native-dialog contracts pass with the existing navigation, appearance, routing, mobile and accessibility tests.
 - [ ] Run the Studio production build and confirm there are no Vite, JSX, CSS import or React warnings introduced by the application frame and workspace layers.
-- [ ] Confirm `apps/studio/src/main.jsx` loads only `studio.css` and that the stylesheet entry point preserves the intended import order across legacy and semantic Studio surfaces.
 - [ ] Smoke-test Content at desktop widths around 1440px and 1280px. Confirm the application rail, collection context rail, compact controls, table controls and collection navigation remain usable.
 - [ ] In Content, verify row click opens the quick inspector, saving refreshes the list, opening the full editor keeps the existing deep-link route, and Escape/focus return work correctly.
 - [ ] In Content, verify current-page selection, select-all, bulk delete confirmation, partial delete errors, pagination resets and inspector selection do not interfere with one another.
@@ -29,7 +28,5 @@ These checks require a local checkout and browser environment. Complete them bef
 - [ ] Verify keyboard focus on every application-rail destination and confirm active destinations expose `aria-current="page"`.
 - [ ] Verify reduced-motion mode disables shell, graph, palette, inspector and workspace transitions without removing state feedback.
 - [ ] Check light mode, dark mode and at least one customized accent color for contrast and selected-state clarity.
-- [ ] Confirm supported browser targets handle the `:has()` shell selectors used to remove unnecessary context rails and to hide application navigation on the authentication surface.
-- [ ] Confirm all shared Studio components remain exported from `apps/studio/src/components/index.js`, screens import shared UI only through that entry point, and no screen introduces a duplicate modal/dialog primitive.
-- [ ] Confirm there are no browser-native `alert`, `prompt` or `confirm` calls anywhere under `apps/studio/src`.
+- [ ] Smoke-test a browser without CSS `:has()` support within the intended compatibility range and confirm explicit route/auth shell classes preserve Files, AI, Data Model and authentication layouts.
 - [ ] Capture replacement Studio screenshots only after the workbench layout is stable enough to represent the shipped interface.
