@@ -24,6 +24,7 @@ import './mcp.css';
 import './content-density.css';
 import './studio-next.css';
 import './studio-next-tokens.css';
+import './command-palette.css';
 import './content-workbench-next.css';
 import './files-next.css';
 import './data-model-next.css';
