@@ -223,7 +223,7 @@ export class PermissionsService extends BaseService {
     const fields = normalizePermissionFields(input.fields ?? null, collectionSchema);
     const filter = input.filter ?? null;
     const validation = input.validation ?? null;
-    if (filter !== null) compileFilter(filter, collectionSchema);
+    if (filter !== null) compileFilter(filter, collectionSchema, { allowUnresolvedDynamicVariables: true });
     assertPermissionValidationRule(validation, collectionSchema);
 
     const [roleRows] = await this.database.query(
@@ -290,7 +290,7 @@ export class PermissionsService extends BaseService {
       params.push(fields == null ? null : JSON.stringify(fields));
     }
     if (Object.hasOwn(patch, 'filter')) {
-      if (patch.filter != null) compileFilter(patch.filter, collectionSchema);
+      if (patch.filter != null) compileFilter(patch.filter, collectionSchema, { allowUnresolvedDynamicVariables: true });
       assignments.push('filter = ?');
       params.push(patch.filter == null ? null : JSON.stringify(patch.filter));
     }

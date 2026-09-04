@@ -65,7 +65,7 @@ function combineCompiledFilters(...filters) {
   };
 }
 
-function createCandidateRecord(schema, id, entries) {
+function createCandidateRecord(schema, id, entries, now = new Date()) {
   const provided = Object.fromEntries(entries);
   const candidate = {};
 
@@ -80,7 +80,7 @@ function createCandidateRecord(schema, id, entries) {
     }
     const metadata = parseMetadata(fieldSchema.schema_metadata);
     if (metadata.defaultPreset === 'now') {
-      candidate[fieldSchema.field] = new Date();
+      candidate[fieldSchema.field] = now;
       continue;
     }
     candidate[fieldSchema.field] = Object.hasOwn(metadata, 'defaultValue')
@@ -150,6 +150,14 @@ export class ItemsService extends BaseService {
     return permissions.resolve(action, this.collection);
   }
 
+  dynamicVariables(now = new Date()) {
+    return {
+      user: this.accountability.user,
+      role: this.accountability.role,
+      now,
+    };
+  }
+
   validatePayload(payload, schema, permission, { creating = false } = {}) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
       throw serviceError('INVALID_PAYLOAD', 'Payload must be an object');
@@ -179,9 +187,9 @@ export class ItemsService extends BaseService {
     return entries;
   }
 
-  compileActionFilters(userFilter, permissionFilter, userSchema, fullSchema, search = null) {
-    const permissionSql = compileFilter(permissionFilter, fullSchema);
-    const userSql = compileFilter(userFilter, userSchema);
+  compileActionFilters(userFilter, permissionFilter, userSchema, fullSchema, search = null, dynamicVariables = this.dynamicVariables()) {
+    const permissionSql = compileFilter(permissionFilter, fullSchema, { dynamicVariables });
+    const userSql = compileFilter(userFilter, userSchema, { dynamicVariables });
     const searchSql = compileSearch(search, userSchema);
     return combineCompiledFilters(permissionSql, userSql, searchSql);
   }
@@ -221,7 +229,14 @@ export class ItemsService extends BaseService {
     const query = await this.normalizeReadQuery(rawQuery);
     const permission = await this.resolvePermission('read');
     const accessSchema = schemaForFields(schema, permission.fields);
-    const filter = this.compileActionFilters(query.filter, permission.filter, accessSchema, schema, query.search);
+    const filter = this.compileActionFilters(
+      query.filter,
+      permission.filter,
+      accessSchema,
+      schema,
+      query.search,
+      this.dynamicVariables(),
+    );
     const table = quoteIdentifier(this.collection, 'collection name');
     const aggregate = compileAggregate(query.aggregate, query.groupBy, accessSchema);
 
@@ -288,7 +303,8 @@ export class ItemsService extends BaseService {
       fields: { ...accessSchema.fields, [trustedLookupField]: schema.fields[trustedLookupField] },
     };
     const internalSelection = compileSelectFields([...visibleSelection.fields, trustedLookupField], internalSchema);
-    const permissionFilter = compileFilter(permission.filter, schema);
+    const dynamicVariables = this.dynamicVariables();
+    const permissionFilter = compileFilter(permission.filter, schema, { dynamicVariables });
     const table = quoteIdentifier(this.collection, 'collection name');
     const data = [];
 
@@ -315,8 +331,9 @@ export class ItemsService extends BaseService {
     const selected = compileSelectFields(normalizeFields(fields), accessSchema);
     const table = quoteIdentifier(this.collection, 'collection name');
     const primaryKey = schema.primary_key;
+    const dynamicVariables = this.dynamicVariables();
     const filter = combineCompiledFilters(
-      compileFilter(permission.filter, schema),
+      compileFilter(permission.filter, schema, { dynamicVariables }),
       compileFilter({ [primaryKey]: { _eq: id } }, schema),
     );
     const [rows] = await this.database.query(
@@ -342,10 +359,13 @@ export class ItemsService extends BaseService {
     const permission = await this.resolvePermission('create');
     const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create' });
     const callerEntries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
-    const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create');
+    const now = new Date();
+    const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create', now);
     const id = randomUUID();
-    const candidate = createCandidateRecord(schema, id, entries);
-    enforcePermissionValidation(candidate, permission.validation, schema);
+    const candidate = createCandidateRecord(schema, id, entries, now);
+    enforcePermissionValidation(candidate, permission.validation, schema, {
+      dynamicVariables: this.dynamicVariables(now),
+    });
 
     const values = { [schema.primary_key]: id, ...Object.fromEntries(entries) };
     const fields = Object.keys(values);
@@ -368,14 +388,17 @@ export class ItemsService extends BaseService {
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('create');
     const staged = [];
+    const now = new Date();
 
     for (const payload of payloads) {
       const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create', bulk: true });
       const callerEntries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
-      const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create');
+      const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create', now);
       const id = randomUUID();
-      const candidate = createCandidateRecord(schema, id, entries);
-      enforcePermissionValidation(candidate, permission.validation, schema);
+      const candidate = createCandidateRecord(schema, id, entries, now);
+      enforcePermissionValidation(candidate, permission.validation, schema, {
+        dynamicVariables: this.dynamicVariables(now),
+      });
       staged.push({ id, values: { [schema.primary_key]: id, ...Object.fromEntries(entries) } });
     }
 
@@ -405,11 +428,13 @@ export class ItemsService extends BaseService {
     const filteredPayload = await this.filterMutation('items.update', payload, { operation: 'update', key: id });
     const callerEntries = this.validatePayload(filteredPayload, schema, permission);
     if (callerEntries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
-    const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'update');
+    const now = new Date();
+    const dynamicVariables = this.dynamicVariables(now);
+    const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'update', now);
     const effectiveChanges = Object.fromEntries(entries);
     const table = quoteIdentifier(this.collection, 'collection name');
     const filter = combineCompiledFilters(
-      compileFilter(permission.filter, schema),
+      compileFilter(permission.filter, schema, { dynamicVariables }),
       compileFilter({ [schema.primary_key]: { _eq: id } }, schema),
     );
 
@@ -417,7 +442,7 @@ export class ItemsService extends BaseService {
       const [currentRows] = await this.database.query(`SELECT * FROM ${table}${filter.sql} LIMIT 1`, filter.params);
       const current = currentRows[0];
       if (!current) return null;
-      enforcePermissionValidation({ ...current, ...effectiveChanges }, permission.validation, schema);
+      enforcePermissionValidation({ ...current, ...effectiveChanges }, permission.validation, schema, { dynamicVariables });
     }
 
     const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
@@ -442,9 +467,11 @@ export class ItemsService extends BaseService {
     const filteredPayload = await this.filterMutation('items.update', payload, { operation: 'update', bulk: true, filter: filterInput });
     const callerEntries = this.validatePayload(filteredPayload, schema, permission);
     if (callerEntries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
-    const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'update');
+    const now = new Date();
+    const dynamicVariables = this.dynamicVariables(now);
+    const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'update', now);
     const effectiveChanges = Object.fromEntries(entries);
-    const filter = this.compileActionFilters(filterInput, permission.filter, accessSchema, schema);
+    const filter = this.compileActionFilters(filterInput, permission.filter, accessSchema, schema, null, dynamicVariables);
     const table = quoteIdentifier(this.collection, 'collection name');
 
     if (permission.validation) {
@@ -455,7 +482,9 @@ export class ItemsService extends BaseService {
       if (rows.length > MAX_BULK_VALIDATION_ROWS) {
         throw serviceError('VALIDATION_BULK_LIMIT', `Permission validation can inspect at most ${MAX_BULK_VALIDATION_ROWS} rows per bulk update`);
       }
-      for (const row of rows) enforcePermissionValidation({ ...row, ...effectiveChanges }, permission.validation, schema);
+      for (const row of rows) {
+        enforcePermissionValidation({ ...row, ...effectiveChanges }, permission.validation, schema, { dynamicVariables });
+      }
     }
 
     const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
@@ -473,8 +502,9 @@ export class ItemsService extends BaseService {
     const filtered = await this.filterMutation('items.delete', { key: id }, { operation: 'delete', key: id });
     const key = filtered?.key ?? id;
     const table = quoteIdentifier(this.collection, 'collection name');
+    const dynamicVariables = this.dynamicVariables();
     const filter = combineCompiledFilters(
-      compileFilter(permission.filter, schema),
+      compileFilter(permission.filter, schema, { dynamicVariables }),
       compileFilter({ [schema.primary_key]: { _eq: key } }, schema),
     );
     const [result] = await this.database.query(`DELETE FROM ${table}${filter.sql}`, filter.params);

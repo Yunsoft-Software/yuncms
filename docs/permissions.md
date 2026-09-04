@@ -30,6 +30,8 @@ For project collections that support advanced permission restrictions, Studio pr
 
 **Visual rules** are intended for straightforward AND conditions. Choose the field, comparison operator and value for each rule. Studio serializes supported rules to the same bounded filter JSON consumed by the permissions API.
 
+The value control also exposes `$CURRENT_USER`, `$CURRENT_ROLE`, `$NOW` and common signed `$NOW(...)` presets. After selecting a time preset, edit the expression directly when another supported distance is needed.
+
 **Advanced JSON** remains available for filters or validation rules that need a structure the visual builder cannot safely represent. Existing nested objects, `_or` expressions or custom shapes are preserved unchanged rather than being simplified or rewritten by the visual editor.
 
 Field allowlists remain explicit checkboxes. Prospective-record validation is available only for create/update actions where the backend supports it.
@@ -94,6 +96,26 @@ Project-collection permissions can additionally contain:
 - prospective-record validation for create/update.
 
 Permission filters/validation use the same bounded filter language documented in [Items query language](api-query-language.md).
+
+Common contextual examples:
+
+```json
+{
+  "owner_id": { "_eq": "$CURRENT_USER" }
+}
+```
+
+```json
+{
+  "_and": [
+    { "role_id": { "_eq": "$CURRENT_ROLE" } },
+    { "publish_at": { "_lte": "$NOW" } },
+    { "expires_at": { "_gt": "$NOW(+2 hours)" } }
+  ]
+}
+```
+
+The same request timestamp is used throughout one create/update validation pass. Cached permission metadata remains unresolved, so two users sharing a role still receive their own `$CURRENT_USER` value at execution time.
 
 ## Deny by default
 

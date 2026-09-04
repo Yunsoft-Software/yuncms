@@ -419,7 +419,13 @@ async function readRowsByLookup({
     },
   };
   const selection = compileSelectFields([...new Set([...visibleFields, ...trustedInternal])], internalSchema);
-  const permissionFilter = compileFilter(permission.filter, schema);
+  const permissionFilter = compileFilter(permission.filter, schema, {
+    dynamicVariables: {
+      user: service.accountability?.user ?? null,
+      role: service.accountability?.role ?? null,
+      now: new Date(),
+    },
+  });
   const table = quoteIdentifier(service.collection, 'collection name');
   const data = [];
 

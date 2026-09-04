@@ -13,6 +13,8 @@ const schema = {
     title: { field: 'title', type: 'string' },
     status: { field: 'status', type: 'string' },
     score: { field: 'score', type: 'integer' },
+    owner_id: { field: 'owner_id', type: 'uuid' },
+    publish_at: { field: 'publish_at', type: 'datetime' },
   },
 };
 
@@ -54,4 +56,31 @@ test('invalid validation rules reuse safe filter schema validation', () => {
     ),
     (error) => error.code === 'INVALID_QUERY',
   );
+});
+
+test('permission validation resolves current user and NOW adjustments against one context', () => {
+  const dynamicVariables = {
+    user: 'user-1',
+    role: 'role-1',
+    now: new Date('2026-09-05T12:00:00.000Z'),
+  };
+  const rule = {
+    _and: [
+      { owner_id: { _eq: '$CURRENT_USER' } },
+      { publish_at: { _lte: '$NOW(+1 hour)' } },
+    ],
+  };
+
+  assert.equal(evaluatePermissionValidation({
+    owner_id: 'user-1',
+    publish_at: new Date('2026-09-05T12:30:00.000Z'),
+  }, rule, schema, { dynamicVariables }), true);
+  assert.equal(evaluatePermissionValidation({
+    owner_id: 'user-2',
+    publish_at: new Date('2026-09-05T12:30:00.000Z'),
+  }, rule, schema, { dynamicVariables }), false);
+  assert.equal(evaluatePermissionValidation({
+    owner_id: 'user-1',
+    publish_at: new Date('2026-09-05T13:30:00.000Z'),
+  }, rule, schema, { dynamicVariables }), false);
 });
