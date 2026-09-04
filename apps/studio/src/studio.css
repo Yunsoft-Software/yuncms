@@ -24,6 +24,7 @@
 /* Semantic Studio foundation and workbench surfaces. */
 @import './studio-next.css';
 @import './studio-next-tokens.css';
+@import './studio-motion.css';
 @import './command-palette.css';
 @import './data-view-options.css';
 @import './content-workbench-next.css';
