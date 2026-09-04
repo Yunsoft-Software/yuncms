@@ -28,6 +28,7 @@ export function readStudioRoute(hash = window.location.hash) {
 
   if (section === 'data-model') {
     if (!first) return { section, view: 'collections', collection: '', field: '' };
+    if (first === 'graph') return { section, view: 'graph', collection: '', field: '' };
     if (first === 'new') return { section, view: 'new-collection', collection: '', field: '' };
     if (!second || second === 'overview') return { section, view: 'overview', collection: first, field: '' };
     if (second === 'fields') {
@@ -67,6 +68,7 @@ export const studioPath = Object.freeze({
   contentNew: (collection) => `#/content/${encode(collection)}/new`,
   contentRecord: (collection, id) => `#/content/${encode(collection)}/${encode(id)}`,
   dataModel: () => '#/data-model',
+  schemaGraph: () => '#/data-model/graph',
   newCollection: () => '#/data-model/new',
   collection: (collection) => `#/data-model/${encode(collection)}/overview`,
   fields: (collection) => `#/data-model/${encode(collection)}/fields`,
