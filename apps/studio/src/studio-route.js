@@ -1,4 +1,5 @@
 const TOP_LEVEL_SECTIONS = new Set(['ai', 'appearance', 'files', 'mcp', 'roles', 'users']);
+export const STUDIO_CONTENT_FOCUS_EVENT = 'yuncms:studio-content-focus';
 
 function decode(value = '') {
   try {
@@ -102,4 +103,8 @@ export function navigateStudio(path, { replace = false } = {}) {
     return;
   }
   window.location.hash = next.slice(1);
+}
+
+export function focusStudioContentNavigation() {
+  window.dispatchEvent(new Event(STUDIO_CONTENT_FOCUS_EVENT));
 }

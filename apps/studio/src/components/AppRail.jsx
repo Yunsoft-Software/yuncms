@@ -3,7 +3,12 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../api.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
-import { navigateStudio, readStudioRoute, studioPath } from '../studio-route.js';
+import {
+  focusStudioContentNavigation,
+  navigateStudio,
+  readStudioRoute,
+  studioPath,
+} from '../studio-route.js';
 import { CommandPalette } from './CommandPalette.jsx';
 import { SidebarIcon } from './SidebarIcon.jsx';
 import { StudioBrand } from './StudioBrand.jsx';
@@ -149,7 +154,10 @@ export function AppRail() {
                 type="button"
                 aria-current={active ? 'page' : undefined}
                 title={item.label}
-                onClick={() => navigateStudio(item.path())}
+                onClick={() => {
+                  if (item.id === 'content') focusStudioContentNavigation();
+                  navigateStudio(item.path());
+                }}
               >
                 <SidebarIcon name={item.icon} size={19} />
                 <span>{item.label}</span>

@@ -12,7 +12,12 @@ import {
 import { useI18n } from './i18n.js';
 import { buildNavigationModel } from './navigation-model.js';
 import { displaySchemaName } from './schema-name.js';
-import { navigateStudio, readStudioRoute, studioPath } from './studio-route.js';
+import {
+  navigateStudio,
+  readStudioRoute,
+  STUDIO_CONTENT_FOCUS_EVENT,
+  studioPath,
+} from './studio-route.js';
 import { AiScreen } from './screens/AiScreen.jsx';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
@@ -134,14 +139,17 @@ export function App() {
     const updateRoute = () => {
       const nextRoute = readStudioRoute();
       setRoute(nextRoute);
-      if (nextRoute.section !== 'content') setContentNavFocused(false);
+      setContentNavFocused(nextRoute.section === 'content');
       setMobileNavOpen(false);
     };
+    const focusContentNavigation = () => setContentNavFocused(true);
     window.addEventListener('hashchange', updateRoute);
     window.addEventListener('popstate', updateRoute);
+    window.addEventListener(STUDIO_CONTENT_FOCUS_EVENT, focusContentNavigation);
     return () => {
       window.removeEventListener('hashchange', updateRoute);
       window.removeEventListener('popstate', updateRoute);
+      window.removeEventListener(STUDIO_CONTENT_FOCUS_EVENT, focusContentNavigation);
     };
   }, []);
 
