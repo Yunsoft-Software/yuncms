@@ -4,19 +4,22 @@ YunCMS stores project content in MySQL collections. A collection has a stable AP
 
 ![YunCMS Data Model with navigation folders, ordering and visibility controls](assets/screenshots/studio-data-model.png)
 
-## Understand the Data Model list
+## Understand the Data Model workspace
 
-The landing screen combines schema navigation with Content-menu presentation:
+Open **Data Model** from the Studio application rail. The workspace keeps collection navigation beside the active schema view so you can move between collection settings, fields, relations and the read-only schema graph without returning to a dashboard.
 
-- **Create collection** adds a MySQL-backed project collection;
-- **Create folder** adds a presentation-only navigation group;
-- the collection icon and name open its fields/relations/settings;
-- the `1` control toggles supported single-item presentation;
-- the eye controls whether the collection appears under Content;
-- a crossed-out eye means the collection is hidden from Content;
-- the six-dot handle reorders a collection/folder or moves a collection into a folder.
+The collection navigation supports:
 
-Dragging near the top or bottom edge of a row changes order. Dropping over the highlighted center of a folder moves the collection into that folder. The helper text under the list summarizes the same behavior in Studio.
+- **Create collection** to add a MySQL-backed project collection;
+- project and system collection groups;
+- collection icons and human-readable display names;
+- visibility metadata for Content navigation;
+- ordering and presentation metadata;
+- access to fields, relations and collection settings.
+
+The navigation editor also supports one-level presentation folders. Folders affect Studio navigation only; they do not create database tables or relations.
+
+Dragging near the top or bottom edge of a row changes order. Dropping over the highlighted center of a folder moves the collection into that folder. The helper text under the navigation editor summarizes the same behavior in Studio.
 
 Folders, order and visibility are interface metadata. They never grant data access; Roles & Permissions remains authoritative.
 
@@ -37,15 +40,21 @@ A collection can also carry a note, navigation/display metadata, visibility sett
 
 ## Create a collection in Studio
 
-1. Open **Settings → Data Model**.
+1. Open **Data Model**.
 2. Choose **New collection**.
 3. Enter a display name and confirm or edit the generated API key.
 4. Select any system fields you want YunCMS to maintain automatically.
 5. Create the collection, then add normal fields and relations.
 
-After creation, return to the landing list when you want to place the collection in a folder, change its order or hide it from Content. Open the collection itself when you want to change fields, relations or collection settings.
+After creation, use the collection navigation when you want to change order, grouping or Content visibility. Open the collection itself when you want to change fields, relations or collection settings.
 
 Use stable lowercase API keys such as `orders`, `customer_requests` and `invoice_lines`. Treat an API key as part of your integration contract after external applications begin using it.
+
+## Fields in Studio
+
+The **Fields** view uses type-specific icons and compact metadata so a schema can be scanned without relying on placeholder letters. Opening a field exposes its API key, storage/display type and supported schema actions.
+
+System-managed and custom system-extension fields remain visually distinct from normal project fields. Destructive field actions remain explicit rather than being hidden behind drag gestures.
 
 ## Supported field types
 
@@ -144,9 +153,40 @@ A project collection may opt into any of these fields at creation time:
 
 These fields are read-only and maintained by YunCMS. User fields must not try to overwrite them. User-reference fields use foreign keys to the users resource and become `null` if the referenced user is removed.
 
+## Schema graph
+
+The **Schema graph** is a read-only relationship map built from the same collection and relation metadata used by the REST schema APIs.
+
+By default the graph focuses on project collections and hides system collections to keep application structure readable. You can reveal system collections when you need the wider schema context.
+
+Selecting a node:
+
+- highlights its connected collections and relation edges;
+- dims unrelated nodes so the active neighborhood is easier to follow;
+- opens collection/relation details in the inspector;
+- provides a route back to the normal collection workspace.
+
+The graph is intentionally read-only. Dragging graph nodes does not create, remove or alter database relations. Schema mutations remain explicit operations in the normal Fields and Relations views.
+
 ## Relations
 
 Relations use collection/field API keys. Relation expansion and permissions are handled by the same Items service used for ordinary reads.
+
+### Relation preview in Studio
+
+When creating a relation, Studio previews the resulting structure before the request is submitted.
+
+For M2O/O2O relations the preview shows:
+
+- the source/many collection;
+- the selected relation field;
+- the target/one collection;
+- the selected delete behavior;
+- the resulting direct field relationship.
+
+For M2M relations it shows the left collection, right collection and managed junction name.
+
+The preview is explanatory only. The actual schema change still happens only after you submit the relation form, using the existing relation API.
 
 ### Many-to-one (M2O)
 

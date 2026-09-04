@@ -6,6 +6,7 @@ import {
 } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { schemaKeyFromName } from '../schema-name.js';
+import { FieldTypeIcon } from './FieldTypeIcon.jsx';
 
 function TypeCard({ option, active, onSelect, t }) {
   return (
@@ -15,7 +16,7 @@ function TypeCard({ option, active, onSelect, t }) {
       aria-pressed={active}
       onClick={() => onSelect(option.value)}
     >
-      <span className="field-type-card-icon" aria-hidden="true">{option.icon}</span>
+      <span className="field-type-card-icon" aria-hidden="true"><FieldTypeIcon type={option.value} size={18} /></span>
       <span className="field-type-card-copy">
         <strong>{t(option.labelKey)}</strong>
         <small>{t(option.descriptionKey)}</small>

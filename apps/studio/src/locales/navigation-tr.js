@@ -47,6 +47,7 @@ export const NAVIGATION_TR = Object.freeze({
   'navigation.groupSummary': '{count} koleksiyon · {behavior}',
   'navigation.structureTitle': 'İçerik menüsü yapısı',
   'navigation.structureSummary': '{collections} koleksiyon · {groups} klasör',
+  'navigation.folders': 'Klasörler',
   'navigation.dragDisabledSearch': 'Arama sırasında sıralama kapalı',
   'navigation.dragReady': 'Sürükleyerek sırala veya klasöre taşı',
   'navigation.moveToRootEnd': 'Ana düzeyin sonuna taşı',

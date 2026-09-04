@@ -1,0 +1,56 @@
+/* Permission matrix state treatment.
+ * Text remains the source of truth; surface color only reinforces the state.
+ */
+
+.permission-action-row:has(.permission-toggle.enabled) {
+  background: color-mix(in srgb, var(--ui-success) 4%, var(--ui-surface));
+}
+
+.permission-action-row:has(.permission-toggle.enabled):hover,
+.permission-action-row:has(.permission-toggle.enabled):focus-within {
+  background: color-mix(in srgb, var(--ui-success) 7%, var(--ui-surface-hover));
+}
+
+.permission-action-row:has(.permission-toggle:not(.enabled)) > div:first-child small {
+  color: var(--ui-text-tertiary);
+}
+
+.permission-action-row:has(.permission-toggle.enabled) > div:first-child small {
+  color: var(--ui-text-secondary);
+  font-weight: 650;
+}
+
+.permission-action-row:has(.protected-permission) {
+  background: var(--ui-surface-subtle);
+}
+
+.permission-action-row:has(.protected-permission) > div:first-child {
+  opacity: .72;
+}
+
+.permission-action-row .permission-toggle:not(.enabled) {
+  background: transparent;
+}
+
+.permission-action-row .permission-toggle.enabled span::before {
+  content: '✓';
+  margin-right: 4px;
+  font-weight: 800;
+}
+
+.permission-action-row > div:first-child small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-collection-card:focus-within > header,
+.permission-collection-card:hover > header {
+  background: var(--ui-surface-hover);
+}
+
+@media (max-width: 900px) {
+  .permission-action-row > div:first-child small {
+    white-space: normal;
+  }
+}

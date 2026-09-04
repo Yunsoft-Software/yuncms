@@ -1,0 +1,111 @@
+.upload-queue {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-border-soft);
+}
+
+.upload-queue-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.upload-queue-heading strong {
+  font-size: 12px;
+}
+
+.upload-queue-heading span {
+  min-width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.upload-queue-list {
+  display: grid;
+  gap: 5px;
+}
+
+.upload-queue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 9px;
+  border: 1px solid var(--ui-border-soft);
+  border-radius: 8px;
+  background: var(--ui-surface);
+}
+
+.upload-queue-item.status-uploading {
+  border-color: var(--ui-border-accent);
+}
+
+.upload-queue-item.status-done {
+  background: color-mix(in srgb, var(--ui-success-bg) 32%, var(--ui-surface));
+}
+
+.upload-queue-item.status-failed {
+  border-color: color-mix(in srgb, var(--ui-danger) 40%, var(--ui-border));
+}
+
+.upload-queue-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.upload-queue-copy strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-queue-copy small {
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+}
+
+.upload-queue-copy .upload-queue-error {
+  color: var(--ui-danger);
+}
+
+.upload-queue-state {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.upload-queue-status {
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.status-uploading .upload-queue-status {
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+}
+
+.status-done .upload-queue-status {
+  background: var(--ui-success-bg);
+  color: var(--ui-success-text);
+}
+
+.status-failed .upload-queue-status {
+  color: var(--ui-danger);
+}

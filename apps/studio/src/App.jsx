@@ -2,13 +2,22 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 
 import { API_URL, apiRequest, health, logout, navigationGroups, readSession, subscribeSession } from './api.js';
 import { collectionUi, sortContentCollections } from './collection-ui.js';
-import { CollectionIcon } from './components/CollectionIcon.jsx';
-import { LanguageSwitcher, StudioBrand, YunsoftFooter } from './components/StudioBrand.jsx';
-import { SidebarIcon } from './components/SidebarIcon.jsx';
+import {
+  CollectionIcon,
+  LanguageSwitcher,
+  SidebarIcon,
+  StudioBrand,
+  YunsoftFooter,
+} from './components/index.js';
 import { useI18n } from './i18n.js';
 import { buildNavigationModel } from './navigation-model.js';
 import { displaySchemaName } from './schema-name.js';
-import { navigateStudio, readStudioRoute, studioPath } from './studio-route.js';
+import {
+  navigateStudio,
+  readStudioRoute,
+  STUDIO_CONTENT_FOCUS_EVENT,
+  studioPath,
+} from './studio-route.js';
 import { AiScreen } from './screens/AiScreen.jsx';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
@@ -27,20 +36,6 @@ const settingsSections = [
   { id: 'mcp', labelKey: 'nav.mcp', icon: 'mcp', adminOnly: true },
   { id: 'appearance', labelKey: 'nav.appearance', icon: 'appearance' },
 ];
-
-function sectionCopy(section, t) {
-  const copy = {
-    'data-model': ['section.dataModelTitle', 'section.dataModelDescription'],
-    users: ['section.usersTitle', 'section.usersDescription'],
-    roles: ['section.rolesTitle', 'section.rolesDescription'],
-    files: ['section.filesTitle', 'section.filesDescription'],
-    ai: ['section.aiTitle', 'section.aiDescription'],
-    mcp: ['section.mcpTitle', 'section.mcpDescription'],
-    appearance: ['section.appearanceTitle', 'section.appearanceDescription'],
-  };
-  const keys = copy[section];
-  return keys ? keys.map((key) => t(key)) : ['', ''];
-}
 
 function readAuthAction() {
   const params = new URLSearchParams(window.location.search);
@@ -144,14 +139,17 @@ export function App() {
     const updateRoute = () => {
       const nextRoute = readStudioRoute();
       setRoute(nextRoute);
-      if (nextRoute.section !== 'content') setContentNavFocused(false);
+      setContentNavFocused(nextRoute.section === 'content');
       setMobileNavOpen(false);
     };
+    const focusContentNavigation = () => setContentNavFocused(true);
     window.addEventListener('hashchange', updateRoute);
     window.addEventListener('popstate', updateRoute);
+    window.addEventListener(STUDIO_CONTENT_FOCUS_EVENT, focusContentNavigation);
     return () => {
       window.removeEventListener('hashchange', updateRoute);
       window.removeEventListener('popstate', updateRoute);
+      window.removeEventListener(STUDIO_CONTENT_FOCUS_EVENT, focusContentNavigation);
     };
   }, []);
 
@@ -236,11 +234,6 @@ export function App() {
   const contentTitle = activeContentCollection
     ? displaySchemaName(activeContentCollection, 'collection')
     : contentCollection;
-  const [title, description] = section === 'content'
-    ? [contentTitle || t('nav.content'), contentCollection
-      ? t('app.contentDescription')
-      : t('app.contentEmpty')]
-    : sectionCopy(section, t);
 
   const activeScreen = useMemo(() => {
     if (section === 'data-model') return <DataModelScreen route={route} onNavigate={navigateStudio} onCollectionsChanged={loadNavigationCollections} />;
@@ -458,14 +451,6 @@ export function App() {
       </aside>
 
       <main className={`main-content section-${section} route-${route.view || 'list'}`}>
-        <header className="page-header">
-          <div>
-            <p className="eyebrow">YunCMS {t('app.studio')}</p>
-            <h1>{title}</h1>
-            <p className="lede">{description}</p>
-          </div>
-        </header>
-
         {activeScreen}
       </main>
     </div>

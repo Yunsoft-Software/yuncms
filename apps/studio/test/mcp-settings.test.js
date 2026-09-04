@@ -13,6 +13,7 @@ const apiSource = await readFile(new URL('../src/api.js', import.meta.url), 'utf
 const screenSource = await readFile(new URL('../src/screens/McpScreen.jsx', import.meta.url), 'utf8');
 const routeSource = await readFile(new URL('../src/studio-route.js', import.meta.url), 'utf8');
 const mainSource = await readFile(new URL('../src/main.jsx', import.meta.url), 'utf8');
+const studioCss = await readFile(new URL('../src/studio.css', import.meta.url), 'utf8');
 
 test('MCP form uses current browser boundaries until explicit values are saved', () => {
   assert.deepEqual(mcpFormFromSettings({
@@ -74,5 +75,6 @@ test('Studio exposes administrator-only MCP settings backed by dedicated API rou
   assert.match(screenSource, /mcpSettingsPatch\(form\)/);
   assert.match(screenSource, /form\.writesEnabled/);
   assert.match(screenSource, /!form\.requireAuthentication/);
-  assert.match(mainSource, /import '\.\/mcp\.css'/);
+  assert.match(mainSource, /import '\.\/studio\.css'/);
+  assert.match(studioCss, /@import '\.\/mcp\.css';/);
 });

@@ -47,6 +47,7 @@ export const NAVIGATION_EN = Object.freeze({
   'navigation.groupSummary': '{count} collections · {behavior}',
   'navigation.structureTitle': 'Content menu structure',
   'navigation.structureSummary': '{collections} collections · {groups} folders',
+  'navigation.folders': 'Folders',
   'navigation.dragDisabledSearch': 'Sorting is disabled while searching',
   'navigation.dragReady': 'Drag to reorder or move into a folder',
   'navigation.moveToRootEnd': 'Move to the end of the root',

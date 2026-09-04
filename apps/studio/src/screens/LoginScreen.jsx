@@ -8,7 +8,7 @@ import {
   loginWithProvider,
   apiRequest,
 } from '../api.js';
-import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/StudioBrand.jsx';
+import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/index.js';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
 

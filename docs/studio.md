@@ -22,19 +22,38 @@ See [Authentication](auth.md) to configure OIDC, OAuth2, LDAP or SAML login meth
 
 # Navigation
 
-The main sidebar is task-oriented:
+Studio uses a workbench layout with a stable application rail and task-specific navigation beside the active workspace.
 
-- **Content** — project collections that are visible in the content menu;
-- **Library / Files** — uploaded assets;
-- **Settings** — Data Model, Users, Roles & Permissions, Branding & Appearance and Administrator-only MCP settings available to the current account.
+The application rail opens:
+
+- **Content** — project collections that are visible in content navigation;
+- **Files** — uploaded assets and media;
+- **Data Model** — collections, fields, relations and the schema graph;
+- **AI** — the built-in assistant when configured;
+- **Access** — roles, permissions and user administration;
+- **Settings** — appearance and integration settings available to the current account.
 
 The visible navigation is not an authorization boundary. Roles and permissions decide what a user can actually read or change.
 
-On narrow screens, Studio replaces the desktop sidebar with an **Open menu** button. Opening it exposes the same sections, account status and language controls without changing the current page.
+When a tool has its own structure, Studio keeps that context nearby. Content shows collection navigation, Files shows asset categories, Data Model shows schema resources, and Access keeps role navigation beside the permission workspace.
+
+On narrow screens the application rail becomes a compact bottom navigation and contextual controls adapt to the available width. Existing record cards, drawers and full-width editing surfaces remain available where a desktop table would be impractical.
 
 <p align="center">
   <img src="assets/screenshots/studio-mobile-menu.png" alt="YunCMS mobile navigation menu" width="360">
 </p>
+
+## Command palette and keyboard shortcuts
+
+Use **Ctrl+K** on Windows/Linux or **Command+K** on macOS to open the command palette. The palette can:
+
+- open major Studio tools;
+- find visible collections by display name or API key;
+- start the primary action for the current workspace, such as creating a record, uploading a file, creating a collection, role or user.
+
+Use the arrow keys to move through results, **Enter** to open the selected command and **Escape** to close the palette.
+
+When focus is not already inside an editable control, press **/** to focus the visible workspace search field.
 
 ## Organize collections
 
@@ -55,18 +74,32 @@ Select a collection directly from **Content** to work with its records.
 
 ![YunCMS Content workspace](assets/screenshots/studio-content.png)
 
-The generic content screen provides:
+The Content workbench opens with a bounded collection identity surface showing live record and field counts, followed immediately by the quiet data controls and table/card work area. It provides:
 
 - record table/list navigation;
-- create records;
-- edit records;
-- delete records when permitted;
+- create and full-page edit routes;
+- quick record editing in an inspector without leaving the list;
+- delete actions when permitted;
+- current-page row selection and bulk deletion;
+- configurable visible columns and table density;
+- search, sorting and a contextual filter panel;
 - form controls generated from field metadata;
+- searchable relation pickers for supported direct relations;
+- relation labels instead of raw relation IDs when target records are readable;
+- file/image previews for Files-backed fields;
+- readable boolean, status, date/time, empty and JSON values;
 - loading, empty and error states;
-- search/filter/navigation controls appropriate to the screen;
-- relation display/pickers for supported relation fields.
+- responsive record cards on narrow screens.
 
 Only operations allowed by your effective role are available. If an API permission prevents an action, the backend remains authoritative even if a client attempts the request manually.
+
+## Search, filter and view options
+
+Search uses readable text fields in the current collection. Filters can be added without keeping the full filter builder permanently open, and active filters remain visible as removable chips.
+
+The **View** control lets you choose which table columns are visible and switch between compact, comfortable and relaxed row density. Studio initially shows the first six useful table columns to keep row actions readable; any additional managed or project fields remain available from **View**. At least one table column remains visible.
+
+Column sorting is applied through the normal Items API query behavior. These presentation controls do not change collection schema or stored records.
 
 ## Create a record
 
@@ -86,7 +119,17 @@ On mobile, records become readable cards rather than forcing the desktop table i
 
 ## Edit a record
 
-Open a row/record, change permitted values and save. Role field allowlists and row filters are applied again on update; viewing a page in Studio does not bypass them.
+Select a table row or **Quick edit** to open the record inspector. The inspector uses the same record fields and save API as the full editor and is intended for fast changes while preserving the current list context.
+
+Choose **Open full editor** when you need the complete record route or want a shareable/deep-linkable editing location.
+
+Role field allowlists and row filters are applied again on update; viewing a page in Studio does not bypass them.
+
+## Bulk actions
+
+The table can select records on the current page. Bulk deletion always uses the normal permission-checked delete endpoint for each selected record and asks for confirmation through Studio's shared dialog system.
+
+If only part of a bulk operation succeeds, Studio reports the partial failure instead of presenting the whole action as successful.
 
 ## Relations in forms
 
@@ -98,19 +141,19 @@ For direct many-to-one relations, Studio chooses a readable label from the targe
 4. another visible string/text field;
 5. target key/id.
 
-The relation picker reads target data through the normal Items API, so target collection/row/field permissions are still enforced.
+Relation fields use a searchable picker rather than relying on a long native select list. The picker reads target data through the normal Items API, so target collection/row/field permissions are still enforced.
 
 For the full relation model, including reverse and M2M querying, see [Data model](data-model.md) and [Items query language](api-query-language.md).
 
 # Data Model
 
-Open **Settings → Data Model** to create and maintain project collections.
+Open **Data Model** from the application rail to create and maintain project collections.
 
 ![YunCMS Data Model navigation editor](assets/screenshots/studio-data-model.png)
 
 ## Collections
 
-From the collection tree you can:
+From the collection workspace you can:
 
 - create a collection;
 - inspect project and system collections separately;
@@ -125,7 +168,7 @@ Display names are for humans; collection API keys are the stable identifiers use
 
 ## Fields
 
-The **Fields** tab lets you inspect/add/remove fields and adjust supported schema properties such as required/nullability.
+The **Fields** tab lets you inspect/add/remove fields and adjust supported schema properties such as required/nullability. Field rows use type-specific icons so text, numeric, boolean, date/time, UUID, relation and Files-backed fields are easier to distinguish while scanning a schema.
 
 Current storage types include:
 
@@ -147,6 +190,12 @@ File and image controls use UUID-backed fields linked to the Files library.
 
 See [Data model](data-model.md) for type limits, defaults and system fields.
 
+## Schema graph
+
+The **Schema graph** provides a read-only relationship view derived from the current collections and relations. System collections are hidden by default so project structure remains readable.
+
+Selecting a graph node highlights connected collections and opens schema details. The graph does not create, delete or modify schema by drag-and-drop; schema mutations remain explicit actions in the normal collection, field and relation screens.
+
 ## Relations
 
 The **Relations** area supports relation lifecycle management including:
@@ -156,6 +205,8 @@ The **Relations** area supports relation lifecycle management including:
 - reverse one-to-many/one-to-one views derived from stored relations;
 - managed many-to-many (M2M) junctions.
 
+Before creating a direct or M2M relation, Studio shows a relation preview with the selected collections, field or junction name and resulting structure. For direct relations it also displays the chosen delete behavior.
+
 Destructive M2M removal explicitly warns that junction link records are removed and calls the guarded schema endpoint with destructive intent.
 
 # Files
@@ -164,19 +215,29 @@ Open **Files** for the media/file library.
 
 ![YunCMS Files gallery](assets/screenshots/studio-files.png)
 
-The library supports:
+The Files workbench supports:
 
 - gallery view;
 - list view;
-- authenticated image thumbnails;
-- placeholders for non-image files;
+- contextual categories for All, recent uploads, images, video, audio, PDF and other files;
+- authenticated image thumbnails and media previews;
+- placeholders for unsupported/non-image previews;
 - search by title, filename, MIME type or storage metadata;
-- drag/drop upload;
-- file-picker upload;
-- upload file name/size feedback;
+- sorting and pagination;
+- whole-workspace drag/drop staging;
+- multi-file upload queue;
+- explicit queued, uploading, completed and failed states;
+- retry for failed queue items;
+- partial-failure reporting without invented percentage progress;
+- quick asset inspection without leaving the library;
+- full file detail routes;
 - authenticated download;
 - editable title/download filename metadata;
 - delete when permitted.
+
+The **Last 7 days** category is calculated from each asset's `uploaded_at` value and is only a library view filter; it does not alter Files records.
+
+Dropping files into the library stages them for the upload screen. YunCMS does not upload a dropped file until you explicitly start the upload.
 
 Files is permission-managed. A non-Administrator role can receive exactly the read/create/update/delete access it needs, and the Public role can intentionally receive filtered read access for public galleries/assets.
 
@@ -184,7 +245,7 @@ See [Files](files.md).
 
 # Users
 
-Open **Settings → Users** to manage accounts when your role has user-management access.
+Open **Access** and then **Users** to manage accounts when your role has user-management access.
 
 Supported administration includes:
 
@@ -200,7 +261,7 @@ Protected Administrator/account invariants remain enforced by the API. Delegated
 
 # Roles & Permissions
 
-Open **Settings → Roles & Permissions** to control access.
+Open **Access** to work with roles and permissions.
 
 ![YunCMS collection permission matrix](assets/screenshots/studio-permissions.png)
 
@@ -209,8 +270,10 @@ The normal workflow is role-first:
 1. select or create a role;
 2. find the collection/resource;
 3. toggle `Read`, `Create`, `Update` or `Delete` for simple grants;
-4. open advanced rules when field, row or write validation restrictions are needed;
+4. open a permission to configure field, row or write-validation restrictions;
 5. save and test with an account assigned to that role.
+
+The permission workspace presents each collection with four stable action columns. Each action communicates whether access is disabled, unrestricted or restricted. System-protected actions remain visibly distinct and cannot be changed through an ordinary role.
 
 The permission matrix can also show explicitly delegatable system resources such as Users, Files and Roles.
 
@@ -219,10 +282,14 @@ The permission matrix can also show explicitly delegatable system resources such
 Advanced rules support:
 
 - field allowlists;
-- row-filter JSON;
-- create/update prospective-record validation JSON.
+- row filters;
+- create/update prospective-record validation.
 
-Studio validates JSON before submitting it. Validation input is relevant to create/update permissions, not ordinary read/delete grants.
+For straightforward AND rules, Studio provides a visual rule builder. Choose a field, condition and value for each rule and Studio serializes the result to the same permission JSON format used by the API.
+
+**Advanced JSON** remains available at all times. If an existing filter contains nested structures, `_or` logic or another shape that cannot be represented safely by the visual editor, Studio preserves that JSON unchanged and keeps it in Advanced JSON mode instead of attempting a lossy conversion.
+
+Validation input is relevant to create/update permissions, not ordinary read/delete grants.
 
 The Public role uses the same explicit grant model. This makes intentional public collections and filtered public Files possible without introducing a separate hard-coded public-access system.
 
@@ -244,7 +311,7 @@ See [Studio customization](studio-customization.md).
 
 ## Public registration
 
-Administrators configure default-off public signup under **Branding & Appearance → Public Registration**. A normal authenticated role must be selected before signup can be enabled; Administrator and Public roles are never eligible. Email verification can be required when SMTP is configured.
+Administrators configure default-off public signup under **Settings → Appearance → Public Registration**. A normal authenticated role must be selected before signup can be enabled; Administrator and Public roles are never eligible. Email verification can be required when SMTP is configured.
 
 See [Public registration](public-registration.md) before enabling signup.
 
@@ -252,9 +319,17 @@ See [Public registration](public-registration.md) before enabling signup.
 
 When configured by an Administrator, the Studio AI assistant can help inspect schema/content and, when explicitly allowed, perform bounded data operations through YunCMS services.
 
-The assistant does not receive an Administrator bypass simply because it is AI. Tool calls use the current user's normal role/accountability, and write access also depends on AI-specific write/access-mode controls.
+The AI workspace emphasizes the actual CMS operations returned by the assistant. Successful and failed schema/item operations are shown alongside the response so it is clear what happened.
+
+Read, write and full access modes remain explicit. The assistant does not receive an Administrator bypass simply because it is AI. Tool calls use the current user's normal role/accountability, and write access also depends on AI-specific write/access-mode controls.
 
 See [AI assistant](ai-assistant.md) before enabling data-changing tools.
+
+# Accessibility and motion
+
+Studio uses shared dialogs, inspectors, command palette and picker controls with keyboard focus management. Important actions should not depend on hover alone, and state labels remain textual even when color also reinforces them.
+
+When the operating system requests reduced motion, Studio removes workspace transitions, overlay movement and smooth scrolling while preserving the final state immediately.
 
 # Running Studio
 

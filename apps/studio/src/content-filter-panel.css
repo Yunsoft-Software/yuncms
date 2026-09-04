@@ -1,0 +1,70 @@
+.content-data-controls-main + .mobile-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  justify-self: end;
+}
+
+.content-data-controls-main + .mobile-filter-toggle small {
+  min-width: 20px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  text-align: center;
+}
+
+.content-data-controls-main + .mobile-filter-toggle[aria-expanded="true"] {
+  border-color: var(--ui-border-accent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+}
+
+.data-controls-panel {
+  position: relative;
+}
+
+.data-controls-panel > .filter-builder {
+  display: none;
+}
+
+.data-controls-panel > .filter-builder.mobile-open {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% - 4px);
+  right: 0;
+  width: min(760px, calc(100vw - 56px));
+  display: grid;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-overlay);
+  background: var(--ui-surface);
+  box-shadow: 0 18px 42px color-mix(in srgb, var(--ui-overlay) 14%, transparent);
+}
+
+.data-controls-panel > .filter-builder.mobile-open .filter-add-button {
+  align-self: end;
+}
+
+@media (max-width: 760px) {
+  .content-data-controls-main + .mobile-filter-toggle {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .data-controls-panel > .filter-builder.mobile-open {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px 0 0;
+    border: 0;
+    border-top: 1px solid var(--ui-border);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}

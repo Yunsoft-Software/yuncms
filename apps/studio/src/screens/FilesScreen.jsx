@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiBlob, apiRequest } from '../api.js';
-import { useConfirmDialog } from '../components/DialogProvider.jsx';
-import { FilePreview } from '../components/FilePreview.jsx';
-import { Pagination, paginateClientItems } from '../components/Pagination.jsx';
+import {
+  FileCategoryRail,
+  FilePreview,
+  Inspector,
+  Pagination,
+  UploadQueue,
+  paginateClientItems,
+  useConfirmDialog,
+} from '../components/index.js';
 import { useI18n } from '../i18n.js';
 import { studioPath } from '../studio-route.js';
 
 const FILE_TYPE_OPTIONS = [
   ['all', 'files.allTypes'],
+  ['recent', 'files.recent'],
   ['image', 'files.images'],
   ['video', 'files.video'],
   ['audio', 'files.audio'],
@@ -26,6 +33,7 @@ const FILE_SORT_OPTIONS = [
 ];
 
 const FILE_PAGE_SIZES = [12, 24, 48, 96];
+const RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 function formatBytes(value) {
   const bytes = Number(value || 0);
@@ -61,6 +69,13 @@ function fileCategory(file) {
   return 'other';
 }
 
+function isRecentFile(file, now = Date.now()) {
+  if (!file?.uploaded_at) return false;
+  const uploadedAt = new Date(file.uploaded_at).getTime();
+  if (!Number.isFinite(uploadedAt)) return false;
+  return uploadedAt <= now && uploadedAt >= now - RECENT_WINDOW_MS;
+}
+
 function fileDisplayName(file, t) {
   return file.title || file.filename_download || t('files.untitled');
 }
@@ -79,11 +94,23 @@ function compareFiles(left, right, sort, t) {
   return sort === 'name-desc' ? -result : result;
 }
 
+function makeQueueItems(fileList) {
+  const stamp = Date.now();
+  return Array.from(fileList || []).map((file, index) => ({
+    id: `${stamp}-${index}-${file.name}-${file.size}`,
+    file,
+    status: 'queued',
+    error: '',
+    sizeLabel: formatBytes(file.size),
+  }));
+}
+
 export function FilesScreen({ route = {}, onNavigate }) {
   const { locale, t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const [files, setFiles] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadQueue, setUploadQueue] = useState([]);
+  const [inspectedFile, setInspectedFile] = useState(null);
   const [view, setView] = useState('grid');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -104,7 +131,12 @@ export function FilesScreen({ route = {}, onNavigate }) {
     setError('');
     try {
       const response = await apiRequest('/files');
-      setFiles(response?.data ?? []);
+      const nextFiles = response?.data ?? [];
+      setFiles(nextFiles);
+      setInspectedFile((current) => {
+        if (!current) return null;
+        return nextFiles.find((file) => String(file.id) === String(current.id)) ?? null;
+      });
     } catch (requestError) {
       setError(requestError.message || t('files.loadError'));
     } finally {
@@ -116,10 +148,31 @@ export function FilesScreen({ route = {}, onNavigate }) {
     load();
   }, []);
 
+  const categoryCounts = useMemo(() => {
+    const counts = { all: files.length, recent: 0, image: 0, video: 0, audio: 0, pdf: 0, other: 0 };
+    const now = Date.now();
+    files.forEach((file) => {
+      counts[fileCategory(file)] += 1;
+      if (isRecentFile(file, now)) counts.recent += 1;
+    });
+    return counts;
+  }, [files]);
+
+  const categoryItems = useMemo(() => FILE_TYPE_OPTIONS.map(([value, key]) => ({
+    value,
+    label: t(key),
+    count: categoryCounts[value] || 0,
+  })), [categoryCounts, t]);
+
   const visibleFiles = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const now = Date.now();
     return files
-      .filter((file) => typeFilter === 'all' || fileCategory(file) === typeFilter)
+      .filter((file) => {
+        if (typeFilter === 'all') return true;
+        if (typeFilter === 'recent') return isRecentFile(file, now);
+        return fileCategory(file) === typeFilter;
+      })
       .filter((file) => !query || [file.title, file.filename_download, file.mimetype, file.storage]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query)))
@@ -131,46 +184,92 @@ export function FilesScreen({ route = {}, onNavigate }) {
   const pageFiles = paged.items;
   const routedFile = files.find((file) => String(file.id) === String(route.fileId)) ?? null;
   const hasActiveFilters = Boolean(search.trim() || typeFilter !== 'all' || sort !== 'newest');
+  const pendingUploads = uploadQueue.filter((item) => item.status === 'queued' || item.status === 'failed');
+  const hasFailedUploads = uploadQueue.some((item) => item.status === 'failed');
 
   useEffect(() => {
     setPage(1);
   }, [search, sort, typeFilter]);
 
+  function stageFiles(fileList) {
+    const next = makeQueueItems(fileList);
+    if (next.length === 0) return;
+    setUploadQueue((current) => [...current, ...next]);
+    setError('');
+    setNotice('');
+  }
+
+  function updateQueueItem(id, patch) {
+    setUploadQueue((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+  function removeQueueItem(id) {
+    if (uploading) return;
+    setUploadQueue((current) => current.filter((item) => item.id !== id));
+  }
+
   async function upload(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    if (!selectedFile) return;
+    const targets = uploadQueue.filter((item) => item.status === 'queued' || item.status === 'failed');
+    if (targets.length === 0) return;
     setUploading(true);
     setError('');
     setNotice('');
-    try {
-      await apiRequest('/files', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/octet-stream',
-          'x-filename': encodeURIComponent(selectedFile.name),
-          'x-mimetype': selectedFile.type || 'application/octet-stream',
-        },
-        body: selectedFile,
-      });
-      setSelectedFile(null);
-      form.reset();
+    let completed = 0;
+    let failed = 0;
+
+    for (const item of targets) {
+      updateQueueItem(item.id, { status: 'uploading', error: '' });
+      try {
+        await apiRequest('/files', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/octet-stream',
+            'x-filename': encodeURIComponent(item.file.name),
+            'x-mimetype': item.file.type || 'application/octet-stream',
+          },
+          body: item.file,
+        });
+        completed += 1;
+        updateQueueItem(item.id, { status: 'done', error: '' });
+      } catch (requestError) {
+        failed += 1;
+        updateQueueItem(item.id, {
+          status: 'failed',
+          error: requestError.message || t('files.uploadError'),
+        });
+      }
+    }
+
+    setUploading(false);
+    if (completed > 0) {
       setPage(1);
-      setNotice(t('files.uploadedNotice'));
       await load();
+    }
+    if (failed === 0) {
+      setNotice(t('files.uploadedCount', { count: completed }));
+      setUploadQueue([]);
+      form.reset();
       onNavigate?.(studioPath.files());
-    } catch (requestError) {
-      setError(requestError.message || t('files.uploadError'));
-    } finally {
-      setUploading(false);
+    } else {
+      setError(t('files.uploadPartial', { failed, count: targets.length }));
     }
   }
 
   function handleDrop(event) {
     event.preventDefault();
     setDropActive(false);
-    const file = event.dataTransfer.files?.[0];
-    if (file) setSelectedFile(file);
+    stageFiles(event.dataTransfer.files);
+  }
+
+  function handleLibraryDrop(event) {
+    event.preventDefault();
+    setDropActive(false);
+    const dropped = event.dataTransfer.files;
+    if (!dropped?.length) return;
+    stageFiles(dropped);
+    onNavigate?.(studioPath.newFile());
   }
 
   async function download(file) {
@@ -234,6 +333,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
     try {
       await apiRequest(`/files/${encodeURIComponent(file.id)}`, { method: 'DELETE' });
       if (editingFile?.id === file.id) setEditingFile(null);
+      if (inspectedFile?.id === file.id) setInspectedFile(null);
       setNotice(t('files.deletedNotice'));
       await load();
       if (route.view === 'detail') onNavigate?.(studioPath.files());
@@ -256,13 +356,27 @@ export function FilesScreen({ route = {}, onNavigate }) {
       <div className="screen-stack routed-form-page">
         <nav className="page-breadcrumbs" aria-label={t('nav.files')}><button type="button" onClick={() => onNavigate?.(studioPath.files())}>{t('nav.files')}</button><span aria-hidden="true">/</span><strong>{t('files.addFile')}</strong></nav>
         {error && <div className="error-banner" role="alert">{error}</div>}
+        {notice && <div className="notice-banner" role="status">{notice}</div>}
         <form className="panel file-upload-panel file-upload-page" onSubmit={upload}>
-          <div className="workspace-section-heading"><div><p className="eyebrow">{t('files.upload')}</p><h2>{t('files.addFile')}</h2><p>{t('files.dropDescription')}</p></div><button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.files())}>{t('common.cancel')}</button></div>
+          <div className="workspace-section-heading"><div><p className="eyebrow">{t('files.upload')}</p><h2>{t('files.addFile')}</h2><p>{t('files.dropDescription')}</p></div><button className="secondary-button" type="button" disabled={uploading} onClick={() => onNavigate?.(studioPath.files())}>{t('common.cancel')}</button></div>
           <div className={`file-dropzone ${dropActive ? 'active' : ''}`} onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDropActive(false)} onDrop={handleDrop}>
-            <input id="file-upload-page-input" type="file" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} />
-            <label htmlFor="file-upload-page-input" className="file-picker-label"><strong>{selectedFile ? selectedFile.name : t('files.chooseFile')}</strong><span>{selectedFile ? formatBytes(selectedFile.size) : t('files.dragDrop')}</span></label>
-            <button className="primary-button" type="submit" disabled={!selectedFile || uploading}>{uploading ? t('files.uploading') : t('files.upload')}</button>
+            <input id="file-upload-page-input" type="file" multiple onChange={(event) => { stageFiles(event.target.files); event.target.value = ''; }} />
+            <label htmlFor="file-upload-page-input" className="file-picker-label"><strong>{uploadQueue.length > 0 ? t('files.selectedFiles', { count: uploadQueue.length }) : t('files.chooseFile')}</strong><span>{t('files.dragDrop')}</span></label>
+            <button className="primary-button" type="submit" disabled={pendingUploads.length === 0 || uploading}>{uploading ? t('files.uploading') : hasFailedUploads ? t('files.retryFailed') : t('files.uploadSelected')}</button>
           </div>
+          <UploadQueue
+            items={uploadQueue}
+            onRemove={removeQueueItem}
+            labels={{
+              title: t('files.uploadQueue'),
+              queued: t('files.queueQueued'),
+              uploading: t('files.queueUploading'),
+              done: t('files.queueDone'),
+              failed: t('files.queueFailed'),
+              remove: t('files.queueRemove'),
+              untitled: t('files.untitled'),
+            }}
+          />
         </form>
       </div>
     );
@@ -289,7 +403,32 @@ export function FilesScreen({ route = {}, onNavigate }) {
   }
 
   return (
-    <div className="screen-stack">
+    <div
+      className={`screen-stack file-library-workspace ${dropActive ? 'drop-active' : ''}`}
+      onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }}
+      onDragOver={(event) => { event.preventDefault(); setDropActive(true); }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setDropActive(false);
+      }}
+      onDrop={handleLibraryDrop}
+    >
+      {dropActive && (
+        <div className="file-library-drop-overlay" aria-hidden="true">
+          <strong>{t('files.uploadFile')}</strong>
+          <span>{t('files.dragDrop')}</span>
+        </div>
+      )}
+
+      <FileCategoryRail
+        items={categoryItems}
+        value={typeFilter}
+        label={t('files.categories')}
+        onChange={(value) => {
+          setTypeFilter(value);
+          setPage(1);
+        }}
+      />
+
       <section className="panel library-toolbar workspace-toolbar library-header-panel">
         <div className="workspace-toolbar-heading">
           <div>
@@ -317,7 +456,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
               aria-label={t('files.searchFiles')}
             />
           </label>
-          <label className="field-label">
+          <label className="field-label file-type-fallback">
             <span>{t('files.fileType')}</span>
             <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
               {FILE_TYPE_OPTIONS.map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}
@@ -359,26 +498,15 @@ export function FilesScreen({ route = {}, onNavigate }) {
             {pageFiles.map((file) => (
               <article className="file-card" key={file.id}>
                 <div className="file-preview">
-                  <button
-                    className="file-preview-open-button"
-                    type="button"
-                    onClick={() => onNavigate?.(studioPath.file(file.id))}
-                    aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}
-                  >
+                  <button className="file-preview-open-button" type="button" onClick={() => setInspectedFile(file)} aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}>
                     <FilePreview file={file} label={fileTypeLabel(file, t)} alt={fileDisplayName(file, t)} />
                   </button>
                 </div>
                 <div className="file-card-body">
-                  <div className="file-card-title">
-                    <strong title={fileDisplayName(file, t)}>{fileDisplayName(file, t)}</strong>
-                    <small title={file.filename_download}>{file.filename_download}</small>
-                  </div>
-                  <div className="file-meta-row">
-                    <span>{fileTypeLabel(file, t)}</span>
-                    <span>{formatBytes(file.filesize)}</span>
-                  </div>
+                  <div className="file-card-title"><strong title={fileDisplayName(file, t)}>{fileDisplayName(file, t)}</strong><small title={file.filename_download}>{file.filename_download}</small></div>
+                  <div className="file-meta-row"><span>{fileTypeLabel(file, t)}</span><span>{formatBytes(file.filesize)}</span></div>
                   <div className="file-card-actions">
-                    <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.file(file.id))}>{t('files.preview')}</button>
+                    <button className="text-button" type="button" onClick={() => setInspectedFile(file)}>{t('files.preview')}</button>
                     <button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button>
                     <button className="text-button" type="button" onClick={() => { beginEdit(file); onNavigate?.(studioPath.file(file.id)); }}>{t('common.edit')}</button>
                     <button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button>
@@ -387,15 +515,7 @@ export function FilesScreen({ route = {}, onNavigate }) {
               </article>
             ))}
           </div>
-          <Pagination
-            page={paged.page}
-            pageSize={pageSize}
-            totalItems={visibleFiles.length}
-            pageSizeOptions={FILE_PAGE_SIZES}
-            itemLabel={t('files.files')}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-          />
+          <Pagination page={paged.page} pageSize={pageSize} totalItems={visibleFiles.length} pageSizeOptions={FILE_PAGE_SIZES} itemLabel={t('files.files')} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
         </section>
       ) : (
         <section className="table-panel">
@@ -405,41 +525,33 @@ export function FilesScreen({ route = {}, onNavigate }) {
               <tbody>
                 {pageFiles.map((file) => (
                   <tr key={file.id}>
-                    <td>
-                      <div className="file-list-name">
-                        <button className="file-list-thumb file-preview-open-button" type="button" onClick={() => onNavigate?.(studioPath.file(file.id))} aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}>
-                          <FilePreview file={file} label={fileTypeLabel(file, t)} />
-                        </button>
-                        <span><strong>{fileDisplayName(file, t)}</strong><small>{file.filename_download}</small></span>
-                      </div>
-                    </td>
+                    <td><div className="file-list-name"><button className="file-list-thumb file-preview-open-button" type="button" onClick={() => setInspectedFile(file)} aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}><FilePreview file={file} label={fileTypeLabel(file, t)} /></button><span><strong>{fileDisplayName(file, t)}</strong><small>{file.filename_download}</small></span></div></td>
                     <td>{file.mimetype || fileTypeLabel(file, t)}</td>
                     <td>{formatBytes(file.filesize)}</td>
                     <td>{file.storage}</td>
                     <td>{file.uploaded_at ? new Date(file.uploaded_at).toLocaleString(dateLocale) : '—'}</td>
-                    <td className="row-actions">
-                      <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.file(file.id))}>{t('files.preview')}</button>
-                      <button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button>
-                      <button className="text-button" type="button" onClick={() => { beginEdit(file); onNavigate?.(studioPath.file(file.id)); }}>{t('common.edit')}</button>
-                      <button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button>
-                    </td>
+                    <td className="row-actions"><button className="text-button" type="button" onClick={() => setInspectedFile(file)}>{t('files.preview')}</button><button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button><button className="text-button" type="button" onClick={() => { beginEdit(file); onNavigate?.(studioPath.file(file.id)); }}>{t('common.edit')}</button><button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <Pagination
-            page={paged.page}
-            pageSize={pageSize}
-            totalItems={visibleFiles.length}
-            pageSizeOptions={FILE_PAGE_SIZES}
-            itemLabel={t('files.files')}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-          />
+          <Pagination page={paged.page} pageSize={pageSize} totalItems={visibleFiles.length} pageSizeOptions={FILE_PAGE_SIZES} itemLabel={t('files.files')} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
         </section>
       )}
 
+      <Inspector
+        open={Boolean(inspectedFile)}
+        title={inspectedFile ? fileDisplayName(inspectedFile, t) : t('files.fileDetails')}
+        description={inspectedFile?.filename_download || ''}
+        closeLabel={t('studio.inspectorClose')}
+        onClose={() => setInspectedFile(null)}
+        actions={inspectedFile && (<><button className="secondary-button" type="button" onClick={() => download(inspectedFile)}>{t('files.download')}</button><button className="primary-button" type="button" onClick={() => { const fileId = inspectedFile.id; setInspectedFile(null); onNavigate?.(studioPath.file(fileId)); }}>{t('files.fileDetails')}</button></>)}
+      >
+        {inspectedFile && <div className="file-inspector-content"><div className="file-inspector-preview"><FilePreview file={inspectedFile} label={fileTypeLabel(inspectedFile, t)} alt={fileDisplayName(inspectedFile, t)} /></div><dl className="file-inspector-meta"><div><dt>{t('common.type')}</dt><dd>{inspectedFile.mimetype || fileTypeLabel(inspectedFile, t)}</dd></div><div><dt>{t('files.size')}</dt><dd>{formatBytes(inspectedFile.filesize)}</dd></div><div><dt>{t('files.storage')}</dt><dd>{inspectedFile.storage || '—'}</dd></div><div><dt>{t('files.uploaded')}</dt><dd>{inspectedFile.uploaded_at ? new Date(inspectedFile.uploaded_at).toLocaleString(dateLocale) : '—'}</dd></div></dl></div>}
+      </Inspector>
     </div>
   );
 }
+
+export { isRecentFile, makeQueueItems };

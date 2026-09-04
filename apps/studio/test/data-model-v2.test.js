@@ -9,6 +9,7 @@ const entrySource = readFileSync(resolve(SRC, 'screens/DataModelScreen.jsx'), 'u
 const css = readFileSync(resolve(SRC, 'data-model-v2.css'), 'utf8');
 const interactionCss = readFileSync(resolve(SRC, 'data-model-v2-interactions.css'), 'utf8');
 const mainSource = readFileSync(resolve(SRC, 'main.jsx'), 'utf8');
+const studioCss = readFileSync(resolve(SRC, 'studio.css'), 'utf8');
 
 test('Data Model entry routes the compact home and collection workspace independently', () => {
   assert.match(entrySource, /view === 'collections'/);
@@ -44,7 +45,8 @@ test('collection ordering supports drag and drop and persists normalized sort sl
   assert.match(screenSource, /onDrop/);
   assert.match(screenSource, /persistProjectOrder/);
   assert.match(screenSource, /sort:\s*\(index \+ 1\) \* 10/);
-  assert.match(mainSource, /data-model-v2-interactions\.css/);
+  assert.match(mainSource, /import '\.\/studio\.css';/);
+  assert.match(studioCss, /@import '\.\/data-model-v2-interactions\.css';/);
   assert.match(interactionCss, /\.collection-drag-handle/);
   assert.match(interactionCss, /cursor:\s*grab/);
 });

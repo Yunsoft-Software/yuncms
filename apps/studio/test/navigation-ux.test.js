@@ -6,6 +6,8 @@ const appSource = await readFile(new URL('../src/App.jsx', import.meta.url), 'ut
 const dataModelSource = await readFile(new URL('../src/screens/DataModelHomeScreen.jsx', import.meta.url), 'utf8');
 const wrapperSource = await readFile(new URL('../src/screens/DataModelScreen.jsx', import.meta.url), 'utf8');
 const contentRouteSource = await readFile(new URL('../src/screens/ContentRouteScreen.jsx', import.meta.url), 'utf8');
+const railSource = await readFile(new URL('../src/components/AppRail.jsx', import.meta.url), 'utf8');
+const routeSource = await readFile(new URL('../src/studio-route.js', import.meta.url), 'utf8');
 const iconSource = await readFile(new URL('../src/components/SidebarIcon.jsx', import.meta.url), 'utf8');
 const cssSource = await readFile(new URL('../src/navigation-model.css', import.meta.url), 'utf8');
 
@@ -52,6 +54,13 @@ test('Content mode renders the same interleaved order and persisted folder colla
   assert.match(appSource, /setContentNavFocused\(true\)/);
   assert.match(cssSource, /\.content-focus-nav/);
   assert.match(cssSource, /\.content-focus-group-trigger/);
+});
+
+test('entering Content always restores the focused collection navigation', () => {
+  assert.match(appSource, /setContentNavFocused\(nextRoute\.section === 'content'\)/);
+  assert.match(appSource, /addEventListener\(STUDIO_CONTENT_FOCUS_EVENT, focusContentNavigation\)/);
+  assert.match(railSource, /item\.id === 'content'\) focusStudioContentNavigation\(\)/);
+  assert.match(routeSource, /window\.dispatchEvent\(new Event\(STUDIO_CONTENT_FOCUS_EVENT\)\)/);
 });
 
 test('singleton Content routes skip list view and resolve directly to record or create form', () => {

@@ -1,0 +1,52 @@
+/* Functional motion contract for Studio workspaces.
+ * Motion should explain selection, opening, closing or completion and remain optional.
+ */
+
+:root {
+  --ui-motion-fast: var(--motion-fast);
+  --ui-motion-base: var(--motion-ui);
+  --ui-motion-slow: var(--motion-panel);
+}
+
+.studio-inspector,
+.command-palette-dialog,
+.relation-picker-menu,
+.data-view-options-popover,
+.data-controls-panel > .filter-builder.mobile-open,
+.file-category-list button,
+.permission-action-row,
+.rule-builder-row,
+.schema-graph-node,
+.schema-graph-edge,
+.upload-queue-item {
+  transition-duration: var(--motion-ui);
+  transition-timing-function: var(--ease-ui);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+  }
+
+  .studio-inspector,
+  .command-palette-dialog,
+  .relation-picker-menu,
+  .data-view-options-popover,
+  .data-controls-panel > .filter-builder.mobile-open,
+  .file-library-drop-overlay,
+  .schema-graph-node,
+  .schema-graph-edge,
+  .relation-diagram-edge,
+  .upload-queue-item {
+    transform: none !important;
+  }
+}

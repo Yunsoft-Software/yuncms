@@ -2,10 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { collectionMetadataPatch, collectionUi } from '../collection-ui.js';
-import { CollectionIcon } from '../components/CollectionIcon.jsx';
-import { CollectionIconPicker } from '../components/CollectionIconPicker.jsx';
-import { useConfirmDialog } from '../components/DialogProvider.jsx';
-import { FieldBuilder } from '../components/FieldBuilder.jsx';
+import {
+  CollectionIcon,
+  CollectionIconPicker,
+  FieldBuilder,
+  FieldTypeIcon,
+  RelationDiagram,
+  SchemaGraph,
+  useConfirmDialog,
+} from '../components/index.js';
 import {
   createEmptyFieldForm,
   fieldCreationPayload,
@@ -100,6 +105,7 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
   const selectedField = fields.find((entry) => entry.field === route.field) ?? null;
   const view = route.view || 'collections';
   const showCreateCollection = view === 'new-collection';
+  const showGraph = view === 'graph';
   const nextCollectionSort = projectCollections.length
     ? Math.max(...projectCollections.map((entry) => collectionUi(entry).sort)) + 10
     : 10;
@@ -162,7 +168,6 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
   async function loadSelected(collection = selected) {
     if (!collection) {
       setFields([]);
-      setRelations([]);
       return;
     }
     try {
@@ -184,6 +189,15 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
     if (next !== selected) setSelected(next);
     if (view === 'new-relation' && route.relationKind) setRelationMode(route.relationKind);
   }, [route.collection, route.relationKind, view]);
+
+  useEffect(() => {
+    if (!showGraph) return undefined;
+    let cancelled = false;
+    apiRequest('/schema/relations')
+      .then((response) => { if (!cancelled) setRelations(response?.data ?? []); })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message || t('dataModel.collectionLoadError')); });
+    return () => { cancelled = true; };
+  }, [showGraph, t]);
 
   useEffect(() => {
     if (!selectedCollection) return;
@@ -474,6 +488,36 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
   }
 
   const selectedIndex = projectCollections.findIndex((entry) => entry.collection === selected);
+  const schemaGraphLabels = {
+    title: t('studio.schemaGraph'),
+    description: t('studio.schemaGraphDescription'),
+    showSystem: t('studio.schemaGraphShowSystem'),
+    empty: t('studio.schemaGraphEmpty'),
+    system: t('studio.schemaGraphSystem'),
+    project: t('studio.schemaGraphProject'),
+    hidden: t('studio.schemaGraphHidden'),
+    visible: t('studio.schemaGraphVisible'),
+    relations: t('studio.schemaGraphRelations'),
+    visibility: t('studio.schemaGraphVisibility'),
+    kind: t('studio.schemaGraphKind'),
+    openCollection: t('studio.schemaGraphOpenCollection'),
+    inspectorTitle: t('studio.schemaGraphInspectorTitle'),
+    inspectorHint: t('studio.schemaGraphInspectorHint'),
+    noDescription: t('dataModel.noDescription'),
+  };
+  const relationPreviewLabels = {
+    preview: t('dataModel.relationPreview'),
+    result: t('dataModel.relationResult'),
+    many: t('dataModel.relationMany'),
+    one: t('dataModel.relationOne'),
+    collection: t('dataModel.relationCollectionRole'),
+    related: t('dataModel.relationRelated'),
+    junctionPending: t('dataModel.relationJunctionPending'),
+    fieldPending: t('dataModel.relationFieldPending'),
+    chooseCollection: t('dataModel.chooseCollection'),
+    chooseField: t('dataModel.chooseField'),
+    onDelete: t('dataModel.ifTargetDeleted'),
+  };
 
   return (
     <div className="data-model-v2 routed-resource-page">
@@ -484,10 +528,13 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
         <aside className="panel data-model-collections-panel">
           <div className="data-model-collections-heading">
             <div><p className="eyebrow">{t('nav.dataModel')}</p><h2>{t('dataModel.collections')}</h2></div>
-            <button className="primary-button" type="button" onClick={() => {
-              setCollectionForm(emptyCollectionForm(nextCollectionSort));
-              onNavigate?.(studioPath.newCollection());
-            }}>{t('common.create')}</button>
+            <div className="data-model-heading-actions">
+              <button className="secondary-button" type="button" aria-current={showGraph ? 'page' : undefined} onClick={() => onNavigate?.(studioPath.schemaGraph())}>{t('studio.schemaGraph')}</button>
+              <button className="primary-button" type="button" onClick={() => {
+                setCollectionForm(emptyCollectionForm(nextCollectionSort));
+                onNavigate?.(studioPath.newCollection());
+              }}>{t('common.create')}</button>
+            </div>
           </div>
 
           <label className="field-label data-model-collection-search">
@@ -542,7 +589,14 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
         </aside>
 
         <main className="data-model-workspace">
-          {showCreateCollection ? (
+          {showGraph ? (
+            <SchemaGraph
+              collections={collections}
+              relations={relations}
+              labels={schemaGraphLabels}
+              onOpenCollection={(collection) => onNavigate?.(studioPath.collection(collection))}
+            />
+          ) : showCreateCollection ? (
             <section className="panel data-model-create-workspace">
               <div className="workspace-section-heading">
                 <div><p className="eyebrow">{t('dataModel.newCollection')}</p><h2>{t('dataModel.createCollection')}</h2><p>{t('dataModel.createCollectionHint')}</p></div>
@@ -639,7 +693,7 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
                       const metadata = fieldMetadata(field);
                       return (
                         <div className="field-workspace-row" key={field.field}>
-                          <span className="field-icon">{String(displayType || '?').slice(0, 1).toUpperCase()}</span>
+                          <span className="field-icon"><FieldTypeIcon type={displayType} size={16} /></span>
                           <div className="field-workspace-copy">
                             <strong>{displaySchemaName(field, 'field')}</strong>
                             <small><code>{field.field}</code> · {t(`fieldType.${displayType}`)}{metadata.defaultPreset === 'now' ? ` · ${t('fieldBuilder.currentTime')}` : ''}</small>
@@ -728,19 +782,38 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
                       </div>}
 
                       {view === 'new-relation' && (relationMode === 'm2m' ? (
-                        <form className="relation-v2-form" onSubmit={createM2M}>
-                          <label className="field-label"><span>{t('dataModel.junctionName')}</span><input value={m2mForm.junctionCollection} onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: schemaKeyFromName(event.target.value, 'collection') }))} placeholder="article_tags" required /></label>
-                          <label className="field-label"><span>{t('dataModel.firstCollection')}</span><select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
-                          <label className="field-label"><span>{t('dataModel.secondCollection')}</span><select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
-                          <button className="primary-button" type="submit">{t('dataModel.createJunction')}</button>
-                        </form>
+                        <div className="relation-v2-form-with-preview">
+                          <form className="relation-v2-form" onSubmit={createM2M}>
+                            <label className="field-label"><span>{t('dataModel.junctionName')}</span><input value={m2mForm.junctionCollection} onChange={(event) => setM2mForm((current) => ({ ...current, junctionCollection: schemaKeyFromName(event.target.value, 'collection') }))} placeholder="article_tags" required /></label>
+                            <label className="field-label"><span>{t('dataModel.firstCollection')}</span><select value={m2mForm.leftCollection} onChange={(event) => setM2mForm((current) => ({ ...current, leftCollection: event.target.value }))} required>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
+                            <label className="field-label"><span>{t('dataModel.secondCollection')}</span><select value={m2mForm.rightCollection} onChange={(event) => setM2mForm((current) => ({ ...current, rightCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
+                            <button className="primary-button" type="submit">{t('dataModel.createJunction')}</button>
+                          </form>
+                          <RelationDiagram
+                            kind="m2m"
+                            leftCollection={m2mForm.leftCollection}
+                            rightCollection={m2mForm.rightCollection}
+                            junctionCollection={m2mForm.junctionCollection}
+                            labels={relationPreviewLabels}
+                          />
+                        </div>
                       ) : (
-                        <form className="relation-v2-form" onSubmit={createDirectRelation}>
-                          <label className="field-label"><span>{t('dataModel.fieldIn', { collection: displaySchemaName(selectedCollection, 'collection') })}</span><select value={directForm.manyField} onChange={(event) => setDirectForm((current) => ({ ...current, manyField: event.target.value }))} required><option value="">{t('dataModel.chooseField')}</option>{relationFields.map((field) => <option key={field.field} value={field.field}>{displaySchemaName(field, 'field')} ({field.field})</option>)}</select></label>
-                          <label className="field-label"><span>{t('dataModel.targetCollection')}</span><select value={directForm.oneCollection} onChange={(event) => setDirectForm((current) => ({ ...current, oneCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
-                          <label className="field-label"><span>{t('dataModel.ifTargetDeleted')}</span><select value={directForm.onDelete} onChange={(event) => setDirectForm((current) => ({ ...current, onDelete: event.target.value }))}><option value="RESTRICT">{t('dataModel.preventDeletion')}</option><option value="CASCADE">{t('dataModel.deleteLinked')}</option><option value="SET NULL">{t('dataModel.clearField')}</option></select></label>
-                          <button className="primary-button" type="submit" disabled={relationFields.length === 0}>{t(relationMode === 'o2o' ? 'dataModel.createO2O' : 'dataModel.createRelation')}</button>
-                        </form>
+                        <div className="relation-v2-form-with-preview">
+                          <form className="relation-v2-form" onSubmit={createDirectRelation}>
+                            <label className="field-label"><span>{t('dataModel.fieldIn', { collection: displaySchemaName(selectedCollection, 'collection') })}</span><select value={directForm.manyField} onChange={(event) => setDirectForm((current) => ({ ...current, manyField: event.target.value }))} required><option value="">{t('dataModel.chooseField')}</option>{relationFields.map((field) => <option key={field.field} value={field.field}>{displaySchemaName(field, 'field')} ({field.field})</option>)}</select></label>
+                            <label className="field-label"><span>{t('dataModel.targetCollection')}</span><select value={directForm.oneCollection} onChange={(event) => setDirectForm((current) => ({ ...current, oneCollection: event.target.value }))} required><option value="">{t('dataModel.chooseCollection')}</option>{projectCollections.map((entry) => <option key={entry.collection} value={entry.collection}>{displaySchemaName(entry, 'collection')} ({entry.collection})</option>)}</select></label>
+                            <label className="field-label"><span>{t('dataModel.ifTargetDeleted')}</span><select value={directForm.onDelete} onChange={(event) => setDirectForm((current) => ({ ...current, onDelete: event.target.value }))}><option value="RESTRICT">{t('dataModel.preventDeletion')}</option><option value="CASCADE">{t('dataModel.deleteLinked')}</option><option value="SET NULL">{t('dataModel.clearField')}</option></select></label>
+                            <button className="primary-button" type="submit" disabled={relationFields.length === 0}>{t(relationMode === 'o2o' ? 'dataModel.createO2O' : 'dataModel.createRelation')}</button>
+                          </form>
+                          <RelationDiagram
+                            kind={relationMode}
+                            leftCollection={selected}
+                            leftField={directForm.manyField}
+                            rightCollection={directForm.oneCollection}
+                            onDelete={directForm.onDelete}
+                            labels={relationPreviewLabels}
+                          />
+                        </div>
                       ))}
                     </>
                   )}

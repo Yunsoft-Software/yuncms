@@ -1,0 +1,125 @@
+.rule-builder {
+  display: grid;
+  gap: 10px;
+}
+
+.rule-builder-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rule-builder-heading strong {
+  font-size: 13px;
+}
+
+.rule-builder-heading p {
+  margin: 3px 0 0;
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.rule-builder-visual {
+  display: grid;
+  gap: 7px;
+}
+
+.rule-builder-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(118px, .8fr) minmax(120px, 1fr) 30px;
+  align-items: center;
+  gap: 6px;
+}
+
+.rule-builder-row select,
+.rule-builder-row input {
+  min-width: 0;
+}
+
+.rule-builder-no-value {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border-soft);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+}
+
+.rule-builder-remove {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 17px;
+}
+
+.rule-builder-empty {
+  margin: 0;
+  padding: 13px;
+  border: 1px dashed var(--ui-border);
+  border-radius: 8px;
+  color: var(--ui-text-tertiary);
+  font-size: 11px;
+  text-align: center;
+}
+
+.rule-builder-add {
+  justify-self: start;
+}
+
+.rule-builder-raw textarea {
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  tab-size: 2;
+}
+
+.rule-builder-raw-notice {
+  margin: 0;
+}
+
+.permission-rule-builder-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.permission-rule-builder-card {
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-surface);
+}
+
+@media (max-width: 920px) {
+  .rule-builder-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px;
+  }
+
+  .rule-builder-row > :nth-child(3) {
+    grid-column: 1 / 3;
+  }
+}
+
+@media (max-width: 620px) {
+  .rule-builder-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rule-builder-row {
+    grid-template-columns: minmax(0, 1fr) 30px;
+  }
+
+  .rule-builder-row > :nth-child(1),
+  .rule-builder-row > :nth-child(2),
+  .rule-builder-row > :nth-child(3) {
+    grid-column: 1;
+  }
+
+  .rule-builder-remove {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}

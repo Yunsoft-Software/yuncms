@@ -75,6 +75,10 @@ export function contentTableFields(fields = [], limit = 8) {
   return [...primary, ...content, ...managed].slice(0, limit);
 }
 
+export function defaultContentColumnKeys(fields = [], limit = 6) {
+  return fields.slice(0, limit).map((field) => field.field);
+}
+
 export function fieldDisplayType(field) {
   if (field?.interface === 'image') return 'image';
   if (field?.interface === 'file') return 'file';

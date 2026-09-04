@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiChat, aiSettings, aiStatus } from '../api.js';
 import { AI_ACCESS_MODES, aiAccessFlags } from '../ai-access.js';
 import { trimConversationHistory } from '../ai-history.js';
-import { AiSettingsPanel } from '../components/AiSettingsPanel.jsx';
+import { AiSettingsPanel } from '../components/index.js';
 import { useI18n } from '../i18n.js';
 
 const STARTER_KEYS = Object.freeze([
@@ -203,7 +203,8 @@ export function AiScreen() {
         </div>
       )}
 
-      <div className="ai-chat-shell">
+      {ready && (
+        <div className="ai-chat-shell">
         <div className="ai-thread" aria-live="polite">
           {messages.length === 0 && ready && (
             <div className="ai-welcome">
@@ -309,7 +310,8 @@ export function AiScreen() {
           </div>
           <small className="ai-composer-hint">{t('ai.composerHint')}</small>
         </div>
-      </div>
+        </div>
+      )}
     </section>
   );
 }

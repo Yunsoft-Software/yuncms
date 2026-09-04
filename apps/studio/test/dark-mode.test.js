@@ -3,10 +3,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-const appearanceCss = readFileSync(resolve(import.meta.dirname, '../src/appearance.css'), 'utf8');
-const visualCss = readFileSync(resolve(import.meta.dirname, '../src/visual-fixes.css'), 'utf8');
-const assetCss = readFileSync(resolve(import.meta.dirname, '../src/asset-picker.css'), 'utf8');
-const mainSource = readFileSync(resolve(import.meta.dirname, '../src/main.jsx'), 'utf8');
+const SRC = resolve(import.meta.dirname, '../src');
+const appearanceCss = readFileSync(resolve(SRC, 'appearance.css'), 'utf8');
+const visualCss = readFileSync(resolve(SRC, 'visual-fixes.css'), 'utf8');
+const assetCss = readFileSync(resolve(SRC, 'asset-picker.css'), 'utf8');
+const mainSource = readFileSync(resolve(SRC, 'main.jsx'), 'utf8');
+const studioCss = readFileSync(resolve(SRC, 'studio.css'), 'utf8');
 
 test('dark theme defines shared surface, input and border variables', () => {
   assert.match(appearanceCss, /:root\[data-theme="dark"\][\s\S]*--studio-surface:/);
@@ -32,7 +34,8 @@ test('legacy and new controls are explicitly normalized for dark mode', () => {
 });
 
 test('pagination and sticky permission columns never force white surfaces in dark mode', () => {
-  assert.match(mainSource, /visual-fixes\.css/);
+  assert.match(mainSource, /import '\.\/studio\.css';/);
+  assert.match(studioCss, /@import '\.\/visual-fixes\.css';/);
   for (const selector of ['.pagination', '.permission-matrix td:first-child', '.permission-list-controls']) {
     assert.ok(visualCss.includes(selector), `missing visual correction: ${selector}`);
   }
