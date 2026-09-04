@@ -58,18 +58,18 @@ export function CommandPalette({ commands, open, onClose, onInvoke, label, place
       invoke(visibleCommands[activeIndex]);
       return;
     }
-    if (event.key !== 'Tab') return;
-
-    const focusable = [...dialogRef.current.querySelectorAll('input, button:not(:disabled)')];
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
+    if (event.key === 'Tab') {
+      const focusable = [...dialogRef.current.querySelectorAll('input, button:not(:disabled)')];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
   }
 
