@@ -60,4 +60,12 @@ export const STUDIO_NEXT_TR = Object.freeze({
   'files.retryFailed': 'Başarısızları yeniden dene',
   'files.uploadedCount': '{count} dosya yüklendi.',
   'files.uploadPartial': '{count} dosyanın {failed} tanesi yüklenemedi. Başarısız dosyalar kuyrukta bırakıldı.',
+  'dataModel.relationPreview': 'İlişki önizlemesi',
+  'dataModel.relationResult': 'Sonuç',
+  'dataModel.relationMany': 'Çok',
+  'dataModel.relationOne': 'Bir',
+  'dataModel.relationCollectionRole': 'Collection',
+  'dataModel.relationRelated': 'İlişkili',
+  'dataModel.relationJunctionPending': 'junction',
+  'dataModel.relationFieldPending': 'alan',
 });
