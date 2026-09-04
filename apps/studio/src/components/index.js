@@ -21,3 +21,4 @@ export { RuleBuilder, parseSimpleRules, rulesToFilter } from './RuleBuilder.jsx'
 export { SchemaGraph } from './SchemaGraph.jsx';
 export { SidebarIcon } from './SidebarIcon.jsx';
 export { LanguageSwitcher, StudioBrand, YunsoftFooter } from './StudioBrand.jsx';
+export { UploadQueue } from './UploadQueue.jsx';
