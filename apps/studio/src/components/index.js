@@ -8,6 +8,7 @@ export { DataViewOptions } from './DataViewOptions.jsx';
 export { DialogProvider, useConfirmDialog } from './DialogProvider.jsx';
 export { FieldBuilder } from './FieldBuilder.jsx';
 export { FieldTypeIcon } from './FieldTypeIcon.jsx';
+export { FileCategoryRail } from './FileCategoryRail.jsx';
 export { FileFieldControl, FileValuePreview } from './FileFieldControl.jsx';
 export { FilePickerModal } from './FilePickerModal.jsx';
 export { FilePreview } from './FilePreview.jsx';
