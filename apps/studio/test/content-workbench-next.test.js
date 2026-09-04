@@ -4,12 +4,15 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 const SRC = resolve(import.meta.dirname, '../src');
-const mainSource = readFileSync(resolve(SRC, 'main.jsx'), 'utf8');
+const studioCss = readFileSync(resolve(SRC, 'studio.css'), 'utf8');
 const contentSource = readFileSync(resolve(SRC, 'screens/ContentScreen.jsx'), 'utf8');
 const workbenchCss = readFileSync(resolve(SRC, 'content-workbench-next.css'), 'utf8');
 
 test('compact Content workbench stylesheet is loaded after the Studio shell foundation', () => {
-  assert.match(mainSource, /import '\.\/studio-next\.css';\nimport '\.\/content-workbench-next\.css';/);
+  const shellIndex = studioCss.indexOf("@import './studio-next.css';");
+  const workbenchIndex = studioCss.indexOf("@import './content-workbench-next.css';");
+  assert.ok(shellIndex > -1);
+  assert.ok(workbenchIndex > shellIndex);
 });
 
 test('existing Content filter state drives the compact filter disclosure', () => {
