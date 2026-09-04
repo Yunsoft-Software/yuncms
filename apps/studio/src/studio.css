@@ -1,0 +1,42 @@
+/* YunCMS Studio stylesheet entry point.
+ * Keep import order stable while legacy surfaces move into the semantic Studio system.
+ */
+
+@import './styles.css';
+@import './ui-improvements.css';
+@import './usability-pass.css';
+@import './appearance.css';
+@import './roles-polish.css';
+@import './media-preview.css';
+@import './field-builder.css';
+@import './visual-fixes.css';
+@import './navigation-v2.css';
+@import './data-model-v2.css';
+@import './data-model-v2-interactions.css';
+@import './asset-picker.css';
+@import './routed-pages.css';
+@import './mobile-responsive.css';
+@import './navigation-model.css';
+@import './ai.css';
+@import './mcp.css';
+@import './content-density.css';
+
+/* Semantic Studio foundation and workbench surfaces. */
+@import './studio-next.css';
+@import './studio-next-tokens.css';
+@import './command-palette.css';
+@import './data-view-options.css';
+@import './content-workbench-next.css';
+@import './content-inspector-next.css';
+@import './files-next.css';
+@import './file-category-rail.css';
+@import './files-inspector-next.css';
+@import './upload-queue.css';
+@import './data-model-next.css';
+@import './schema-graph.css';
+@import './relation-diagram.css';
+@import './access-next.css';
+@import './rule-builder.css';
+@import './ai-next.css';
+@import './auth-settings-next.css';
+@import './users-mcp-next.css';
