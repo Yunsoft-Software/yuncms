@@ -23,7 +23,7 @@ This file is the source of truth for implementation and release status. Detailed
 - [x] Replace desktop and mobile Studio documentation screenshots with the release-candidate interface.
 - [x] Pass the fast and complete source suites.
 - [x] Pass `npm run test:release` after the final version update, including real MySQL/API integration.
-- [ ] Publish the public npm packages and verify the registry versions.
+- [x] Publish the public npm packages and verify `latest` resolves to 0.1.15 for each package.
 
 ## After this release
 
