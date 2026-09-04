@@ -30,4 +30,11 @@ export const STUDIO_NEXT_TR = Object.freeze({
   'content.bulkDeletePartial': '{count} kaydın {failed} tanesi silinemedi.',
   'content.relationSearch': 'İlişkili kayıtlarda ara…',
   'content.relationEmpty': 'Eşleşen ilişkili kayıt yok',
+  'content.viewOptions': 'Görünüm',
+  'content.viewOptionsTitle': 'Tablo görünüm seçenekleri',
+  'content.columns': 'Kolonlar',
+  'content.density': 'Yoğunluk',
+  'content.densityCompact': 'Sıkı',
+  'content.densityComfortable': 'Rahat',
+  'content.densityRelaxed': 'Geniş',
 });
