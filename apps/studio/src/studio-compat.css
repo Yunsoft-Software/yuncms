@@ -1,0 +1,39 @@
+/* Compatibility selectors for Studio shell state.
+ * These duplicate the relational-selector behavior without requiring CSS :has().
+ */
+
+.studio-next-frame.section-files .studio-next-app .studio-shell,
+.studio-next-frame.section-ai .studio-next-app .studio-shell,
+.studio-next-frame.section-data-model .studio-next-app .studio-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.studio-next-frame.section-files .studio-next-app .studio-shell > .sidebar,
+.studio-next-frame.section-ai .studio-next-app .studio-shell > .sidebar,
+.studio-next-frame.section-data-model .studio-next-app .studio-shell > .sidebar {
+  display: none;
+}
+
+.studio-next-frame.auth-surface {
+  display: block;
+  min-height: 100vh;
+  padding: 0;
+}
+
+.studio-next-frame.auth-surface > .studio-next-app {
+  min-height: 100vh;
+}
+
+@media (max-width: 760px) {
+  .studio-next-frame.section-files .studio-next-app .studio-shell,
+  .studio-next-frame.section-ai .studio-next-app .studio-shell,
+  .studio-next-frame.section-data-model .studio-next-app .studio-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .studio-next-frame.section-files .studio-next-app .studio-shell > .sidebar,
+  .studio-next-frame.section-ai .studio-next-app .studio-shell > .sidebar,
+  .studio-next-frame.section-data-model .studio-next-app .studio-shell > .sidebar {
+    display: flex;
+  }
+}
