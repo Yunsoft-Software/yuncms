@@ -1,0 +1,125 @@
+.data-view-options {
+  position: relative;
+}
+
+.data-view-options-trigger {
+  min-width: 72px;
+}
+
+.data-view-options-popover {
+  position: absolute;
+  z-index: 90;
+  inset: calc(100% + 6px) 0 auto auto;
+  width: min(310px, calc(100vw - 32px));
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-overlay);
+  background: var(--ui-surface);
+  box-shadow: 0 16px 36px rgb(15 23 42 / 14%);
+}
+
+.data-view-options-popover section + section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-border-soft);
+}
+
+.data-view-options-popover section > strong {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 11px;
+  color: var(--ui-text-secondary);
+}
+
+.data-view-column-list {
+  display: grid;
+  gap: 2px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.data-view-column-list label {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 7px;
+  border-radius: 7px;
+}
+
+.data-view-column-list label:hover {
+  background: var(--ui-surface-hover);
+}
+
+.data-view-column-list input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+
+.data-view-column-list span {
+  font-size: 12px;
+}
+
+.data-view-column-list small {
+  max-width: 92px;
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font: 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-view-density {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.data-view-density button {
+  min-height: 32px;
+  padding: 6px 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+}
+
+.data-view-density button:hover {
+  background: var(--ui-surface-hover);
+  color: var(--ui-text);
+}
+
+.data-view-density button.active {
+  border-color: var(--ui-border-accent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+}
+
+.content-table-density-compact td {
+  padding-block: 6px !important;
+}
+
+.content-table-density-compact th {
+  padding-block: 7px !important;
+}
+
+.content-table-density-relaxed td {
+  padding-block: 14px !important;
+}
+
+.content-table-density-relaxed th {
+  padding-block: 11px !important;
+}
+
+@media (max-width: 760px) {
+  .data-view-options-popover {
+    position: fixed;
+    inset: auto 10px 68px;
+    width: auto;
+    max-height: 70vh;
+    overflow: auto;
+  }
+}
