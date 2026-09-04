@@ -6,15 +6,33 @@ YunCMS authorization is role-based and enforced inside services, not only in Stu
 
 ## Recommended Studio workflow
 
-1. Open **Settings → Roles & Permissions**.
+1. Open **Access** from the Studio application rail.
 2. Select an existing role or choose **Create**.
-3. Turn on `Read`, `Create`, `Update` or `Delete` for simple unrestricted action access.
-4. Open the permission page only when the action needs field, row or write restrictions.
-5. Save the restriction and test it with a real account assigned to the role.
+3. Find the collection/resource in the permission matrix.
+4. Turn on `Read`, `Create`, `Update` or `Delete` for simple unrestricted action access.
+5. Open the permission page only when the action needs field, row or write restrictions.
+6. Save the restriction and test it with a real account assigned to the role.
 
-The matrix distinguishes **Allowed** from **Off** at a glance. An enabled action with advanced rules is still enabled, but its field/filter/validation scope limits what the API accepts or returns.
+The matrix keeps the four actions in stable columns for every collection. Each cell communicates one of the useful states:
+
+- disabled/off;
+- allowed for all permitted records/fields;
+- enabled with field, row-filter or validation restrictions;
+- protected when the action cannot be delegated through the selected role.
+
+State text remains visible even when Studio also uses surface color to make scanning the matrix faster.
 
 Start with the smallest role that can complete the job. Avoid testing only as Administrator because Administrator bypass does not reveal missing ordinary-role grants.
+
+## Visual and Advanced JSON rule editing
+
+For project collections that support advanced permission restrictions, Studio provides two editing modes.
+
+**Visual rules** are intended for straightforward AND conditions. Choose the field, comparison operator and value for each rule. Studio serializes supported rules to the same bounded filter JSON consumed by the permissions API.
+
+**Advanced JSON** remains available for filters or validation rules that need a structure the visual builder cannot safely represent. Existing nested objects, `_or` expressions or custom shapes are preserved unchanged rather than being simplified or rewritten by the visual editor.
+
+Field allowlists remain explicit checkboxes. Prospective-record validation is available only for create/update actions where the backend supports it.
 
 ## Accountability
 
