@@ -30,4 +30,11 @@ export const STUDIO_NEXT_EN = Object.freeze({
   'content.bulkDeletePartial': '{failed} of {count} records could not be deleted.',
   'content.relationSearch': 'Search related records…',
   'content.relationEmpty': 'No matching related records',
+  'content.viewOptions': 'View',
+  'content.viewOptionsTitle': 'Table view options',
+  'content.columns': 'Columns',
+  'content.density': 'Density',
+  'content.densityCompact': 'Compact',
+  'content.densityComfortable': 'Comfortable',
+  'content.densityRelaxed': 'Relaxed',
 });
