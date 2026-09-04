@@ -1,0 +1,656 @@
+/* Access workspace — compact role navigation and permission audit grid. */
+
+.permissions-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 248px) minmax(0, 1fr);
+  gap: 0;
+  min-height: calc(100vh - 94px);
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--ui-surface);
+}
+
+.access-role-sidebar {
+  min-width: 0;
+  padding: 14px 12px;
+  border: 0;
+  border-right: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: var(--ui-surface-subtle);
+  box-shadow: none;
+}
+
+.access-role-sidebar .panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 12px;
+}
+
+.access-role-sidebar .panel-heading > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.access-role-sidebar .panel-heading .eyebrow,
+.access-role-sidebar .panel-heading p:not(.eyebrow) {
+  display: none;
+}
+
+.access-role-sidebar .panel-heading h2 {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.access-role-sidebar .panel-heading .primary-button {
+  min-height: 30px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+.access-role-sidebar .sidebar-filter-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  margin: 0 0 10px;
+}
+
+.access-role-sidebar .sidebar-filter-row .field-label {
+  gap: 4px;
+}
+
+.access-role-sidebar .sidebar-filter-row .field-label > span {
+  display: none;
+}
+
+.access-role-sidebar .sidebar-filter-row input,
+.access-role-sidebar .sidebar-filter-row select {
+  min-height: 34px;
+  font-size: 12px;
+}
+
+.role-list-page {
+  display: grid;
+  gap: 3px;
+}
+
+.role-list-page .role-list-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ui-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-ui),
+    border-color var(--motion-fast) var(--ease-ui);
+}
+
+.role-list-page .role-list-button:hover {
+  background: var(--ui-surface-hover);
+}
+
+.role-list-page .role-list-button.active {
+  border-color: color-mix(in srgb, var(--ui-accent) 18%, var(--ui-border));
+  background: var(--ui-surface-selected);
+}
+
+.role-list-page .role-list-button > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.role-list-page .role-list-button strong,
+.role-list-page .role-list-button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-list-page .role-list-button strong {
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.role-list-page .role-list-button small {
+  color: var(--ui-text-tertiary);
+  font-size: 10.5px;
+}
+
+.role-list-page .permission-count {
+  min-width: 24px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.permissions-detail-stack {
+  min-width: 0;
+  padding: 18px 20px 24px;
+  background: var(--ui-canvas);
+}
+
+.permissions-detail-stack > .page-breadcrumbs {
+  margin: 0 0 12px;
+}
+
+.role-summary-panel,
+.permission-overview-panel,
+.public-role-guidance,
+.permission-matrix-panel,
+.permission-detail-page {
+  box-shadow: none;
+}
+
+.role-summary-panel {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.role-name-form {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.role-name-form > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.role-heading-line {
+  margin-bottom: 4px;
+}
+
+.role-name-field > span {
+  font-size: 10px;
+  color: var(--ui-text-tertiary);
+}
+
+.role-name-field input {
+  max-width: 420px;
+  min-height: 36px;
+  font-size: 16px;
+  font-weight: 680;
+}
+
+.role-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.role-summary-stat {
+  display: grid;
+  gap: 1px;
+  text-align: right;
+}
+
+.role-summary-stat strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.role-summary-stat small {
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+}
+
+.permission-overview-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface-subtle);
+}
+
+.permission-overview-panel .eyebrow {
+  display: none;
+}
+
+.permission-overview-panel p {
+  margin: 0;
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+}
+
+.permission-overview-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.permission-overview-stats > span {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.permission-overview-stats strong {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.permission-overview-stats small {
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+}
+
+.permission-matrix-panel {
+  margin-top: 12px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.permission-matrix-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 0 10px;
+}
+
+.permission-matrix-heading .eyebrow {
+  display: none;
+}
+
+.permission-matrix-heading h2 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.permission-matrix-heading p {
+  margin: 3px 0 0;
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+}
+
+.permission-list-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto auto;
+  align-items: end;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.permission-list-controls .field-label > span {
+  display: none;
+}
+
+.permission-list-controls input[type="search"] {
+  min-height: 34px;
+}
+
+.permission-filter-checkbox {
+  min-height: 34px;
+}
+
+.permission-collection-grid {
+  display: grid;
+  gap: 0;
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-surface);
+}
+
+.permission-collection-card {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.35fr) minmax(0, 3.65fr);
+  align-items: stretch;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.permission-collection-card:last-child {
+  border-bottom: 0;
+}
+
+.permission-collection-card > header {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 11px 12px;
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.permission-collection-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.permission-collection-name strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.permission-collection-card > header > small {
+  overflow: hidden;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-action-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(104px, 1fr));
+  min-width: 0;
+}
+
+.permission-action-row {
+  position: relative;
+  display: grid;
+  align-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 76px;
+  padding: 9px 10px;
+  border-right: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  transition: background var(--motion-fast) var(--ease-ui);
+}
+
+.permission-action-row:last-child {
+  border-right: 0;
+}
+
+.permission-action-row:hover,
+.permission-action-row:focus-within {
+  background: var(--ui-surface-hover);
+}
+
+.permission-action-row > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.permission-action-row > div:first-child strong {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  color: var(--ui-text-secondary);
+}
+
+.permission-action-row > div:first-child small {
+  min-height: 13px;
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+}
+
+.permission-action-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+}
+
+.permission-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 27px;
+  padding: 2px 7px 2px 4px;
+  gap: 5px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.permission-toggle.enabled {
+  border-color: color-mix(in srgb, var(--ui-success) 24%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-success) 10%, var(--ui-surface));
+  color: var(--ui-success);
+}
+
+.permission-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.permission-configure {
+  min-height: 27px;
+  padding: 0 7px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 10px;
+  opacity: .34;
+  transition: opacity var(--motion-fast) var(--ease-ui), background var(--motion-fast) var(--ease-ui);
+}
+
+.permission-action-row:hover .permission-configure,
+.permission-action-row:focus-within .permission-configure {
+  opacity: 1;
+}
+
+.protected-permission {
+  justify-self: start;
+  margin-top: 2px;
+}
+
+.permission-detail-page {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.permission-detail-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.permission-detail-heading .eyebrow {
+  display: none;
+}
+
+.permission-detail-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.015em;
+}
+
+.permission-detail-heading p {
+  margin: 5px 0 0;
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+}
+
+.permission-state-badge {
+  min-width: 72px;
+  padding: 5px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.permission-state-badge.enabled {
+  border-color: color-mix(in srgb, var(--ui-success) 28%, var(--ui-border));
+  background: color-mix(in srgb, var(--ui-success) 9%, var(--ui-surface));
+  color: var(--ui-success);
+}
+
+.permission-state-badge.disabled {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-tertiary);
+}
+
+.permission-master-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 14px 0;
+  padding: 12px 13px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-surface);
+}
+
+.permission-master-switch strong {
+  font-size: 12px;
+}
+
+.permission-master-switch p {
+  margin: 3px 0 0;
+  color: var(--ui-text-secondary);
+  font-size: 11px;
+}
+
+.permission-rule-page {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  gap: 12px;
+}
+
+.permission-rule-page .schema-create-card {
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+
+@media (max-width: 1180px) {
+  .permission-collection-card {
+    grid-template-columns: minmax(160px, 1fr) minmax(0, 3fr);
+  }
+
+  .permission-action-row {
+    min-height: 82px;
+    padding: 8px;
+  }
+
+  .permission-action-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 900px) {
+  .permissions-layout {
+    grid-template-columns: 1fr;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    background: transparent;
+  }
+
+  .access-role-sidebar {
+    border: 1px solid var(--ui-border);
+    border-radius: 9px;
+  }
+
+  .permissions-detail-stack {
+    padding: 16px 0 0;
+  }
+
+  .permission-collection-card {
+    grid-template-columns: 1fr;
+  }
+
+  .permission-collection-card > header {
+    border-right: 0;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .permission-rule-page {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .permission-list-controls {
+    grid-template-columns: 1fr auto;
+  }
+
+  .permission-list-controls .field-label {
+    grid-column: 1 / -1;
+  }
+
+  .permission-action-list {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .permission-action-row:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .permission-action-row:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .role-summary-panel,
+  .role-name-form,
+  .permission-detail-heading,
+  .permission-master-switch {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .role-summary-actions {
+    justify-content: space-between;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .role-list-page .role-list-button,
+  .permission-action-row,
+  .permission-configure {
+    transition: none;
+  }
+}
