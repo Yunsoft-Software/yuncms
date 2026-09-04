@@ -156,7 +156,7 @@
   padding: 22px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .mcp-toggle-grid,
   .mcp-settings-grid,
   .mcp-limit-grid {

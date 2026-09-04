@@ -917,7 +917,7 @@ input[type='checkbox'] {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .studio-next-frame::before {
     position: fixed;
   }

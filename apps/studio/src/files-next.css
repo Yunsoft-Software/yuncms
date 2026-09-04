@@ -493,7 +493,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .library-header-panel .workspace-toolbar-heading {
     align-items: flex-start;
     padding-bottom: 12px;

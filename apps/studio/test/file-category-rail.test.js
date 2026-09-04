@@ -26,6 +26,6 @@ test('Files recent category is explicitly a seven day filter', () => {
 test('file categories use a desktop rail and retain a mobile fallback selector', () => {
   assert.match(railCss, /grid-template-columns: 176px minmax\(0, 1fr\)/);
   assert.match(railCss, /position: sticky/);
-  assert.match(railCss, /@media \(max-width: 760px\)/);
+  assert.match(railCss, /@media \(max-width: 900px\)/);
   assert.match(filesSource, /file-type-fallback/);
 });

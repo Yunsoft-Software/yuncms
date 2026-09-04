@@ -16,6 +16,6 @@ test('Content filter control remains stateful and accessible', () => {
 test('Content filters render as a desktop popover and mobile inline panel', () => {
   assert.match(filterCss, /position: absolute/);
   assert.match(filterCss, /\.filter-builder\.mobile-open/);
-  assert.match(filterCss, /@media \(max-width: 760px\)/);
+  assert.match(filterCss, /@media \(max-width: 900px\)/);
   assert.match(filterCss, /position: static/);
 });

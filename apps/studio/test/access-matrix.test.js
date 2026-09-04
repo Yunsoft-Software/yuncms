@@ -13,6 +13,8 @@ test('permission overview renders four action columns per collection', () => {
   assert.match(accessSource, /permission-collection-grid/);
   assert.match(accessSource, /permission-action-row/);
   assert.match(accessCss, /grid-template-columns: repeat\(4, minmax\(104px, 1fr\)\)/);
+  assert.match(accessCss, /\.permission-collection-grid\s*\{[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(accessCss, /\.permission-configure\s*\{[\s\S]*opacity:\s*\.72/);
 });
 
 test('permission matrix communicates configured and restricted states with text', () => {

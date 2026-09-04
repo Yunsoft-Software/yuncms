@@ -50,9 +50,9 @@ test('workbench shell uses semantic tokens and compact navigation', () => {
 });
 
 test('workbench shell includes responsive and reduced-motion behavior', () => {
-  assert.match(shellCss, /@media \(max-width: 760px\)/);
+  assert.match(shellCss, /@media \(max-width: 900px\)/);
   assert.match(shellCss, /position:\s*fixed;[\s\S]*inset:\s*auto 0 0/);
   assert.match(shellCss, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(shellCss, /transition:\s*none !important/);
-  assert.match(compatCss, /@media \(max-width: 760px\)/);
+  assert.match(compatCss, /@media \(max-width: 900px\)/);
 });

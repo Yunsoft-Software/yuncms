@@ -50,7 +50,7 @@
   align-self: end;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .content-data-controls-main + .mobile-filter-toggle {
     width: 100%;
     justify-self: stretch;

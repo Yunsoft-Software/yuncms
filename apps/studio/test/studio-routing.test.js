@@ -73,7 +73,7 @@ test('dense field and permission tabs/modals were replaced with routed page surf
   assert.match(roles, /permission-collection-grid/);
   assert.doesNotMatch(roles, /<Modal/);
   assert.doesNotMatch(files, /FilePreviewModal/);
-  assert.match(routedCss, /@media \(max-width: 760px\)/);
+  assert.match(routedCss, /@media \(max-width: 900px\)/);
   assert.match(routedCss, /permission-action-row/);
   assert.match(routedCss, /field-detail-grid/);
   assert.match(source('navigation-v2.css'), /sidebar:not\(\.mobile-nav-open\) \.sidebar-nav/);

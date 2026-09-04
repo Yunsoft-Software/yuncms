@@ -35,7 +35,7 @@
   justify-self: end;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .data-model-collection-item:not(.system),
   .relation-v2-row {
     grid-template-columns: 1fr;

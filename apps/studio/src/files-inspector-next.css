@@ -86,7 +86,7 @@
   text-align: right;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .file-library-drop-overlay {
     inset: 12px 12px 70px;
   }

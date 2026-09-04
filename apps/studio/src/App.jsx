@@ -129,7 +129,7 @@ export function App() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [mobileLayout, setMobileLayout] = useState(() => window.matchMedia('(max-width: 760px)').matches);
+  const [mobileLayout, setMobileLayout] = useState(() => window.matchMedia('(max-width: 900px)').matches);
   const [groups, setGroups] = useState({ settings: true });
   const [contentNavFocused, setContentNavFocused] = useState(() => readStudioRoute().section === 'content');
 
@@ -154,7 +154,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 760px)');
+    const media = window.matchMedia('(max-width: 900px)');
     const updateLayout = () => setMobileLayout(media.matches);
     media.addEventListener('change', updateLayout);
     return () => media.removeEventListener('change', updateLayout);
