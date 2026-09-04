@@ -1,0 +1,29 @@
+/* Shared semantic tokens for Studio Next workspaces. Keep these mapped to Appearance settings. */
+
+:root {
+  --ui-border-strong: color-mix(in srgb, var(--studio-border) 72%, var(--studio-text) 28%);
+  --ui-success: var(--studio-success-text);
+  --ui-warning: #a16207;
+  --ui-info: var(--studio-accent);
+  --ui-focus-ring: var(--studio-accent-soft);
+  --ui-overlay: #0f172a;
+
+  --motion-fast: 110ms;
+  --motion-ui: 160ms;
+  --motion-panel: 210ms;
+  --ease-ui: cubic-bezier(.2, .8, .2, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+}
+
+:root[data-theme="dark"] {
+  --ui-warning: #fbbf24;
+  --ui-overlay: #020617;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-ui: 0ms;
+    --motion-panel: 0ms;
+  }
+}
