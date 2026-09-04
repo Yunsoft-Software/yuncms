@@ -74,7 +74,7 @@ Select a collection directly from **Content** to work with its records.
 
 ![YunCMS Content workspace](assets/screenshots/studio-content.png)
 
-The Content workbench provides:
+The Content workbench opens with a bounded collection identity surface showing live record and field counts, followed immediately by the quiet data controls and table/card work area. It provides:
 
 - record table/list navigation;
 - create and full-page edit routes;
@@ -97,7 +97,7 @@ Only operations allowed by your effective role are available. If an API permissi
 
 Search uses readable text fields in the current collection. Filters can be added without keeping the full filter builder permanently open, and active filters remain visible as removable chips.
 
-The **View** control lets you choose which table columns are visible and switch between compact, comfortable and relaxed row density. At least one table column remains visible.
+The **View** control lets you choose which table columns are visible and switch between compact, comfortable and relaxed row density. Studio initially shows the first six useful table columns to keep row actions readable; any additional managed or project fields remain available from **View**. At least one table column remains visible.
 
 Column sorting is applied through the normal Items API query behavior. These presentation controls do not change collection schema or stored records.
 

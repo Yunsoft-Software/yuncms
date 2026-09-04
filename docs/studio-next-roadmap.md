@@ -31,7 +31,7 @@ The layout is intended to keep context visible, reduce repeated headings and nes
 
 ### Workbench first
 
-Routine screens should prioritize the actual work surface. Large dashboard-style titles, repeated descriptions and stacked cards should not push content below the fold.
+Routine screens prioritize the actual work surface. Content and Data Model may use one bounded identity surface at the top of the workspace, but repeated descriptions, metric-card grids and stacked dashboard panels must not push the useful data out of view.
 
 ### Context stays visible
 
@@ -43,7 +43,7 @@ Tables and schema lists should make better use of desktop space while keeping cl
 
 ### Motion explains state
 
-Animation should communicate navigation, selection, saving, uploading, filtering or structural change. Decorative motion, continuous glow effects and unnecessary transitions do not belong in routine work surfaces.
+Animation should communicate navigation, selection, saving, uploading, filtering or structural change. Slow ambient movement is reserved for the spectrum line and the two identity surfaces; tables, forms and routine cards remain still. Every motion layer must have a reduced-motion fallback.
 
 ### One visual system
 
@@ -53,9 +53,9 @@ Light mode, dark mode, appearance customization, responsive layouts, dialogs, ta
 
 Content is the primary Studio workspace and will receive the largest usability improvement.
 
-Planned behavior:
+Current behavior:
 
-- compact collection header with record count and primary action;
+- bounded collection identity header with record and field counts plus the primary action;
 - integrated search, filters, sorting, columns and density controls;
 - filters shown in a popover or sheet instead of a permanently expanded form;
 - sticky table header;
@@ -204,7 +204,7 @@ Detailed permission editing will provide visual field selection and rule buildin
 
 ## AI workspace
 
-The AI workspace will continue to respect normal YunCMS permissions and access modes. The interface will emphasize the actual operations performed by the assistant rather than decorative AI styling.
+The AI workspace continues to respect normal YunCMS permissions and access modes. The interface emphasizes the actual operations performed by the assistant rather than decorative chat bubbles. When AI is not configured, Studio shows one bounded setup surface instead of an empty disabled conversation canvas.
 
 Useful operation feedback includes:
 
@@ -231,9 +231,11 @@ Keyboard navigation should work consistently with arrow keys, Enter and Escape.
 
 ## Visual system
 
-Studio will move toward semantic design tokens for surfaces, text, borders, focus, selection and state colors.
+Studio uses semantic design tokens for surfaces, text, borders, focus, selection and state colors.
 
-The existing appearance accent remains useful, but accent color should be reserved for selection, primary actions, focus and active navigation rather than being applied to every badge or card.
+The product spectrum is coral `#ff6238`, magenta `#ca3e7b` and teal `#16b8a6`. It appears on collection/model identity, navigation state and live feedback. Light mode uses warm paper-like surfaces; dark mode uses near-black neutral surfaces. Dense data areas stay quiet and high-contrast in both modes.
+
+The existing appearance accent remains useful for project-specific selection and focus. Primary actions may use a neutral ink/paper treatment when that gives better hierarchy than another saturated color. Gradients are never used as generic card decoration.
 
 Recommended interface scale:
 
@@ -243,11 +245,12 @@ Recommended interface scale:
 13px  dense data rows
 14px  standard controls and copy
 16px  section headings
-20px  workspace titles
-24–28px exceptional top-level or authentication headings
+20px  routine workspace titles
+24–28px authentication and setup headings
+30–43px bounded Content/Data Model identity headings only
 ```
 
-Routine workspaces should not use oversized dashboard headings.
+Routine workspaces should not use oversized dashboard headings or repeat the identity treatment inside nested panels.
 
 ## Motion and feedback
 
@@ -258,6 +261,7 @@ Typical ranges:
 - micro state changes: about 110 ms;
 - selection, menus and inspector movement: about 160 ms;
 - larger workspace transitions: about 210 ms.
+- ambient identity movement: about 8–14 seconds, limited to the spectrum line and identity surfaces.
 
 Examples:
 

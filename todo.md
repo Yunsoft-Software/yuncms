@@ -2,9 +2,6 @@
 
 These checks require a local checkout and browser environment. Complete them before merging the Studio Next changes into the main branch, then remove this file when the checklist is empty.
 
-- [ ] Run the Studio test suite and confirm the shell, workspace, command palette, schema graph, shared-component, file-category, upload-queue, permission-rule and native-dialog contracts pass with the existing navigation, appearance, routing, mobile and accessibility tests.
-- [ ] Run the Studio production build and confirm there are no Vite, JSX, CSS import or React warnings introduced by the application frame and workspace layers.
-- [ ] Smoke-test Content at desktop widths around 1440px and 1280px. Confirm the application rail, collection context rail, compact controls, table controls and collection navigation remain usable.
 - [ ] In Content, verify row click opens the quick inspector, saving refreshes the list, opening the full editor keeps the existing deep-link route, and Escape/focus return work correctly.
 - [ ] In Content, verify current-page selection, select-all, bulk delete confirmation, partial delete errors, pagination resets and inspector selection do not interfere with one another.
 - [ ] In Content, verify relation fields and relation filters use the searchable relation picker, including required values, optional empty values and existing values that are not present in the first lookup page.
@@ -27,6 +24,4 @@ These checks require a local checkout and browser environment. Complete them bef
 - [ ] Smoke-test mobile widths around 390px and 430px. Confirm the bottom application rail does not cover forms, pagination, dialogs or destructive actions and the graph, asset, permission and inspector layouts remain usable.
 - [ ] Verify keyboard focus on every application-rail destination and confirm active destinations expose `aria-current="page"`.
 - [ ] Verify reduced-motion mode disables shell, graph, palette, inspector and workspace transitions without removing state feedback.
-- [ ] Check light mode, dark mode and at least one customized accent color for contrast and selected-state clarity.
 - [ ] Smoke-test a browser without CSS `:has()` support within the intended compatibility range and confirm explicit route/auth shell classes preserve Files, AI, Data Model and authentication layouts.
-- [ ] Capture replacement Studio screenshots only after the workbench layout is stable enough to represent the shipped interface.
