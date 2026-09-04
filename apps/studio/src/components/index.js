@@ -17,6 +17,7 @@ export { Modal } from './Modal.jsx';
 export { Pagination, paginateClientItems } from './Pagination.jsx';
 export { PublicRegistrationSettings } from './PublicRegistrationSettings.jsx';
 export { RelationPicker } from './RelationPicker.jsx';
+export { RuleBuilder, parseSimpleRules, rulesToFilter } from './RuleBuilder.jsx';
 export { SchemaGraph } from './SchemaGraph.jsx';
 export { SidebarIcon } from './SidebarIcon.jsx';
 export { LanguageSwitcher, StudioBrand, YunsoftFooter } from './StudioBrand.jsx';
