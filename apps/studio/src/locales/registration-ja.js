@@ -24,4 +24,5 @@ export const REGISTRATION_JA = Object.freeze({
   'auth.verificationResent': 'このアカウントにまだ確認が必要な場合、新しいメールを送信しました。',
   'auth.haveAccount': 'すでにアカウントをお持ちですか？ サインイン',
   'auth.needAccount': 'アカウントを作成',
+  'auth.authenticationProviders': '認証プロバイダー',
 });
