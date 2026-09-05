@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { useI18n } from '../i18n.js';
+
 export function DataViewOptions({
   columns = [],
   visibleKeys = [],
@@ -8,8 +10,13 @@ export function DataViewOptions({
   onDensityChange,
   labels = {},
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
+  const triggerLabel = labels.trigger || t('content.viewOptions');
+  const titleLabel = labels.title || labels.trigger || t('content.viewOptionsTitle');
+  const columnsLabel = labels.columns || t('content.columns');
+  const densityLabel = labels.density || t('content.density');
 
   useEffect(() => {
     if (!open) return undefined;
@@ -36,12 +43,12 @@ export function DataViewOptions({
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        {labels.trigger || 'View'}
+        {triggerLabel}
       </button>
       {open && (
-        <div className="data-view-options-popover" role="dialog" aria-label={labels.title || labels.trigger || 'View options'}>
+        <div className="data-view-options-popover" role="dialog" aria-label={titleLabel}>
           <section>
-            <strong>{labels.columns || 'Columns'}</strong>
+            <strong>{columnsLabel}</strong>
             <div className="data-view-column-list">
               {columns.map((column) => {
                 const checked = visibleKeys.includes(column.key);
@@ -62,12 +69,12 @@ export function DataViewOptions({
             </div>
           </section>
           <section>
-            <strong>{labels.density || 'Density'}</strong>
-            <div className="data-view-density" role="group" aria-label={labels.density || 'Density'}>
+            <strong>{densityLabel}</strong>
+            <div className="data-view-density" role="group" aria-label={densityLabel}>
               {[
-                ['compact', labels.compact || 'Compact'],
-                ['comfortable', labels.comfortable || 'Comfortable'],
-                ['relaxed', labels.relaxed || 'Relaxed'],
+                ['compact', labels.compact || t('content.densityCompact')],
+                ['comfortable', labels.comfortable || t('content.densityComfortable')],
+                ['relaxed', labels.relaxed || t('content.densityRelaxed')],
               ].map(([value, label]) => (
                 <button
                   className={density === value ? 'active' : ''}

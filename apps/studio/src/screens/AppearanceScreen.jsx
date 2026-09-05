@@ -9,6 +9,7 @@ import {
 } from '../components/index.js';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
+import { getEnabledLocaleDefinitions } from '../locale-registry.js';
 import {
   DEFAULT_STUDIO_SETTINGS,
   YUNSOFT_DARK_LOGO_URL,
@@ -28,6 +29,7 @@ export function AppearanceScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const localeOptions = getEnabledLocaleDefinitions();
 
   useEffect(() => setForm(settings), [settings]);
 
@@ -154,8 +156,9 @@ export function AppearanceScreen() {
                 value={form.default_locale || 'en'}
                 onChange={(event) => update('default_locale', event.target.value)}
               >
-                <option value="en">{t('appearance.english')}</option>
-                <option value="tr">{t('appearance.turkish')}</option>
+                {localeOptions.map((locale) => (
+                  <option key={locale.code} value={locale.code}>{locale.nativeName}</option>
+                ))}
               </select>
               <small>{t('appearance.defaultLanguageHint')}</small>
             </label>

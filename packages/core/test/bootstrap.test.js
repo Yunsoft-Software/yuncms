@@ -297,7 +297,19 @@ test('AI, navigation, MCP and registration settings extend the required compatib
   assert.match(publicRegistrationSettings.statements.join('\n'), /public_registration_enabled TINYINT\(1\)/);
   assert.match(publicRegistrationSettings.statements.join('\n'), /public_registration_role CHAR\(36\)/);
   assert.match(publicRegistrationEmailVerification.statements.join('\n'), /public_registration_require_email_verification TINYINT\(1\)/);
-  assert.equal(CORE_MIGRATIONS.at(-1).id, '0019-public-registration-email-verification');
+});
+
+test('expanded Studio locale constraint is a required atomic upgrade', () => {
+  const migration = CORE_MIGRATIONS.find(({ id }) => id === '0020-studio-locales');
+  assert.ok(migration);
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0020-studio-locales'));
+  assert.equal(migration.statements.length, 1);
+  assert.match(migration.statements[0], /DROP CHECK chk_yuncms_studio_settings_locale/);
+  assert.match(
+    migration.statements[0],
+    /default_locale IN \('en', 'tr', 'es', 'de', 'fr', 'pt-BR', 'ja', 'zh-CN'\)/,
+  );
+  assert.equal(CORE_MIGRATIONS.at(-1).id, '0020-studio-locales');
 });
 
 test('advisory lock uses one connection and always releases it', async () => {

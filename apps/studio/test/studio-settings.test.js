@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { SUPPORTED_LOCALES } from '../src/locale-registry.js';
 import {
   DEFAULT_STUDIO_SETTINGS,
   STUDIO_FAVICON_ASSET_PATH,
@@ -22,7 +23,7 @@ test('Studio settings normalize unsafe or unsupported appearance values to defau
     favicon_file: '',
     accent_color: 'blue',
     theme: 'neon',
-    default_locale: 'de',
+    default_locale: 'xx-unknown',
   });
 
   assert.equal(settings.brand_name, DEFAULT_STUDIO_SETTINGS.brand_name);
@@ -32,6 +33,16 @@ test('Studio settings normalize unsafe or unsupported appearance values to defau
   assert.equal(settings.accent_color, DEFAULT_STUDIO_SETTINGS.accent_color);
   assert.equal(settings.theme, 'system');
   assert.equal(settings.default_locale, 'en');
+});
+
+test('Studio settings preserve every supported locale', () => {
+  for (const default_locale of SUPPORTED_LOCALES) {
+    const settings = normalizeStudioSettings({
+      ...DEFAULT_STUDIO_SETTINGS,
+      default_locale,
+    });
+    assert.equal(settings.default_locale, default_locale);
+  }
 });
 
 test('legacy custom URL branding remains readable until replaced', () => {

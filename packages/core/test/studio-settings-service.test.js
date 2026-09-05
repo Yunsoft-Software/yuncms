@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { createAccountability, createPublicAccountability } from '../src/accountability.js';
 import { StudioSettingsService } from '../src/services/studio-settings-service.js';
+import { STUDIO_LOCALE_CODES } from '../src/studio-locales.js';
 
 const LOGO_FILE_ID = '123e4567-e89b-42d3-a456-426614174000';
 const FAVICON_FILE_ID = '223e4567-e89b-42d3-a456-426614174001';
@@ -179,6 +180,40 @@ test('administrator can choose existing image files as Studio logo and favicon',
   assert.equal(result.favicon_file, FAVICON_FILE_ID);
   const update = calls.find(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'));
   assert.deepEqual(update.params.slice(0, -1), ['Acme CMS', LOGO_FILE_ID, FAVICON_FILE_ID, 'dark']);
+});
+
+test('Studio locale normalization accepts every registered locale and rejects unknown locales', async () => {
+  const calls = [];
+  const database = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (sql.includes('UPDATE yuncms_studio_settings')) return [{ affectedRows: 1 }, []];
+      if (sql.includes('FROM yuncms_studio_settings')) {
+        return [[{ ...SETTINGS_ROW, default_locale: 'en' }], []];
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  const service = new StudioSettingsService({
+    database,
+    accountability: createAccountability({ user: 'admin-1', role: 'admin-role', admin: true }),
+  });
+
+  for (const locale of STUDIO_LOCALE_CODES) {
+    await service.updateOne({ default_locale: ` ${locale.toUpperCase()} ` });
+  }
+
+  const updates = calls.filter(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'));
+  assert.deepEqual(
+    updates.map(({ params }) => params),
+    STUDIO_LOCALE_CODES.map((locale) => [locale, 1]),
+  );
+
+  await assert.rejects(
+    service.updateOne({ default_locale: 'xx-unknown' }),
+    (error) => error.code === 'INVALID_PAYLOAD'
+      && STUDIO_LOCALE_CODES.every((locale) => error.message.includes(locale)),
+  );
 });
 
 function imageAssetFixture(settingKey, fileId) {

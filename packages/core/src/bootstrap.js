@@ -19,6 +19,7 @@ import { navigationGroupCollapseMigration } from './migrations/0016-navigation-g
 import { mcpSettingsMigration } from './migrations/0017-mcp-settings.js';
 import { publicRegistrationSettingsMigration } from './migrations/0018-public-registration-settings.js';
 import { publicRegistrationEmailVerificationMigration } from './migrations/0019-public-registration-email-verification.js';
+import { studioLocalesMigration } from './migrations/0020-studio-locales.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -42,6 +43,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   mcpSettingsMigration,
   publicRegistrationSettingsMigration,
   publicRegistrationEmailVerificationMigration,
+  studioLocalesMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(

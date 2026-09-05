@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 
+import { useI18n } from '../i18n.js';
+
 const OPERATORS = Object.freeze([
   '_eq',
   '_neq',
@@ -106,9 +108,23 @@ export function RuleBuilder({
   onChange,
   labels = {},
 }) {
+  const { t } = useI18n();
   const parsed = useMemo(() => parseSimpleRules(value), [value]);
   const [rawOpen, setRawOpen] = useState(false);
   const rules = parsed.compatible ? parsed.rules : [];
+  const operatorLabels = {
+    _eq: t('content.opEquals'),
+    _neq: t('content.opDoesNotEqual'),
+    _contains: t('content.opContains'),
+    _starts_with: t('content.opStartsWith'),
+    _ends_with: t('content.opEndsWith'),
+    _gt: t('content.opGreaterThan'),
+    _gte: t('content.opGreaterEqual'),
+    _lt: t('content.opLessThan'),
+    _lte: t('content.opLessEqual'),
+    _null: t('content.opEmpty'),
+    _nnull: t('content.opNotEmpty'),
+  };
 
   function commit(nextRules) {
     onChange?.(rulesToFilter(nextRules, fields));
@@ -135,19 +151,19 @@ export function RuleBuilder({
     <div className={`rule-builder ${forceRaw ? 'raw-only' : ''}`}>
       <div className="rule-builder-heading">
         <div>
-          <strong>{labels.title || 'Rules'}</strong>
+          <strong>{labels.title || t('roles.visualRules')}</strong>
           {labels.description && <p>{labels.description}</p>}
         </div>
         {!forceRaw && (
           <button className="text-button" type="button" onClick={() => setRawOpen((current) => !current)}>
-            {rawOpen ? (labels.visualMode || 'Visual editor') : (labels.rawMode || 'Advanced JSON')}
+            {rawOpen ? (labels.visualMode || t('roles.visualRules')) : (labels.rawMode || t('roles.advancedJson'))}
           </button>
         )}
       </div>
 
       {forceRaw && (
         <div className="inline-info rule-builder-raw-notice">
-          {parsed.error ? (labels.invalidJson || 'Invalid JSON') : (labels.complexJson || 'This rule uses advanced JSON and is preserved as-is.')}
+          {parsed.error ? (labels.invalidJson || t('roles.invalidRuleJson')) : (labels.complexJson || t('roles.complexRuleNotice'))}
         </div>
       )}
 
@@ -162,7 +178,7 @@ export function RuleBuilder({
                 <select
                   value={rule.field}
                   disabled={disabled}
-                  aria-label={labels.field || 'Field'}
+                  aria-label={labels.field || t('roles.ruleField')}
                   onChange={(event) => updateRule(index, { field: event.target.value, value: '' })}
                 >
                   {fields.map((field) => (
@@ -172,27 +188,27 @@ export function RuleBuilder({
                 <select
                   value={rule.operator}
                   disabled={disabled}
-                  aria-label={labels.operator || 'Condition'}
+                  aria-label={labels.operator || t('roles.ruleCondition')}
                   onChange={(event) => updateRule(index, { operator: event.target.value, value: '' })}
                 >
                   {OPERATORS.map((operator) => (
-                    <option key={operator} value={operator}>{labels.operators?.[operator] || operator}</option>
+                    <option key={operator} value={operator}>{labels.operators?.[operator] || operatorLabels[operator]}</option>
                   ))}
                 </select>
                 {noValue ? (
-                  <span className="rule-builder-no-value">{labels.noValue || 'No value'}</span>
+                  <span className="rule-builder-no-value">{labels.noValue || t('roles.ruleNoValue')}</span>
                 ) : (
                   <div className={`rule-builder-value-control ${dynamicValue ? 'dynamic' : ''}`}>
                     {type === 'boolean' && !dynamicValue ? (
                       <select
                         value={String(rule.value ?? '')}
                         disabled={disabled}
-                        aria-label={labels.value || 'Value'}
+                        aria-label={labels.value || t('roles.ruleValue')}
                         onChange={(event) => updateRule(index, { value: event.target.value })}
                       >
                         <option value="">—</option>
-                        <option value="true">{labels.trueLabel || 'True'}</option>
-                        <option value="false">{labels.falseLabel || 'False'}</option>
+                        <option value="true">{labels.trueLabel || t('common.yes')}</option>
+                        <option value="false">{labels.falseLabel || t('common.no')}</option>
                       </select>
                     ) : (
                       <input
@@ -200,7 +216,7 @@ export function RuleBuilder({
                         step={!dynamicValue && type === 'decimal' ? 'any' : undefined}
                         value={rule.value === true ? '' : (rule.value ?? '')}
                         disabled={disabled}
-                        aria-label={labels.value || 'Value'}
+                        aria-label={labels.value || t('roles.ruleValue')}
                         onChange={(event) => updateRule(index, { value: event.target.value })}
                       />
                     )}
@@ -208,13 +224,13 @@ export function RuleBuilder({
                       className="rule-builder-dynamic-select"
                       value={DYNAMIC_VALUES.includes(rule.value) ? rule.value : ''}
                       disabled={disabled}
-                      aria-label={labels.dynamicValue || 'Dynamic value'}
-                      title={labels.dynamicHint || 'Use a value from the current request context'}
+                      aria-label={labels.dynamicValue || t('roles.dynamicValue')}
+                      title={labels.dynamicHint || t('roles.dynamicValueHint')}
                       onChange={(event) => {
                         if (event.target.value) updateRule(index, { value: event.target.value });
                       }}
                     >
-                      <option value="">{labels.staticValue || 'Static'}</option>
+                      <option value="">{labels.staticValue || t('roles.staticValue')}</option>
                       {DYNAMIC_VALUES.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
                     </select>
                   </div>
@@ -223,7 +239,7 @@ export function RuleBuilder({
                   className="text-button rule-builder-remove"
                   type="button"
                   disabled={disabled}
-                  aria-label={labels.removeRule || 'Remove rule'}
+                  aria-label={labels.removeRule || t('roles.removeRule')}
                   onClick={() => removeRule(index)}
                 >
                   ×
@@ -231,9 +247,9 @@ export function RuleBuilder({
               </div>
             );
           })}
-          {rules.length === 0 && <p className="rule-builder-empty">{labels.empty || 'No restrictions.'}</p>}
+          {rules.length === 0 && <p className="rule-builder-empty">{labels.empty || t('roles.noRestrictions')}</p>}
           <button className="secondary-button rule-builder-add" type="button" disabled={disabled || fields.length === 0} onClick={addRule}>
-            {labels.addRule || 'Add rule'}
+            {labels.addRule || t('roles.addRule')}
           </button>
         </div>
       )}

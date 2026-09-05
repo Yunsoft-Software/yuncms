@@ -24,4 +24,5 @@ export const REGISTRATION_EN = Object.freeze({
   'auth.verificationResent': 'If this account still needs verification, a new email has been sent.',
   'auth.haveAccount': 'Already have an account? Sign in',
   'auth.needAccount': 'Create an account',
+  'auth.authenticationProviders': 'Authentication providers',
 });

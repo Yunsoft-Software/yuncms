@@ -1,3 +1,5 @@
+import { isSupportedLocale } from './locale-registry.js';
+
 export const YUNSOFT_LIGHT_LOGO_URL = 'https://yunsoft.com/light-logo.png';
 export const YUNSOFT_DARK_LOGO_URL = 'https://yunsoft.com/dark-logo.png';
 export const YUNSOFT_DEFAULT_FAVICON_URL = 'https://yunsoft.com/light-icon.png';
@@ -18,7 +20,6 @@ export const DEFAULT_STUDIO_SETTINGS = Object.freeze({
 
 const LOCALE_KEY = 'yuncms.studio.locale';
 const THEMES = new Set(['system', 'light', 'dark']);
-const LOCALES = new Set(['en', 'tr']);
 const ACCENT_PATTERN = /^#[0-9a-f]{6}$/i;
 
 export function normalizeStudioSettings(value = {}) {
@@ -39,7 +40,7 @@ export function normalizeStudioSettings(value = {}) {
       ? value.accent_color.toLowerCase()
       : DEFAULT_STUDIO_SETTINGS.accent_color,
     theme: THEMES.has(value.theme) ? value.theme : DEFAULT_STUDIO_SETTINGS.theme,
-    default_locale: LOCALES.has(value.default_locale)
+    default_locale: isSupportedLocale(value.default_locale)
       ? value.default_locale
       : DEFAULT_STUDIO_SETTINGS.default_locale,
     public_registration_enabled: value.public_registration_enabled === true,
@@ -52,7 +53,7 @@ export function normalizeStudioSettings(value = {}) {
 export function readLocalePreference() {
   if (typeof window === 'undefined') return null;
   const locale = window.localStorage.getItem(LOCALE_KEY);
-  return LOCALES.has(locale) ? locale : null;
+  return isSupportedLocale(locale) ? locale : null;
 }
 
 export function writeLocalePreference(locale) {
@@ -61,7 +62,7 @@ export function writeLocalePreference(locale) {
     window.localStorage.removeItem(LOCALE_KEY);
     return;
   }
-  if (!LOCALES.has(locale)) throw new Error(`Unsupported Studio locale: ${locale}`);
+  if (!isSupportedLocale(locale)) throw new Error(`Unsupported Studio locale: ${locale}`);
   window.localStorage.setItem(LOCALE_KEY, locale);
 }
 
