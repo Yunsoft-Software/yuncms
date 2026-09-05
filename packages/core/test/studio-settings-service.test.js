@@ -181,7 +181,7 @@ test('administrator can choose existing image files as Studio logo and favicon',
   assert.deepEqual(update.params.slice(0, -1), ['Acme CMS', LOGO_FILE_ID, FAVICON_FILE_ID, 'dark']);
 });
 
-test('Studio locale normalization is case-insensitive and rejects locales not enabled yet', async () => {
+test('Studio locale normalization accepts enabled locales and rejects disabled locales', async () => {
   const calls = [];
   const database = {
     async query(sql, params = []) {
@@ -200,12 +200,20 @@ test('Studio locale normalization is case-insensitive and rejects locales not en
 
   const result = await service.updateOne({ default_locale: ' TR ' });
   assert.equal(result.default_locale, 'tr');
-  const update = calls.find(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'));
-  assert.deepEqual(update.params, ['tr', 1]);
+  assert.deepEqual(
+    calls.filter(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'))[0].params,
+    ['tr', 1],
+  );
+
+  await service.updateOne({ default_locale: ' ES ' });
+  assert.deepEqual(
+    calls.filter(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'))[1].params,
+    ['es', 1],
+  );
 
   await assert.rejects(
-    service.updateOne({ default_locale: 'es' }),
-    (error) => error.code === 'INVALID_PAYLOAD' && /en, tr/.test(error.message),
+    service.updateOne({ default_locale: 'de' }),
+    (error) => error.code === 'INVALID_PAYLOAD' && /en, tr, es/.test(error.message),
   );
 });
 
