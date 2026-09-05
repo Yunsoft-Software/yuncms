@@ -48,7 +48,7 @@ This file is the source of truth for implementation and release status. Detailed
 - [x] Replace the empty split sign-in surface with a responsive, project-logo-aware brand panel and keep auth action screens consistent.
 - [x] Correct the routed upload workspace so its heading, dropzone and queue use the full content width.
 - [x] Pass the fast, complete and release suites, including real MySQL/API integration and npm package dry runs.
-- [ ] Publish the public npm packages and verify `latest` resolves to 0.1.17 for each package.
+- [x] Publish the public npm packages and verify `latest` resolves to 0.1.17 for each package.
 
 ## After this release
 
