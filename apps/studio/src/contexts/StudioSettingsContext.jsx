@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { API_URL, apiRequest } from '../api.js';
+import { getLocaleDefinition } from '../locale-registry.js';
 import {
   DEFAULT_STUDIO_SETTINGS,
   applyStudioAppearance,
@@ -70,6 +71,13 @@ export function StudioSettingsProvider({ children }) {
   }, [settings]);
 
   const locale = localeOverride || settings.default_locale;
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const definition = getLocaleDefinition(locale);
+    document.documentElement.lang = definition.code;
+    document.documentElement.dir = definition.direction;
+  }, [locale]);
 
   const setLocale = useCallback((nextLocale) => {
     writeLocalePreference(nextLocale);
