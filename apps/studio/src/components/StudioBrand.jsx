@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { API_URL } from '../api.js';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
+import { getEnabledLocaleDefinitions } from '../locale-registry.js';
 import { resolveStudioLogo } from '../studio-settings.js';
 
 function absoluteLogoUrl(value) {
@@ -79,25 +80,21 @@ export function YunsoftFooter({ compact = false }) {
 
 export function LanguageSwitcher({ compact = false }) {
   const { locale, setLocale, t } = useI18n();
+  const localeOptions = getEnabledLocaleDefinitions();
+
   return (
-    <div className={`language-switcher ${compact ? 'compact' : ''}`} role="group" aria-label={t('appearance.currentLanguage')}>
-      <button
-        className={locale === 'en' ? 'active' : ''}
-        type="button"
-        onClick={() => setLocale('en')}
-        aria-pressed={locale === 'en'}
+    <label className={`language-switcher ${compact ? 'compact' : ''}`}>
+      <span className="sr-only">{t('appearance.currentLanguage')}</span>
+      <select
+        value={locale}
+        onChange={(event) => setLocale(event.target.value)}
+        aria-label={t('appearance.currentLanguage')}
       >
-        EN
-      </button>
-      <button
-        className={locale === 'tr' ? 'active' : ''}
-        type="button"
-        onClick={() => setLocale('tr')}
-        aria-pressed={locale === 'tr'}
-      >
-        TR
-      </button>
-    </div>
+        {localeOptions.map((option) => (
+          <option key={option.code} value={option.code}>{option.nativeName}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
