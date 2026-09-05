@@ -2,7 +2,7 @@
 
 **A programmable MySQL CMS/backend with a focused React Studio, strong role-based access control, Files, extensions, AI/MCP integrations and a documented REST API.**
 
-YunCMS is developed by **Yunsoft**. Learn more about the company at **[Yunsoft — About](https://yunsoft.com/about)**.
+YunCMS is developed and maintained by **[Yunsoft Software](https://yunsoft.com)**.
 
 > YunCMS is currently in the `0.1.x` pre-stable line. Use the managed backup/update flow and verify your own database, storage, proxy and authentication configuration before exposing a production installation.
 

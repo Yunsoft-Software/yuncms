@@ -1,6 +1,6 @@
 {
   "name": "@yunsoft/yuncms",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "Command-line setup and runtime launcher for YunCMS.",
   "license": "MIT",
   "type": "module",
@@ -19,7 +19,7 @@
     "url": "git+https://github.com/Yunsoft-Software/yuncms.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/Yunsoft-Software/yuncms#readme",
+  "homepage": "https://yunsoft.com",
   "bugs": {
     "url": "https://github.com/Yunsoft-Software/yuncms/issues"
   },
@@ -30,7 +30,7 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@yunsoft/yuncms-api": "0.1.19",
-    "@yunsoft/yuncms-core": "0.1.19"
+    "@yunsoft/yuncms-api": "0.1.20",
+    "@yunsoft/yuncms-core": "0.1.20"
   }
 }
