@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { createAccountability, createPublicAccountability } from '../src/accountability.js';
 import { StudioSettingsService } from '../src/services/studio-settings-service.js';
+import { STUDIO_LOCALE_CODES } from '../src/studio-locales.js';
 
 const LOGO_FILE_ID = '123e4567-e89b-42d3-a456-426614174000';
 const FAVICON_FILE_ID = '223e4567-e89b-42d3-a456-426614174001';
@@ -181,14 +182,14 @@ test('administrator can choose existing image files as Studio logo and favicon',
   assert.deepEqual(update.params.slice(0, -1), ['Acme CMS', LOGO_FILE_ID, FAVICON_FILE_ID, 'dark']);
 });
 
-test('Studio locale normalization accepts enabled locales and rejects disabled locales', async () => {
+test('Studio locale normalization accepts every registered locale and rejects unknown locales', async () => {
   const calls = [];
   const database = {
     async query(sql, params = []) {
       calls.push({ sql, params });
       if (sql.includes('UPDATE yuncms_studio_settings')) return [{ affectedRows: 1 }, []];
       if (sql.includes('FROM yuncms_studio_settings')) {
-        return [[{ ...SETTINGS_ROW, default_locale: 'tr' }], []];
+        return [[{ ...SETTINGS_ROW, default_locale: 'en' }], []];
       }
       throw new Error(`Unexpected query: ${sql}`);
     },
@@ -198,22 +199,20 @@ test('Studio locale normalization accepts enabled locales and rejects disabled l
     accountability: createAccountability({ user: 'admin-1', role: 'admin-role', admin: true }),
   });
 
-  const result = await service.updateOne({ default_locale: ' TR ' });
-  assert.equal(result.default_locale, 'tr');
-  assert.deepEqual(
-    calls.filter(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'))[0].params,
-    ['tr', 1],
-  );
+  for (const locale of STUDIO_LOCALE_CODES) {
+    await service.updateOne({ default_locale: ` ${locale.toUpperCase()} ` });
+  }
 
-  await service.updateOne({ default_locale: ' ES ' });
+  const updates = calls.filter(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'));
   assert.deepEqual(
-    calls.filter(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'))[1].params,
-    ['es', 1],
+    updates.map(({ params }) => params),
+    STUDIO_LOCALE_CODES.map((locale) => [locale, 1]),
   );
 
   await assert.rejects(
-    service.updateOne({ default_locale: 'de' }),
-    (error) => error.code === 'INVALID_PAYLOAD' && /en, tr, es/.test(error.message),
+    service.updateOne({ default_locale: 'xx-unknown' }),
+    (error) => error.code === 'INVALID_PAYLOAD'
+      && STUDIO_LOCALE_CODES.every((locale) => error.message.includes(locale)),
   );
 });
 
