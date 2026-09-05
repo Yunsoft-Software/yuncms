@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 
+import { useI18n } from '../i18n.js';
+
 export function RelationPicker({
   value = '',
   items = [],
@@ -7,14 +9,19 @@ export function RelationPicker({
   labelField = 'name',
   required = false,
   disabled = false,
-  placeholder = 'Select a record',
-  searchPlaceholder = 'Search records…',
-  emptyLabel = 'No matching records',
-  noneLabel = 'None',
+  placeholder,
+  searchPlaceholder,
+  emptyLabel,
+  noneLabel,
   onChange,
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const resolvedPlaceholder = placeholder || t('content.chooseRecord');
+  const resolvedSearchPlaceholder = searchPlaceholder || t('content.relationSearch');
+  const resolvedEmptyLabel = emptyLabel || t('content.relationEmpty');
+  const resolvedNoneLabel = noneLabel || t('common.none');
 
   const selected = useMemo(
     () => items.find((item) => String(item?.[keyField]) === String(value)) ?? null,
@@ -51,7 +58,7 @@ export function RelationPicker({
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <span className={selectedLabel ? '' : 'placeholder'}>{selectedLabel || placeholder}</span>
+        <span className={selectedLabel ? '' : 'placeholder'}>{selectedLabel || resolvedPlaceholder}</span>
         <span aria-hidden="true">⌄</span>
       </button>
 
@@ -61,7 +68,7 @@ export function RelationPicker({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={searchPlaceholder}
+            placeholder={resolvedSearchPlaceholder}
             autoFocus
           />
           <div className="relation-picker-options" role="listbox">
@@ -73,7 +80,7 @@ export function RelationPicker({
                 aria-selected={!value}
                 onClick={() => choose('')}
               >
-                {noneLabel}
+                {resolvedNoneLabel}
               </button>
             )}
             {filtered.map((item) => {
@@ -94,7 +101,7 @@ export function RelationPicker({
                 </button>
               );
             })}
-            {filtered.length === 0 && <p className="relation-picker-empty">{emptyLabel}</p>}
+            {filtered.length === 0 && <p className="relation-picker-empty">{resolvedEmptyLabel}</p>}
           </div>
         </div>
       )}
