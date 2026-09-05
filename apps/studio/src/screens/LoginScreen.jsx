@@ -309,7 +309,7 @@ export function LoginScreen({ onAuthenticated }) {
           </form>
 
           {!resetMode && !registerMode && !ldapProvider && (browserProviders.length > 0 || ldapProviders.length > 0) && (
-            <div className="form-stack" aria-label="Authentication providers">
+            <div className="form-stack" aria-label={t('auth.authenticationProviders')}>
               {browserProviders.map((provider) => (
                 <button
                   key={provider.id}
