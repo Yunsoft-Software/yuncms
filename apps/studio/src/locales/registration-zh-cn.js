@@ -24,4 +24,5 @@ export const REGISTRATION_ZH_CN = Object.freeze({
   'auth.verificationResent': '如果此账户仍需验证，新的邮件已发送。',
   'auth.haveAccount': '已有账户？登录',
   'auth.needAccount': '创建账户',
+  'auth.authenticationProviders': '身份验证提供商',
 });
