@@ -1,7 +1,7 @@
 export const LOCALE_CATALOG = Object.freeze({
   en: Object.freeze({ code: 'en', name: 'English', nativeName: 'English', direction: 'ltr', enabled: true }),
   tr: Object.freeze({ code: 'tr', name: 'Turkish', nativeName: 'Türkçe', direction: 'ltr', enabled: true }),
-  es: Object.freeze({ code: 'es', name: 'Spanish', nativeName: 'Español', direction: 'ltr', enabled: false }),
+  es: Object.freeze({ code: 'es', name: 'Spanish', nativeName: 'Español', direction: 'ltr', enabled: true }),
   de: Object.freeze({ code: 'de', name: 'German', nativeName: 'Deutsch', direction: 'ltr', enabled: false }),
   fr: Object.freeze({ code: 'fr', name: 'French', nativeName: 'Français', direction: 'ltr', enabled: false }),
   'pt-BR': Object.freeze({ code: 'pt-BR', name: 'Portuguese (Brazil)', nativeName: 'Português (Brasil)', direction: 'ltr', enabled: false }),
