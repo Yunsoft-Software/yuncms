@@ -1,4 +1,5 @@
 import { compileFilter } from './query.js';
+import { resolveDynamicVariables } from './dynamic-variables.js';
 
 function validationError(message, path = null) {
   const error = new Error(message);
@@ -8,13 +9,19 @@ function validationError(message, path = null) {
 }
 
 function compare(operator, actual, expected) {
+  const temporalExpected = expected instanceof Date ? expected.getTime() : null;
+  const temporalActual = temporalExpected == null
+    ? actual
+    : actual instanceof Date ? actual.getTime() : new Date(actual).getTime();
+  const comparableActual = temporalExpected == null ? actual : temporalActual;
+  const comparableExpected = temporalExpected == null ? expected : temporalExpected;
   switch (operator) {
-    case '_eq': return actual === expected;
-    case '_neq': return actual !== expected;
-    case '_lt': return actual != null && actual < expected;
-    case '_lte': return actual != null && actual <= expected;
-    case '_gt': return actual != null && actual > expected;
-    case '_gte': return actual != null && actual >= expected;
+    case '_eq': return comparableActual === comparableExpected;
+    case '_neq': return comparableActual !== comparableExpected;
+    case '_lt': return comparableActual != null && comparableActual < comparableExpected;
+    case '_lte': return comparableActual != null && comparableActual <= comparableExpected;
+    case '_gt': return comparableActual != null && comparableActual > comparableExpected;
+    case '_gte': return comparableActual != null && comparableActual >= comparableExpected;
     case '_in': return expected.some((candidate) => actual === candidate);
     case '_nin': return !expected.some((candidate) => actual === candidate);
     case '_null': return expected ? actual == null : actual != null;
@@ -47,17 +54,18 @@ function evaluateNode(record, node) {
 
 export function assertPermissionValidationRule(rule, schema) {
   if (rule == null) return null;
-  compileFilter(rule, schema);
+  compileFilter(rule, schema, { allowUnresolvedDynamicVariables: true });
   return rule;
 }
 
-export function evaluatePermissionValidation(record, rule, schema) {
+export function evaluatePermissionValidation(record, rule, schema, { dynamicVariables = {} } = {}) {
   if (rule == null) return true;
   assertPermissionValidationRule(rule, schema);
-  return evaluateNode(record, rule);
+  const resolvedRule = resolveDynamicVariables(rule, dynamicVariables, { path: 'validation' });
+  return evaluateNode(record, resolvedRule);
 }
 
-export function enforcePermissionValidation(record, rule, schema, { path = 'validation' } = {}) {
-  if (evaluatePermissionValidation(record, rule, schema)) return record;
+export function enforcePermissionValidation(record, rule, schema, { path = 'validation', dynamicVariables = {} } = {}) {
+  if (evaluatePermissionValidation(record, rule, schema, { dynamicVariables })) return record;
   throw validationError('Record does not satisfy the permission validation rule', path);
 }

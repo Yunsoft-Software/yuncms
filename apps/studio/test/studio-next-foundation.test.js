@@ -9,6 +9,9 @@ const tokensCss = readFileSync(resolve(SRC, 'studio-next-tokens.css'), 'utf8');
 const authCss = readFileSync(resolve(SRC, 'auth-settings-next.css'), 'utf8');
 const compatCss = readFileSync(resolve(SRC, 'studio-compat.css'), 'utf8');
 const railSource = readFileSync(resolve(SRC, 'components/AppRail.jsx'), 'utf8');
+const brandSource = readFileSync(resolve(SRC, 'components/StudioBrand.jsx'), 'utf8');
+const loginSource = readFileSync(resolve(SRC, 'screens/LoginScreen.jsx'), 'utf8');
+const authActionSource = readFileSync(resolve(SRC, 'screens/AuthActionScreen.jsx'), 'utf8');
 const aiCss = readFileSync(resolve(SRC, 'ai-next.css'), 'utf8');
 
 test('semantic Studio tokens cover workspace borders, state colors, focus and motion', () => {
@@ -50,7 +53,15 @@ test('sign-in removes application navigation and becomes a dedicated responsive 
   assert.match(railSource, /!authSurface && <AppRail \/>/);
   assert.match(compatCss, /\.studio-next-frame\.auth-surface[\s\S]*display:\s*block/);
   assert.match(authCss, /\.auth-shell[\s\S]*grid-template-columns/);
+  assert.match(brandSource, /export function AuthBrandPanel/);
+  assert.match(brandSource, /auth-brand-logo-stage/);
+  assert.match(loginSource, /<AuthBrandPanel \/>/);
+  assert.match(authActionSource, /<AuthBrandPanel \/>/);
+  assert.match(authCss, /\.auth-brand-showcase/);
+  assert.match(authCss, /\.auth-brand-logo-stage/);
+  assert.match(authCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.auth-brand-orbit-one/);
   assert.match(authCss, /@media \(max-width: 680px\)/);
+  assert.match(authCss, /\.auth-footer\s*\{[\s\S]*?align-self:\s*stretch;/);
 });
 
 test('Appearance uses a settings-and-preview layout instead of generic stacked panels', () => {

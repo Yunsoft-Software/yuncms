@@ -70,6 +70,9 @@ function ruleBuilderLabels(t, title, description) {
     operator: t('roles.ruleCondition'),
     value: t('roles.ruleValue'),
     noValue: t('roles.ruleNoValue'),
+    dynamicValue: t('roles.dynamicValue'),
+    dynamicHint: t('roles.dynamicValueHint'),
+    staticValue: t('roles.staticValue'),
     rawLabel: t('roles.advancedJson'),
     trueLabel: t('common.yes'),
     falseLabel: t('common.no'),
@@ -515,6 +518,10 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
                     {(collectionSearch || configuredOnly) && <button className="text-button" type="button" onClick={() => { setCollectionSearch(''); setConfiguredOnly(false); }}>{t('common.reset')}</button>}
                   </div>
                   <div className="permission-collection-grid">
+                    <div className="permission-matrix-columns" aria-hidden="true">
+                      <span>{t('roles.collection')}</span>
+                      {ACTIONS.map((action) => <span key={action}>{actionLabel(action, t)}</span>)}
+                    </div>
                     {pagedCollections.items.map((collection) => {
                       const policy = permissionResourcePolicy(collection);
                       return (
@@ -530,12 +537,12 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
                               const allowed = canConfigurePermission(collection, action, selectedRole);
                               const advanced = isRestricted(permission);
                               return (
-                                <div className="permission-action-row" key={action}>
-                                  <div><strong>{actionLabel(action, t)}</strong><small>{permission ? (advanced ? t('roles.restricted') : t('roles.allRecords')) : t('roles.permissionDisabled')}</small></div>
+                                <div className="permission-action-row" data-action={action} key={action}>
+                                  <div className="permission-action-meta"><strong>{actionLabel(action, t)}</strong><small>{permission ? (advanced ? t('roles.restricted') : t('roles.allRecords')) : t('roles.permissionDisabled')}</small></div>
                                   {allowed ? (
                                     <div className="permission-action-controls">
                                       <label className={`permission-toggle ${permission ? 'enabled' : ''}`}><input type="checkbox" checked={Boolean(permission)} disabled={busyKey === key} onChange={() => togglePermission(collection, action)} aria-label={t('roles.actionCollection', { action: actionLabel(action, t), collection: collection.collection })} /><span>{permission ? t('roles.allowed') : t('roles.off')}</span></label>
-                                      <button className="secondary-button permission-configure" type="button" onClick={() => openPermissionPage(collection, action)}>{t('roles.openPermission')}</button>
+                                      <button className="secondary-button permission-configure" type="button" aria-label={t('roles.openPermission')} title={t('roles.openPermission')} onClick={() => openPermissionPage(collection, action)}><span aria-hidden="true">•••</span><span>{t('roles.configure')}</span></button>
                                     </div>
                                   ) : <span className="status-pill protected-permission">{t('roles.protected')}</span>}
                                 </div>

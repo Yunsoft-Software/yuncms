@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { apiRequest } from '../api.js';
-import { LanguageSwitcher, StudioBrand, YunsoftFooter } from '../components/index.js';
+import { AuthBrandPanel, YunsoftFooter } from '../components/index.js';
 import { useI18n } from '../i18n.js';
 
 export function AuthActionScreen({ action, token, onDone }) {
@@ -56,10 +56,7 @@ export function AuthActionScreen({ action, token, onDone }) {
   return (
     <main className="auth-layout">
       <div className="auth-shell">
-        <div className="auth-branding">
-          <StudioBrand />
-          <LanguageSwitcher compact />
-        </div>
+        <AuthBrandPanel />
         <section className="auth-card" aria-labelledby="auth-action-title">
           <div>
             <p className="eyebrow">YunCMS {t('app.studio')}</p>

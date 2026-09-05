@@ -95,6 +95,41 @@ test('filter compiler parameterizes values and fails closed on operators', () =>
   assert.throws(() => compileFilter({ missing: { _eq: 1 } }, schema), /Unknown field/);
 });
 
+test('filter compiler resolves contextual identities and deterministic time values as parameters', () => {
+  const now = new Date('2026-09-05T10:20:30.000Z');
+  const compiled = compileFilter({
+    _and: [
+      { id: { _eq: '$CURRENT_USER' } },
+      { status: { _eq: '$CURRENT_ROLE' } },
+      { amount: { _lte: '$NOW(+2 hours)' } },
+    ],
+  }, schema, {
+    dynamicVariables: { user: 'user-1', role: 'role-1', now },
+  });
+
+  assert.equal(compiled.sql.includes('$CURRENT'), false);
+  assert.deepEqual(compiled.params.slice(0, 2), ['user-1', 'role-1']);
+  assert.equal(compiled.params[2] instanceof Date, true);
+  assert.equal(compiled.params[2].toISOString(), '2026-09-05T12:20:30.000Z');
+});
+
+test('dynamic identity variables fail closed and malformed or nested values are rejected', () => {
+  assert.throws(
+    () => compileFilter({ id: { _eq: '$CURRENT_USER' } }, schema),
+    (error) => error.code === 'FORBIDDEN' && error.path === 'filter.id._eq',
+  );
+  assert.throws(
+    () => compileFilter({ amount: { _lte: '$NOW(next week)' } }, schema),
+    (error) => error.code === 'INVALID_QUERY' && /signed adjustment/.test(error.message),
+  );
+  assert.throws(
+    () => compileFilter({ id: { _eq: '$CURRENT_USER.email' } }, schema, {
+      allowUnresolvedDynamicVariables: true,
+    }),
+    (error) => error.code === 'INVALID_QUERY' && /Nested current-user/.test(error.message),
+  );
+});
+
 test('filter compiler rejects oversized IN lists and excessive nesting', () => {
   assert.throws(
     () => compileFilter({

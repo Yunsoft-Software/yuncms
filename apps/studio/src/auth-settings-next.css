@@ -39,32 +39,225 @@
 .auth-branding {
   grid-column: 1;
   grid-row: 1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 36px;
   padding: 28px 30px;
   border-right: 1px solid var(--ui-border);
-  background: var(--ui-surface-subtle);
+  overflow: hidden;
+  background:
+    linear-gradient(155deg, color-mix(in srgb, var(--yun-spectrum-one) 10%, transparent), transparent 44%),
+    radial-gradient(circle at 80% 18%, color-mix(in srgb, var(--yun-spectrum-two) 18%, transparent), transparent 32%),
+    radial-gradient(circle at 18% 82%, color-mix(in srgb, var(--yun-spectrum-three) 13%, transparent), transparent 35%),
+    var(--ui-surface-subtle);
 }
 
-.auth-branding .studio-brand {
+.auth-branding::before {
+  content: '';
+  z-index: -2;
+  position: absolute;
+  inset: 0;
+  opacity: .26;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--ui-border-strong) 42%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ui-border-strong) 42%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(155deg, #000, transparent 72%);
+}
+
+.auth-branding::after {
+  content: '';
+  z-index: -1;
+  position: absolute;
+  width: 310px;
+  height: 310px;
+  right: -150px;
+  bottom: -126px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--yun-spectrum-two) 30%, transparent);
+  box-shadow:
+    0 0 0 54px color-mix(in srgb, var(--yun-spectrum-three) 5%, transparent),
+    0 0 0 108px color-mix(in srgb, var(--yun-spectrum-one) 3%, transparent);
+  animation: auth-brand-breathe 11s ease-in-out infinite alternate;
+}
+
+.auth-branding-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.auth-branding-head > .studio-brand {
   width: min(180px, 72%);
 }
 
-.auth-branding .studio-brand-logo {
+.auth-branding-head > .studio-brand .studio-brand-logo {
   max-width: 156px;
   max-height: 42px;
 }
 
-.auth-branding .language-switcher {
+.auth-branding-head > .language-switcher {
   flex: 0 0 auto;
+}
+
+.auth-brand-showcase {
+  width: min(100%, 440px);
+  align-self: center;
+  justify-self: center;
+  display: grid;
+  gap: 28px;
+  padding: 20px 4px 54px;
+}
+
+.auth-brand-visual {
+  position: relative;
+  min-height: clamp(150px, 21vw, 230px);
+  display: grid;
+  place-items: center;
+}
+
+.auth-brand-logo-stage {
+  position: relative;
+  z-index: 2;
+  width: min(80%, 320px);
+  min-height: 116px;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  border: 1px solid color-mix(in srgb, var(--ui-border-strong) 78%, transparent);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--ui-surface) 78%, transparent);
+  box-shadow:
+    0 30px 80px color-mix(in srgb, var(--yun-ink) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 48%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.auth-brand-logo-stage .studio-brand {
+  justify-content: center;
+  width: 100%;
+}
+
+.auth-brand-logo-stage .studio-brand-logo {
+  width: auto;
+  max-width: min(100%, 220px);
+  height: auto;
+  max-height: 64px;
+  object-position: center;
+}
+
+.auth-brand-orbit {
+  position: absolute;
+  z-index: 1;
+  border: 1px solid color-mix(in srgb, var(--yun-spectrum-two) 24%, var(--ui-border));
+  border-radius: 50%;
+}
+
+.auth-brand-orbit-one {
+  width: min(78%, 320px);
+  aspect-ratio: 1;
+  animation: auth-brand-orbit 18s linear infinite;
+}
+
+.auth-brand-orbit-two {
+  width: min(55%, 220px);
+  aspect-ratio: 1;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--yun-spectrum-three) 32%, var(--ui-border));
+  animation: auth-brand-orbit 13s linear infinite reverse;
+}
+
+.auth-brand-copy {
+  position: relative;
+  z-index: 2;
+}
+
+.auth-brand-copy .eyebrow {
+  margin: 0 0 9px;
+  color: var(--ui-text-tertiary);
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.auth-brand-copy h2 {
+  max-width: 420px;
+  margin: 0;
+  color: var(--ui-text);
+  font-size: clamp(30px, 3.4vw, 46px);
+  font-weight: 590;
+  line-height: .98;
+  letter-spacing: -.052em;
+}
+
+.auth-brand-copy > p:last-of-type {
+  max-width: 410px;
+  margin: 14px 0 0;
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.auth-brand-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.auth-brand-capabilities span {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 31px;
+  padding: 6px 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-surface) 66%, transparent);
+  color: var(--ui-text-secondary);
+  font-size: 10.5px;
+  font-weight: 690;
+  backdrop-filter: blur(12px);
+}
+
+.auth-brand-capabilities span::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--yun-spectrum-two);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--yun-spectrum-two) 12%, transparent);
+}
+
+.auth-brand-capabilities span:nth-child(2)::before {
+  background: var(--yun-spectrum-three);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--yun-spectrum-three) 12%, transparent);
+}
+
+.auth-brand-capabilities span:nth-child(3)::before {
+  background: var(--yun-spectrum-one);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--yun-spectrum-one) 12%, transparent);
+}
+
+@keyframes auth-brand-orbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes auth-brand-breathe {
+  to { transform: translate3d(-24px, -18px, 0) scale(1.05); }
 }
 
 .auth-card {
   grid-column: 2;
   grid-row: 1 / span 2;
   width: min(100%, 520px);
+  display: grid;
+  align-content: center;
   align-self: center;
   justify-self: center;
   padding: clamp(28px, 5vw, 54px);
@@ -317,12 +510,32 @@
 
 @media (max-width: 900px) {
   .auth-shell {
-    grid-template-columns: minmax(210px, .6fr) minmax(360px, 1.4fr);
+    grid-template-columns: minmax(290px, .85fr) minmax(390px, 1.15fr);
   }
 
   .auth-branding,
   .auth-footer {
     padding-inline: 22px;
+  }
+
+  .auth-branding {
+    gap: 18px;
+  }
+
+  .auth-brand-showcase {
+    gap: 18px;
+    padding-bottom: 36px;
+  }
+
+  .auth-brand-logo-stage {
+    width: min(88%, 270px);
+    min-height: 96px;
+    padding: 20px;
+  }
+
+  .auth-brand-copy h2 {
+    font-size: clamp(26px, 4vw, 34px);
+    overflow-wrap: anywhere;
   }
 
   .appearance-layout {
@@ -354,8 +567,18 @@
     border-bottom: 1px solid var(--ui-border);
   }
 
-  .auth-branding .studio-brand {
+  .auth-branding-head {
+    width: 100%;
+  }
+
+  .auth-branding-head > .studio-brand {
     width: min(150px, 62%);
+  }
+
+  .auth-brand-showcase,
+  .auth-branding::before,
+  .auth-branding::after {
+    display: none;
   }
 
   .auth-card {
@@ -367,6 +590,8 @@
   }
 
   .auth-footer {
+    width: 100%;
+    align-self: stretch;
     padding: 14px 18px 18px;
     border-right: 0;
     border-top: 1px solid var(--ui-border);
@@ -384,5 +609,13 @@
 
   .appearance-heading {
     display: grid;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-branding::after,
+  .auth-brand-orbit-one,
+  .auth-brand-orbit-two {
+    animation: none;
   }
 }

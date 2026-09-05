@@ -85,33 +85,29 @@
   .sidebar-collapsed .sidebar-collapse-button,
   .sidebar.mobile-nav-open .sidebar-collapse-button,
   .sidebar-collapsed .sidebar.mobile-nav-open .sidebar-collapse-button {
-    width: auto;
-    min-width: 42px;
-    height: 38px;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
-    padding: 0 10px;
+    gap: 0;
+    padding: 0;
     transform: none;
-    border: 1px solid var(--studio-border);
-    background: var(--studio-surface-muted);
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 20%, var(--studio-border));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--ui-accent) 7%, var(--studio-surface));
+    color: var(--ui-accent);
   }
 
   .sidebar .sidebar-collapse-button .sidebar-icon {
-    transform: rotate(-90deg);
-    transition: transform 150ms ease;
-  }
-
-  .sidebar.mobile-nav-open .sidebar-collapse-button .sidebar-icon {
-    transform: rotate(90deg);
+    width: 20px;
+    height: 20px;
+    transform: none;
   }
 
   .mobile-menu-label {
-    display: inline;
-    color: var(--studio-text-soft);
-    font-size: 12px;
-    font-weight: 750;
+    display: none;
   }
 
   .page-breadcrumbs {

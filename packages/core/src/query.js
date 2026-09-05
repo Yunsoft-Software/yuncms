@@ -1,4 +1,5 @@
 import { quoteIdentifier } from './identifier.js';
+import { resolveDynamicVariables } from './dynamic-variables.js';
 
 const QUERY_KEYS = new Set(['fields', 'filter', 'sort', 'limit', 'offset', 'search', 'aggregate', 'groupBy']);
 const FILTER_OPERATORS = new Set([
@@ -289,7 +290,16 @@ function compileFilterObject(filter, schema, path, limits, state, depth) {
 
 export function compileFilter(filter, schema, options = {}) {
   if (!filter) return { sql: '', params: [] };
-  const limits = { ...QUERY_LIMITS, ...options };
-  const compiled = compileFilterObject(filter, schema, 'filter', limits, { nodes: 0 }, 1);
+  const {
+    dynamicVariables = {},
+    allowUnresolvedDynamicVariables = false,
+    ...limitOptions
+  } = options;
+  const limits = { ...QUERY_LIMITS, ...limitOptions };
+  const resolvedFilter = resolveDynamicVariables(filter, dynamicVariables, {
+    allowUnresolved: allowUnresolvedDynamicVariables,
+    path: 'filter',
+  });
+  const compiled = compileFilterObject(resolvedFilter, schema, 'filter', limits, { nodes: 0 }, 1);
   return { sql: ` WHERE ${compiled.sql}`, params: compiled.params };
 }

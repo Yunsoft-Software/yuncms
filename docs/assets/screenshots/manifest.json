@@ -1,7 +1,7 @@
 {
-  "yuncmsVersion": "0.1.16",
+  "yuncmsVersion": "0.1.17",
   "capturedAt": "2026-09-05",
-  "source": "0.1.16 release-candidate build on http://127.0.0.1:3008",
+  "source": "0.1.17 release-candidate build on http://127.0.0.1:3008",
   "files": [
     "studio-content.png",
     "studio-data-model.png",

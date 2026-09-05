@@ -47,6 +47,7 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
   const token = suffix();
   const collection = `it_accountability_${token}`;
   const actorId = `actor-${token}`.slice(0, 36);
+  const secondActorId = `actor-2-${token}`.slice(0, 36);
   const actorEmail = `actor-${token}@example.test`;
   const collections = new CollectionsService({ database: pool, accountability: system });
   const fields = new FieldsService({ database: pool, accountability: system });
@@ -56,13 +57,21 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
   let userReadPermissionId = null;
   let publicUserReadPermissionId = null;
   let roleUpdatePermissionId = null;
+  let contentReadPermissionId = null;
 
   try {
     await bootstrapDatabase(pool);
     await pool.query(
       `INSERT INTO yuncms_users (id, email, password_hash, role, status)
-       VALUES (?, ?, ?, NULL, 'active')`,
-      [actorId, actorEmail, 'integration-only-password-hash'],
+       VALUES (?, ?, ?, NULL, 'active'), (?, ?, ?, NULL, 'active')`,
+      [
+        actorId,
+        actorEmail,
+        'integration-only-password-hash',
+        secondActorId,
+        `actor-2-${token}@example.test`,
+        'integration-only-password-hash',
+      ],
     );
 
     await collections.createOne({
@@ -106,6 +115,11 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
     assert.equal(updated.created_by, actorId);
     assert.equal(updated.updated_by, actorId);
     assert.ok(new Date(updated.updated_at).getTime() >= new Date(created.updated_at).getTime());
+    const secondActorItems = new ItemsService(collection, {
+      database: pool,
+      accountability: createAccountability({ user: secondActorId, admin: true }),
+    });
+    await secondActorItems.createOne({ title: 'Second actor' });
 
     const [constraints] = await pool.query(
       `SELECT k.COLUMN_NAME, k.REFERENCED_TABLE_NAME, r.DELETE_RULE
@@ -139,6 +153,30 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
 
     const role = await roles.createOne({ name: `Content manager ${token}` });
     customRoleId = role.id;
+    const contentReadPermission = await permissions.createOne({
+      role: customRoleId,
+      collection,
+      action: 'read',
+      fields: ['id', 'title', 'created_by', 'published_at'],
+      filter: {
+        _and: [
+          { created_by: { _eq: '$CURRENT_USER' } },
+          { published_at: { _lte: '$NOW(+1 day)' } },
+        ],
+      },
+    });
+    contentReadPermissionId = contentReadPermission.id;
+    const firstActorRows = await new ItemsService(collection, {
+      database: pool,
+      accountability: createAccountability({ user: actorId, role: customRoleId }),
+    }).readMany({ sort: 'title' });
+    const secondActorRows = await new ItemsService(collection, {
+      database: pool,
+      accountability: createAccountability({ user: secondActorId, role: customRoleId }),
+    }).readMany({ sort: 'title' });
+    assert.deepEqual(firstActorRows.map((row) => row.title), ['Changed']);
+    assert.deepEqual(secondActorRows.map((row) => row.title), ['Second actor']);
+
     const permission = await permissions.createOne({
       role: customRoleId,
       collection: 'yuncms_users',
@@ -192,12 +230,14 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
     assert.equal(preserved.created_by, null);
     assert.equal(preserved.updated_by, null);
   } finally {
+    if (contentReadPermissionId) await permissions.deleteOne(contentReadPermissionId).catch(() => {});
     if (roleUpdatePermissionId) await permissions.deleteOne(roleUpdatePermissionId).catch(() => {});
     if (publicUserReadPermissionId) await permissions.deleteOne(publicUserReadPermissionId).catch(() => {});
     if (userReadPermissionId) await permissions.deleteOne(userReadPermissionId).catch(() => {});
     if (customRoleId) await roles.deleteOne(customRoleId).catch(() => {});
     await collections.deleteOne(collection, { destructive: true }).catch(() => {});
     await pool.query('DELETE FROM yuncms_users WHERE id = ?', [actorId]).catch(() => {});
+    await pool.query('DELETE FROM yuncms_users WHERE id = ?', [secondActorId]).catch(() => {});
     await closeDatabasePool(pool);
   }
 });

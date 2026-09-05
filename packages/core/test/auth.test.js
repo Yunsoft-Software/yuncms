@@ -77,12 +77,51 @@ test('refresh rotation makes the old refresh token unusable and preserves the ro
   assert.equal(tokenType(rotated.access_token), 'access');
   assert.equal(tokenType(rotated.refresh_token), 'refresh');
   assert.equal(rotated.role_name, 'Content Editor');
+  assert.equal(rotated.admin, false);
   assert.notEqual(rotated.refresh_token, original.token);
 
   await assert.rejects(
     service.rotateRefreshToken(original.token),
     (error) => error.code === 'INVALID_CREDENTIALS',
   );
+});
+
+test('login session user exposes the administrator flag required by Studio navigation', async () => {
+  const encoded = await hashPassword('actual-password', {
+    N: 1024,
+    r: 8,
+    p: 1,
+    keyLength: 32,
+    maxmem: 16 * 1024 * 1024,
+  });
+  const database = {
+    async query(sql) {
+      const normalized = sql.replace(/\s+/g, ' ').trim();
+      if (normalized.startsWith('SELECT u.id, u.email, u.password_hash')) {
+        return [[{
+          id: 'admin-1',
+          email: 'admin@example.com',
+          password_hash: encoded,
+          role: 'admin-role',
+          role_name: 'Administrator',
+          status: 'active',
+          email_verified_at: new Date('2026-09-05T00:00:00.000Z'),
+          role_admin: 1,
+          role_public: 0,
+        }], []];
+      }
+      if (normalized.startsWith('INSERT INTO yuncms_sessions')) return [{ affectedRows: 1 }, []];
+      throw new Error(`Unexpected query: ${normalized}`);
+    },
+  };
+  const service = new AuthService({
+    accountability: createPublicAccountability(),
+    database,
+  });
+
+  const result = await service.login({ email: 'admin@example.com', password: 'actual-password' });
+  assert.equal(result.user.admin, true);
+  assert.equal(result.user.role_name, 'Administrator');
 });
 
 test('login returns generic invalid credentials for wrong password', async () => {

@@ -101,7 +101,13 @@ export class FilesService extends BaseService {
           'System schema is required to enforce a filtered Files permission',
         );
       }
-      const compiled = compileFilter(permission.filter, collectionSchema);
+      const compiled = compileFilter(permission.filter, collectionSchema, {
+        dynamicVariables: {
+          user: this.accountability.user,
+          role: this.accountability.role,
+          now: new Date(),
+        },
+      });
       sql = compiled.sql;
       params = [...compiled.params];
     }

@@ -324,13 +324,40 @@
   margin-top: 10px;
   overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: 9px;
+  border-radius: 12px;
   background: var(--ui-surface);
+}
+
+.permission-matrix-columns {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.45fr) repeat(4, minmax(108px, 1fr));
+  min-height: 42px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.permission-matrix-columns > span {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--ui-text-tertiary);
+  font-size: 9.5px;
+  font-weight: 760;
+  letter-spacing: .075em;
+  text-transform: uppercase;
+}
+
+.permission-matrix-columns > span:first-child {
+  border-right: 1px solid var(--ui-border);
+}
+
+.permission-matrix-columns > span:not(:last-child) {
+  border-right: 1px solid var(--ui-border);
 }
 
 .permission-collection-card {
   display: grid;
-  grid-template-columns: minmax(190px, 1.35fr) minmax(0, 3.65fr);
+  grid-template-columns: minmax(220px, 1.45fr) minmax(0, 4fr);
   align-items: stretch;
   min-width: 0;
   border: 0;
@@ -349,7 +376,7 @@
   align-content: center;
   gap: 3px;
   min-width: 0;
-  padding: 11px 12px;
+  padding: 13px 14px;
   border-right: 1px solid var(--ui-border);
   background: var(--ui-surface-subtle);
 }
@@ -366,7 +393,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 720;
 }
 
 .permission-collection-card > header > small {
@@ -379,7 +407,7 @@
 
 .permission-action-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(104px, 1fr));
+  grid-template-columns: repeat(4, minmax(108px, 1fr));
   min-width: 0;
 }
 
@@ -387,10 +415,10 @@
   position: relative;
   display: grid;
   align-content: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
-  min-height: 76px;
-  padding: 9px 10px;
+  min-height: 86px;
+  padding: 10px 11px;
   border-right: 1px solid var(--ui-border);
   background: var(--ui-surface);
   transition: background var(--motion-fast) var(--ease-ui);
@@ -405,23 +433,25 @@
   background: var(--ui-surface-hover);
 }
 
-.permission-action-row > div:first-child {
+.permission-action-meta {
   display: grid;
   gap: 2px;
 }
 
-.permission-action-row > div:first-child strong {
-  font-size: 10.5px;
+.permission-action-meta strong {
+  display: none;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.045em;
   color: var(--ui-text-secondary);
 }
 
-.permission-action-row > div:first-child small {
+.permission-action-meta small {
   min-height: 13px;
   color: var(--ui-text-tertiary);
-  font-size: 9.5px;
+  font-size: 9.75px;
+  font-weight: 620;
 }
 
 .permission-action-controls {
@@ -460,17 +490,21 @@
 
 .permission-configure {
   min-height: 27px;
-  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
   border-color: transparent;
   background: transparent;
-  font-size: 10px;
-  opacity: .72;
-  transition: opacity var(--motion-fast) var(--ease-ui), background var(--motion-fast) var(--ease-ui);
+  color: var(--ui-text-secondary);
+  font-size: 9.5px;
+  opacity: 1;
+  transition: color var(--motion-fast) var(--ease-ui), background var(--motion-fast) var(--ease-ui);
 }
 
 .permission-action-row:hover .permission-configure,
 .permission-action-row:focus-within .permission-configure {
-  opacity: 1;
+  color: var(--ui-accent);
 }
 
 .protected-permission {
@@ -567,18 +601,43 @@
 }
 
 @media (max-width: 1180px) {
+  .permission-matrix-columns {
+    display: none;
+  }
+
   .permission-collection-card {
-    grid-template-columns: minmax(160px, 1fr) minmax(0, 3fr);
+    grid-template-columns: 1fr;
+  }
+
+  .permission-collection-card > header {
+    border-right: 0;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .permission-action-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .permission-action-row {
-    min-height: 82px;
-    padding: 8px;
+    min-height: 76px;
+    padding: 10px 12px;
+  }
+
+  .permission-action-row:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .permission-action-row:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .permission-action-meta strong {
+    display: block;
   }
 
   .permission-action-controls {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
   }
 }
 
@@ -600,15 +659,6 @@
     padding: 16px 0 0;
   }
 
-  .permission-collection-card {
-    grid-template-columns: 1fr;
-  }
-
-  .permission-collection-card > header {
-    border-right: 0;
-    border-bottom: 1px solid var(--ui-border);
-  }
-
   .permission-rule-page {
     grid-template-columns: 1fr;
   }
@@ -621,18 +671,6 @@
 
   .permission-list-controls .field-label {
     grid-column: 1 / -1;
-  }
-
-  .permission-action-list {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .permission-action-row:nth-child(2n) {
-    border-right: 0;
-  }
-
-  .permission-action-row:nth-child(-n + 2) {
-    border-bottom: 1px solid var(--ui-border);
   }
 
   .role-summary-panel,

@@ -149,3 +149,40 @@ test('permission validation metadata is schema-validated before database mutatio
   );
   assert.equal(database.calls.length, 0);
 });
+
+test('permission metadata accepts supported dynamic values but rejects unsupported nested paths', async () => {
+  const database = databaseWithPermission();
+  const service = new PermissionsService({
+    database,
+    schema,
+    accountability: createSystemAccountability(),
+  });
+
+  await assert.rejects(
+    service.createOne({
+      role: 'role-1',
+      collection: 'projects',
+      action: 'read',
+      filter: {
+        _and: [
+          { id: { _eq: '$CURRENT_USER' } },
+          { status: { _eq: '$CURRENT_ROLE' } },
+        ],
+      },
+    }),
+    (error) => error.code === 'ROLE_NOT_FOUND',
+  );
+  assert.equal(database.calls.length, 1, 'supported variables should reach the role lookup');
+
+  database.calls.length = 0;
+  await assert.rejects(
+    service.createOne({
+      role: 'role-1',
+      collection: 'projects',
+      action: 'read',
+      filter: { id: { _eq: '$CURRENT_USER.email' } },
+    }),
+    (error) => error.code === 'INVALID_QUERY',
+  );
+  assert.equal(database.calls.length, 0);
+});

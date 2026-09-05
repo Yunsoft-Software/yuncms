@@ -11,6 +11,8 @@ const PATHS = {
   mcp: <><path d="M8.5 7.5 6 10a3 3 0 0 0 4.2 4.2l2-2"/><path d="m15.5 16.5 2.5-2.5a3 3 0 0 0-4.2-4.2l-2 2"/><path d="m9 15 6-6"/></>,
   chevron: <path d="m9 6 6 6-6 6"/>,
   collapse: <><path d="M4 5h16v14H4z"/><path d="m14 9-3 3 3 3"/></>,
+  menu: <><path d="M5 7h14M5 12h14M5 17h14"/></>,
+  close: <><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></>,
 };
 
 export function SidebarIcon({ name, size = 18 }) {

@@ -14,6 +14,14 @@ const OPERATORS = Object.freeze([
   '_nnull',
 ]);
 
+const DYNAMIC_VALUES = Object.freeze([
+  '$CURRENT_USER',
+  '$CURRENT_ROLE',
+  '$NOW',
+  '$NOW(-1 day)',
+  '$NOW(+1 day)',
+]);
+
 function simpleClauseFromObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const fields = Object.keys(value);
@@ -56,6 +64,9 @@ function fieldType(fields, fieldName) {
 
 function normalizeRuleValue(type, operator, value) {
   if (operator === '_null' || operator === '_nnull') return true;
+  if (typeof value === 'string' && DYNAMIC_VALUES.some((entry) => value.startsWith(entry.replace(/\(.+$/, '')))) {
+    return value;
+  }
   if (type === 'boolean') return value === true || value === 'true';
   if (['integer', 'bigint'].includes(type)) {
     const parsed = Number.parseInt(value, 10);
@@ -145,6 +156,7 @@ export function RuleBuilder({
           {rules.map((rule, index) => {
             const type = fieldType(fields, rule.field);
             const noValue = rule.operator === '_null' || rule.operator === '_nnull';
+            const dynamicValue = typeof rule.value === 'string' && rule.value.startsWith('$');
             return (
               <div className="rule-builder-row" key={`${index}-${rule.field}-${rule.operator}`}>
                 <select
@@ -169,26 +181,43 @@ export function RuleBuilder({
                 </select>
                 {noValue ? (
                   <span className="rule-builder-no-value">{labels.noValue || 'No value'}</span>
-                ) : type === 'boolean' ? (
-                  <select
-                    value={String(rule.value ?? '')}
-                    disabled={disabled}
-                    aria-label={labels.value || 'Value'}
-                    onChange={(event) => updateRule(index, { value: event.target.value })}
-                  >
-                    <option value="">—</option>
-                    <option value="true">{labels.trueLabel || 'True'}</option>
-                    <option value="false">{labels.falseLabel || 'False'}</option>
-                  </select>
                 ) : (
-                  <input
-                    type={inputType(type)}
-                    step={type === 'decimal' ? 'any' : undefined}
-                    value={rule.value === true ? '' : (rule.value ?? '')}
-                    disabled={disabled}
-                    aria-label={labels.value || 'Value'}
-                    onChange={(event) => updateRule(index, { value: event.target.value })}
-                  />
+                  <div className={`rule-builder-value-control ${dynamicValue ? 'dynamic' : ''}`}>
+                    {type === 'boolean' && !dynamicValue ? (
+                      <select
+                        value={String(rule.value ?? '')}
+                        disabled={disabled}
+                        aria-label={labels.value || 'Value'}
+                        onChange={(event) => updateRule(index, { value: event.target.value })}
+                      >
+                        <option value="">—</option>
+                        <option value="true">{labels.trueLabel || 'True'}</option>
+                        <option value="false">{labels.falseLabel || 'False'}</option>
+                      </select>
+                    ) : (
+                      <input
+                        type={dynamicValue ? 'text' : inputType(type)}
+                        step={!dynamicValue && type === 'decimal' ? 'any' : undefined}
+                        value={rule.value === true ? '' : (rule.value ?? '')}
+                        disabled={disabled}
+                        aria-label={labels.value || 'Value'}
+                        onChange={(event) => updateRule(index, { value: event.target.value })}
+                      />
+                    )}
+                    <select
+                      className="rule-builder-dynamic-select"
+                      value={DYNAMIC_VALUES.includes(rule.value) ? rule.value : ''}
+                      disabled={disabled}
+                      aria-label={labels.dynamicValue || 'Dynamic value'}
+                      title={labels.dynamicHint || 'Use a value from the current request context'}
+                      onChange={(event) => {
+                        if (event.target.value) updateRule(index, { value: event.target.value });
+                      }}
+                    >
+                      <option value="">{labels.staticValue || 'Static'}</option>
+                      {DYNAMIC_VALUES.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+                    </select>
+                  </div>
                 )}
                 <button
                   className="text-button rule-builder-remove"
@@ -226,4 +255,4 @@ export function RuleBuilder({
   );
 }
 
-export { OPERATORS as RULE_OPERATORS };
+export { DYNAMIC_VALUES as RULE_DYNAMIC_VALUES, OPERATORS as RULE_OPERATORS };

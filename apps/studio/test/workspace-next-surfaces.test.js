@@ -34,8 +34,8 @@ test('Data Model separates collection navigation from the schema workbench', () 
 });
 
 test('Access renders permissions as a compact four-action audit grid without relying on color alone', () => {
-  assert.match(accessCss, /\.permission-action-list[\s\S]*repeat\(4, minmax\(104px, 1fr\)\)/);
-  assert.match(accessCss, /\.permission-action-row > div:first-child strong/);
+  assert.match(accessCss, /\.permission-action-list[\s\S]*repeat\(4, minmax\(108px, 1fr\)\)/);
+  assert.match(accessCss, /\.permission-action-meta strong/);
   assert.match(accessCss, /\.permission-toggle\.enabled/);
   assert.match(accessCss, /\.permission-state-badge\.disabled/);
   assert.match(accessCss, /@media \(max-width: 620px\)/);

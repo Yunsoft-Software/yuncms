@@ -111,6 +111,44 @@ test('role row filter is server-enforced while hidden fields cannot be queried b
   );
 });
 
+test('cached role rules resolve CURRENT_USER per request instead of per role', async () => {
+  const permission = {
+    id: 'permission-current-user',
+    role: 'role-1',
+    collection: 'projects',
+    action: 'read',
+    fields: null,
+    filter: JSON.stringify({ id: { _eq: '$CURRENT_USER' } }),
+    validation: null,
+  };
+  const cacheValues = new Map();
+  const permissionCache = {
+    async get(key) { return cacheValues.get(key); },
+    async set(key, value) { cacheValues.set(key, value); },
+  };
+
+  const firstDatabase = createDatabase({ permission });
+  const first = new ItemsService('projects', {
+    database: firstDatabase,
+    schema,
+    permissionCache,
+    accountability: createAccountability({ user: 'user-1', role: 'role-1' }),
+  });
+  await first.readMany();
+  assert.equal(firstDatabase.calls[1].params[0], 'user-1');
+
+  const secondDatabase = createDatabase({ permission });
+  const second = new ItemsService('projects', {
+    database: secondDatabase,
+    schema,
+    permissionCache,
+    accountability: createAccountability({ user: 'user-2', role: 'role-1' }),
+  });
+  await second.readMany();
+  assert.equal(secondDatabase.calls[0].params[0], 'user-2');
+  assert.equal(secondDatabase.calls.some(({ sql }) => sql.includes('FROM yuncms_permissions')), false);
+});
+
 test('relation reads keep hidden lookup fields internal and chunk trusted source keys', async () => {
   const database = createDatabase({
     permission: {

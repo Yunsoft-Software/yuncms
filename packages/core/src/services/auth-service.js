@@ -38,6 +38,7 @@ function publicUser(user) {
     email: user.email,
     role: user.role ?? null,
     role_name: user.role_name ?? null,
+    admin: Boolean(user.role_admin ?? user.admin),
     status: user.status,
     email_verified_at: user.email_verified_at ?? null,
   };
@@ -191,6 +192,7 @@ export class AuthService extends BaseService {
         email: result.email,
         role: result.role,
         role_name: result.role_name ?? null,
+        admin: result.admin === true,
       },
       access_token: result.access_token,
       access_expires_at: result.access_expires_at,

@@ -1,6 +1,12 @@
 export { DEFAULT_SERVER_PORT, loadConfig, loadEnvFileIfPresent } from './config.js';
 export { isCacheStore, MemoryCacheStore } from './cache.js';
 export {
+  DYNAMIC_FILTER_VALUES,
+  resolveDynamicVariable,
+  resolveDynamicVariables,
+} from './dynamic-variables.js';
+
+export {
   RedisClient,
   RedisCacheStore,
   RedisFixedWindowStore,

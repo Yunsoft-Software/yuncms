@@ -230,6 +230,33 @@ An empty `_in` matches no rows; an empty `_nin` excludes no rows. Each array acc
 
 Text operators escape SQL LIKE wildcard characters in user input before binding.
 
+### Dynamic values
+
+Filters may resolve a small set of request-context values at execution time:
+
+| Value | Resolves to |
+| --- | --- |
+| `$CURRENT_USER` | authenticated user's primary key |
+| `$CURRENT_ROLE` | current role's primary key |
+| `$NOW` | one timestamp captured for the operation |
+| `$NOW(<adjustment>)` | that timestamp plus/minus a signed number of seconds, minutes, hours, days, weeks, months or years |
+
+Examples:
+
+```json
+{
+  "owner_id": { "_eq": "$CURRENT_USER" },
+  "publish_at": { "_lte": "$NOW" },
+  "expires_at": { "_gt": "$NOW(+2 hours)" }
+}
+```
+
+Dynamic values are resolved before SQL compilation and remain bound parameters; they never become SQL text. `$CURRENT_USER` fails closed when no authenticated user exists. `$CURRENT_ROLE` also fails closed when the request has no resolved role.
+
+Adjustments must use an explicit sign, for example `$NOW(-1 day)` or `$NOW(+2 hours)`. Malformed/unbounded adjustments are rejected with `INVALID_QUERY`.
+
+YunCMS V1 deliberately supports the root identity values only. Directus-style related paths such as `$CURRENT_USER.team.name`, multi-role/policy arrays and `$FOLLOW(...)` are not implemented because YunCMS V1 has a single-role model and no policy layer.
+
 ### AND behavior
 
 Different field clauses in the same object are combined with `AND`:
