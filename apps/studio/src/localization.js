@@ -19,7 +19,7 @@ import { UX_TR } from './locales/ux-tr.js';
 export const EN = Object.freeze({ ...BASE_EN, ...UI_EN, ...UX_EN, ...AI_EN, ...MCP_EN, ...NAVIGATION_EN, ...REGISTRATION_EN, ...STUDIO_NEXT_EN });
 export const TR = Object.freeze({ ...BASE_TR, ...UI_TR, ...UX_TR, ...AI_TR, ...MCP_TR, ...NAVIGATION_TR, ...REGISTRATION_TR, ...STUDIO_NEXT_TR });
 
-const DICTIONARIES = Object.freeze({ en: EN, tr: TR });
+export const DICTIONARIES = Object.freeze({ en: EN, tr: TR });
 
 function interpolate(message, values = {}) {
   return message.replace(/\{(\w+)\}/g, (_, key) => (
