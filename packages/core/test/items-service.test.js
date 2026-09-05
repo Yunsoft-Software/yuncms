@@ -18,6 +18,9 @@ const schema = {
         id: { field: 'id', type: 'uuid', required: 1, readonly: 1, schema_metadata: { primaryKey: true } },
         title: { field: 'title', type: 'string', required: 1, readonly: 0, schema_metadata: {} },
         status: { field: 'status', type: 'string', required: 0, readonly: 0, schema_metadata: {} },
+        settings: { field: 'settings', type: 'json', required: 0, readonly: 0, schema_metadata: {} },
+        published_at: { field: 'published_at', type: 'datetime', required: 0, readonly: 0, schema_metadata: {} },
+        processed_at: { field: 'processed_at', type: 'timestamp', required: 0, readonly: 0, schema_metadata: {} },
       },
     },
   },
@@ -206,4 +209,100 @@ test('bulk update/delete require explicit non-empty filters', async () => {
   assert.equal(affected, 1);
   assert.match(database.calls.at(-1).sql, /UPDATE `projects` SET `status` = \? WHERE \(\(`status` = \?\)\)/);
   assert.deepEqual(database.calls.at(-1).params, ['done', 'active']);
+});
+
+test('JSON mutation values are serialized for MySQL without changing the service payload contract', async () => {
+  const database = createDatabase();
+  let filteredSettings;
+  const service = new ItemsService('projects', {
+    database,
+    schema,
+    accountability: createSystemAccountability(),
+    emitter: {
+      async filter(_event, payload) {
+        filteredSettings = payload.settings;
+        return payload;
+      },
+      async action() {},
+    },
+  });
+
+  const settings = { filters: ['active', 'upcoming'], nested: { enabled: true } };
+  await service.createOne({ title: 'JSON project', settings });
+  const insert = database.calls.find(({ sql }) => sql.startsWith('INSERT INTO `projects`'));
+  assert.equal(filteredSettings, settings);
+  assert.equal(insert.params.at(-1), JSON.stringify(settings));
+
+  await service.updateOne('project-1', { settings: ['one', 'two'] });
+  const update = database.calls.find(({ sql }) => sql.startsWith('UPDATE `projects`'));
+  assert.equal(update.params[0], JSON.stringify(['one', 'two']));
+});
+
+test('bulk JSON mutations serialize each value exactly once', async () => {
+  const database = createDatabase();
+  database.beginTransaction = async () => {};
+  database.commit = async () => {};
+  database.rollback = async () => {};
+  database.release = () => {};
+  database.getConnection = async () => database;
+  const service = new ItemsService('projects', {
+    database,
+    schema,
+    accountability: createSystemAccountability(),
+  });
+
+  await service.createMany([
+    { title: 'First', settings: ['first'] },
+    { title: 'Second', settings: { rank: 2 } },
+  ]);
+  const inserts = database.calls.filter(({ sql }) => sql.startsWith('INSERT INTO `projects`'));
+  assert.equal(inserts[0].params.at(-1), JSON.stringify(['first']));
+  assert.equal(inserts[1].params.at(-1), JSON.stringify({ rank: 2 }));
+
+  await service.updateMany(
+    { status: { _eq: 'active' } },
+    { settings: JSON.stringify({ already: 'serialized' }) },
+  );
+  assert.equal(database.calls.at(-1).params[0], JSON.stringify({ already: 'serialized' }));
+});
+
+test('ISO datetime and timestamp values are converted across single and bulk mutations', async () => {
+  const database = createDatabase();
+  database.beginTransaction = async () => {};
+  database.commit = async () => {};
+  database.rollback = async () => {};
+  database.release = () => {};
+  database.getConnection = async () => database;
+  const service = new ItemsService('projects', {
+    database,
+    schema,
+    accountability: createSystemAccountability(),
+  });
+
+  const datetimeIso = '2026-09-05T09:00:00.000Z';
+  const timestampIso = '2026-09-05T12:30:00+03:00';
+  await service.createOne({ title: 'Dated project', published_at: datetimeIso });
+  await service.updateOne('project-1', { processed_at: timestampIso });
+  await service.createMany([
+    { title: 'Bulk dated', published_at: datetimeIso },
+    { title: 'Bulk timestamped', processed_at: timestampIso },
+  ]);
+  await service.updateMany(
+    { status: { _eq: 'active' } },
+    { published_at: datetimeIso, processed_at: timestampIso },
+  );
+
+  const mutationCalls = database.calls.filter(({ sql }) => (
+    sql.startsWith('INSERT INTO `projects`') || sql.startsWith('UPDATE `projects`')
+  ));
+  const dates = mutationCalls.flatMap(({ params }) => params.filter((value) => value instanceof Date));
+  assert.equal(dates.length, 6);
+  assert.deepEqual(dates.map((date) => date.toISOString()), [
+    datetimeIso,
+    new Date(timestampIso).toISOString(),
+    datetimeIso,
+    new Date(timestampIso).toISOString(),
+    datetimeIso,
+    new Date(timestampIso).toISOString(),
+  ]);
 });

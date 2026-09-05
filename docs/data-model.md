@@ -108,6 +108,12 @@ They can also use `autoUpdate: true` when the value should be refreshed by MySQL
 
 Literal defaults for `text` and `json` are not part of the current field contract.
 
+### Writing JSON and time values
+
+REST item mutations and `ItemsService` accept objects or arrays for `json` fields. Valid pre-serialized JSON text is also accepted and is not encoded a second time.
+
+For `datetime` and `timestamp` fields, timezone-bearing ISO-8601 strings such as `2026-09-05T09:00:00.000Z` are accepted. YunCMS converts these values only at the MySQL boundary, so extension filters and other service-level mutation handling continue to receive the original payload shape.
+
 ## Display interfaces
 
 Storage type and Studio interface are separate concepts. For example, a UUID field can be presented as a normal UUID input, a File picker or an Image picker.
