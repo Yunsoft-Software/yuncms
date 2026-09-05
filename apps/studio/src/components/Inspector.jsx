@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useI18n } from '../i18n.js';
+
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
@@ -17,13 +19,15 @@ export function Inspector({
   children,
   actions,
   onClose,
-  closeLabel = 'Close',
+  closeLabel,
   className = '',
 }) {
+  const { t } = useI18n();
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef(null);
   const previousFocusRef = useRef(null);
+  const resolvedCloseLabel = closeLabel || t('common.close');
 
   useEffect(() => {
     if (!open) return undefined;
@@ -66,7 +70,7 @@ export function Inspector({
 
   return createPortal(
     <div className="studio-inspector-layer">
-      <button className="studio-inspector-scrim" type="button" aria-label={closeLabel} onClick={onClose} />
+      <button className="studio-inspector-scrim" type="button" aria-label={resolvedCloseLabel} onClick={onClose} />
       <aside
         ref={panelRef}
         className={`studio-inspector ${className}`.trim()}
@@ -82,7 +86,7 @@ export function Inspector({
             <h2 id={titleId}>{title}</h2>
             {description && <p id={descriptionId}>{description}</p>}
           </div>
-          <button className="text-button studio-inspector-close" type="button" onClick={onClose} aria-label={closeLabel}>×</button>
+          <button className="text-button studio-inspector-close" type="button" onClick={onClose} aria-label={resolvedCloseLabel}>×</button>
         </header>
         <div className="studio-inspector-body">{children}</div>
         {actions && <footer className="studio-inspector-actions">{actions}</footer>}
