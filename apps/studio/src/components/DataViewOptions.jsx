@@ -14,7 +14,7 @@ export function DataViewOptions({
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const triggerLabel = labels.trigger || t('content.viewOptions');
-  const titleLabel = labels.title || triggerLabel || t('content.viewOptionsTitle');
+  const titleLabel = labels.title || labels.trigger || t('content.viewOptionsTitle');
   const columnsLabel = labels.columns || t('content.columns');
   const densityLabel = labels.density || t('content.density');
 
