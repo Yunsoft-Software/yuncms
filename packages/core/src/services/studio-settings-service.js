@@ -1,7 +1,10 @@
 import { BaseService } from './base-service.js';
 
 const THEMES = new Set(['system', 'light', 'dark']);
-const LOCALES = new Set(['en', 'tr']);
+const LOCALES = new Map([
+  ['en', 'en'],
+  ['tr', 'tr'],
+]);
 const ACCENT_PATTERN = /^#[0-9a-f]{6}$/i;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const YUNSOFT_LOGOS = new Set([
@@ -63,8 +66,11 @@ function normalizeTheme(value) {
 }
 
 function normalizeLocale(value) {
-  const normalized = String(value ?? '').trim().toLowerCase();
-  if (!LOCALES.has(normalized)) throw invalid('Default locale must be en or tr');
+  const lookup = String(value ?? '').trim().toLowerCase();
+  const normalized = LOCALES.get(lookup);
+  if (!normalized) {
+    throw invalid(`Default locale must be one of: ${[...new Set(LOCALES.values())].join(', ')}`);
+  }
   return normalized;
 }
 
