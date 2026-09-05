@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import test from 'node:test';
 
+import { COLLECTION_ICONS } from '../src/collection-icons.js';
 import { FIELD_TYPE_OPTIONS } from '../src/field-ui.js';
 import {
   LOCALE_CATALOG,
@@ -103,9 +104,10 @@ test('every statically referenced Studio translation exists in every enabled loc
   assert.deepEqual(missing, []);
 });
 
-test('dynamic field, permission and Data Model tab labels are translated in every enabled locale', () => {
+test('dynamic field, permission, icon and Data Model labels are translated in every enabled locale', () => {
   const dynamicKeys = [
     ...FIELD_TYPE_OPTIONS.map((option) => option.labelKey),
+    ...COLLECTION_ICONS.map((icon) => `collectionIcon.${icon.id}`),
     ...['read', 'create', 'update', 'delete'].map((action) => `roles.${action}`),
     ...['overview', 'fields', 'relations'].map((tab) => `dataModel.tab.${tab}`),
   ];
@@ -137,6 +139,7 @@ test('enabled locales contain real localized Studio copy', () => {
   assert.equal(TR['fieldType.image'], 'Görsel');
   assert.equal(TR['dataModel.oneToOne'], 'Bire bir');
   assert.equal(TR['dataModel.tab.overview'], 'Genel');
+  assert.equal(TR['collectionIcon.company'], 'Şirket');
 
   assert.equal(ES['nav.settings'], 'Ajustes');
   assert.equal(ES['content.deleteRecordAction'], 'Eliminar registro');
@@ -144,6 +147,7 @@ test('enabled locales contain real localized Studio copy', () => {
   assert.equal(ES['fieldType.image'], 'Imagen');
   assert.equal(ES['dataModel.oneToOne'], 'Uno a uno');
   assert.equal(ES['dataModel.tab.overview'], 'Resumen');
+  assert.equal(ES['collectionIcon.company'], 'Empresa');
 
   assert.equal(DE['nav.settings'], 'Einstellungen');
   assert.equal(DE['content.deleteRecordAction'], 'Datensatz löschen');
@@ -151,6 +155,7 @@ test('enabled locales contain real localized Studio copy', () => {
   assert.equal(DE['fieldType.image'], 'Bild');
   assert.equal(DE['dataModel.oneToOne'], 'Eins zu eins');
   assert.equal(DE['dataModel.tab.overview'], 'Übersicht');
+  assert.equal(DE['collectionIcon.company'], 'Unternehmen');
 
   assert.equal(FR['nav.settings'], 'Paramètres');
   assert.equal(FR['content.deleteRecordAction'], 'Supprimer l’enregistrement');
@@ -158,6 +163,7 @@ test('enabled locales contain real localized Studio copy', () => {
   assert.equal(FR['fieldType.image'], 'Image');
   assert.equal(FR['dataModel.oneToOne'], 'Un à un');
   assert.equal(FR['dataModel.tab.overview'], 'Vue d’ensemble');
+  assert.equal(FR['collectionIcon.company'], 'Entreprise');
 
   assert.equal(PT_BR['nav.settings'], 'Configurações');
   assert.equal(PT_BR['content.deleteRecordAction'], 'Excluir registro');
@@ -165,6 +171,7 @@ test('enabled locales contain real localized Studio copy', () => {
   assert.equal(PT_BR['fieldType.image'], 'Imagem');
   assert.equal(PT_BR['dataModel.oneToOne'], 'Um para um');
   assert.equal(PT_BR['dataModel.tab.overview'], 'Visão geral');
+  assert.equal(PT_BR['collectionIcon.company'], 'Empresa');
 
   assert.equal(JA['nav.settings'], '設定');
   assert.equal(JA['content.deleteRecordAction'], 'レコードを削除');
@@ -172,6 +179,7 @@ test('enabled locales contain real localized Studio copy', () => {
   assert.equal(JA['fieldType.image'], '画像');
   assert.equal(JA['dataModel.oneToOne'], '一対一');
   assert.equal(JA['dataModel.tab.overview'], '概要');
+  assert.equal(JA['collectionIcon.company'], '会社');
 
   assert.equal(ZH_CN['nav.settings'], '设置');
   assert.equal(ZH_CN['content.deleteRecordAction'], '删除记录');
@@ -179,4 +187,5 @@ test('enabled locales contain real localized Studio copy', () => {
   assert.equal(ZH_CN['fieldType.image'], '图片');
   assert.equal(ZH_CN['dataModel.oneToOne'], '一对一');
   assert.equal(ZH_CN['dataModel.tab.overview'], '概览');
+  assert.equal(ZH_CN['collectionIcon.company'], '公司');
 });
