@@ -6,7 +6,7 @@ export const LOCALE_CATALOG = Object.freeze({
   fr: Object.freeze({ code: 'fr', name: 'French', nativeName: 'Français', direction: 'ltr', enabled: true }),
   'pt-BR': Object.freeze({ code: 'pt-BR', name: 'Portuguese (Brazil)', nativeName: 'Português (Brasil)', direction: 'ltr', enabled: true }),
   ja: Object.freeze({ code: 'ja', name: 'Japanese', nativeName: '日本語', direction: 'ltr', enabled: true }),
-  'zh-CN': Object.freeze({ code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: '简体中文', direction: 'ltr', enabled: false }),
+  'zh-CN': Object.freeze({ code: 'zh-CN', name: 'Chinese (Simplified)', nativeName: '简体中文', direction: 'ltr', enabled: true }),
   it: Object.freeze({ code: 'it', name: 'Italian', nativeName: 'Italiano', direction: 'ltr', enabled: false }),
   ru: Object.freeze({ code: 'ru', name: 'Russian', nativeName: 'Русский', direction: 'ltr', enabled: false }),
   pl: Object.freeze({ code: 'pl', name: 'Polish', nativeName: 'Polski', direction: 'ltr', enabled: false }),
