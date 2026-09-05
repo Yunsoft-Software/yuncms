@@ -95,6 +95,38 @@ function mergeSystemEntries(entries, schema, accountability, operation, now = ne
   return [...entries, ...systemMutationEntries(schema, accountability, operation, now)];
 }
 
+function databaseMutationValue(field, value, schema) {
+  if (value == null) return value;
+  const type = schema.fields[field]?.type;
+
+  if (type === 'json') {
+    if (typeof value === 'string') {
+      try {
+        JSON.parse(value);
+        return value;
+      } catch {
+        return JSON.stringify(value);
+      }
+    }
+    return JSON.stringify(value);
+  }
+
+  if (
+    (type === 'datetime' || type === 'timestamp')
+    && typeof value === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(value)
+  ) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+
+  return value;
+}
+
+function databaseMutationParams(entries, schema) {
+  return entries.map(([field, value]) => databaseMutationValue(field, value, schema));
+}
+
 export class ItemsService extends BaseService {
   constructor(collection, options = {}) {
     super(options);
@@ -372,7 +404,7 @@ export class ItemsService extends BaseService {
     const table = quoteIdentifier(this.collection, 'collection name');
     await this.database.query(
       `INSERT INTO ${table} (${fields.map((field) => quoteIdentifier(field, 'field name')).join(', ')})\n       VALUES (${fields.map(() => '?').join(', ')})`,
-      fields.map((field) => values[field]),
+      databaseMutationParams(fields.map((field) => [field, values[field]]), schema),
     );
 
     const record = await this.returnCreatedOrUpdated(id, schema);
@@ -408,7 +440,10 @@ export class ItemsService extends BaseService {
         const fields = Object.keys(entry.values);
         await connection.query(
           `INSERT INTO ${table} (${fields.map((field) => quoteIdentifier(field, 'field name')).join(', ')})\n           VALUES (${fields.map(() => '?').join(', ')})`,
-          fields.map((field) => entry.values[field]),
+          databaseMutationParams(
+            fields.map((field) => [field, entry.values[field]]),
+            schema,
+          ),
         );
       }
     });
@@ -448,7 +483,7 @@ export class ItemsService extends BaseService {
     const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
     const [result] = await this.database.query(
       `UPDATE ${table} SET ${setSql}${filter.sql}`,
-      [...entries.map(([, value]) => value), ...filter.params],
+      [...databaseMutationParams(entries, schema), ...filter.params],
     );
     if (result.affectedRows === 0) return null;
     const record = await this.returnCreatedOrUpdated(id, schema);
@@ -490,7 +525,7 @@ export class ItemsService extends BaseService {
     const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
     const [result] = await this.database.query(
       `UPDATE ${table} SET ${setSql}${filter.sql}`,
-      [...entries.map(([, value]) => value), ...filter.params],
+      [...databaseMutationParams(entries, schema), ...filter.params],
     );
     await this.actionMutation('items.update', { filter: filterInput, changes: effectiveChanges, affected: result.affectedRows }, { operation: 'update', bulk: true });
     return result.affectedRows;

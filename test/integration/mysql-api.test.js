@@ -162,6 +162,8 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
       { field: 'title', type: 'string', required: true },
       { field: 'status', type: 'string', required: true },
       { field: 'author_id', type: 'uuid', required: false },
+      { field: 'settings', type: 'json', required: false },
+      { field: 'published_at', type: 'datetime', required: false },
     ]) {
       const created = await request(`/schema/collections/${names.articles}/fields`, {
         method: 'POST', token: accessToken, body: field,
@@ -217,16 +219,36 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
     assert.equal(author.response.status, 201);
     const authorId = author.payload.data.id;
 
+    const publishedAt = '2026-09-05T09:00:00.000Z';
+    const publishedSettings = { channels: ['web', 'api'], featured: true };
     const published = await request(`/items/${names.articles}`, {
       method: 'POST', token: accessToken,
-      body: { title: 'Published', status: 'published', author_id: authorId },
+      body: {
+        title: 'Published',
+        status: 'published',
+        author_id: authorId,
+        settings: publishedSettings,
+        published_at: publishedAt,
+      },
     });
     const draft = await request(`/items/${names.articles}`, {
       method: 'POST', token: accessToken,
       body: { title: 'Draft', status: 'draft', author_id: authorId },
     });
-    assert.equal(published.response.status, 201);
-    assert.equal(draft.response.status, 201);
+    assert.equal(published.response.status, 201, JSON.stringify(published.payload));
+    assert.equal(draft.response.status, 201, JSON.stringify(draft.payload));
+    assert.deepEqual(published.payload.data.settings, publishedSettings);
+    assert.equal(published.payload.data.published_at, publishedAt);
+
+    const rescheduledAt = '2026-09-06T15:30:00+03:00';
+    const rescheduled = await request(`/items/${names.articles}/${draft.payload.data.id}`, {
+      method: 'PATCH',
+      token: accessToken,
+      body: { settings: ['review', 'scheduled'], published_at: rescheduledAt },
+    });
+    assert.equal(rescheduled.response.status, 200, JSON.stringify(rescheduled.payload));
+    assert.deepEqual(rescheduled.payload.data.settings, ['review', 'scheduled']);
+    assert.equal(rescheduled.payload.data.published_at, new Date(rescheduledAt).toISOString());
 
     const filtered = await request(
       `/items/${names.articles}?filter=${encodeURIComponent(JSON.stringify({ status: { _eq: 'published' } }))}&sort=title&limit=1&offset=0`,

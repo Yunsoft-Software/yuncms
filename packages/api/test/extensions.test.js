@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { HookEmitter } from '@yunsoft/yuncms-core';
@@ -118,7 +118,10 @@ test('runtime accepts SDK marker and exposes services directly to hooks', async 
       register({ init }, context) {
         init('app.beforeStart', async () => {
           const service = new context.services.ProbeService({ database: context.database });
-          globalThis.__yuncmsRuntimeProbe = await service.read();
+          globalThis.__yuncmsRuntimeProbe = {
+            service: await service.read(),
+            env: context.env.RUNTIME_PROBE,
+          };
         });
       }
     };\n`,
@@ -143,9 +146,21 @@ test('runtime accepts SDK marker and exposes services directly to hooks', async 
     schemaCache: { get: async () => ({ version: 1 }) },
     emitter: new HookEmitter(),
     logger: { info() {} },
-    env: {},
+    env: { RUNTIME_PROBE: 'process-environment' },
   });
 
   await runtime.init('app.beforeStart');
-  assert.equal(globalThis.__yuncmsRuntimeProbe, 'direct-service-context');
+  assert.deepEqual(globalThis.__yuncmsRuntimeProbe, {
+    service: 'direct-service-context',
+    env: 'process-environment',
+  });
+});
+
+test('API server passes the process environment to the extension runtime', async () => {
+  const source = await readFile(resolve(import.meta.dirname, '../src/server.js'), 'utf8');
+
+  assert.match(
+    source,
+    /loadExtensionRuntime\(\{[\s\S]*?env:\s*process\.env,[\s\S]*?\}\)/u,
+  );
 });

@@ -209,7 +209,13 @@ test('real schema mutations emit ordered post-success events and compensate a fa
 export default {
   __yuncms_extension__: true,
   type: 'hook',
-  register({ action }) {
+  register({ action, init }, context) {
+    init('app.beforeStart', async () => {
+      await context.database.query(
+        'INSERT INTO ${eventsTable} (event_name, item_key, collection_name, broad_event) VALUES (?, ?, ?, ?)',
+        ['extension.env', context.env.EXTENSION_RUNTIME_PROBE ?? null, null, null],
+      );
+    });
     for (const event of ['schema.collection.create', 'schema.field.create', 'schema.relation.create', 'schema.changed']) {
       action(event, async (payload, { database }) => {
         await database.query(
@@ -227,6 +233,7 @@ export default {
     processInfo = startApi(projectRoot, port, {
       ...serverEnv(config, storageRoot),
       STUDIO_ORIGIN: `http://127.0.0.1:${port}`,
+      EXTENSION_RUNTIME_PROBE: `extension-process-${runId}`,
     });
     await waitForReady(processInfo);
     const token = admin.token.token;
@@ -263,10 +270,17 @@ export default {
     const [events] = await pool.query(
       `SELECT event_name, item_key, collection_name, broad_event FROM ${quotedEvents} ORDER BY seq`,
     );
-    assert.equal(events.length, 16);
-    for (let index = 0; index < events.length; index += 2) {
-      const specific = events[index];
-      const broad = events[index + 1];
+    assert.deepEqual(events[0], {
+      event_name: 'extension.env',
+      item_key: `extension-process-${runId}`,
+      collection_name: null,
+      broad_event: null,
+    });
+    const schemaEvents = events.slice(1);
+    assert.equal(schemaEvents.length, 16);
+    for (let index = 0; index < schemaEvents.length; index += 2) {
+      const specific = schemaEvents[index];
+      const broad = schemaEvents[index + 1];
       assert.notEqual(specific.event_name, 'schema.changed');
       assert.equal(specific.broad_event, null);
       assert.equal(broad.event_name, 'schema.changed');
@@ -274,7 +288,7 @@ export default {
       assert.equal(broad.item_key, specific.item_key);
       assert.equal(broad.collection_name, specific.collection_name);
     }
-    assert.deepEqual(events.filter((entry) => entry.event_name === 'schema.relation.create').map((entry) => entry.item_key), [
+    assert.deepEqual(schemaEvents.filter((entry) => entry.event_name === 'schema.relation.create').map((entry) => entry.item_key), [
       'many_id',
       'one_id',
       names.junction,

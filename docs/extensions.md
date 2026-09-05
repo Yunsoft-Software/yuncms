@@ -97,7 +97,7 @@ The context includes:
 - `services` — service-class registry;
 - `database` — current database pool/connection context;
 - `logger` — structured logger;
-- `env` — process environment;
+- `env` — the unfiltered process environment, including extension-specific variables (not the parsed YunCMS core configuration);
 - `emitter` — lifecycle event bus;
 - `storage` — registered Files storage context when available;
 - `getSchema()` — current schema snapshot;
