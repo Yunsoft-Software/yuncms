@@ -5,6 +5,13 @@ import test from 'node:test';
 
 import { FIELD_TYPE_OPTIONS } from '../src/field-ui.js';
 import {
+  LOCALE_CATALOG,
+  SUPPORTED_LOCALES,
+  getEnabledLocaleDefinitions,
+  getLocaleDefinition,
+  isSupportedLocale,
+} from '../src/locale-registry.js';
+import {
   EN,
   TR,
   hasTranslation,
@@ -12,6 +19,7 @@ import {
 } from '../src/localization.js';
 
 const SRC_ROOT = resolve(import.meta.dirname, '../src');
+const DICTIONARIES = { en: EN, tr: TR };
 
 function sourceFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -31,21 +39,39 @@ function staticTranslationKeys() {
   return [...keys].sort();
 }
 
-test('English and Turkish dictionaries have identical key coverage', () => {
-  assert.deepEqual(Object.keys(TR).sort(), Object.keys(EN).sort());
+test('locale registry exposes enabled locales as the single supported locale list', () => {
+  assert.deepEqual(SUPPORTED_LOCALES, ['en', 'tr']);
+  assert.equal(isSupportedLocale('en'), true);
+  assert.equal(isSupportedLocale('tr'), true);
+  assert.equal(isSupportedLocale('de'), false);
+  assert.equal(getLocaleDefinition('tr').nativeName, 'Türkçe');
+  assert.equal(getLocaleDefinition('unknown').code, 'en');
+  assert.deepEqual(
+    getEnabledLocaleDefinitions().map((locale) => locale.code),
+    SUPPORTED_LOCALES,
+  );
+  assert.equal(LOCALE_CATALOG.ar.direction, 'rtl');
 });
 
-test('every statically referenced Studio translation exists in English and Turkish', () => {
+test('all enabled dictionaries have identical key coverage with English', () => {
+  const englishKeys = Object.keys(EN).sort();
+  for (const locale of SUPPORTED_LOCALES) {
+    assert.ok(DICTIONARIES[locale], `Missing dictionary export for enabled locale ${locale}`);
+    assert.deepEqual(Object.keys(DICTIONARIES[locale]).sort(), englishKeys, locale);
+  }
+});
+
+test('every statically referenced Studio translation exists in every enabled locale', () => {
   const missing = [];
   for (const key of staticTranslationKeys()) {
-    for (const locale of ['en', 'tr']) {
+    for (const locale of SUPPORTED_LOCALES) {
       if (!hasTranslation(locale, key)) missing.push(`${locale}:${key}`);
     }
   }
   assert.deepEqual(missing, []);
 });
 
-test('dynamic field, permission and Data Model tab labels are translated in both locales', () => {
+test('dynamic field, permission and Data Model tab labels are translated in every enabled locale', () => {
   const dynamicKeys = [
     ...FIELD_TYPE_OPTIONS.map((option) => option.labelKey),
     ...['read', 'create', 'update', 'delete'].map((action) => `roles.${action}`),
@@ -53,7 +79,7 @@ test('dynamic field, permission and Data Model tab labels are translated in both
   ];
   const missing = [];
   for (const key of dynamicKeys) {
-    for (const locale of ['en', 'tr']) {
+    for (const locale of SUPPORTED_LOCALES) {
       if (!hasTranslation(locale, key)) missing.push(`${locale}:${key}`);
     }
   }
