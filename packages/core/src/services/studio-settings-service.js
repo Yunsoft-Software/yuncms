@@ -1,11 +1,7 @@
+import { canonicalStudioLocale, STUDIO_LOCALE_CODES } from '../studio-locales.js';
 import { BaseService } from './base-service.js';
 
 const THEMES = new Set(['system', 'light', 'dark']);
-const LOCALES = new Map([
-  ['en', 'en'],
-  ['tr', 'tr'],
-  ['es', 'es'],
-]);
 const ACCENT_PATTERN = /^#[0-9a-f]{6}$/i;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const YUNSOFT_LOGOS = new Set([
@@ -67,10 +63,9 @@ function normalizeTheme(value) {
 }
 
 function normalizeLocale(value) {
-  const lookup = String(value ?? '').trim().toLowerCase();
-  const normalized = LOCALES.get(lookup);
+  const normalized = canonicalStudioLocale(value);
   if (!normalized) {
-    throw invalid(`Default locale must be one of: ${[...new Set(LOCALES.values())].join(', ')}`);
+    throw invalid(`Default locale must be one of: ${STUDIO_LOCALE_CODES.join(', ')}`);
   }
   return normalized;
 }
