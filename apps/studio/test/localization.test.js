@@ -17,7 +17,10 @@ import {
   EN,
   ES,
   FR,
+  JA,
+  PT_BR,
   TR,
+  ZH_CN,
   hasTranslation,
   translate,
 } from '../src/localization.js';
@@ -59,6 +62,9 @@ test('locale registry exposes every enabled locale through the supported locale 
   assert.equal(getLocaleDefinition('es').nativeName, 'Español');
   assert.equal(getLocaleDefinition('de').nativeName, 'Deutsch');
   assert.equal(getLocaleDefinition('fr').nativeName, 'Français');
+  assert.equal(getLocaleDefinition('pt-BR').nativeName, 'Português (Brasil)');
+  assert.equal(getLocaleDefinition('ja').nativeName, '日本語');
+  assert.equal(getLocaleDefinition('zh-CN').nativeName, '简体中文');
   assert.equal(getLocaleDefinition('unknown').code, 'en');
   assert.deepEqual(
     getEnabledLocaleDefinitions().map((locale) => locale.code),
@@ -118,6 +124,9 @@ test('translations interpolate values and fall back safely for an unknown locale
   assert.equal(translate('es', 'users.summary', { total: 12, active: 8 }), '12 en total · 8 activos');
   assert.equal(translate('de', 'users.summary', { total: 12, active: 8 }), '12 insgesamt · 8 aktiv');
   assert.equal(translate('fr', 'users.summary', { total: 12, active: 8 }), '12 au total · 8 actifs');
+  assert.equal(translate('pt-BR', 'users.summary', { total: 12, active: 8 }), '12 no total · 8 ativos');
+  assert.equal(translate('ja', 'users.summary', { total: 12, active: 8 }), '合計 12 · 有効 8');
+  assert.equal(translate('zh-CN', 'users.summary', { total: 12, active: 8 }), '共 12 个 · 8 个启用');
   assert.equal(translate('xx-unknown', 'common.save'), 'Save');
 });
 
@@ -149,4 +158,25 @@ test('enabled locales contain real localized Studio copy', () => {
   assert.equal(FR['fieldType.image'], 'Image');
   assert.equal(FR['dataModel.oneToOne'], 'Un à un');
   assert.equal(FR['dataModel.tab.overview'], 'Vue d’ensemble');
+
+  assert.equal(PT_BR['nav.settings'], 'Configurações');
+  assert.equal(PT_BR['content.deleteRecordAction'], 'Excluir registro');
+  assert.equal(PT_BR['appearance.logoFromFiles'], 'Logotipo dos Arquivos');
+  assert.equal(PT_BR['fieldType.image'], 'Imagem');
+  assert.equal(PT_BR['dataModel.oneToOne'], 'Um para um');
+  assert.equal(PT_BR['dataModel.tab.overview'], 'Visão geral');
+
+  assert.equal(JA['nav.settings'], '設定');
+  assert.equal(JA['content.deleteRecordAction'], 'レコードを削除');
+  assert.equal(JA['appearance.logoFromFiles'], 'ファイルからロゴ');
+  assert.equal(JA['fieldType.image'], '画像');
+  assert.equal(JA['dataModel.oneToOne'], '一対一');
+  assert.equal(JA['dataModel.tab.overview'], '概要');
+
+  assert.equal(ZH_CN['nav.settings'], '设置');
+  assert.equal(ZH_CN['content.deleteRecordAction'], '删除记录');
+  assert.equal(ZH_CN['appearance.logoFromFiles'], '从文件选择标志');
+  assert.equal(ZH_CN['fieldType.image'], '图片');
+  assert.equal(ZH_CN['dataModel.oneToOne'], '一对一');
+  assert.equal(ZH_CN['dataModel.tab.overview'], '概览');
 });
