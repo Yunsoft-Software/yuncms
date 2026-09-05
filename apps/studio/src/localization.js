@@ -1,3 +1,4 @@
+import { SUPPORTED_LOCALES } from './locale-registry.js';
 import { AI_EN } from './locales/ai-en.js';
 import { AI_TR } from './locales/ai-tr.js';
 import { EN as BASE_EN } from './locales/en.js';
@@ -36,4 +37,4 @@ export function translate(locale, key, values = {}) {
   return interpolate(message, values);
 }
 
-export const SUPPORTED_LOCALES = Object.freeze(['en', 'tr']);
+export { SUPPORTED_LOCALES };
