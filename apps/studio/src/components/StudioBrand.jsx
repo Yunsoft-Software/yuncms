@@ -84,7 +84,6 @@ export function LanguageSwitcher({ compact = false }) {
 
   return (
     <label className={`language-switcher ${compact ? 'compact' : ''}`}>
-      <span className="sr-only">{t('appearance.currentLanguage')}</span>
       <select
         value={locale}
         onChange={(event) => setLocale(event.target.value)}
