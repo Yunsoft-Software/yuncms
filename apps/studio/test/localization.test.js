@@ -14,6 +14,7 @@ import {
 import {
   DICTIONARIES,
   EN,
+  ES,
   TR,
   hasTranslation,
   translate,
@@ -46,11 +47,13 @@ function placeholders(message) {
 }
 
 test('locale registry exposes enabled locales as the single supported locale list', () => {
-  assert.deepEqual(SUPPORTED_LOCALES, ['en', 'tr']);
+  assert.deepEqual(SUPPORTED_LOCALES, ['en', 'tr', 'es']);
   assert.equal(isSupportedLocale('en'), true);
   assert.equal(isSupportedLocale('tr'), true);
+  assert.equal(isSupportedLocale('es'), true);
   assert.equal(isSupportedLocale('de'), false);
   assert.equal(getLocaleDefinition('tr').nativeName, 'Türkçe');
+  assert.equal(getLocaleDefinition('es').nativeName, 'Español');
   assert.equal(getLocaleDefinition('unknown').code, 'en');
   assert.deepEqual(
     getEnabledLocaleDefinitions().map((locale) => locale.code),
@@ -107,14 +110,22 @@ test('dynamic field, permission and Data Model tab labels are translated in ever
 test('translations interpolate values and fall back safely for an unknown locale', () => {
   assert.equal(translate('en', 'users.summary', { total: 12, active: 8 }), '12 total · 8 active');
   assert.equal(translate('tr', 'users.summary', { total: 12, active: 8 }), 'Toplam 12 · 8 aktif');
+  assert.equal(translate('es', 'users.summary', { total: 12, active: 8 }), '12 en total · 8 activos');
   assert.equal(translate('de', 'common.save'), 'Save');
 });
 
-test('Turkish locale contains real localized navigation and current customization copy', () => {
+test('Turkish and Spanish locales contain real localized Studio copy', () => {
   assert.equal(TR['nav.settings'], 'Ayarlar');
   assert.equal(TR['content.deleteRecordAction'], 'Kaydı sil');
   assert.equal(TR['appearance.logoFromFiles'], 'Dosyalardan logo seç');
   assert.equal(TR['fieldType.image'], 'Görsel');
   assert.equal(TR['dataModel.oneToOne'], 'Bire bir');
   assert.equal(TR['dataModel.tab.overview'], 'Genel');
+
+  assert.equal(ES['nav.settings'], 'Ajustes');
+  assert.equal(ES['content.deleteRecordAction'], 'Eliminar registro');
+  assert.equal(ES['appearance.logoFromFiles'], 'Logotipo desde Archivos');
+  assert.equal(ES['fieldType.image'], 'Imagen');
+  assert.equal(ES['dataModel.oneToOne'], 'Uno a uno');
+  assert.equal(ES['dataModel.tab.overview'], 'Resumen');
 });
