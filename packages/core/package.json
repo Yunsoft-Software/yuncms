@@ -1,6 +1,6 @@
 {
   "name": "@yunsoft/yuncms-core",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "Core services, schema, authentication, permissions and storage primitives for YunCMS.",
   "license": "MIT",
   "type": "module",
@@ -18,7 +18,7 @@
     "url": "git+https://github.com/Yunsoft-Software/yuncms.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/Yunsoft-Software/yuncms#readme",
+  "homepage": "https://yunsoft.com",
   "bugs": {
     "url": "https://github.com/Yunsoft-Software/yuncms/issues"
   },

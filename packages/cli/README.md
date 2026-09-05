@@ -2,6 +2,8 @@
 
 Command-line setup, runtime launcher and guarded upgrade tooling for YunCMS.
 
+YunCMS is developed and maintained by **[Yunsoft Software](https://yunsoft.com)**.
+
 ## Quick start
 
 You do **not** need to clone or fork the YunCMS repository. From an empty project directory, run the published package directly:
@@ -55,6 +57,6 @@ YunCMS requires Node.js 24 LTS and MySQL. See the [project documentation](https:
 
 ## Project status
 
-YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com). It is under active development, so interfaces and behavior may change between releases. Test upgrades and keep verified backups before production use.
+YunCMS is under active development, so interfaces and behavior may change between releases. Test upgrades and keep verified backups before production use.
 
 Use YunCMS at your own risk. This package is provided under the [MIT License](https://github.com/Yunsoft-Software/yuncms/blob/main/LICENSE) without warranty.
