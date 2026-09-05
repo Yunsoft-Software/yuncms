@@ -12,6 +12,7 @@ import {
   isSupportedLocale,
 } from '../src/locale-registry.js';
 import {
+  DICTIONARIES,
   EN,
   TR,
   hasTranslation,
@@ -19,7 +20,6 @@ import {
 } from '../src/localization.js';
 
 const SRC_ROOT = resolve(import.meta.dirname, '../src');
-const DICTIONARIES = { en: EN, tr: TR };
 
 function sourceFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -37,6 +37,12 @@ function staticTranslationKeys() {
     for (const match of source.matchAll(pattern)) keys.add(match[1]);
   }
   return [...keys].sort();
+}
+
+function placeholders(message) {
+  return [...String(message).matchAll(/\{(\w+)\}/g)]
+    .map((match) => match[1])
+    .sort();
 }
 
 test('locale registry exposes enabled locales as the single supported locale list', () => {
@@ -58,6 +64,18 @@ test('all enabled dictionaries have identical key coverage with English', () => 
   for (const locale of SUPPORTED_LOCALES) {
     assert.ok(DICTIONARIES[locale], `Missing dictionary export for enabled locale ${locale}`);
     assert.deepEqual(Object.keys(DICTIONARIES[locale]).sort(), englishKeys, locale);
+  }
+});
+
+test('enabled translations preserve English interpolation placeholders', () => {
+  for (const locale of SUPPORTED_LOCALES) {
+    for (const [key, englishMessage] of Object.entries(EN)) {
+      assert.deepEqual(
+        placeholders(DICTIONARIES[locale][key]),
+        placeholders(englishMessage),
+        `${locale}:${key}`,
+      );
+    }
   }
 });
 
