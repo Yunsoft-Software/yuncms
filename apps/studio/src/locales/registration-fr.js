@@ -8,7 +8,7 @@ export const REGISTRATION_FR = Object.freeze({
   'registration.roleMissing': 'Le rôle précédemment sélectionné n’existe plus. Choisissez un autre rôle avant d’activer l’inscription.',
   'registration.noRoles': 'Créez un rôle normal non administrateur avant d’activer l’inscription publique.',
   'registration.allowPublic': 'Autoriser l’inscription publique',
-  'registration.enabledHint': 'Lorsqu’elle est désactivée, le endpoint d’inscription publique et le formulaire de création de compte restent indisponibles.',
+  'registration.enabledHint': 'Lorsqu’elle est désactivée, le point de terminaison d’inscription publique et le formulaire de création de compte restent indisponibles.',
   'registration.requireEmailVerification': 'Exiger la vérification de l’e-mail',
   'registration.requireEmailVerificationHint': 'Lorsqu’elle est activée, les nouvelles inscriptions publiques doivent vérifier le lien reçu par e-mail avant la connexion locale. L’envoi SMTP doit être configuré.',
   'registration.saved': 'Paramètres d’inscription publique enregistrés.',
@@ -24,4 +24,5 @@ export const REGISTRATION_FR = Object.freeze({
   'auth.verificationResent': 'Si ce compte doit encore être vérifié, un nouvel e-mail a été envoyé.',
   'auth.haveAccount': 'Vous avez déjà un compte ? Connectez-vous',
   'auth.needAccount': 'Créer un compte',
+  'auth.authenticationProviders': 'Fournisseurs d’authentification',
 });
