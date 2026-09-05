@@ -147,7 +147,7 @@ async function start() {
     emitter,
     storage,
     logger,
-    env: config,
+    env: process.env,
   });
 
   const app = createApp({
