@@ -8,7 +8,7 @@ export const REGISTRATION_DE = Object.freeze({
   'registration.roleMissing': 'Die zuvor ausgewählte Rolle existiert nicht mehr. Wähle eine andere Rolle, bevor du die Registrierung aktivierst.',
   'registration.noRoles': 'Erstelle eine normale Nicht-Administrator-Rolle, bevor du die öffentliche Registrierung aktivierst.',
   'registration.allowPublic': 'Öffentliche Registrierung erlauben',
-  'registration.enabledHint': 'Wenn deaktiviert, bleiben der öffentliche Registrierungsendpunkt und das Anmeldeformular nicht verfügbar.',
+  'registration.enabledHint': 'Wenn deaktiviert, sind der öffentliche Registrierungsendpunkt und das Registrierungsformular nicht verfügbar.',
   'registration.requireEmailVerification': 'E-Mail-Bestätigung verlangen',
   'registration.requireEmailVerificationHint': 'Wenn aktiviert, müssen neue öffentliche Registrierungen den per E-Mail gesendeten Link bestätigen, bevor sie sich lokal anmelden können. SMTP-Mailversand muss konfiguriert sein.',
   'registration.saved': 'Einstellungen für öffentliche Registrierung gespeichert.',
@@ -24,4 +24,5 @@ export const REGISTRATION_DE = Object.freeze({
   'auth.verificationResent': 'Wenn dieses Konto noch bestätigt werden muss, wurde eine neue E-Mail gesendet.',
   'auth.haveAccount': 'Du hast bereits ein Konto? Anmelden',
   'auth.needAccount': 'Konto erstellen',
+  'auth.authenticationProviders': 'Authentifizierungsanbieter',
 });
