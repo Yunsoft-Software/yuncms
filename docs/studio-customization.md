@@ -10,7 +10,8 @@ Relevant migrations:
 
 - `0006-studio-settings` — brand name, logo URL fallback, accent, theme and locale;
 - `0008-studio-logo-file` — optional Files-backed logo;
-- `0010-studio-favicon-file` — optional Files-backed favicon.
+- `0010-studio-favicon-file` — optional Files-backed favicon;
+- `0020-studio-locales` — expanded default-locale constraint.
 
 The administrator can change:
 
@@ -19,7 +20,7 @@ The administrator can change:
 - favicon selected from YunCMS Files;
 - accent color;
 - theme: `system`, `light` or `dark`;
-- default locale: `en` or `tr`.
+- default locale: `en`, `tr`, `es`, `de`, `fr`, `pt-BR`, `ja` or `zh-CN`.
 
 `GET /studio-settings` is intentionally public because login/reset/verification surfaces need safe display settings before authentication. It exposes only display settings. `PATCH /studio-settings` is administrator/system-only through `StudioSettingsService`.
 
@@ -123,7 +124,7 @@ Pagination, permission matrices, permission-rule badges, Files surfaces, dialogs
 
 # Localization
 
-Studio ships English and Turkish dictionaries plus focused current-UI modules.
+Studio ships complete dictionaries for English, Turkish, Spanish, German, French, Brazilian Portuguese, Japanese and Simplified Chinese.
 
 Language resolution:
 
@@ -133,7 +134,7 @@ personal browser preference -> server default_locale -> English fallback
 
 The personal preference is stored in browser local storage. Changing it does not alter the project-wide default for other users.
 
-English and Turkish cover the same Studio interface. Dynamic field, action and Data Model labels follow the active personal language where translations are available.
+All enabled locales cover the same Studio translation keys and interpolation placeholders. Dynamic field, action, collection-icon and Data Model labels follow the active personal language.
 
 ---
 

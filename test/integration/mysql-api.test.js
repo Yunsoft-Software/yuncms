@@ -147,6 +147,18 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
     assert.equal(refresh.response.status, 200);
     accessToken = refresh.payload.data.access_token;
 
+    const localizedSettings = await request('/studio-settings', {
+      method: 'PATCH',
+      token: accessToken,
+      body: { default_locale: 'pt-BR' },
+    });
+    assert.equal(localizedSettings.response.status, 200, JSON.stringify(localizedSettings.payload));
+    assert.equal(localizedSettings.payload.data.default_locale, 'pt-BR');
+    const [storedLocale] = await pool.query(
+      'SELECT default_locale FROM yuncms_studio_settings WHERE id = 1',
+    );
+    assert.equal(storedLocale[0].default_locale, 'pt-BR');
+
     for (const collection of [names.authors, names.articles, names.tags]) {
       const created = await request('/schema/collections', {
         method: 'POST', token: accessToken, body: { collection },
@@ -431,6 +443,9 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
     }
   } finally {
     if (server) await new Promise((resolve) => server.close(resolve));
+    await pool.query(
+      "UPDATE yuncms_studio_settings SET default_locale = 'en' WHERE id = 1",
+    ).catch(() => {});
     if (publicPermissionId) {
       await pool.query('DELETE FROM yuncms_permissions WHERE id = ?', [publicPermissionId]).catch(() => {});
     }
