@@ -1,4 +1,4 @@
-export const STUDIO_LOCALE_CODES = Object.freeze(['en', 'tr', 'es', 'de', 'fr', 'pt-BR']);
+export const STUDIO_LOCALE_CODES = Object.freeze(['en', 'tr', 'es', 'de', 'fr', 'pt-BR', 'ja']);
 
 const STUDIO_LOCALE_LOOKUP = new Map(
   STUDIO_LOCALE_CODES.map((locale) => [locale.toLowerCase(), locale]),
