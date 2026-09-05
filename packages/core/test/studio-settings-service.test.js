@@ -181,6 +181,34 @@ test('administrator can choose existing image files as Studio logo and favicon',
   assert.deepEqual(update.params.slice(0, -1), ['Acme CMS', LOGO_FILE_ID, FAVICON_FILE_ID, 'dark']);
 });
 
+test('Studio locale normalization is case-insensitive and rejects locales not enabled yet', async () => {
+  const calls = [];
+  const database = {
+    async query(sql, params = []) {
+      calls.push({ sql, params });
+      if (sql.includes('UPDATE yuncms_studio_settings')) return [{ affectedRows: 1 }, []];
+      if (sql.includes('FROM yuncms_studio_settings')) {
+        return [[{ ...SETTINGS_ROW, default_locale: 'tr' }], []];
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  const service = new StudioSettingsService({
+    database,
+    accountability: createAccountability({ user: 'admin-1', role: 'admin-role', admin: true }),
+  });
+
+  const result = await service.updateOne({ default_locale: ' TR ' });
+  assert.equal(result.default_locale, 'tr');
+  const update = calls.find(({ sql }) => sql.includes('UPDATE yuncms_studio_settings'));
+  assert.deepEqual(update.params, ['tr', 1]);
+
+  await assert.rejects(
+    service.updateOne({ default_locale: 'es' }),
+    (error) => error.code === 'INVALID_PAYLOAD' && /en, tr/.test(error.message),
+  );
+});
+
 function imageAssetFixture(settingKey, fileId) {
   const bytes = Buffer.from('<svg/>');
   const database = {
