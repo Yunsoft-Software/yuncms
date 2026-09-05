@@ -16,6 +16,7 @@ import {
   DICTIONARIES,
   EN,
   ES,
+  FR,
   TR,
   hasTranslation,
   translate,
@@ -53,10 +54,11 @@ test('locale registry exposes every enabled locale through the supported locale 
     .map((locale) => locale.code);
   assert.deepEqual(SUPPORTED_LOCALES, enabledCatalogLocales);
   for (const locale of enabledCatalogLocales) assert.equal(isSupportedLocale(locale), true, locale);
-  assert.equal(isSupportedLocale('fr'), false);
+  assert.equal(isSupportedLocale('xx-unknown'), false);
   assert.equal(getLocaleDefinition('tr').nativeName, 'Türkçe');
   assert.equal(getLocaleDefinition('es').nativeName, 'Español');
   assert.equal(getLocaleDefinition('de').nativeName, 'Deutsch');
+  assert.equal(getLocaleDefinition('fr').nativeName, 'Français');
   assert.equal(getLocaleDefinition('unknown').code, 'en');
   assert.deepEqual(
     getEnabledLocaleDefinitions().map((locale) => locale.code),
@@ -115,7 +117,8 @@ test('translations interpolate values and fall back safely for an unknown locale
   assert.equal(translate('tr', 'users.summary', { total: 12, active: 8 }), 'Toplam 12 · 8 aktif');
   assert.equal(translate('es', 'users.summary', { total: 12, active: 8 }), '12 en total · 8 activos');
   assert.equal(translate('de', 'users.summary', { total: 12, active: 8 }), '12 insgesamt · 8 aktiv');
-  assert.equal(translate('fr', 'common.save'), 'Save');
+  assert.equal(translate('fr', 'users.summary', { total: 12, active: 8 }), '12 au total · 8 actifs');
+  assert.equal(translate('xx-unknown', 'common.save'), 'Save');
 });
 
 test('enabled locales contain real localized Studio copy', () => {
@@ -139,4 +142,11 @@ test('enabled locales contain real localized Studio copy', () => {
   assert.equal(DE['fieldType.image'], 'Bild');
   assert.equal(DE['dataModel.oneToOne'], 'Eins zu eins');
   assert.equal(DE['dataModel.tab.overview'], 'Übersicht');
+
+  assert.equal(FR['nav.settings'], 'Paramètres');
+  assert.equal(FR['content.deleteRecordAction'], 'Supprimer l’enregistrement');
+  assert.equal(FR['appearance.logoFromFiles'], 'Logo depuis Fichiers');
+  assert.equal(FR['fieldType.image'], 'Image');
+  assert.equal(FR['dataModel.oneToOne'], 'Un à un');
+  assert.equal(FR['dataModel.tab.overview'], 'Vue d’ensemble');
 });
