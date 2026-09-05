@@ -12,6 +12,7 @@ import {
   isSupportedLocale,
 } from '../src/locale-registry.js';
 import {
+  DE,
   DICTIONARIES,
   EN,
   ES,
@@ -46,14 +47,16 @@ function placeholders(message) {
     .sort();
 }
 
-test('locale registry exposes enabled locales as the single supported locale list', () => {
-  assert.deepEqual(SUPPORTED_LOCALES, ['en', 'tr', 'es']);
-  assert.equal(isSupportedLocale('en'), true);
-  assert.equal(isSupportedLocale('tr'), true);
-  assert.equal(isSupportedLocale('es'), true);
-  assert.equal(isSupportedLocale('de'), false);
+test('locale registry exposes every enabled locale through the supported locale list', () => {
+  const enabledCatalogLocales = Object.values(LOCALE_CATALOG)
+    .filter((locale) => locale.enabled)
+    .map((locale) => locale.code);
+  assert.deepEqual(SUPPORTED_LOCALES, enabledCatalogLocales);
+  for (const locale of enabledCatalogLocales) assert.equal(isSupportedLocale(locale), true, locale);
+  assert.equal(isSupportedLocale('fr'), false);
   assert.equal(getLocaleDefinition('tr').nativeName, 'Türkçe');
   assert.equal(getLocaleDefinition('es').nativeName, 'Español');
+  assert.equal(getLocaleDefinition('de').nativeName, 'Deutsch');
   assert.equal(getLocaleDefinition('unknown').code, 'en');
   assert.deepEqual(
     getEnabledLocaleDefinitions().map((locale) => locale.code),
@@ -111,10 +114,11 @@ test('translations interpolate values and fall back safely for an unknown locale
   assert.equal(translate('en', 'users.summary', { total: 12, active: 8 }), '12 total · 8 active');
   assert.equal(translate('tr', 'users.summary', { total: 12, active: 8 }), 'Toplam 12 · 8 aktif');
   assert.equal(translate('es', 'users.summary', { total: 12, active: 8 }), '12 en total · 8 activos');
-  assert.equal(translate('de', 'common.save'), 'Save');
+  assert.equal(translate('de', 'users.summary', { total: 12, active: 8 }), '12 insgesamt · 8 aktiv');
+  assert.equal(translate('fr', 'common.save'), 'Save');
 });
 
-test('Turkish and Spanish locales contain real localized Studio copy', () => {
+test('enabled locales contain real localized Studio copy', () => {
   assert.equal(TR['nav.settings'], 'Ayarlar');
   assert.equal(TR['content.deleteRecordAction'], 'Kaydı sil');
   assert.equal(TR['appearance.logoFromFiles'], 'Dosyalardan logo seç');
@@ -128,4 +132,11 @@ test('Turkish and Spanish locales contain real localized Studio copy', () => {
   assert.equal(ES['fieldType.image'], 'Imagen');
   assert.equal(ES['dataModel.oneToOne'], 'Uno a uno');
   assert.equal(ES['dataModel.tab.overview'], 'Resumen');
+
+  assert.equal(DE['nav.settings'], 'Einstellungen');
+  assert.equal(DE['content.deleteRecordAction'], 'Datensatz löschen');
+  assert.equal(DE['appearance.logoFromFiles'], 'Logo aus Dateien');
+  assert.equal(DE['fieldType.image'], 'Bild');
+  assert.equal(DE['dataModel.oneToOne'], 'Eins zu eins');
+  assert.equal(DE['dataModel.tab.overview'], 'Übersicht');
 });
