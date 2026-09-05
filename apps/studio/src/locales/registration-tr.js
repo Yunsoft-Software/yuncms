@@ -24,4 +24,5 @@ export const REGISTRATION_TR = Object.freeze({
   'auth.verificationResent': 'Bu hesabın hâlâ doğrulanması gerekiyorsa yeni bir e-posta gönderildi.',
   'auth.haveAccount': 'Zaten hesabınız var mı? Giriş yapın',
   'auth.needAccount': 'Hesap oluştur',
+  'auth.authenticationProviders': 'Kimlik doğrulama sağlayıcıları',
 });
