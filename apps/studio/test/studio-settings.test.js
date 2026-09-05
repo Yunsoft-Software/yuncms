@@ -34,6 +34,14 @@ test('Studio settings normalize unsafe or unsupported appearance values to defau
   assert.equal(settings.default_locale, 'en');
 });
 
+test('Studio settings preserve supported locales', () => {
+  const settings = normalizeStudioSettings({
+    ...DEFAULT_STUDIO_SETTINGS,
+    default_locale: 'es',
+  });
+  assert.equal(settings.default_locale, 'es');
+});
+
 test('legacy custom URL branding remains readable until replaced', () => {
   const settings = normalizeStudioSettings({
     brand_name: 'Acme CMS',
