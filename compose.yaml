@@ -22,7 +22,7 @@ services:
       start_period: 20s
 
   yuncms:
-    image: ${YUNCMS_IMAGE:-yunsoftofficial/yuncms:0.1.20}
+    image: ${YUNCMS_IMAGE:-yunsoftofficial/yuncms:0.1.21}
     restart: unless-stopped
     depends_on:
       mysql:
