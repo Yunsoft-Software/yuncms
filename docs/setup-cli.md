@@ -1,6 +1,6 @@
 # YunCMS Setup and CLI
 
-YunCMS is distributed through npm as `@yunsoft/yuncms`. Normal users do **not** need to clone or fork the source repository.
+YunCMS is distributed through npm as `@yunsoft/yuncms`. Normal users do **not** need to clone or fork the source repository. Container deployments use the same commands through the published image; see [Docker](docker.md) for the Compose-specific workflow.
 
 ## Requirements
 

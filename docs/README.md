@@ -14,7 +14,8 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 
 | Your goal | Read this | What you will learn |
 | --- | --- | --- |
-| Evaluate or install YunCMS | [Getting Started](getting-started.md) | Requirements, npm installation, first collection, editor role and first API call. |
+| Install YunCMS with Docker | [Docker](docker.md) | Compose setup, persistent volumes, container CLI, backups and image updates. |
+| Install YunCMS with npm | [Getting Started](getting-started.md) | Requirements, npm installation, first collection, editor role and first API call. |
 | Operate the browser interface | [Using Studio](studio.md) | Content, Data Model, Files, users, permissions, branding, AI and mobile navigation. |
 | Configure the server | [Configuration](configuration.md) | MySQL, Files, SMTP, Redis, auth providers, rate limits and deployment URLs. |
 | Build a data model | [Data Model](data-model.md) | Fields, system fields, relations, singletons, groups, ordering and visibility. |
@@ -26,6 +27,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 ## Start here
 
 - [Getting Started](getting-started.md) — install YunCMS and complete a guided first project in about 15 minutes.
+- [Docker](docker.md) — run the published image with MySQL, persistent state, health checks and a pinned upgrade path.
 - [Setup and CLI](setup-cli.md) — create a project, configure MySQL, bootstrap the Administrator account, start the server, back up, restore and update.
 - [Using Studio](studio.md) — sign in, manage content, build collections, work with Files, users, roles, permissions, appearance and the built-in AI assistant.
 - [Configuration](configuration.md) — server, MySQL, Redis, rate limits, Files/S3, SMTP, external authentication and MCP settings.
@@ -63,6 +65,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 
 ## Operations
 
+- [Docker](docker.md) — published image, Compose stack, persistent volumes, container CLI, backups and image updates.
 - [Deployment](deployment.md) — production process, reverse proxy, TLS, environment and operational recommendations.
 - [Upgrades](upgrades.md) — managed update, backup/restore safety and maintenance behavior.
 - [Database operations](database.md) — MySQL requirements, backup concerns and database-level behavior.

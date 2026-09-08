@@ -14,6 +14,8 @@
   },
   "scripts": {
     "build:studio": "npm run build --workspace=@yunsoft/yuncms-studio",
+    "docker:build": "node scripts/docker-image.mjs --load",
+    "docker:publish": "node scripts/docker-image.mjs --push",
     "dev": "npm run build:studio && node --watch packages/api/src/server.js",
     "dev:api": "node --watch packages/api/src/server.js",
     "init": "node packages/cli/bin/yuncms.js init",

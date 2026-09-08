@@ -31,7 +31,8 @@ These screenshots were captured from the current published package. New users sh
 
 | I want to… | Start here |
 | --- | --- |
-| Install YunCMS and create my first collection | [Getting Started](docs/getting-started.md) |
+| Install YunCMS with Docker | [Docker](docs/docker.md) |
+| Install YunCMS with npm and create my first collection | [Getting Started](docs/getting-started.md) |
 | Understand Content, Files, Data Model and users | [Using YunCMS Studio](docs/studio.md) |
 | Design fields and relations | [Data Model Guide](docs/data-model.md) |
 | Configure roles and safe public access | [Roles and Permissions](docs/permissions.md) |
@@ -62,7 +63,34 @@ These screenshots were captured from the current published package. New users sh
 - single-port Studio + API runtime;
 - backup, restore and managed update commands.
 
-## Requirements
+## Choose Docker or npm
+
+YunCMS is available as the [`yunsoftofficial/yuncms`](https://hub.docker.com/r/yunsoftofficial/yuncms) Docker image and as the `@yunsoft/yuncms` npm package. Both distribution paths run the same CLI, API and Studio.
+
+### Docker Compose
+
+Docker users only need Docker Engine with the Compose plugin (or Docker Desktop); the maintained stack includes MySQL 8.4 and the required Node.js runtime.
+
+```bash
+mkdir my-yuncms
+cd my-yuncms
+curl -fsSLO https://raw.githubusercontent.com/Yunsoft-Software/yuncms/main/compose.yaml
+curl -fsSL https://raw.githubusercontent.com/Yunsoft-Software/yuncms/main/docker.env.example -o .env
+```
+
+Replace both example passwords in `.env`, then initialize and start the stack:
+
+```bash
+docker compose up -d mysql
+docker compose run --rm yuncms init
+docker compose up -d yuncms
+```
+
+During `init`, use `mysql` as the database host, `yuncms` as the database and user, and the password from `.env`; then create the first Administrator. Open `http://localhost:3008` after `docker compose ps` reports YunCMS healthy.
+
+The complete volume, configuration, backup and image-update workflow is in **[Docker](docs/docker.md)**.
+
+### npm requirements
 
 ```text
 Node.js 24 LTS
@@ -70,7 +98,7 @@ npm 11+
 MySQL 8-compatible server
 ```
 
-## Quick start — no clone or fork required
+### npm quick start — no clone or fork required
 
 Create an empty directory and run the published npm package directly with `npx`:
 
@@ -422,6 +450,7 @@ The complete user/operator/integrator index is **[docs/README.md](docs/README.md
 
 ## Production and operations
 
+- **[Docker](docs/docker.md)**
 - **[Deployment](docs/deployment.md)**
 - **[Upgrades / Backup / Restore](docs/upgrades.md)**
 - **[Security](docs/security.md)**
@@ -440,7 +469,7 @@ For a production installation:
 5. preserve `.yuncms/ai-settings.key` when AI provider credentials are configured;
 6. use Redis shared state where multiple API replicas require coherent cache/rate-limit behavior;
 7. start MCP read-only and AI writes disabled until permissions have been verified with representative accounts;
-8. use the managed backup/update flow for version changes.
+8. use the managed backup/update flow for npm installations or pinned-image replacement flow for Docker installations.
 
 See **[Deployment](docs/deployment.md)** and **[Production Readiness](docs/production-readiness.md)**.
 

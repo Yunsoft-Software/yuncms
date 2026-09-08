@@ -1,6 +1,6 @@
 # Getting Started with YunCMS
 
-This guide takes a new installation from an empty directory to a working content collection, a restricted editor role and a first API request. You do not need to clone the YunCMS repository or understand the internal architecture.
+This guide takes an npm installation from an empty directory to a working content collection, a restricted editor role and a first API request. You do not need to clone the YunCMS repository or understand the internal architecture. To use the published container image instead, complete [Docker](docker.md), then return at step 4 for the same Studio walkthrough.
 
 The walkthrough normally takes about 15 minutes when MySQL is already available.
 
@@ -8,7 +8,7 @@ The walkthrough normally takes about 15 minutes when MySQL is already available.
 
 By the end you will have:
 
-- a YunCMS project installed from npm;
+- a YunCMS project installed from npm (or the equivalent Docker installation from the linked guide);
 - an Administrator account;
 - a `products` collection with several fields;
 - records visible in Studio;

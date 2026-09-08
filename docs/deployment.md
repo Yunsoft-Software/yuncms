@@ -1,26 +1,27 @@
 # Deployment Baseline
 
-YunCMS V1 targets Node.js 24 LTS with a MySQL 8-compatible server.
+YunCMS V1 targets Node.js 24 LTS with a MySQL 8-compatible server. Operators can install the npm package directly or use the published Docker image; both paths run the same API, Studio and service layer.
 
 > YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com) and remains under active development. Treat every deployment as your own operational responsibility: test upgrades in staging, keep verified backups and complete the [Production Readiness](production-readiness.md) checklist. YunCMS is provided under the MIT License without warranty.
 
 ## Required runtime pieces
 
-- Node.js 24 LTS;
-- reviewed npm install/lockfile;
+- Node.js 24 LTS and a reviewed npm install/lockfile, or a pinned `yunsoftofficial/yuncms` container image;
 - MySQL database/user;
 - persistent local storage or configured S3-compatible bucket;
 - optional SMTP for password reset/email verification.
 
 Expose YunCMS through a production reverse proxy/TLS terminator when internet-facing.
 
+For the maintained MySQL 8.4 Compose stack, non-root image, persistent-volume layout, health check and pinned-image update flow, see [Docker](docker.md).
+
 ## Startup flow
 
 ```text
-1. install dependencies/package
+1. install the npm dependency/package or pull a pinned container image
 2. provide environment variables
 3. yuncms bootstrap
-4. yuncms start
+4. yuncms start (directly or through the container entrypoint)
 5. reverse proxy/TLS -> the single YunCMS API + built Studio port
 ```
 

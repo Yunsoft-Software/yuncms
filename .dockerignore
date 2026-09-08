@@ -1,0 +1,15 @@
+.git
+.gitignore
+.DS_Store
+.credentials
+.env
+.env.*
+.yuncms
+node_modules
+coverage
+dist
+packages/api/studio-dist
+screenshots
+uploads
+*.log
+npm-debug.log*
