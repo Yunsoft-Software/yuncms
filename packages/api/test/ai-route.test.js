@@ -6,7 +6,7 @@ import { aiRequestAccess, requireAdministrator, requireAuthenticated } from '../
 test('AI routes reject Public accountability', () => {
   assert.throws(
     () => requireAuthenticated({ authMethod: 'public', accountability: { user: null } }),
-    (error) => error.code === 'UNAUTHORIZED',
+    (error) => error.code === 'UNAUTHORIZED' && error.message === 'AI assistant requires an authenticated YunCMS account',
   );
 });
 
@@ -30,7 +30,7 @@ test('AI settings routes require Administrator or system accountability', () => 
       authMethod: 'api_token',
       accountability: { user: 'user-1', role: 'role-1', admin: false, system: false },
     }),
-    (error) => error.code === 'FORBIDDEN',
+    (error) => error.code === 'FORBIDDEN' && error.message === 'AI assistant settings require administrator access',
   );
   assert.doesNotThrow(() => requireAdministrator({
     authMethod: 'session',

@@ -68,7 +68,7 @@ test('AI settings cannot be enabled without both model and saved key', async () 
   const store = new AiSettingsStore({ database: createDatabase(), key: randomBytes(32) });
   await assert.rejects(
     () => store.update({ enabled: true }),
-    (error) => error.code === 'INVALID_AI_CONFIG',
+    (error) => error.code === 'INVALID_AI_CONFIG' && error.message === 'Save an API key before enabling the AI assistant',
   );
 });
 

@@ -63,8 +63,8 @@ export function AiSettingsPanel({ settings, onSaved, onClose }) {
       setForm(formFromSettings(next));
       setNotice(t('ai.settingsSaved'));
       await onSaved?.(next);
-    } catch (requestError) {
-      setError(requestError.message || t('ai.settingsSaveFailed'));
+    } catch {
+      setError(t('ai.settingsSaveFailed'));
     } finally {
       setSaving(false);
     }

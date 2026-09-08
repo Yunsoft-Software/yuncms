@@ -18,6 +18,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 | Install YunCMS with Docker | [Docker](docker.md) | Compose setup, persistent volumes, container CLI, backups and image updates. |
 | Install YunCMS with npm | [Getting Started](getting-started.md) | Requirements, npm installation, first collection, editor role and first API call. |
 | Operate the browser interface | [Using Studio](studio.md) | Content, Data Model, Files, users, permissions, branding, AI and mobile navigation. |
+| Choose the Studio and AI language | [Localization](studio-customization.md#localization) | The eight supported languages, personal selection, project default and English fallback. |
 | Configure the server | [Configuration](configuration.md) | MySQL, Files, SMTP, Redis, auth providers, rate limits and deployment URLs. |
 | Build a data model | [Data Model](data-model.md) | Fields, system fields, relations, singletons, groups, ordering and visibility. |
 | Secure access | [Roles and Permissions](permissions.md) | Deny-by-default actions, fields, row filters, validation and Public access. |

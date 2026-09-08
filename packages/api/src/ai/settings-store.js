@@ -119,10 +119,10 @@ export class AiSettingsStore {
     const effectiveModel = Object.hasOwn(normalized, 'model') ? normalized.model : current.model;
     const effectiveEnabled = Object.hasOwn(normalized, 'enabled') ? normalized.enabled : Boolean(current.enabled);
     if (effectiveEnabled && !effectiveHasKey) {
-      throw settingsError('INVALID_AI_CONFIG', 'Save an API key before enabling Yapay Zeka');
+      throw settingsError('INVALID_AI_CONFIG', 'Save an API key before enabling the AI assistant');
     }
     if (effectiveEnabled && !effectiveModel) {
-      throw settingsError('INVALID_AI_CONFIG', 'Choose a model before enabling Yapay Zeka');
+      throw settingsError('INVALID_AI_CONFIG', 'Choose a model before enabling the AI assistant');
     }
 
     params.push(1);

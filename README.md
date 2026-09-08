@@ -52,6 +52,7 @@ These screenshots were captured from the current published package. New users sh
 | Install YunCMS with Docker | [Docker](docs/docker.md) |
 | Install YunCMS with npm and create my first collection | [Getting Started](docs/getting-started.md) |
 | Understand Content, Files, Data Model and users | [Using YunCMS Studio](docs/studio.md) |
+| Choose the Studio and AI language | [Localization](docs/studio-customization.md#localization) |
 | Design fields and relations | [Data Model Guide](docs/data-model.md) |
 | Configure roles and safe public access | [Roles and Permissions](docs/permissions.md) |
 | Connect a frontend or integration | [REST API](docs/rest-api.md) and [Items Query Language](docs/api-query-language.md) |

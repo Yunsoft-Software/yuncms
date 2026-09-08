@@ -223,7 +223,7 @@ export async function saveMcpSettings(patch) {
 }
 
 export async function aiChat(messages, {
-  locale = 'tr',
+  locale = 'en',
   allowWrites = false,
   allowDeletes = false,
 } = {}) {

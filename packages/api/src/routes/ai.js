@@ -1,7 +1,7 @@
 import express from 'express';
 
 function authError() {
-  const error = new Error('Yapay Zeka requires an authenticated YunCMS account');
+  const error = new Error('AI assistant requires an authenticated YunCMS account');
   error.code = 'UNAUTHORIZED';
   return error;
 }
@@ -13,7 +13,7 @@ function requireAuthenticated(req) {
 function requireAdministrator(req) {
   requireAuthenticated(req);
   if (req.accountability?.admin === true || req.accountability?.system === true) return;
-  const error = new Error('Yapay Zeka settings require administrator access');
+  const error = new Error('AI assistant settings require administrator access');
   error.code = 'FORBIDDEN';
   throw error;
 }

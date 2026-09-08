@@ -1,12 +1,12 @@
-# YunCMS Yapay Zeka
+# YunCMS AI Assistant
 
-YunCMS Studio includes a built-in **Yapay Zeka** chat screen. Users open it directly from the Studio sidebar; no separate desktop app, agent process or protocol client is required.
+YunCMS Studio includes a built-in **AI** chat screen. Users open it directly from the Studio sidebar; no separate desktop app, agent process or protocol client is required.
 
 The assistant can inspect the current YunCMS schema and records using the **same authenticated user, role and permission rules** as the rest of YunCMS.
 
 ## Configure from Studio
 
-Provider configuration is managed from **Yapay Zeka → Ayarlar**. YunCMS does not require `AI_*` environment variables for the assistant.
+Provider configuration is managed from **AI → Settings**. YunCMS does not require `AI_*` environment variables for the assistant.
 
 An Administrator can configure:
 
@@ -39,7 +39,7 @@ Multiple API processes sharing one database must use the same AI settings key. P
 
 ## Studio experience
 
-The Studio sidebar contains **Yapay Zeka** as a top-level section.
+The Studio sidebar contains **AI** as a top-level section. Its name and every surrounding control follow the active personal Studio language.
 
 The screen provides:
 
@@ -52,6 +52,23 @@ The screen provides:
 - light/dark and responsive layouts using the existing Studio theme.
 
 Conversation history is not persisted by YunCMS. Studio sends only the bounded recent conversation window needed for the next answer.
+
+## Language behavior
+
+The AI workspace follows the same personal language selected for the rest of Studio. The language selector is available in the Studio shell and the sign-in experience; changing it updates AI controls immediately and asks the configured provider to answer in that language on the next request.
+
+Supported AI response languages match the complete Studio locale catalogue:
+
+- English (`en`);
+- Turkish (`tr`);
+- Spanish (`es`);
+- German (`de`);
+- French (`fr`);
+- Brazilian Portuguese (`pt-BR`);
+- Japanese (`ja`);
+- Simplified Chinese (`zh-CN`).
+
+`POST /ai/chat` accepts one of these codes as `locale`. Locale matching is case-insensitive and canonicalized; a missing or unsupported value falls back to English. A user can still explicitly ask for a different response language in the message itself.
 
 ## Data access and RBAC
 
@@ -70,15 +87,15 @@ If a user cannot access data through ordinary YunCMS permissions, the assistant 
 
 Data-changing abilities are disabled in persisted settings by default.
 
-An Administrator can enable **Veri değiştirme özelliğini kullanılabilir yap** from the settings panel. Even then, each Studio conversation starts in **Salt okunur** mode. Before sending a message, the current user can choose one of three access modes:
+An Administrator can enable **Make data-changing actions available** from the settings panel. Even then, each Studio conversation starts in **Read only** mode. Before sending a message, the current user can choose one of three access modes:
 
-- **Salt okunur**: schema and record reads only;
-- **Otomatik yazma**: create and update tools may run for the user's explicit request without another per-operation approval; delete is not advertised and is rejected server-side;
-- **Tam yetki (silme dahil)**: create, update and delete tools may run for the user's explicit request without another per-operation approval.
+- **Read only**: schema and record reads only;
+- **Automatic writes**: create and update tools may run for the user's explicit request without another per-operation approval; delete is not advertised and is rejected server-side;
+- **Full access (with delete)**: create, update and delete tools may run for the user's explicit request without another per-operation approval.
 
 Both conditions must therefore be true:
 
-1. the Administrator has made assistant writes available in Yapay Zeka settings;
+1. the Administrator has made assistant writes available in AI settings;
 2. the current user selects automatic writes or full access for the current request.
 
 Full access is not an Administrator bypass. Normal YunCMS create/update/delete permissions, row/field restrictions, validation, hooks and audit behavior still apply. Selecting an access mode never grants a permission the user's role does not already have.
@@ -93,7 +110,7 @@ Write operations must originate from the actual user's request and remain subjec
 
 ## Provider privacy
 
-Yapay Zeka is executed against the provider configured in Studio. User chat text and bounded YunCMS data returned by assistant tools may therefore be sent to that provider when needed to answer a request.
+The AI assistant is executed against the provider configured in Studio. User chat text and bounded YunCMS data returned by assistant tools may therefore be sent to that provider when needed to answer a request.
 
 Deployments must choose a provider and data-retention/privacy policy appropriate for their data. Do not enable a third-party provider for sensitive production data until its data-processing terms are acceptable for that deployment.
 
@@ -101,7 +118,7 @@ YunCMS does not intentionally send the provider API key, YunCMS access/refresh t
 
 ## Recommended production posture
 
-1. Open **Yapay Zeka → Ayarlar** as Administrator.
+1. Open **AI → Settings** as Administrator.
 2. Enter the provider URL, model and API key.
 3. Keep data-changing abilities disabled initially.
 4. Verify read access, RBAC behavior and provider/privacy expectations with representative non-Administrator accounts in the target environment.

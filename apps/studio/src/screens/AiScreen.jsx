@@ -73,7 +73,7 @@ export function AiScreen() {
         setStatusError('');
       } else {
         setStatus(null);
-        setStatusError(statusResult.reason?.message || t('ai.statusFailed'));
+        setStatusError(t('ai.statusFailed'));
       }
       if (settingsResult.status === 'fulfilled') {
         setAdminSettings(settingsResult.value);
@@ -126,8 +126,8 @@ export function AiScreen() {
           operations: Array.isArray(result?.operations) ? result.operations : [],
         },
       ]);
-    } catch (requestError) {
-      setError(requestError.message || t('ai.requestFailed'));
+    } catch {
+      setError(t('ai.requestFailed'));
     } finally {
       setSending(false);
     }

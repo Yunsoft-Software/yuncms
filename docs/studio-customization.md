@@ -136,6 +136,8 @@ The personal preference is stored in browser local storage. Changing it does not
 
 All enabled locales cover the same Studio translation keys and interpolation placeholders. Dynamic field, action, collection-icon and Data Model labels follow the active personal language.
 
+The built-in AI workspace uses the same active personal language for its controls and passes that locale to the model provider so the response language stays aligned with Studio. The supported AI locale set is identical to the enabled Studio locale set; direct API requests with a missing or unsupported locale fall back to English.
+
 ---
 
 # Architecture

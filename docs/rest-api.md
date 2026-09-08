@@ -539,6 +539,8 @@ When configured, the AI API is mounted under:
 
 The built-in Studio assistant uses the authenticated request's normal accountability. Model/tool access does not create an Administrator bypass. Data-changing tools also require the configured AI write capability and the user's selected per-conversation access mode.
 
+`POST /ai/chat` accepts `locale` values `en`, `tr`, `es`, `de`, `fr`, `pt-BR`, `ja` and `zh-CN`. YunCMS canonicalizes locale casing, asks the provider to answer in the selected language and falls back to English when the value is missing or unsupported.
+
 See [`ai-assistant.md`](ai-assistant.md) for configuration, privacy, write modes and prompt-injection boundaries.
 
 # MCP

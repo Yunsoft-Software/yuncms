@@ -319,6 +319,8 @@ See [Public registration](public-registration.md) before enabling signup.
 
 When configured by an Administrator, the Studio AI assistant can help inspect schema/content and, when explicitly allowed, perform bounded data operations through YunCMS services.
 
+The AI workspace follows the user's personal Studio language. English, Turkish, Spanish, German, French, Brazilian Portuguese, Japanese and Simplified Chinese are supported for both the interface and the requested assistant response; unsupported API locale values fall back to English.
+
 The AI workspace emphasizes the actual CMS operations returned by the assistant. Successful and failed schema/item operations are shown alongside the response so it is clear what happened.
 
 Read, write and full access modes remain explicit. The assistant does not receive an Administrator bypass simply because it is AI. Tool calls use the current user's normal role/accountability, and write access also depends on AI-specific write/access-mode controls.

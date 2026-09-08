@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { DICTIONARIES } from '../src/localization.js';
+
 const appSource = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const apiSource = await readFile(new URL('../src/api.js', import.meta.url), 'utf8');
 const screenSource = await readFile(new URL('../src/screens/AiScreen.jsx', import.meta.url), 'utf8');
@@ -22,12 +24,33 @@ test('Studio exposes Yapay Zeka as a first-class top-level section', () => {
   assert.match(trSource, /'nav\.ai': 'Yapay Zeka'/);
 });
 
+test('every enabled locale provides localized primary AI controls', () => {
+  const expected = {
+    en: ['Settings', 'New chat', 'Read only', 'Send'],
+    tr: ['Ayarlar', 'Yeni sohbet', 'Salt okunur', 'Gönder'],
+    es: ['Ajustes', 'Nuevo chat', 'Solo lectura', 'Enviar'],
+    de: ['Einstellungen', 'Neuer Chat', 'Nur lesen', 'Senden'],
+    fr: ['Paramètres', 'Nouvelle discussion', 'Lecture seule', 'Envoyer'],
+    'pt-BR': ['Configurações', 'Novo chat', 'Somente leitura', 'Enviar'],
+    ja: ['設定', '新しいチャット', '読み取り専用', '送信'],
+    'zh-CN': ['设置', '新聊天', '只读', '发送'],
+  };
+  for (const [locale, values] of Object.entries(expected)) {
+    assert.deepEqual(
+      ['ai.settings', 'ai.newChat', 'ai.accessRead', 'ai.send'].map((key) => DICTIONARIES[locale][key]),
+      values,
+      locale,
+    );
+  }
+});
+
 test('Studio AI client uses built-in chat and administrator settings routes', () => {
   assert.match(apiSource, /export async function aiStatus/);
   assert.match(apiSource, /export async function aiSettings/);
   assert.match(apiSource, /export async function saveAiSettings/);
   assert.match(apiSource, /'\/ai\/settings'/);
   assert.match(apiSource, /export async function aiChat/);
+  assert.match(apiSource, /locale = 'en'/);
   assert.match(apiSource, /allow_writes: allowWrites/);
   assert.match(apiSource, /allow_deletes: allowWrites && allowDeletes/);
   assert.match(screenSource, /<AiSettingsPanel/);
@@ -38,6 +61,11 @@ test('Studio AI client uses built-in chat and administrator settings routes', ()
   assert.match(screenSource, /AI_ACCESS_MODES\.WRITE/);
   assert.match(screenSource, /AI_ACCESS_MODES\.FULL/);
   assert.match(screenSource, /\{ready && \(\s*<div className="ai-chat-shell">/);
+  assert.doesNotMatch(screenSource, /statusResult\.reason\?\.message|requestError\.message/);
+  assert.doesNotMatch(settingsSource, /requestError\.message/);
+  assert.match(screenSource, /setStatusError\(t\('ai\.statusFailed'\)\)/);
+  assert.match(screenSource, /setError\(t\('ai\.requestFailed'\)\)/);
+  assert.match(settingsSource, /setError\(t\('ai\.settingsSaveFailed'\)\)/);
 });
 
 test('AI settings form never pre-fills or renders the saved API key', () => {

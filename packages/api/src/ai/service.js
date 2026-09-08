@@ -1,3 +1,5 @@
+import { canonicalStudioLocale, STUDIO_LOCALE_CODES } from '@yunsoft/yuncms-core';
+
 import {
   aiToolDefinitions,
   executeAiTool,
@@ -7,7 +9,21 @@ import {
 } from './tools.js';
 
 const PROVIDER_RESPONSE_LIMIT = 2_000_000;
-const SUPPORTED_LOCALES = new Set(['tr', 'en']);
+export const AI_REPLY_LANGUAGE_BY_LOCALE = Object.freeze({
+  en: 'English',
+  tr: 'Turkish',
+  es: 'Spanish',
+  de: 'German',
+  fr: 'French',
+  'pt-BR': 'Brazilian Portuguese',
+  ja: 'Japanese',
+  'zh-CN': 'Simplified Chinese',
+});
+
+if (Object.keys(AI_REPLY_LANGUAGE_BY_LOCALE).length !== STUDIO_LOCALE_CODES.length
+  || STUDIO_LOCALE_CODES.some((locale) => !AI_REPLY_LANGUAGE_BY_LOCALE[locale])) {
+  throw new Error('AI reply languages must cover every supported Studio locale');
+}
 
 function aiError(code, message) {
   const error = new Error(message);
@@ -77,9 +93,10 @@ export function normalizeAiConversation(messages, config) {
 }
 
 function systemPrompt({ locale, writesEnabled, deletesEnabled }) {
-  const language = locale === 'en' ? 'English' : 'Turkish';
+  const normalizedLocale = canonicalStudioLocale(locale) ?? 'en';
+  const language = AI_REPLY_LANGUAGE_BY_LOCALE[normalizedLocale];
   return [
-    'You are YunCMS Yapay Zeka, the assistant embedded inside YunCMS Studio.',
+    'You are the AI assistant embedded inside YunCMS Studio.',
     `Reply in ${language} unless the user explicitly asks for another language.`,
     'Use the provided tools whenever an answer depends on YunCMS schema or records. Never invent collection names, fields, records, counts or permissions.',
     'The tools already enforce the signed-in user\'s YunCMS permissions. If a tool says access is forbidden, explain that the current account does not have that access instead of trying to bypass it.',
@@ -184,20 +201,20 @@ export class AiAssistantService {
 
   async chat(req, {
     messages,
-    locale = 'tr',
+    locale = 'en',
     allowWrites = false,
     allowDeletes = false,
   } = {}) {
     const config = await this.settings();
     if (!config.enabled || !config.apiKey || !config.model) {
-      throw aiError('AI_NOT_CONFIGURED', 'Yapay Zeka is not configured on this YunCMS server');
+      throw aiError('AI_NOT_CONFIGURED', 'The AI assistant is not configured on this YunCMS server');
     }
     if (req?.authMethod === 'public' || !req?.accountability?.user) {
-      throw aiError('UNAUTHORIZED', 'Yapay Zeka requires an authenticated YunCMS account');
+      throw aiError('UNAUTHORIZED', 'The AI assistant requires an authenticated YunCMS account');
     }
 
     const conversation = normalizeAiConversation(messages, config);
-    const normalizedLocale = SUPPORTED_LOCALES.has(locale) ? locale : 'tr';
+    const normalizedLocale = canonicalStudioLocale(locale) ?? 'en';
     const writesEnabled = config.writesEnabled === true && allowWrites === true;
     const deletesEnabled = writesEnabled && allowDeletes === true;
     const tools = aiToolDefinitions({ writesEnabled, deletesEnabled, maxItems: 100 });
@@ -229,7 +246,7 @@ export class AiAssistantService {
       }
 
       if (round >= config.maxToolRounds) {
-        throw aiError('AI_TOOL_ROUND_LIMIT', 'Yapay Zeka reached the tool-call safety limit');
+        throw aiError('AI_TOOL_ROUND_LIMIT', 'The AI assistant reached the tool-call safety limit');
       }
 
       providerMessages.push(providerAssistantMessage(assistantMessage, toolCalls));
@@ -261,7 +278,7 @@ export class AiAssistantService {
       }
     }
 
-    throw aiError('AI_TOOL_ROUND_LIMIT', 'Yapay Zeka reached the tool-call safety limit');
+    throw aiError('AI_TOOL_ROUND_LIMIT', 'The AI assistant reached the tool-call safety limit');
   }
 }
 

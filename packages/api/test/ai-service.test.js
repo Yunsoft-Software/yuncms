@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { AiAssistantService, normalizeAiConversation } from '../src/ai/service.js';
+import { STUDIO_LOCALE_CODES } from '@yunsoft/yuncms-core';
+
+import {
+  AI_REPLY_LANGUAGE_BY_LOCALE,
+  AiAssistantService,
+  normalizeAiConversation,
+  systemPrompt,
+} from '../src/ai/service.js';
 
 function config(overrides = {}) {
   return {
@@ -58,6 +65,25 @@ test('AI conversation accepts only bounded user/assistant history and requires a
   assert.throws(
     () => normalizeAiConversation([{ role: 'assistant', content: 'done' }], settings),
     /final conversation message must be from the user/,
+  );
+});
+
+test('AI reply language coverage stays aligned with every enabled Studio locale', () => {
+  assert.deepEqual(Object.keys(AI_REPLY_LANGUAGE_BY_LOCALE), STUDIO_LOCALE_CODES);
+  for (const locale of STUDIO_LOCALE_CODES) {
+    assert.match(
+      systemPrompt({ locale, writesEnabled: false, deletesEnabled: false }),
+      new RegExp(`Reply in ${AI_REPLY_LANGUAGE_BY_LOCALE[locale]}`),
+      locale,
+    );
+  }
+  assert.match(
+    systemPrompt({ locale: 'pt-br', writesEnabled: false, deletesEnabled: false }),
+    /Reply in Brazilian Portuguese/,
+  );
+  assert.match(
+    systemPrompt({ locale: 'unsupported', writesEnabled: false, deletesEnabled: false }),
+    /Reply in English/,
   );
 });
 

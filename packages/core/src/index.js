@@ -14,6 +14,7 @@ export {
   redactRedisUrl,
 } from './redis.js';
 export { createDatabasePool, pingDatabase, closeDatabasePool } from './database.js';
+export { canonicalStudioLocale, STUDIO_LOCALE_CODES } from './studio-locales.js';
 export { withTransaction, withConnectionTransaction } from './transaction.js';
 export { assertIdentifier, quoteIdentifier } from './identifier.js';
 export { normalizeDisplayName, normalizeSchemaKey, resolveSchemaName } from './schema-key.js';
