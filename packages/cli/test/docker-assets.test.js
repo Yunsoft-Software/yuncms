@@ -79,3 +79,27 @@ test('Docker build context excludes local dependencies, state and credentials', 
     assert.match(dockerignore, new RegExp(`^${entry.replace('.', '\\.')}\\s*$`, 'm'));
   }
 });
+
+test('GitHub documentation presents Yunsoft branding and every installation option', async () => {
+  const [readme, installation, documentationIndex] = await Promise.all([
+    readRootFile('README.md'),
+    readRootFile('docs/installation.md'),
+    readRootFile('docs/README.md'),
+  ]);
+
+  assert.match(readme, /<a href="https:\/\/yunsoft\.com" aria-label="Yunsoft Software">/);
+  assert.match(readme, /https:\/\/yunsoft\.com\/light-logo\.png/);
+  assert.match(readme, /https:\/\/yunsoft\.com\/dark-logo\.png/);
+  assert.match(readme, /https:\/\/hub\.docker\.com\/r\/yunsoftofficial\/yuncms/);
+  assert.match(readme, /https:\/\/www\.npmjs\.com\/package\/@yunsoft\/yuncms/);
+  assert.match(readme, /\| Docker Compose \|/);
+  assert.match(readme, /\| `npx` \|/);
+  assert.match(readme, /\| Persistent npm install \|/);
+  assert.match(readme, /\| Source checkout \|/);
+
+  for (const heading of ['## Docker Compose', '## Remote `npx`', '## Persistent npm installation', '## Source checkout']) {
+    assert.match(installation, new RegExp(heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.match(installation, /\[Yunsoft Software\]\(https:\/\/yunsoft\.com\)/);
+  assert.match(documentationIndex, /\[Installation Options\]\(installation\.md\)/);
+});

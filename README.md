@@ -1,8 +1,25 @@
-# YunCMS
+<p align="center">
+  <a href="https://yunsoft.com" aria-label="Yunsoft Software">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://yunsoft.com/light-logo.png">
+      <source media="(prefers-color-scheme: light)" srcset="https://yunsoft.com/dark-logo.png">
+      <img src="https://yunsoft.com/dark-logo.png" alt="Yunsoft Software" width="240">
+    </picture>
+  </a>
+</p>
 
-**A programmable MySQL CMS/backend with a focused React Studio, strong role-based access control, Files, extensions, AI/MCP integrations and a documented REST API.**
+<h1 align="center">YunCMS</h1>
 
-YunCMS is developed and maintained by **[Yunsoft Software](https://yunsoft.com)**.
+<p align="center"><strong>A programmable MySQL CMS/backend with a focused React Studio, strong role-based access control, Files, extensions, AI/MCP integrations and a documented REST API.</strong></p>
+
+<p align="center">
+  <a href="https://hub.docker.com/r/yunsoftofficial/yuncms"><img alt="Docker image version" src="https://img.shields.io/docker/v/yunsoftofficial/yuncms?sort=semver&label=Docker&logo=docker"></a>
+  <a href="https://www.npmjs.com/package/@yunsoft/yuncms"><img alt="npm package version" src="https://img.shields.io/npm/v/%40yunsoft%2Fyuncms?logo=npm"></a>
+  <img alt="Node.js 24 LTS" src="https://img.shields.io/badge/Node.js-24_LTS-5FA04E?logo=nodedotjs&logoColor=white">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/Yunsoft-Software/yuncms"></a>
+</p>
+
+<p align="center">Developed and maintained by <a href="https://yunsoft.com"><strong>Yunsoft Software</strong></a>.</p>
 
 > YunCMS is currently in the `0.1.x` pre-stable line. Use the managed backup/update flow and verify your own database, storage, proxy and authentication configuration before exposing a production installation.
 
@@ -31,6 +48,7 @@ These screenshots were captured from the current published package. New users sh
 
 | I want to… | Start here |
 | --- | --- |
+| Compare every installation method | [Installation Options](docs/installation.md) |
 | Install YunCMS with Docker | [Docker](docs/docker.md) |
 | Install YunCMS with npm and create my first collection | [Getting Started](docs/getting-started.md) |
 | Understand Content, Files, Data Model and users | [Using YunCMS Studio](docs/studio.md) |
@@ -63,9 +81,16 @@ These screenshots were captured from the current published package. New users sh
 - single-port Studio + API runtime;
 - backup, restore and managed update commands.
 
-## Choose Docker or npm
+## Installation options
 
 YunCMS is available as the [`yunsoftofficial/yuncms`](https://hub.docker.com/r/yunsoftofficial/yuncms) Docker image and as the `@yunsoft/yuncms` npm package. Both distribution paths run the same CLI, API and Studio.
+
+| Option | Best for | Requirements | Start here |
+| --- | --- | --- | --- |
+| Docker Compose | Fastest complete self-hosted stack | Docker with Compose | [Docker guide](docs/docker.md) |
+| `npx` | Evaluation without a persistent package install | Node.js 24, npm 11+, MySQL | Commands below |
+| Persistent npm install | Long-lived Node deployments with managed updates | Node.js 24, npm 11+, MySQL | [Setup and CLI](docs/setup-cli.md) |
+| Source checkout | Contributors and local core development | Git, Node.js 24, npm 11+, MySQL | [Installation Options](docs/installation.md#source-checkout) |
 
 ### Docker Compose
 
@@ -90,7 +115,7 @@ During `init`, use `mysql` as the database host, `yuncms` as the database and us
 
 The complete volume, configuration, backup and image-update workflow is in **[Docker](docs/docker.md)**.
 
-### npm requirements
+### npm and source requirements
 
 ```text
 Node.js 24 LTS
@@ -98,7 +123,7 @@ npm 11+
 MySQL 8-compatible server
 ```
 
-### npm quick start — no clone or fork required
+### Quick evaluation with `npx`
 
 Create an empty directory and run the published npm package directly with `npx`:
 
@@ -125,12 +150,26 @@ The direct `npx` flow above is enough to initialize and run YunCMS without cloni
 
 ```bash
 npm init -y
-npm install @yunsoft/yuncms
+npm install --save-exact @yunsoft/yuncms
 npx yuncms init
 npx yuncms start
 ```
 
 After a local install, `npx yuncms ...` uses the project dependency instead of downloading a temporary copy.
+
+### Source checkout
+
+Contributors can run the workspace directly:
+
+```bash
+git clone https://github.com/Yunsoft-Software/yuncms.git
+cd yuncms
+npm ci
+npm run init
+npm start
+```
+
+Source installs are intended for development. Production operators should prefer a pinned Docker image or a versioned npm dependency. See **[Installation Options](docs/installation.md)** for the comparison, state layout and update path for each method.
 
 Useful commands:
 
@@ -429,6 +468,7 @@ The complete user/operator/integrator index is **[docs/README.md](docs/README.md
 ## Getting started and administration
 
 - **[Documentation index](docs/README.md)**
+- **[Installation Options](docs/installation.md)**
 - **[Getting Started](docs/getting-started.md)**
 - **[Setup and CLI](docs/setup-cli.md)**
 - **[Using YunCMS Studio](docs/studio.md)**

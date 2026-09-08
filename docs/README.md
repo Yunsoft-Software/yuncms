@@ -14,6 +14,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 
 | Your goal | Read this | What you will learn |
 | --- | --- | --- |
+| Compare installation methods | [Installation Options](installation.md) | Docker Compose, `npx`, persistent npm and source-checkout tradeoffs. |
 | Install YunCMS with Docker | [Docker](docker.md) | Compose setup, persistent volumes, container CLI, backups and image updates. |
 | Install YunCMS with npm | [Getting Started](getting-started.md) | Requirements, npm installation, first collection, editor role and first API call. |
 | Operate the browser interface | [Using Studio](studio.md) | Content, Data Model, Files, users, permissions, branding, AI and mobile navigation. |
@@ -26,6 +27,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 
 ## Start here
 
+- [Installation Options](installation.md) — choose Docker Compose, remote `npx`, persistent npm or a source checkout.
 - [Getting Started](getting-started.md) — install YunCMS and complete a guided first project in about 15 minutes.
 - [Docker](docker.md) — run the published image with MySQL, persistent state, health checks and a pinned upgrade path.
 - [Setup and CLI](setup-cli.md) — create a project, configure MySQL, bootstrap the Administrator account, start the server, back up, restore and update.
