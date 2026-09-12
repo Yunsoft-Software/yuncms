@@ -29,3 +29,12 @@ test('production mail and MCP dependencies stay above audited security baselines
   assert.equal(lockfile.packages['node_modules/nodemailer'].version, '9.1.1');
   assert.equal(lockfile.packages['node_modules/hono'].version, '4.13.7');
 });
+
+test('release verification serializes integration files that share the MySQL fixture', async () => {
+  const verifySource = await readFile(resolve(PACKAGES_ROOT, '../scripts/verify.mjs'), 'utf8');
+
+  assert.match(
+    verifySource,
+    /real MySQL\/API integration suite[\s\S]*?\{ concurrency: 1 \}/,
+  );
+});

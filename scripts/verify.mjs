@@ -137,13 +137,14 @@ function run(command, args, { label, env = process.env, failureArgs = null } = {
   process.exit(result.status || 1);
 }
 
-function runNodeTests(files, label) {
+function runNodeTests(files, label, { concurrency = null } = {}) {
+  const concurrencyArgs = concurrency == null ? [] : [`--test-concurrency=${concurrency}`];
   run(
     process.execPath,
-    ['--test', '--test-reporter=dot', ...files],
+    ['--test', '--test-reporter=dot', ...concurrencyArgs, ...files],
     {
       label,
-      failureArgs: ['--test', '--test-reporter=spec', ...files],
+      failureArgs: ['--test', '--test-reporter=spec', ...concurrencyArgs, ...files],
     },
   );
 }
@@ -191,7 +192,11 @@ if (MODE === 'release') {
 
   if (process.env.YUNCMS_TEST_MYSQL === '1') {
     const integrationTests = collectTests('test/integration').sort();
-    runNodeTests(integrationTests, `real MySQL/API integration suite (${integrationTests.length} files)`);
+    runNodeTests(
+      integrationTests,
+      `real MySQL/API integration suite (${integrationTests.length} files)`,
+      { concurrency: 1 },
+    );
   } else {
     console.log('○ real MySQL/API integration skipped (set YUNCMS_TEST_MYSQL=1)');
   }
