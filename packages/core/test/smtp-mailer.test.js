@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import nodemailer from 'nodemailer';
+
 import { SmtpMailer } from '../src/mail/smtp-mailer.js';
 
 test('SMTP mailer validates envelope fields and delegates message to transport', async () => {
@@ -38,4 +40,29 @@ test('SMTP mailer rejects header injection attempts', async () => {
     }),
     (error) => error.code === 'INVALID_MAIL_MESSAGE',
   );
+});
+
+test('SMTP mailer sends through the pinned Nodemailer transport contract', async () => {
+  const transport = nodemailer.createTransport({
+    streamTransport: true,
+    buffer: true,
+    newline: 'unix',
+  });
+  const mailer = new SmtpMailer({
+    from: 'no-reply@example.com',
+    transport,
+  });
+
+  const result = await mailer.send({
+    to: 'user@example.com',
+    subject: 'Compatibility check',
+    text: 'Nodemailer transport is operational.',
+  });
+  const message = result.message.toString('utf8');
+
+  assert.match(message, /^From: no-reply@example\.com$/m);
+  assert.match(message, /^To: user@example\.com$/m);
+  assert.match(message, /^Subject: Compatibility check$/m);
+  assert.match(message, /Nodemailer transport is operational\./);
+  transport.close();
 });

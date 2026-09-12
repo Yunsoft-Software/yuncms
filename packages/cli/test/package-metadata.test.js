@@ -18,3 +18,14 @@ test('published package metadata and README introductions link to Yunsoft', asyn
     assert.match(introduction, new RegExp(YUNSOFT_LINK.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 });
+
+test('production mail and MCP dependencies stay above audited security baselines', async () => {
+  const [coreManifest, lockfile] = await Promise.all([
+    readFile(resolve(PACKAGES_ROOT, 'core/package.json'), 'utf8').then(JSON.parse),
+    readFile(resolve(PACKAGES_ROOT, '../package-lock.json'), 'utf8').then(JSON.parse),
+  ]);
+
+  assert.equal(coreManifest.dependencies.nodemailer, '9.1.1');
+  assert.equal(lockfile.packages['node_modules/nodemailer'].version, '9.1.1');
+  assert.equal(lockfile.packages['node_modules/hono'].version, '4.13.7');
+});
