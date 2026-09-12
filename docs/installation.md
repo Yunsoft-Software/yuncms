@@ -52,7 +52,7 @@ The current directory remains the project directory. YunCMS creates `.env`, loca
 For repeatable automation, invoke an explicit version instead of relying on the npm latest tag:
 
 ```bash
-npx --yes @yunsoft/yuncms@0.1.20 start
+npx --yes @yunsoft/yuncms@0.1.22 start
 ```
 
 ## Persistent npm installation
