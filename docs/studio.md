@@ -17,6 +17,7 @@ The login screen supports normal email/password authentication and displays any 
 If you forget a local password, use the password-reset option. Reset and verification links return to Studio and are completed against the normal authentication API.
 
 Studio keeps opaque session credentials in browser session storage, refreshes an expired access token when possible and sends you back to login if the session can no longer be refreshed.
+When another same-origin YunCMS extension console opens in a new tab, an open authenticated Studio tab can hand off the existing session on request. The session remains in tab-scoped storage; credentials are not placed in URLs or persistent local storage. If no authenticated tab remains open, sign in normally.
 
 See [Authentication](auth.md) to configure OIDC, OAuth2, LDAP or SAML login methods.
 

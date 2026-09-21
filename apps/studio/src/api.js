@@ -2,10 +2,14 @@ const SAME_ORIGIN_API_URL = typeof window !== 'undefined'
   ? window.location.origin
   : 'http://127.0.0.1:3008';
 
-export const API_URL = import.meta.env.VITE_API_URL || SAME_ORIGIN_API_URL;
+export const API_URL = import.meta.env?.VITE_API_URL || SAME_ORIGIN_API_URL;
 
 const SESSION_KEY = 'yuncms.studio.session';
 const SESSION_EVENT = 'yuncms:session-changed';
+const SESSION_CHANNEL = 'yuncms.studio.session.v1';
+const sessionChannel = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'
+  ? new BroadcastChannel(SESSION_CHANNEL)
+  : null;
 let refreshInFlight = null;
 
 export class ApiError extends Error {
@@ -33,6 +37,12 @@ export function readSession() {
     return null;
   }
 }
+
+sessionChannel?.addEventListener('message', ({ data }) => {
+  if (data?.type !== 'session-request' || typeof data.requestId !== 'string') return;
+  const session = readSession();
+  if (session) sessionChannel.postMessage({ type: 'session-response', requestId: data.requestId, session });
+});
 
 export function writeSession(session) {
   if (!session) {
