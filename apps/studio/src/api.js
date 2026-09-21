@@ -52,6 +52,7 @@ export function writeSession(session) {
   }
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
   emitSessionChange();
+  sessionChannel?.postMessage({ type: 'session-available' });
   return session;
 }
 

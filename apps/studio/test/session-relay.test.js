@@ -14,14 +14,16 @@ test('an authenticated Studio tab answers only matching same-origin session requ
     postMessage(message) { messages.push(message); }
   }
   const messages = [];
-  globalThis.window = { location: { origin: 'https://factory.example.test' } };
+  let sessionValue = JSON.stringify({ access_token: 'access', refresh_token: 'refresh' });
+  globalThis.window = { location: { origin: 'https://factory.example.test' }, dispatchEvent() {} };
   globalThis.BroadcastChannel = Channel;
   globalThis.sessionStorage = {
-    getItem: () => JSON.stringify({ access_token: 'access', refresh_token: 'refresh' }),
+    getItem: () => sessionValue,
+    setItem: (_key, value) => { sessionValue = value; },
   };
 
   try {
-    await import(`../src/api.js?session-relay=${Date.now()}`);
+    const api = await import(`../src/api.js?session-relay=${Date.now()}`);
     assert.equal(listeners.size, 1);
     const [listener] = listeners;
     listener({ data: { type: 'unrelated', requestId: 'one' } });
@@ -32,6 +34,8 @@ test('an authenticated Studio tab answers only matching same-origin session requ
       requestId: 'one',
       session: { access_token: 'access', refresh_token: 'refresh' },
     }]);
+    api.writeSession({ access_token: 'rotated', refresh_token: 'rotated-refresh' });
+    assert.deepEqual(messages.at(-1), { type: 'session-available' });
   } finally {
     globalThis.window = original.window;
     globalThis.sessionStorage = original.sessionStorage;
