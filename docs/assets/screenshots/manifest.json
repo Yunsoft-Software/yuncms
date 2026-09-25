@@ -1,7 +1,7 @@
 {
-  "yuncmsVersion": "0.1.22",
-  "capturedAt": "2026-09-05",
-  "source": "0.1.22 release build on http://127.0.0.1:3008",
+  "yuncmsVersion": "0.1.23",
+  "capturedAt": "2026-09-25",
+  "source": "0.1.23 release candidate visually validated on http://127.0.0.1:3018; unchanged documentation views retained",
   "files": [
     "studio-content.png",
     "studio-data-model.png",
