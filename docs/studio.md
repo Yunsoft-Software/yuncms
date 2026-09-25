@@ -23,6 +23,8 @@ See [Authentication](auth.md) to configure OIDC, OAuth2, LDAP or SAML login meth
 
 # Navigation
 
+Collection names stay on one line so navigation rows keep a consistent rhythm. When a display name is wider than the available sidebar space, its edge fades softly and the full display name and collection key appear in a tooltip on hover or keyboard focus.
+
 Studio uses a workbench layout with a stable application rail and task-specific navigation beside the active workspace.
 
 The application rail opens:

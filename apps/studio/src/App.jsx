@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useState } from 'react';
 
 import { API_URL, apiRequest, health, logout, navigationGroups, readSession, subscribeSession } from './api.js';
 import { collectionUi, sortContentCollections } from './collection-ui.js';
 import {
   CollectionIcon,
   LanguageSwitcher,
+  OverflowTooltipLabel,
   SidebarIcon,
   StudioBrand,
   YunsoftFooter,
@@ -77,15 +78,30 @@ function AccordionGroup({ id, label, icon, open, collapsed, onToggle, children }
 }
 
 function ContentCollectionButton({ entry, active, onClick }) {
+  const label = displaySchemaName(entry, 'collection');
+  const tooltipId = useId();
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const [labelOverflowing, setLabelOverflowing] = useState(false);
+
   return (
     <button
       className={`nav-item collection-nav-item ${active ? 'active' : ''}`}
       type="button"
-      title={entry.collection}
+      aria-describedby={tooltipOpen && labelOverflowing ? tooltipId : undefined}
+      onMouseEnter={() => setTooltipOpen(true)}
+      onMouseLeave={() => setTooltipOpen(false)}
+      onFocus={() => setTooltipOpen(true)}
+      onBlur={() => setTooltipOpen(false)}
       onClick={onClick}
     >
       <CollectionIcon name={collectionUi(entry).icon} size={16} />
-      <span className="nav-item-label">{displaySchemaName(entry, 'collection')}</span>
+      <OverflowTooltipLabel
+        id={tooltipId}
+        label={label}
+        detail={entry.collection}
+        open={tooltipOpen}
+        onOverflowChange={setLabelOverflowing}
+      />
     </button>
   );
 }

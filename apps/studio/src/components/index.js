@@ -15,6 +15,7 @@ export { FilePreview } from './FilePreview.jsx';
 export { FilePreviewModal } from './FilePreviewModal.jsx';
 export { Inspector } from './Inspector.jsx';
 export { Modal } from './Modal.jsx';
+export { OverflowTooltipLabel } from './OverflowTooltipLabel.jsx';
 export { Pagination, paginateClientItems } from './Pagination.jsx';
 export { PublicRegistrationSettings } from './PublicRegistrationSettings.jsx';
 export { RelationDiagram } from './RelationDiagram.jsx';

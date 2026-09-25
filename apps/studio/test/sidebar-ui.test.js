@@ -34,6 +34,15 @@ test('collection navigation uses collection metadata ordering and icons', () => 
   assert.match(navigationCss, /\.nav-item-child[\s\S]*font-size:\s*13px/);
 });
 
+test('long collection names keep stable navigation geometry and expose an overflow tooltip', () => {
+  assert.match(appSource, /OverflowTooltipLabel/);
+  assert.match(appSource, /onOverflowChange=\{setLabelOverflowing\}/);
+  assert.doesNotMatch(appSource, /title=\{entry\.collection\}/);
+  assert.match(navigationCss, /\.collection-nav-item\s*\{[\s\S]*?width:\s*100%[\s\S]*?min-width:\s*0/);
+  assert.match(navigationCss, /\.collection-nav-label\s*\{[\s\S]*?flex:\s*1 1 auto/);
+  assert.match(navigationCss, /\.collection-nav-tooltip\s*\{[\s\S]*?position:\s*fixed/);
+});
+
 test('sidebar identity shows role name rather than raw role UUID', () => {
   assert.match(appSource, /session\.user\?\.role_name/);
   assert.doesNotMatch(appSource, /<small>\{session\.user\?\.role\s*\|\|/);
