@@ -51,7 +51,7 @@ function studioCors(config) {
       res.set('access-control-allow-origin', origin);
       res.set('vary', 'Origin');
       res.set('access-control-allow-headers', 'content-type, authorization, x-request-id, x-filename, x-title, x-mimetype, mcp-protocol-version, mcp-method, mcp-name');
-      res.set('access-control-allow-methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+      res.set('access-control-allow-methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     }
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     return next();
