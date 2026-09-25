@@ -36,6 +36,11 @@ test('an authenticated Studio tab answers only matching same-origin session requ
     }]);
     api.writeSession({ access_token: 'rotated', refresh_token: 'rotated-refresh' });
     assert.deepEqual(messages.at(-1), { type: 'session-available' });
+
+    sessionValue = null;
+    const messageCount = messages.length;
+    listener({ data: { type: 'session-request', requestId: 'two' } });
+    assert.equal(messages.length, messageCount);
   } finally {
     globalThis.window = original.window;
     globalThis.sessionStorage = original.sessionStorage;
