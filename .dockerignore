@@ -2,6 +2,7 @@
 .gitignore
 .DS_Store
 .credentials
+.npmrc
 .env
 .env.*
 .yuncms

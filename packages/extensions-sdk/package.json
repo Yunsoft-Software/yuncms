@@ -1,6 +1,6 @@
 {
   "name": "@yunsoft/yuncms-extensions-sdk",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "description": "Extension authoring helpers for YunCMS endpoints and hooks.",
   "license": "MIT",
   "type": "module",
@@ -27,5 +27,9 @@
   },
   "scripts": {
     "test": "node --test"
+  },
+  "funding": {
+    "type": "custom",
+    "url": "https://yunsoft.com/contact?utm_source=npm-fund&utm_medium=yuncms&utm_campaign=yuncms-sponsorship"
   }
 }

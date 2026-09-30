@@ -75,7 +75,7 @@ test('Docker build command uses versioned and latest tags and multi-platform pub
 
 test('Docker build context excludes local dependencies, state and credentials', async () => {
   const dockerignore = await readRootFile('.dockerignore');
-  for (const entry of ['.git', '.credentials', '.env', '.yuncms', 'node_modules', 'uploads']) {
+  for (const entry of ['.git', '.credentials', '.npmrc', '.env', '.yuncms', 'node_modules', 'uploads']) {
     assert.match(dockerignore, new RegExp(`^${entry.replace('.', '\\.')}\\s*$`, 'm'));
   }
 });
