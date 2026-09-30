@@ -4,6 +4,10 @@ Command-line setup, runtime launcher and guarded upgrade tooling for YunCMS.
 
 YunCMS is developed and maintained by **[Yunsoft Software](https://yunsoft.com)**.
 
+Need help building your project, integrating YunCMS or migrating an existing backend? [Talk to Yunsoft](https://yunsoft.com/contact?utm_source=npm&utm_medium=yuncms&utm_campaign=yuncms-services). Support the project by [starring it on GitHub](https://github.com/Yunsoft-Software/yuncms) or [discussing corporate sponsorship](https://yunsoft.com/contact?utm_source=npm&utm_medium=yuncms&utm_campaign=yuncms-sponsorship).
+
+Configure repeated summaries, classifications or translations through Studio/MCP with [AI Automations](https://github.com/Yunsoft-Software/yuncms/blob/main/docs/ai-automations.md): preview a record, select restricted input/output fields and inspect persistent run history.
+
 ## Quick start
 
 You do **not** need to clone or fork the YunCMS repository. From an empty project directory, run the published package directly:

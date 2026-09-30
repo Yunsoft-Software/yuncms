@@ -21,6 +21,8 @@
 
 <p align="center">Developed and maintained by <a href="https://yunsoft.com"><strong>Yunsoft Software</strong></a>.</p>
 
+**Building with YunCMS?** [Yunsoft can help with your project, integration or migration](https://yunsoft.com/contact?utm_source=github&utm_medium=yuncms&utm_campaign=yuncms-services). If YunCMS helps you, [give the repository a star](https://github.com/Yunsoft-Software/yuncms) or [discuss corporate sponsorship](https://yunsoft.com/contact?utm_source=github&utm_medium=yuncms&utm_campaign=yuncms-sponsorship).
+
 > YunCMS is currently in the `0.1.x` pre-stable line. Use the managed backup/update flow and verify your own database, storage, proxy and authentication configuration before exposing a production installation.
 
 ## See YunCMS in action
@@ -56,6 +58,7 @@ These screenshots were captured from the current published package. New users sh
 | Design fields and relations | [Data Model Guide](docs/data-model.md) |
 | Configure roles and safe public access | [Roles and Permissions](docs/permissions.md) |
 | Connect a frontend or integration | [REST API](docs/rest-api.md) and [Items Query Language](docs/api-query-language.md) |
+| Automate summaries, classification or translation with AI | [AI Automations](docs/ai-automations.md) |
 | Deploy, back up and update a server | [Deployment](docs/deployment.md), [Production Readiness](docs/production-readiness.md) and [Upgrades](docs/upgrades.md) |
 
 ## What YunCMS provides
@@ -77,6 +80,7 @@ These screenshots were captured from the current published package. New users sh
 - permission-managed public/filtered Files use cases;
 - endpoint, hook and scheduled-job extensions;
 - optional Studio AI assistant using normal YunCMS permissions;
+- AI automations for repeated content transformations, with preview, persistent runs and a restricted execution user;
 - optional MCP endpoint using the same service/RBAC layer;
 - in-memory or Redis-backed permission cache and rate-limit state;
 - single-port Studio + API runtime;
@@ -437,6 +441,10 @@ The optional Studio AI assistant operates through the current user's normal YunC
 
 Read **[AI Assistant](docs/ai-assistant.md)**.
 
+For repeated tasks, define **[AI Automations](docs/ai-automations.md)** once in Studio or through MCP. New records and selected input-field changes can produce summaries, classifications or translations in designated output fields, with normal user permissions and visible run history.
+
+![AI automation editor with selected input/output fields and a restricted execution user](docs/assets/screenshots/studio-automations.jpg)
+
 The optional MCP endpoint exposes bounded schema/data tools through the same service/RBAC layer. It is disabled and read-only by default; Administrators configure it under **Settings → MCP Connection** without editing `.env` or restarting YunCMS.
 
 Read **[MCP](docs/mcp.md)**.
@@ -488,6 +496,7 @@ The complete user/operator/integrator index is **[docs/README.md](docs/README.md
 - **[Extensions](docs/extensions.md)**
 - **[MCP](docs/mcp.md)**
 - **[AI Assistant](docs/ai-assistant.md)**
+- **[AI Automations](docs/ai-automations.md)**
 
 ## Production and operations
 

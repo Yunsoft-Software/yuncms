@@ -42,6 +42,7 @@ const FAST_TESTS = [
   'packages/core/test/relation-expansion.test.js',
 
   'packages/api/test/authentication.test.js',
+  'packages/api/test/automations.test.js',
   'packages/api/test/error-response.test.js',
   'packages/api/test/maintenance-startup.test.js',
   'packages/api/test/request-identity.test.js',
@@ -56,6 +57,7 @@ const FAST_TESTS = [
 
   'packages/cli/test/backup-integrity.test.js',
   'packages/cli/test/cli.test.js',
+  'packages/cli/test/community-links.test.js',
   'packages/cli/test/database-backup-options.test.js',
   'packages/cli/test/database-backup-process.test.js',
   'packages/cli/test/default-port.test.js',
@@ -77,6 +79,7 @@ const FAST_TESTS = [
   'packages/extensions-sdk/test/sdk.test.js',
 
   'apps/studio/test/collection-visibility.test.js',
+  'apps/studio/test/automations.test.js',
   'apps/studio/test/collection-ui.test.js',
   'apps/studio/test/schema-name.test.js',
   'apps/studio/test/studio-settings.test.js',
