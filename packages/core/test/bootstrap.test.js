@@ -310,7 +310,20 @@ test('expanded Studio locale constraint is a required atomic upgrade', () => {
     migration.statements[0],
     /default_locale IN \('en', 'tr', 'es', 'de', 'fr', 'pt-BR', 'ja', 'zh-CN'\)/,
   );
-  assert.equal(CORE_MIGRATIONS.at(-1).id, '0020-studio-locales');
+  assert.ok(CORE_MIGRATIONS.findIndex(({ id }) => id === '0020-studio-locales') > CORE_MIGRATIONS.findIndex(({ id }) => id === '0019-public-registration-email-verification'));
+});
+
+test('AI automation migration is required and preserves queue, identity and disabled defaults', () => {
+  const migration = CORE_MIGRATIONS.find(({ id }) => id === '0021-ai-automations');
+  assert.ok(migration);
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes(migration.id));
+  assert.equal(CORE_MIGRATIONS.at(-1).id, migration.id);
+  assert.equal(migration.statements.length, 2);
+  const sql = migration.statements.join('\n');
+  assert.match(sql, /enabled TINYINT\(1\) NOT NULL DEFAULT 0/);
+  assert.match(sql, /REFERENCES yuncms_users \(id\) ON DELETE RESTRICT/);
+  assert.match(sql, /REFERENCES yuncms_ai_automations \(id\) ON DELETE CASCADE/);
+  assert.match(sql, /CHECK \(status IN \('pending', 'running', 'succeeded', 'failed', 'skipped'\)\)/);
 });
 
 test('advisory lock uses one connection and always releases it', async () => {

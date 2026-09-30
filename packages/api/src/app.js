@@ -129,6 +129,7 @@ export function createApp({
   externalAuthRegistry = null,
   endpointExtensions = [],
   aiRouter = null,
+  automationsRouter = null,
   mcpRouter = null,
   studioRoot = undefined,
 }) {
@@ -190,6 +191,7 @@ export function createApp({
   if (requestEvents) app.use(requestEvents);
 
   if (aiRouter) app.use('/ai', aiRouter);
+  if (automationsRouter) app.use('/automations', automationsRouter);
   if (mcpRouter) app.use('/mcp', mcpRouter);
   app.use('/studio-navigation', createStudioNavigationRouter());
   app.use('/studio-settings', createStudioSettingsRouter());

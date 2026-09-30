@@ -30,6 +30,9 @@ import { loadExtensionRuntime } from './extensions/runtime.js';
 import { createMcpRouter } from './mcp.js';
 import { McpSettingsStore } from './mcp/settings-store.js';
 import { createAiRouter } from './routes/ai.js';
+import { createAutomationsRouter } from './routes/automations.js';
+import { AiAutomationsService } from './automations/service.js';
+import { AiAutomationWorker } from './automations/worker.js';
 
 loadEnvFileIfPresent();
 await assertMaintenanceStartupAllowed({ cwd: process.cwd(), env: process.env });
@@ -82,6 +85,7 @@ const mailer = config.mail.host ? new SmtpMailer({
 
 let server = null;
 let extensionRuntime = null;
+let automationWorker = null;
 let shuttingDown = false;
 
 function registerInternalAudit({ emitter, services }) {
@@ -136,9 +140,17 @@ async function start() {
   const aiAssistant = new AiAssistantService({ settingsStore: aiSettingsStore, logger });
   const aiRouter = createAiRouter({ assistant: aiAssistant, settingsStore: aiSettingsStore });
   const mcpSettingsStore = new McpSettingsStore({ database: pool });
-  const mcpRouter = createMcpRouter({ settingsStore: mcpSettingsStore, logger });
   mailer?.setEmitter(emitter);
   registerInternalAudit({ emitter, services });
+  const automationOptions = { assistant: aiAssistant, settingsStore: aiSettingsStore, schemaCache };
+  const automations = new AiAutomationsService({ ...automationOptions, database: pool,
+    accountability: createSystemAccountability(), services, emitter, storage, logger });
+  for (const event of ['items.create', 'items.update']) {
+    emitter.registerAction(event, (payload, context) => automations.enqueue(event, payload, context), { extensionId: 'core.ai-automations' });
+  }
+  automationWorker = new AiAutomationWorker(automations);
+  const automationsRouter = createAutomationsRouter(automationOptions);
+  const mcpRouter = createMcpRouter({ settingsStore: mcpSettingsStore, logger, automationOptions });
 
   extensionRuntime = await loadExtensionRuntime({
     services,
@@ -165,6 +177,7 @@ async function start() {
     externalAuthRegistry,
     endpointExtensions: extensionRuntime.endpointExtensions,
     aiRouter,
+    automationsRouter,
     mcpRouter,
   });
 
@@ -178,6 +191,7 @@ async function start() {
   });
   await extensionRuntime.init('app.afterStart');
   extensionRuntime.startSchedules();
+  automationWorker.start();
 }
 
 async function shutdown(signal) {
@@ -189,6 +203,7 @@ async function shutdown(signal) {
     process.exit(1);
   }, 10_000);
   forceExit.unref();
+  await automationWorker?.stop();
 
   const schedulesStopped = await extensionRuntime?.stopSchedules({ timeoutMs: 5_000 }).catch(() => false);
   if (schedulesStopped === false) {

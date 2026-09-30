@@ -1,4 +1,5 @@
 import express from 'express';
+import { automationServiceFromRequest } from './routes/automations.js';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import {
@@ -201,6 +202,7 @@ export function registerMcpTools(server, req, {
   writesEnabled = false,
   maxItems = 100,
   maxResultBytes = 1_000_000,
+  automationOptions = null,
 } = {}) {
   const wrap = (handler) => toolHandler(handler, maxResultBytes);
 
@@ -250,6 +252,29 @@ export function registerMcpTools(server, req, {
     options: serviceOptionsFromRequest(req),
     ItemsServiceClass: req.context.services.ItemsService,
   })));
+
+  if (automationOptions && req.accountability?.admin === true && req.accountability?.user && req.authMethod !== 'public') {
+    const automations = () => automationServiceFromRequest(req, automationOptions);
+    const register = (name, description, inputSchema, handler, readOnlyHint = true) => server.registerTool(name, {
+      title: name, description, inputSchema, annotations: { readOnlyHint, destructiveHint: name === 'automations.delete' },
+    }, wrap(handler));
+    register('automations.list', 'List AI automation rules. Administrator only.', z.object({}), () => automations().list());
+    register('automations.configuration', 'Get project fields and active normal users for configuring bounded AI automation rules. Administrator only.', z.object({}), () => automations().configuration());
+    register('automations.runs', 'Read the last 50 runs of an AI automation.', z.object({ id: z.string().max(36) }), ({ id }) => automations().runs(id));
+    const ruleSchema = z.object({ name: z.string().min(1).max(120), collection: collectionSchema,
+      run_as: z.string().min(1).max(36), instruction: z.string().min(1).max(8000),
+      input_fields: z.array(collectionSchema).min(1).max(10), output_fields: z.array(collectionSchema).min(1).max(10),
+      enabled: z.boolean().optional(), on_create: z.boolean().optional(), on_update: z.boolean().optional(),
+    }).strict();
+    register('automations.preview', 'Generate proposed output for an existing sample record without saving it.',
+      z.object({ rule: ruleSchema, item_key: z.string().min(1).max(191) }), ({ rule, item_key }) => automations().preview(rule, item_key));
+    if (writesEnabled) {
+      register('automations.save', 'Create or replace an AI automation. Disabled by default; choose an active normal Run as user with the required permissions.',
+        z.object({ id: z.string().max(36).optional(), rule: ruleSchema }), ({ id, rule }) => automations().save(rule, id), false);
+      register('automations.delete', 'Delete an automation and its run history.', z.object({ id: z.string().max(36) }), async ({ id }) => { await automations().remove(id); return { deleted: true }; }, false);
+      register('automations.retry', 'Retry a failed run of the current enabled rule.', z.object({ id: z.string().max(36) }), ({ id }) => automations().retry(id), false);
+    }
+  }
 
   if (!writesEnabled) return server;
 
@@ -339,7 +364,7 @@ export function requireMcpAdministrator(req) {
   throw error;
 }
 
-export function createMcpRouter({ settingsStore, logger = console } = {}) {
+export function createMcpRouter({ settingsStore, logger = console, automationOptions = null } = {}) {
   if (!settingsStore) throw new Error('MCP settings store is required');
   const router = express.Router();
 
@@ -389,7 +414,7 @@ export function createMcpRouter({ settingsStore, logger = console } = {}) {
       code: error?.code ?? null,
     });
     const handler = createMcpHandler(
-      () => createRequestMcpServer(req, req.mcpConfig),
+      () => createRequestMcpServer(req, { ...req.mcpConfig, automationOptions }),
       { legacy: 'stateless', onerror: reportError },
     );
     const nodeHandler = toNodeHandler(handler, { onerror: reportError });

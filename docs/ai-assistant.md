@@ -1,5 +1,7 @@
 # YunCMS AI Assistant
 
+For repeated content transformations triggered by creation or source-field changes, use [AI Automations](ai-automations.md). Automations share the configured provider and run as a selected normal user; the chat assistant operates as the currently signed-in user.
+
 YunCMS Studio includes a built-in **AI** chat screen. Users open it directly from the Studio sidebar; no separate desktop app, agent process or protocol client is required.
 
 The assistant can inspect the current YunCMS schema and records using the **same authenticated user, role and permission rules** as the rest of YunCMS.
