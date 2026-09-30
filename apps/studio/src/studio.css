@@ -51,3 +51,4 @@
 
 /* Explicit fallbacks for shell state in browsers without :has(). */
 @import './studio-compat.css';
+@import './automations.css';

@@ -1,4 +1,4 @@
-const TOP_LEVEL_SECTIONS = new Set(['ai', 'appearance', 'files', 'mcp', 'roles', 'users']);
+const TOP_LEVEL_SECTIONS = new Set(['ai', 'automations', 'appearance', 'files', 'mcp', 'roles', 'users']);
 export const STUDIO_CONTENT_FOCUS_EVENT = 'yuncms:studio-content-focus';
 
 function decode(value = '') {
@@ -88,6 +88,7 @@ export const studioPath = Object.freeze({
   newUser: () => '#/users/new',
   user: (userId) => `#/users/${encode(userId)}`,
   ai: () => '#/ai',
+  automations: () => '#/automations',
   mcp: () => '#/mcp',
   appearance: () => '#/appearance',
 });

@@ -330,6 +330,12 @@ Read, write and full access modes remain explicit. The assistant does not receiv
 
 See [AI assistant](ai-assistant.md) before enabling data-changing tools.
 
+## AI automations and Yunsoft support
+
+Administrators can open **Settings → AI Automations** (`#/automations`) to define a repeated content transformation, choose a normal Run as user, select input/output fields and test a sample record before enabling it. The same screen shows pending/running/succeeded/failed/skipped runs and eligible retry actions. Ordinary users do not see this administration destination. See [AI Automations](ai-automations.md) for the permission, trigger and concurrency contract.
+
+The Administrator sidebar includes links to Yunsoft project help, the GitHub repository and corporate sponsorship. The AI and automation screens also show a small help card; dismissing it is remembered in that browser's local storage.
+
 # Accessibility and motion
 
 Studio uses shared dialogs, inspectors, command palette and picker controls with keyboard focus management. Important actions should not depend on hover alone, and state labels remain textual even when color also reinforces them.

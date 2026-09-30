@@ -543,6 +543,12 @@ The built-in Studio assistant uses the authenticated request's normal accountabi
 
 See [`ai-assistant.md`](ai-assistant.md) for configuration, privacy, write modes and prompt-injection boundaries.
 
+# AI automations
+
+Authenticated Administrators manage rules through `GET /automations`, `GET /automations/configuration`, `POST /automations`, `PUT /automations/:id`, `DELETE /automations/:id`, `POST /automations/preview`, `GET /automations/:id/runs` and `POST /automations/runs/:id/retry`.
+
+Background execution uses the configured normal Run as user's permissions. See [AI Automations](ai-automations.md) for full request/response definitions, field restrictions, queue behavior, failure codes and privacy.
+
 # MCP
 
 When enabled, MCP is mounted under:

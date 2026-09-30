@@ -4,6 +4,7 @@ import { runInitCommand } from './init-command.js';
 import { runRestoreCommand } from './restore-command.js';
 import { runStartCommand } from './start-command.js';
 import { runUpdateCommand } from './update-command.js';
+import { printCommunityLinks } from './community-links.js';
 
 function assertSupportedNode(version = process.versions.node) {
   const major = Number(String(version).split('.')[0]);
@@ -41,7 +42,11 @@ export async function runCli(argv = process.argv.slice(2), {
   switch (command) {
     case 'init':
       assertNoArguments(command, rest);
-      return runInitCommand({ env, cwd, output, ...(prompts ? { prompts } : {}) });
+      {
+        const result = await runInitCommand({ env, cwd, output, ...(prompts ? { prompts } : {}) });
+        printCommunityLinks({ env, output });
+        return result;
+      }
     case 'bootstrap':
       assertNoArguments(command, rest);
       return runBootstrapCommand({ env, output });
@@ -59,6 +64,7 @@ export async function runCli(argv = process.argv.slice(2), {
     case '-h':
       assertNoArguments(command, rest);
       printHelp(output);
+      printCommunityLinks({ env, output, help: true });
       return null;
     default: {
       const error = new Error(`Unknown YunCMS command: ${command}`);

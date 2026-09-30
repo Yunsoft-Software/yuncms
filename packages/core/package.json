@@ -1,6 +1,6 @@
 {
   "name": "@yunsoft/yuncms-core",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "description": "Core services, schema, authentication, permissions and storage primitives for YunCMS.",
   "license": "MIT",
   "type": "module",
@@ -32,5 +32,9 @@
     "@aws-sdk/client-s3": "3.1100.0",
     "mysql2": "3.23.2",
     "nodemailer": "9.1.1"
+  },
+  "funding": {
+    "type": "custom",
+    "url": "https://yunsoft.com/contact?utm_source=npm-fund&utm_medium=yuncms&utm_campaign=yuncms-sponsorship"
   }
 }

@@ -106,6 +106,12 @@ Reads one item by id with normal field/relation selection.
 
 ## Write tools
 
+### AI automation tools for Administrators
+
+Authenticated Administrators also receive `automations.list`, `automations.configuration`, `automations.runs` and `automations.preview`. Enabling MCP data-changing tools adds `automations.save`, `automations.delete` and `automations.retry`; ordinary users and Public access never receive these management tools. Agents can inspect eligible collections/users, save a disabled rule, preview it and then enable it. See [AI Automations](ai-automations.md) for argument schemas and execution permissions. Preview calls the configured AI provider and may incur cost, even in MCP read-only mode.
+
+### Item writes
+
 Write tools are absent unless an Administrator enables **Data-changing tools**:
 
 - `items.create`

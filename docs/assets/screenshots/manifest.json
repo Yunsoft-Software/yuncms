@@ -1,13 +1,14 @@
 {
-  "yuncmsVersion": "0.1.23",
-  "capturedAt": "2026-09-25",
-  "source": "0.1.23 release candidate visually validated on http://127.0.0.1:3018; unchanged documentation views retained",
+  "yuncmsVersion": "0.1.24",
+  "capturedAt": "2026-09-30",
+  "source": "0.1.24 release candidate visually validated on http://127.0.0.1:33008; automation view captured, previously validated Content/Data Model/Files documentation tours retained",
   "files": [
     "studio-content.png",
     "studio-data-model.png",
     "studio-files.png",
     "studio-permissions.png",
     "studio-mobile-content.png",
-    "studio-mobile-menu.png"
+    "studio-mobile-menu.png",
+    "studio-automations.jpg"
   ]
 }
