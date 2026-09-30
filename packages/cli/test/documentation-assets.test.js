@@ -5,6 +5,15 @@ import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../../..');
 
+test('public listing metadata includes the website and Glama maintainer', () => {
+  const readme = readFileSync(resolve(root, 'README.md'), 'utf8');
+  const glama = JSON.parse(readFileSync(resolve(root, 'glama.json'), 'utf8'));
+
+  assert.match(readme, /^Website: \[https:\/\/yunsoft\.com\]\(https:\/\/yunsoft\.com\)$/m);
+  assert.equal(glama.$schema, 'https://glama.ai/mcp/schemas/server.json');
+  assert.deepEqual(glama.maintainers, ['raichubuilds']);
+});
+
 test('public documentation screenshots track the current release', () => {
   const workspace = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
   const manifest = JSON.parse(readFileSync(resolve(root, 'docs/assets/screenshots/manifest.json'), 'utf8'));
