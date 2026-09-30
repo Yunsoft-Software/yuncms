@@ -82,6 +82,7 @@ test('Docker build context excludes local dependencies, state and credentials', 
   for (const entry of ['.git', '.credentials', '.npmrc', '.env', '.yuncms', 'node_modules', 'uploads']) {
     assert.match(dockerignore, new RegExp(`^${entry.replace('.', '\\.')}\\s*$`, 'm'));
   }
+  assert.match(dockerignore, /^\*\*\/node_modules\s*$/m);
 });
 
 test('GitHub documentation presents Yunsoft branding and every installation option', async () => {
