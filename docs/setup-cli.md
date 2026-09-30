@@ -54,7 +54,7 @@ The same port serves both Studio and the REST API.
 
 Rerunning `init` reuses the existing `.env`, safely checks migrations again and does not silently create another initial Administrator.
 
-After successful interactive initialization, the CLI prints optional GitHub-star, Yunsoft project-help and corporate-sponsorship links. These links are suppressed for non-TTY output and CI runs. `yuncms help` includes them explicitly; normal server and maintenance output does not add repeated promotional messages.
+After successful interactive initialization, the CLI prints optional GitHub-star, Yunsoft project-help and GitHub Sponsors links. These links are suppressed for non-TTY output and CI runs. `yuncms help` includes them explicitly; normal server and maintenance output does not add repeated promotional messages.
 
 For a guided walkthrough of the generated files and first Studio workflow, continue with [Getting Started](getting-started.md).
 

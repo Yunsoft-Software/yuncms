@@ -334,7 +334,7 @@ See [AI assistant](ai-assistant.md) before enabling data-changing tools.
 
 Administrators can open **Settings → AI Automations** (`#/automations`) to define a repeated content transformation, choose a normal Run as user, select input/output fields and test a sample record before enabling it. The same screen shows pending/running/succeeded/failed/skipped runs and eligible retry actions. Ordinary users do not see this administration destination. See [AI Automations](ai-automations.md) for the permission, trigger and concurrency contract.
 
-The Administrator sidebar includes links to Yunsoft project help, the GitHub repository and corporate sponsorship. The AI and automation screens also show a small help card; dismissing it is remembered in that browser's local storage.
+The Administrator sidebar includes links to Yunsoft project help, the GitHub repository and GitHub Sponsors. The AI and automation screens also show a small help card; dismissing it is remembered in that browser's local storage.
 
 # Accessibility and motion
 

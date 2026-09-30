@@ -2,7 +2,7 @@
 
 AI automations run in the same container and persist their rules/queue in MySQL. See [AI Automations](ai-automations.md) for setup through Studio or MCP.
 
-Need help deploying, integrating or migrating? [Contact Yunsoft](https://yunsoft.com/contact?utm_source=docker-docs&utm_medium=yuncms&utm_campaign=yuncms-services), [star YunCMS on GitHub](https://github.com/Yunsoft-Software/yuncms), or [discuss corporate sponsorship](https://yunsoft.com/contact?utm_source=docker-docs&utm_medium=yuncms&utm_campaign=yuncms-sponsorship).
+Need help deploying, integrating or migrating? [Contact Yunsoft](https://yunsoft.com/contact?utm_source=docker-docs&utm_medium=yuncms&utm_campaign=yuncms-services), [star YunCMS on GitHub](https://github.com/Yunsoft-Software/yuncms), or [sponsor YunCMS](https://github.com/sponsors/Yunsoft-Software).
 
 YunCMS publishes a Linux container image at [`yunsoftofficial/yuncms`](https://hub.docker.com/r/yunsoftofficial/yuncms). The image contains the YunCMS CLI, the built React Studio and the MySQL client tools required by `backup` and `restore`.
 

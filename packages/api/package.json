@@ -42,7 +42,7 @@
     "zod": "4.4.3"
   },
   "funding": {
-    "type": "custom",
-    "url": "https://yunsoft.com/contact?utm_source=npm-fund&utm_medium=yuncms&utm_campaign=yuncms-sponsorship"
+    "type": "github",
+    "url": "https://github.com/sponsors/Yunsoft-Software"
   }
 }
