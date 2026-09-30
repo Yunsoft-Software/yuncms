@@ -181,6 +181,8 @@ AUTH_PUBLIC_URL=http://localhost:3008
 
 SMTP is needed for email-delivered password-reset and email-verification flows.
 
+YunCMS uses Nodemailer 10.0.13 for SMTP delivery, including its patched recipient parsing and TLS server-name isolation. Keep the YunCMS package family on the same release when upgrading; no separate mail dependency override is needed.
+
 `AUTH_PUBLIC_URL` is the public origin used to build reset/verification links. In production it should be the externally reachable HTTPS URL, not an internal container hostname.
 
 ## External authentication providers

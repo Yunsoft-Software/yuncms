@@ -35,8 +35,8 @@ test('production mail and MCP dependencies stay above audited security baselines
     readFile(resolve(PACKAGES_ROOT, '../package-lock.json'), 'utf8').then(JSON.parse),
   ]);
 
-  assert.equal(coreManifest.dependencies.nodemailer, '9.1.1');
-  assert.equal(lockfile.packages['node_modules/nodemailer'].version, '9.1.1');
+  assert.equal(coreManifest.dependencies.nodemailer, '10.0.13');
+  assert.equal(lockfile.packages['node_modules/nodemailer'].version, '10.0.13');
   assert.equal(lockfile.packages['node_modules/hono'].version, '4.13.7');
 });
 

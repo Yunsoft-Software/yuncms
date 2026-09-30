@@ -66,3 +66,16 @@ test('SMTP mailer sends through the pinned Nodemailer transport contract', async
   assert.match(message, /Nodemailer transport is operational\./);
   transport.close();
 });
+
+test('patched address parsing keeps trailing comment text out of the SMTP envelope', async () => {
+  const transport = nodemailer.createTransport({ streamTransport: true, buffer: true });
+  try {
+    const mailer = new SmtpMailer({ from: 'no-reply@example.test', transport });
+    const result = await mailer.send({
+      to: '"user"@example.com(x)evil.com', subject: 'Envelope boundary', text: 'body',
+    });
+    assert.deepEqual(result.envelope.to, ['user@example.com']);
+  } finally {
+    transport.close();
+  }
+});
