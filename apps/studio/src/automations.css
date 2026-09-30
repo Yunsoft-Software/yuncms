@@ -1,0 +1,29 @@
+.automations-workspace { padding: 24px; max-width: 1280px; margin: 0 auto; }
+.automation-heading, .automation-actions { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.automation-heading { justify-content:space-between; margin-bottom:24px; }
+.automation-heading h1 { margin:0; }
+.automation-heading p, .automation-preview p { color:var(--studio-text-muted); }
+.automation-notice { padding:12px 16px; margin-bottom:16px; border:1px solid var(--studio-border); border-radius:10px; }
+.automation-layout { display:grid; grid-template-columns:240px minmax(0,1fr); gap:24px; }
+.automation-list { display:flex; flex-direction:column; gap:8px; }
+.automation-list button { text-align:left; border:1px solid var(--studio-border); border-radius:10px; padding:14px; background:var(--studio-surface); color:inherit; }
+.automation-list button.active { border-color:var(--studio-accent); }
+.automation-list small, .automation-run small { display:block; margin-top:5px; color:var(--studio-text-muted); }
+.automation-form-fields { border:0; padding:0; margin:0; display:grid; gap:20px; min-width:0; }
+.automation-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.automation-fields { margin:0; padding:12px; border:1px solid var(--studio-border); border-radius:10px; max-height:240px; overflow:auto; }
+.automation-fields label, .automation-triggers label { display:flex; align-items:center; gap:8px; padding:5px; }
+.automation-fields small { color:var(--studio-text-muted); }
+.automation-fields input, .automation-triggers input { width:16px; height:16px; accent-color:var(--studio-accent); }
+.automation-triggers { display:flex; gap:12px; flex-wrap:wrap; }
+.automation-preview, .automation-runs { margin-top:28px; padding-top:20px; border-top:1px solid var(--studio-border); }
+.automation-preview pre { overflow:auto; max-height:320px; padding:16px; border:1px solid var(--studio-border); border-radius:10px; font-size:12px; }
+.automation-run { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--studio-border); }
+.automation-run > div { margin-right:auto; }
+.automation-run code { font-size:11px; overflow-wrap:anywhere; }
+.yunsoft-support-card { position:relative; margin-top:28px; border:1px solid var(--studio-border); border-radius:12px; padding:18px 42px 18px 18px; }
+.yunsoft-support-card p { margin:8px 0 12px; color:var(--studio-text-muted); }
+.yunsoft-support-card > button { position:absolute; right:12px; top:10px; }
+.yunsoft-support-links { display:flex; flex-wrap:wrap; gap:14px; font-size:12px; }
+.sidebar-support-links .yunsoft-support-links { gap:8px 12px; font-size:11px; padding-top:10px; border-top:1px solid var(--studio-border); }
+@media (max-width:780px) { .automations-workspace { padding:16px; } .automation-layout, .automation-grid { grid-template-columns:minmax(0,1fr); } .automation-list { max-height:200px; overflow:auto; } }

@@ -25,3 +25,4 @@ export { SchemaGraph } from './SchemaGraph.jsx';
 export { SidebarIcon } from './SidebarIcon.jsx';
 export { AuthBrandPanel, LanguageSwitcher, StudioBrand, YunsoftFooter } from './StudioBrand.jsx';
 export { UploadQueue } from './UploadQueue.jsx';
+export { YunsoftSupportCard, YunsoftSupportLinks } from './YunsoftSupportCard.jsx';

@@ -24,6 +24,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 | Secure access | [Roles and Permissions](permissions.md) | Deny-by-default actions, fields, row filters, validation and Public access. |
 | Connect an application | [REST API](rest-api.md) | Authentication, CRUD, schema, Files and system endpoints. |
 | Query content safely | [Items Query Language](api-query-language.md) | Fields, relations, filters, search, sorting, pagination and aggregation. |
+| Automate repeated content tasks with AI | [AI Automations](ai-automations.md) | Input/output fields, preview, restricted execution users, persistent runs and MCP setup. |
 | Put YunCMS in production | [Production Readiness](production-readiness.md) | Preflight checklist, backups, storage, proxy, security and upgrade verification. |
 
 ## Start here
@@ -47,6 +48,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 - [Extensions](extensions.md) — endpoint extensions, hooks, lifecycle events, scheduled jobs and the extension SDK.
 - [MCP](mcp.md) — connect agents through the same query and RBAC model as REST.
 - [AI assistant](ai-assistant.md) — configure the Studio assistant, provider privacy, read/write modes and permission boundaries.
+- [AI automations](ai-automations.md) — repeat summaries, classification, translation and extraction when selected content changes.
 
 ## Studio administration
 

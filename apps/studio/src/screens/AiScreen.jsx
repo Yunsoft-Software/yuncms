@@ -5,6 +5,7 @@ import { AI_ACCESS_MODES, aiAccessFlags } from '../ai-access.js';
 import { trimConversationHistory } from '../ai-history.js';
 import { AiSettingsPanel } from '../components/index.js';
 import { useI18n } from '../i18n.js';
+import { YunsoftSupportCard } from '../components/index.js';
 
 const STARTER_KEYS = Object.freeze([
   'ai.starterCollections',
@@ -158,6 +159,7 @@ export function AiScreen() {
           </div>
         </div>
         <div className="ai-toolbar-actions">
+          {canManageSettings && <a className="secondary-button" href="#/automations">{t('automation.title')}</a>}
           {canManageSettings && (
             <button
               className="secondary-button"
@@ -177,6 +179,8 @@ export function AiScreen() {
           </button>
         </div>
       </div>
+
+      {canManageSettings && <YunsoftSupportCard />}
 
       {settingsOpen && canManageSettings && adminSettings && (
         <AiSettingsPanel

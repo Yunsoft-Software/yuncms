@@ -9,6 +9,7 @@ import {
   SidebarIcon,
   StudioBrand,
   YunsoftFooter,
+  YunsoftSupportLinks,
 } from './components/index.js';
 import { useI18n } from './i18n.js';
 import { buildNavigationModel } from './navigation-model.js';
@@ -20,6 +21,7 @@ import {
   studioPath,
 } from './studio-route.js';
 import { AiScreen } from './screens/AiScreen.jsx';
+import { AutomationsScreen } from './screens/AutomationsScreen.jsx';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
 import { ContentRouteScreen } from './screens/ContentRouteScreen.jsx';
@@ -35,6 +37,7 @@ const settingsSections = [
   { id: 'users', labelKey: 'nav.users', icon: 'users' },
   { id: 'roles', labelKey: 'nav.roles', icon: 'roles' },
   { id: 'mcp', labelKey: 'nav.mcp', icon: 'mcp', adminOnly: true },
+  { id: 'automations', labelKey: 'automation.title', icon: 'ai', adminOnly: true },
   { id: 'appearance', labelKey: 'nav.appearance', icon: 'appearance' },
 ];
 
@@ -257,6 +260,8 @@ export function App() {
     if (section === 'roles') return <RolesPermissionsScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'files') return <FilesScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'ai') return <AiScreen />;
+    if (section === 'automations') return session?.user?.admin
+      ? <AutomationsScreen /> : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;
     if (section === 'mcp') return session?.user?.admin
       ? <McpScreen />
       : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;
@@ -299,6 +304,7 @@ export function App() {
       files: studioPath.files(),
       ai: studioPath.ai(),
       mcp: studioPath.mcp(),
+      automations: studioPath.automations(),
       appearance: studioPath.appearance(),
       content: studioPath.content(contentCollection || contentCollections[0]?.collection || ''),
     };
@@ -458,6 +464,8 @@ export function App() {
               {loggingOut ? t('app.signingOut') : t('app.signOut')}
             </button>
           </div>
+
+          {session?.user?.admin === true && !navigationCollapsed && <div className="sidebar-support-links"><YunsoftSupportLinks source="studio-sidebar" /></div>}
 
           <div className="sidebar-branding-footer">
             <LanguageSwitcher compact />
