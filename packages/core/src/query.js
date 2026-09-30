@@ -222,7 +222,11 @@ export function compileAggregate(aggregate, groupBy, schema) {
   };
 }
 
-function datetimeFilterValue(value, path) {
+function datetimeFilterValue(value, path, { allowUnresolvedDynamicVariables = false } = {}) {
+  // Schema-only permission validation keeps recognized dynamic values unresolved.
+  // resolveDynamicVariables already validates their syntax before compilation.
+  if (allowUnresolvedDynamicVariables && typeof value === 'string'
+    && (value === '$NOW' || value.toUpperCase().startsWith('$NOW('))) return value;
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime()) || value.getUTCFullYear() < 1000 || value.getUTCFullYear() > 9999) {
       throw queryError('Invalid datetime filter value', path);
@@ -253,7 +257,7 @@ function datetimeFilterValue(value, path) {
 function compileOperator(fieldSql, operator, value, path, limits, field) {
   if (!FILTER_OPERATORS.has(operator)) throw queryError(`Unknown filter operator: ${operator}`, path);
   const temporal = field.type === 'datetime' || field.type === 'timestamp';
-  const normalize = (entry) => temporal ? datetimeFilterValue(entry, path) : entry;
+  const normalize = (entry) => temporal ? datetimeFilterValue(entry, path, limits) : entry;
   switch (operator) {
     case '_eq':
       if (value === null) throw queryError('Use _null for NULL comparisons', path);
@@ -325,7 +329,7 @@ export function compileFilter(filter, schema, options = {}) {
     allowUnresolvedDynamicVariables = false,
     ...limitOptions
   } = options;
-  const limits = { ...QUERY_LIMITS, ...limitOptions };
+  const limits = { ...QUERY_LIMITS, ...limitOptions, allowUnresolvedDynamicVariables };
   const resolvedFilter = resolveDynamicVariables(filter, dynamicVariables, {
     allowUnresolved: allowUnresolvedDynamicVariables,
     path: 'filter',

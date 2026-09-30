@@ -170,6 +170,8 @@ test('datetime comparisons normalize ISO offsets using trusted field types and b
     assert.deepEqual(compileFilter({ [field]: { _null: true } }, dates).params, []);
     const now = new Date('2026-09-30T00:00:00.000Z');
     assert.equal(compileFilter({ [field]: { _lt: '$NOW' } }, dates, { dynamicVariables: { now } }).params[0].toISOString(), now.toISOString());
+    assert.deepEqual(compileFilter({ [field]: { _lte: '$NOW(+1 hour)' } }, dates, { allowUnresolvedDynamicVariables: true }).params, ['$NOW(+1 hour)']);
+    assert.throws(() => compileFilter({ [field]: { _lt: '$NOW(next week)' } }, dates, { allowUnresolvedDynamicVariables: true }), (error) => error.code === 'INVALID_QUERY');
     for (const value of ['bad', '2026-02-30T00:00:00Z', '2026-13-01T00:00:00Z', '2026-01-01T24:00:00Z', '2026-01-01T00:00:00', '2026-01-01T00:00:00+25:00', 1, {}, new Date(NaN), "2026-01-01T00:00:00Z' OR 1=1"]) {
       assert.throws(() => compileFilter({ [field]: { _in: [value] } }, dates), (error) => error.code === 'INVALID_QUERY' && error.path === `filter.${field}._in`);
     }
