@@ -55,6 +55,8 @@ test('items query parser rejects unknown parameters and clamps shape', () => {
   assert.deepEqual(parseItemsQuery({ fields: '*' }).fields, ['*']);
   assert.throws(() => parseItemsQuery({ raw: 'sql' }), /Unknown query parameter/);
   assert.throws(() => parseItemsQuery({ limit: 9999 }), /limit must be an integer/);
+  assert.throws(() => parseItemsQuery({ limit: ['25'] }), /limit must be an integer/);
+  assert.throws(() => parseItemsQuery({ offset: ['10'] }), /offset must be an integer/);
   assert.throws(
     () => parseItemsQuery({ offset: QUERY_LIMITS.maxOffset + 1 }),
     /offset must be an integer/,

@@ -47,6 +47,9 @@ function normalizeDelimited(value, label, { maxItems }) {
 
 function normalizeInteger(value, fallback, { label, min, max }) {
   if (value == null || value === '') return fallback;
+  if (typeof value === 'object' || typeof value === 'boolean') {
+    throw queryError(`${label} must be an integer between ${min} and ${max}`, label);
+  }
   const number = Number(value);
   if (!Number.isInteger(number) || number < min || number > max) {
     throw queryError(`${label} must be an integer between ${min} and ${max}`, label);
