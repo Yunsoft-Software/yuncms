@@ -156,3 +156,23 @@ test('filter compiler rejects excessive logical node counts', () => {
 
   assert.throws(() => compileFilter(filter, schema), /Filter cannot contain more than/);
 });
+
+test('datetime comparisons normalize ISO offsets using trusted field types and bound parameters', () => {
+  const dates = { fields: { at: { type: 'datetime' }, ts: { type: 'timestamp' }, text: { type: 'string' } } };
+  for (const field of ['at', 'ts']) {
+    for (const operator of ['_eq', '_neq', '_lt', '_lte', '_gt', '_gte', '_in', '_nin']) {
+      const iso = '2026-08-31T07:56:17.687+03:00';
+      const compiled = compileFilter({ [field]: { [operator]: operator === '_in' || operator === '_nin' ? [iso] : iso } }, dates);
+      assert.equal(compiled.params[0].toISOString(), '2026-08-31T04:56:17.687Z');
+      assert.ok(!compiled.sql.includes(iso));
+    }
+    assert.deepEqual(compileFilter({ [field]: { _lt: '2026-08-31 04:56:17.687' } }, dates).params, ['2026-08-31 04:56:17.687']);
+    assert.deepEqual(compileFilter({ [field]: { _null: true } }, dates).params, []);
+    const now = new Date('2026-09-30T00:00:00.000Z');
+    assert.equal(compileFilter({ [field]: { _lt: '$NOW' } }, dates, { dynamicVariables: { now } }).params[0].toISOString(), now.toISOString());
+    for (const value of ['bad', '2026-02-30T00:00:00Z', '2026-13-01T00:00:00Z', '2026-01-01T24:00:00Z', '2026-01-01T00:00:00', '2026-01-01T00:00:00+25:00', 1, {}, new Date(NaN), "2026-01-01T00:00:00Z' OR 1=1"]) {
+      assert.throws(() => compileFilter({ [field]: { _in: [value] } }, dates), (error) => error.code === 'INVALID_QUERY' && error.path === `filter.${field}._in`);
+    }
+  }
+  assert.deepEqual(compileFilter({ text: { _eq: '2026-08-31T04:56:17.687Z' } }, dates).params, ['2026-08-31T04:56:17.687Z']);
+});
