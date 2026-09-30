@@ -35,7 +35,8 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.description": "Yunsoft can help with setup, migration, custom development and AI workflows.",
     "support.contact": "Talk to Yunsoft",
     "support.star": "Star on GitHub",
-    "support.sponsor": "Corporate sponsorship"
+    "support.sponsor": "Corporate sponsorship",
+    "automation.adminOnly": "Only administrators can manage AI automations."
   },
   "tr": {
     "automation.title": "AI Otomasyonları",
@@ -73,7 +74,8 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.description": "Yunsoft’tan kurulum, veri taşıma, özel geliştirme ve AI iş akışları için destek alın.",
     "support.contact": "Yunsoft’a ulaşın",
     "support.star": "GitHub’da yıldız verin",
-    "support.sponsor": "Kurumsal sponsorluk"
+    "support.sponsor": "Kurumsal sponsorluk",
+    "automation.adminOnly": "Yapay zekâ otomasyonlarını yalnız yöneticiler yönetebilir."
   },
   "es": {
     "automation.title": "Automatizaciones de IA",
@@ -111,7 +113,8 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.description": "Yunsoft te ayuda con instalación, migración, desarrollo e integración de IA.",
     "support.contact": "Contactar a Yunsoft",
     "support.star": "Dar estrella en GitHub",
-    "support.sponsor": "Patrocinio corporativo"
+    "support.sponsor": "Patrocinio corporativo",
+    "automation.adminOnly": "Solo los administradores pueden gestionar las automatizaciones de IA."
   },
   "de": {
     "automation.title": "KI-Automatisierungen",
@@ -149,7 +152,8 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.description": "Yunsoft hilft bei Einrichtung, Migration, Entwicklung und KI-Arbeitsabläufen.",
     "support.contact": "Yunsoft kontaktieren",
     "support.star": "Stern auf GitHub",
-    "support.sponsor": "Unternehmenssponsoring"
+    "support.sponsor": "Unternehmenssponsoring",
+    "automation.adminOnly": "Nur Administratoren können KI-Automatisierungen verwalten."
   },
   "fr": {
     "automation.title": "Automatisations IA",
@@ -187,7 +191,8 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.description": "Yunsoft vous accompagne dans l’installation, la migration, le développement et les processus IA.",
     "support.contact": "Contacter Yunsoft",
     "support.star": "Étoile sur GitHub",
-    "support.sponsor": "Sponsoring d’entreprise"
+    "support.sponsor": "Sponsoring d’entreprise",
+    "automation.adminOnly": "Seuls les administrateurs peuvent gérer les automatisations IA."
   },
   "pt-BR": {
     "automation.title": "Automações de IA",
@@ -225,7 +230,8 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.description": "A Yunsoft ajuda com instalação, migração, desenvolvimento e fluxos de IA.",
     "support.contact": "Fale com a Yunsoft",
     "support.star": "Estrela no GitHub",
-    "support.sponsor": "Patrocínio corporativo"
+    "support.sponsor": "Patrocínio corporativo",
+    "automation.adminOnly": "Somente administradores podem gerenciar automações de IA."
   },
   "ja": {
     "automation.title": "AI自動化",
@@ -263,7 +269,8 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.description": "Yunsoftがセットアップ、移行、開発、AIワークフローを支援します。",
     "support.contact": "Yunsoftに相談",
     "support.star": "GitHubでスター",
-    "support.sponsor": "法人スポンサー"
+    "support.sponsor": "法人スポンサー",
+    "automation.adminOnly": "AI自動化を管理できるのは管理者だけです。"
   },
   "zh-CN": {
     "automation.title": "AI 自动化",
@@ -301,6 +308,7 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.description": "Yunsoft 可协助安装、迁移、定制开发和 AI 工作流。",
     "support.contact": "联系 Yunsoft",
     "support.star": "在 GitHub 加星",
-    "support.sponsor": "企业赞助"
+    "support.sponsor": "企业赞助",
+    "automation.adminOnly": "只有管理员可以管理 AI 自动化。"
   }
 });

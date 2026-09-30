@@ -18,6 +18,7 @@ test('automation route, administrator boundaries, preview and reusable confirmat
   const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
   assert.match(app, /id: 'automations'.*adminOnly: true/);
   assert.match(app, /section === 'automations'\) return session\?\.user\?\.admin/);
+  assert.match(app, /<AutomationsScreen \/> : <div[^>]*>\{t\('automation.adminOnly'\)\}/);
   const source = readFileSync(new URL('../src/screens/AutomationsScreen.jsx', import.meta.url), 'utf8');
   assert.match(source, /useConfirmDialog/); assert.match(source, /\/automations\/preview/);
   assert.match(source, /run.status === 'failed' && selectedRule\?\.enabled && run.revision === selectedRule.revision/);
