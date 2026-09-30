@@ -34,6 +34,53 @@ function suffix() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.slice(-9);
 }
 
+test('real MySQL accepts ISO datetime filters for reads and strict bulk mutations with RBAC', {
+  skip: !ENABLED, timeout: 30_000,
+}, async () => {
+  const config = loadConfig(process.env);
+  requireDisposableDatabase(config);
+  const pool = createDatabasePool(config.database);
+  const collection = `it_dates_${suffix()}`;
+  const options = { database: pool, accountability: createSystemAccountability(), schemaCache: new SchemaCache({ versionCheckTtlMs: 0 }) };
+  const collections = new CollectionsService(options);
+  const fields = new FieldsService(options);
+  const roles = new RolesService(options);
+  const permissions = new PermissionsService(options);
+  let roleId;
+  try {
+    await bootstrapDatabase(pool);
+    await collections.createOne({ collection, systemFields: ['created_at'] });
+    for (const definition of [{ field: 'at', type: 'datetime' }, { field: 'ts', type: 'timestamp' }, { field: 'status', type: 'string' }]) {
+      await fields.createOne(collection, definition);
+    }
+    const items = new ItemsService(collection, options);
+    const iso = '2026-08-20T04:56:17.687Z';
+    const allowed = await items.createOne({ at: iso, ts: iso, status: 'allowed' });
+    const hidden = await items.createOne({ at: iso, ts: iso, status: 'hidden' });
+    const role = await roles.createOne({ name: `Datetime role ${collection}` });
+    roleId = role.id;
+    for (const action of ['read', 'update', 'delete']) {
+      await permissions.createOne({ role: roleId, collection, action, fields: ['id', 'at', 'ts', 'status', 'created_at'], filter: { status: { _eq: 'allowed' } } });
+    }
+    const restricted = new ItemsService(collection, { ...options, accountability: createAccountability({ user: 'datetime-user', role: roleId }) });
+    for (const field of ['at', 'ts']) {
+      const rows = await restricted.readMany({ filter: { [field]: { _in: ['2026-08-20T07:56:17.687+03:00'] } } });
+      assert.deepEqual(rows.map((row) => row.id), [allowed.id]);
+    }
+    await restricted.updateMany({ at: { _lt: '2026-08-31T04:56:17.687Z' } }, { ts: '2026-08-21T04:56:17.687Z' });
+    const deleted = await restricted.deleteMany({ _and: [{ at: { _lt: '2026-08-31T04:56:17.687Z' } }, { ts: { _nin: [iso] } }, { created_at: { _lt: '2099-01-01T00:00:00Z' } }] });
+    assert.equal(deleted, 1);
+    assert.deepEqual((await items.readMany()).map((row) => row.id), [hidden.id]);
+    await assert.rejects(items.deleteMany({ at: { _lt: '2026-02-30T00:00:00Z' } }), (error) => error.code === 'INVALID_QUERY');
+    assert.equal((await items.readMany()).length, 1);
+  } finally {
+    if (roleId) await pool.query('DELETE FROM yuncms_permissions WHERE role = ?', [roleId]);
+    if (roleId) await roles.deleteOne(roleId);
+    await collections.deleteOne(collection).catch(() => {});
+    await closeDatabasePool(pool);
+  }
+});
+
 test('real MySQL enforces deep, reverse, M2M and advanced-query RBAC boundaries', {
   skip: !ENABLED,
   timeout: 90_000,

@@ -222,26 +222,60 @@ export function compileAggregate(aggregate, groupBy, schema) {
   };
 }
 
-function compileOperator(fieldSql, operator, value, path, limits) {
+function datetimeFilterValue(value, path, { allowUnresolvedDynamicVariables = false } = {}) {
+  // Schema-only permission validation keeps recognized dynamic values unresolved.
+  // resolveDynamicVariables already validates their syntax before compilation.
+  if (allowUnresolvedDynamicVariables && typeof value === 'string'
+    && (value === '$NOW' || value.toUpperCase().startsWith('$NOW('))) return value;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime()) || value.getUTCFullYear() < 1000 || value.getUTCFullYear() > 9999) {
+      throw queryError('Invalid datetime filter value', path);
+    }
+    return value;
+  }
+  const match = typeof value === 'string'
+    ? /^(\d{4})-(\d{2})-(\d{2})([T ])(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})?$/u.exec(value)
+    : null;
+  if (!match || (match[4] === 'T' ? !match[9] : Boolean(match[9]))) {
+    throw queryError('Datetime filters require a timezone-bearing ISO value or a MySQL datetime', path);
+  }
+  const [, year, month, day, , hour, minute, second, , zone] = match;
+  const daysInMonth = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
+  if (Number(year) < 1000 || Number(month) < 1 || Number(month) > 12
+    || Number(day) < 1 || Number(day) > daysInMonth
+    || Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59) {
+    throw queryError('Invalid datetime filter value', path);
+  }
+  if (!zone) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() < 1000 || date.getUTCFullYear() > 9999) {
+    throw queryError('Invalid datetime filter value', path);
+  }
+  return date;
+}
+
+function compileOperator(fieldSql, operator, value, path, limits, field) {
   if (!FILTER_OPERATORS.has(operator)) throw queryError(`Unknown filter operator: ${operator}`, path);
+  const temporal = field.type === 'datetime' || field.type === 'timestamp';
+  const normalize = (entry) => temporal ? datetimeFilterValue(entry, path, limits) : entry;
   switch (operator) {
     case '_eq':
       if (value === null) throw queryError('Use _null for NULL comparisons', path);
-      return { sql: `${fieldSql} = ?`, params: [value] };
+      return { sql: `${fieldSql} = ?`, params: [normalize(value)] };
     case '_neq':
       if (value === null) throw queryError('Use _nnull for NULL comparisons', path);
-      return { sql: `${fieldSql} <> ?`, params: [value] };
-    case '_lt': return { sql: `${fieldSql} < ?`, params: [value] };
-    case '_lte': return { sql: `${fieldSql} <= ?`, params: [value] };
-    case '_gt': return { sql: `${fieldSql} > ?`, params: [value] };
-    case '_gte': return { sql: `${fieldSql} >= ?`, params: [value] };
+      return { sql: `${fieldSql} <> ?`, params: [normalize(value)] };
+    case '_lt': return { sql: `${fieldSql} < ?`, params: [normalize(value)] };
+    case '_lte': return { sql: `${fieldSql} <= ?`, params: [normalize(value)] };
+    case '_gt': return { sql: `${fieldSql} > ?`, params: [normalize(value)] };
+    case '_gte': return { sql: `${fieldSql} >= ?`, params: [normalize(value)] };
     case '_in':
     case '_nin': {
       if (!Array.isArray(value)) throw queryError(`${operator} requires an array`, path);
       if (value.length > limits.maxInValues) throw queryError(`${operator} accepts at most ${limits.maxInValues} values`, path);
       if (value.length === 0) return { sql: operator === '_in' ? '0 = 1' : '1 = 1', params: [] };
       const placeholders = value.map(() => '?').join(', ');
-      return { sql: `${fieldSql} ${operator === '_in' ? 'IN' : 'NOT IN'} (${placeholders})`, params: value };
+      return { sql: `${fieldSql} ${operator === '_in' ? 'IN' : 'NOT IN'} (${placeholders})`, params: value.map(normalize) };
     }
     case '_null':
     case '_nnull': {
@@ -272,12 +306,12 @@ function compileFilterObject(filter, schema, path, limits, state, depth) {
       for (const child of children) params.push(...child.params);
       continue;
     }
-    resolveField(schema, key, `${path}.${key}`);
+    const field = resolveField(schema, key, `${path}.${key}`);
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw queryError('Field filters must be operator objects', `${path}.${key}`);
     const fieldSql = quoteIdentifier(key, 'field name');
     const fieldFragments = [];
     for (const [operator, operatorValue] of Object.entries(value)) {
-      const compiled = compileOperator(fieldSql, operator, operatorValue, `${path}.${key}.${operator}`, limits);
+      const compiled = compileOperator(fieldSql, operator, operatorValue, `${path}.${key}.${operator}`, limits, field);
       fieldFragments.push(compiled.sql);
       params.push(...compiled.params);
     }
@@ -295,7 +329,7 @@ export function compileFilter(filter, schema, options = {}) {
     allowUnresolvedDynamicVariables = false,
     ...limitOptions
   } = options;
-  const limits = { ...QUERY_LIMITS, ...limitOptions };
+  const limits = { ...QUERY_LIMITS, ...limitOptions, allowUnresolvedDynamicVariables };
   const resolvedFilter = resolveDynamicVariables(filter, dynamicVariables, {
     allowUnresolved: allowUnresolvedDynamicVariables,
     path: 'filter',

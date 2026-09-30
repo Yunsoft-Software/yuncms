@@ -2,7 +2,7 @@
 
 AI automations run in the same container and persist their rules/queue in MySQL. See [AI Automations](ai-automations.md) for setup through Studio or MCP.
 
-Need help deploying, integrating or migrating? [Contact Yunsoft](https://yunsoft.com/contact?utm_source=docker-docs&utm_medium=yuncms&utm_campaign=yuncms-services), [star YunCMS on GitHub](https://github.com/Yunsoft-Software/yuncms), or [discuss corporate sponsorship](https://yunsoft.com/contact?utm_source=docker-docs&utm_medium=yuncms&utm_campaign=yuncms-sponsorship).
+Need help deploying, integrating or migrating? [Contact Yunsoft](https://yunsoft.com/contact?utm_source=docker-docs&utm_medium=yuncms&utm_campaign=yuncms-services), [star YunCMS on GitHub](https://github.com/Yunsoft-Software/yuncms), or [sponsor YunCMS](https://github.com/sponsors/Yunsoft-Software).
 
 YunCMS publishes a Linux container image at [`yunsoftofficial/yuncms`](https://hub.docker.com/r/yunsoftofficial/yuncms). The image contains the YunCMS CLI, the built React Studio and the MySQL client tools required by `backup` and `restore`.
 
@@ -153,6 +153,8 @@ npm run docker:build
 ```
 
 This builds the current architecture and tags both `yunsoftofficial/yuncms:<package-version>` and `yunsoftofficial/yuncms:latest`. To use another registry namespace:
+
+The Studio is compiled on the builder's native platform, and its static files are shared between target images. Runtime dependencies are installed separately for each target architecture. Workspace-local `node_modules` directories are excluded from the build context, so local dependency installations cannot replace the image's clean dependency tree.
 
 ```bash
 YUNCMS_DOCKER_IMAGE=your-account/yuncms npm run docker:build

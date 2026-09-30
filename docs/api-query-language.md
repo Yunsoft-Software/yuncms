@@ -230,6 +230,12 @@ An empty `_in` matches no rows; an empty `_nin` excludes no rows. Each array acc
 
 Text operators escape SQL LIKE wildcard characters in user input before binding.
 
+### Datetime filter values
+
+For `datetime` and `timestamp` comparison operators (`_eq`, `_neq`, `_lt`, `_lte`, `_gt`, `_gte`, `_in`, `_nin`), use timezone-bearing ISO values such as `2026-08-31T04:56:17.687Z` or `2026-08-31T07:56:17.687+03:00`. YunCMS binds these as JavaScript dates at the MySQL boundary, consistently with datetime mutations. Native MySQL datetime strings such as `2026-08-31 04:56:17.687` remain supported.
+
+This applies to collection reads, permission row filters and `ItemsService.updateMany()` / `deleteMany()`. Invalid calendar dates, timezone-free ISO values and unsupported value types fail with `INVALID_QUERY` before SQL runs. `_null` and `_nnull` retain their boolean syntax; date-like text in a `string` field is not converted.
+
 ### Dynamic values
 
 Filters may resolve a small set of request-context values at execution time:

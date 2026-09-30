@@ -261,7 +261,7 @@ export function App() {
     if (section === 'files') return <FilesScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'ai') return <AiScreen />;
     if (section === 'automations') return session?.user?.admin
-      ? <AutomationsScreen /> : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;
+      ? <AutomationsScreen /> : <div className="error-banner" role="alert">{t('automation.adminOnly')}</div>;
     if (section === 'mcp') return session?.user?.admin
       ? <McpScreen />
       : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;

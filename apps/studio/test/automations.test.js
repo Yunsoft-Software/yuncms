@@ -18,6 +18,7 @@ test('automation route, administrator boundaries, preview and reusable confirmat
   const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
   assert.match(app, /id: 'automations'.*adminOnly: true/);
   assert.match(app, /section === 'automations'\) return session\?\.user\?\.admin/);
+  assert.match(app, /<AutomationsScreen \/> : <div[^>]*>\{t\('automation.adminOnly'\)\}/);
   const source = readFileSync(new URL('../src/screens/AutomationsScreen.jsx', import.meta.url), 'utf8');
   assert.match(source, /useConfirmDialog/); assert.match(source, /\/automations\/preview/);
   assert.match(source, /run.status === 'failed' && selectedRule\?\.enabled && run.revision === selectedRule.revision/);
@@ -36,7 +37,9 @@ test('support card can be dismissed and the footer links are limited to administ
   assert.match(card, /localStorage\.setItem\('yuncms.support-dismissed', '1'\)/);
   assert.match(card, /aria-label=\{t\('common.close'\)\}/);
   assert.match(card, /rel="noopener noreferrer"/);
-  assert.match(card, /utm_campaign.*yuncms-sponsorship.*yuncms-services/);
+  assert.match(card, /utm_campaign.*yuncms-services/);
+  assert.match(card, /YUNCMS_SPONSORS = 'https:\/\/github\.com\/sponsors\/Yunsoft-Software'/);
+  assert.match(card, /href=\{YUNCMS_SPONSORS\}/);
   assert.match(app, /session\?\.user\?\.admin === true && !navigationCollapsed && <div className="sidebar-support-links"><YunsoftSupportLinks/);
   const css = readFileSync(new URL('../src/automations.css', import.meta.url), 'utf8');
   const tokens = readFileSync(new URL('../src/appearance.css', import.meta.url), 'utf8');

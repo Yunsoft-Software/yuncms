@@ -31,10 +31,10 @@
   "dependencies": {
     "@aws-sdk/client-s3": "3.1100.0",
     "mysql2": "3.23.2",
-    "nodemailer": "9.1.1"
+    "nodemailer": "10.0.13"
   },
   "funding": {
-    "type": "custom",
-    "url": "https://yunsoft.com/contact?utm_source=npm-fund&utm_medium=yuncms&utm_campaign=yuncms-sponsorship"
+    "type": "github",
+    "url": "https://github.com/sponsors/Yunsoft-Software"
   }
 }

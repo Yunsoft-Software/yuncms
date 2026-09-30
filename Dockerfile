@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-bookworm-slim AS build
+FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS studio-build
 
 WORKDIR /opt/yuncms
 
@@ -16,8 +16,23 @@ RUN npm ci
 COPY apps/studio apps/studio
 COPY packages packages
 
-RUN npm run build:studio \
-  && npm prune --omit=dev
+RUN npm run build:studio
+
+FROM node:24-bookworm-slim AS build
+
+WORKDIR /opt/yuncms
+
+COPY package.json package-lock.json ./
+COPY apps/studio/package.json apps/studio/package.json
+COPY packages/api/package.json packages/api/package.json
+COPY packages/cli/package.json packages/cli/package.json
+COPY packages/core/package.json packages/core/package.json
+COPY packages/extensions-sdk/package.json packages/extensions-sdk/package.json
+
+RUN npm ci --omit=dev
+
+COPY packages packages
+COPY --from=studio-build /opt/yuncms/packages/api/studio-dist /opt/yuncms/packages/api/studio-dist
 
 FROM node:24-bookworm-slim AS runtime
 

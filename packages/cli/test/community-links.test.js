@@ -12,5 +12,7 @@ test('setup CTA is quiet in CI/pipes and visible in interactive setup or explici
   printCommunityLinks({ output, isTTY: false, env: {}, help: true });
   assert.equal(messages.length, 2);
   assert.match(messages[0], /Star the project/);
+  assert.match(messages[0], /Sponsor YunCMS: https:\/\/github\.com\/sponsors\/Yunsoft-Software/);
+  assert.equal(COMMUNITY_LINKS.sponsorship, 'https://github.com/sponsors/Yunsoft-Software');
   for (const url of Object.values(COMMUNITY_LINKS)) assert.equal(new URL(url).protocol, 'https:');
 });

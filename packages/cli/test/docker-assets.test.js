@@ -15,9 +15,13 @@ test('Docker runtime is a Node 24 non-root image with the complete YunCMS CLI co
   const dockerfile = await readRootFile('Dockerfile');
 
   assert.match(dockerfile, /^FROM node:24-bookworm-slim AS build$/m);
+  assert.match(dockerfile, /^FROM --platform=\$BUILDPLATFORM node:24-bookworm-slim AS studio-build$/m);
   assert.match(dockerfile, /^FROM node:24-bookworm-slim AS runtime$/m);
   assert.match(dockerfile, /npm run build:studio/);
-  assert.match(dockerfile, /npm prune --omit=dev/);
+  assert.match(dockerfile, /npm ci --omit=dev/);
+  assert.match(dockerfile, /^COPY --from=studio-build \/opt\/yuncms\/packages\/api\/studio-dist \/opt\/yuncms\/packages\/api\/studio-dist$/m);
+  const dependencyStage = dockerfile.split('FROM node:24-bookworm-slim AS build')[1].split('FROM node:24-bookworm-slim AS runtime')[0];
+  assert.doesNotMatch(dependencyStage, /npm run build:studio|npm ci\s*$/m);
   assert.match(dockerfile, /default-mysql-client tini/);
   assert.match(dockerfile, /^USER node$/m);
   assert.match(dockerfile, /^VOLUME \["\/data"\]$/m);
@@ -78,6 +82,7 @@ test('Docker build context excludes local dependencies, state and credentials', 
   for (const entry of ['.git', '.credentials', '.npmrc', '.env', '.yuncms', 'node_modules', 'uploads']) {
     assert.match(dockerignore, new RegExp(`^${entry.replace('.', '\\.')}\\s*$`, 'm'));
   }
+  assert.match(dockerignore, /^\*\*\/node_modules\s*$/m);
 });
 
 test('GitHub documentation presents Yunsoft branding and every installation option', async () => {

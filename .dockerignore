@@ -7,6 +7,7 @@
 .env.*
 .yuncms
 node_modules
+**/node_modules
 coverage
 dist
 packages/api/studio-dist
