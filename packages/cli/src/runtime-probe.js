@@ -1,7 +1,10 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 
 import { MAINTENANCE_BYPASS_ENV } from '@yunsoft/yuncms-core';
+import { ATTACHED_RUNTIME_ENV } from './start-command.js';
+
+export const DEFAULT_PROBE_SHUTDOWN_GRACE_MS = 12_000;
 
 function delay(ms) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
@@ -9,8 +12,10 @@ function delay(ms) {
 
 function probeError(code, message, details = {}) {
   const error = new Error(message);
+  const { code: exitCode, ...otherDetails } = details;
+  Object.assign(error, otherDetails);
+  if (Object.hasOwn(details, 'code')) error.exitCode = exitCode;
   error.code = code;
-  Object.assign(error, details);
   return error;
 }
 
@@ -22,7 +27,7 @@ export async function verifyInstalledRuntime({
   fetchFn = globalThis.fetch,
   spawnProcess = spawn,
   timeoutMs = 15_000,
-  shutdownGraceMs = 3_000,
+  shutdownGraceMs = DEFAULT_PROBE_SHUTDOWN_GRACE_MS,
 } = {}) {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw probeError('UPDATE_PROBE_PORT_INVALID', `Invalid probe port: ${port}`);
@@ -48,6 +53,7 @@ export async function verifyInstalledRuntime({
     PORT: String(port),
     STUDIO_ORIGIN: origin,
     AUTH_PUBLIC_URL: origin,
+    [ATTACHED_RUNTIME_ENV]: '1',
   };
   if (maintenanceBypassToken !== null) childEnv[MAINTENANCE_BYPASS_ENV] = maintenanceBypassToken;
 
@@ -55,6 +61,7 @@ export async function verifyInstalledRuntime({
     cwd,
     env: childEnv,
     stdio: ['ignore', 'ignore', 'pipe'],
+    detached: process.platform !== 'win32',
   });
 
   let stderr = '';
@@ -65,6 +72,7 @@ export async function verifyInstalledRuntime({
 
   let settled = false;
   let shutdownAttempted = false;
+  let readyAndStopped = false;
   const exitPromise = new Promise((resolveExit, rejectExit) => {
     child.once('error', (error) => {
       if (settled) return;
@@ -81,9 +89,18 @@ export async function verifyInstalledRuntime({
 
   function requestKill(signal) {
     try {
+      if (signal === 'SIGKILL' && Number.isInteger(child.pid)) {
+        if (process.platform === 'win32') {
+          execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', timeout: 1000 });
+        } else {
+          process.kill(-child.pid, signal);
+        }
+        return;
+      }
       child.kill(signal);
     } catch {
-      // The bounded shutdown path still escalates and reports a timeout.
+      // ESRCH is expected for an exited group; keep a bounded direct-child fallback.
+      try { child.kill(signal); } catch {}
     }
   }
 
@@ -145,6 +162,7 @@ export async function verifyInstalledRuntime({
             if (result.code !== 0 && result.signal !== 'SIGTERM') {
               throw probeError('UPDATE_PROBE_SHUTDOWN_FAILED', 'Updated runtime did not stop cleanly', result);
             }
+            readyAndStopped = true;
             return { ready: true, origin };
           }
         }
@@ -161,5 +179,6 @@ export async function verifyInstalledRuntime({
     if (!settled && !shutdownAttempted) {
       await stopProbe({ strict: false }).catch(() => null);
     }
+    if (settled && !readyAndStopped && Number.isInteger(child.pid)) requestKill('SIGKILL');
   }
 }

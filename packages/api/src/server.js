@@ -23,7 +23,7 @@ import { createApp } from './app.js';
 import { AiAssistantService } from './ai/service.js';
 import { loadOrCreateAiSettingsKey } from './ai/secret-key.js';
 import { AiSettingsStore } from './ai/settings-store.js';
-import { INTERNAL_AUDIT_EVENTS } from './audit-events.js';
+import { registerInternalAudit } from './audit-hooks.js';
 import { loadExternalAuthConfig } from './external-auth/config.js';
 import { ExternalAuthProviderRegistry } from './external-auth/providers.js';
 import { loadExtensionRuntime } from './extensions/runtime.js';
@@ -88,28 +88,6 @@ let extensionRuntime = null;
 let automationWorker = null;
 let shuttingDown = false;
 
-function registerInternalAudit({ emitter, services }) {
-  const AuditService = services.AuditService;
-  const systemAccountability = createSystemAccountability();
-  for (const event of INTERNAL_AUDIT_EVENTS) {
-    emitter.registerAction(event, async (payload, context) => {
-      try {
-        const audit = new AuditService({ accountability: systemAccountability, database: pool, logger, requestId: context.requestId ?? null });
-        await audit.record({
-          user: context.accountability?.user ?? null,
-          action: event,
-          collection: context.collection ?? null,
-          itemKey: payload?.key ?? null,
-          requestId: context.requestId ?? null,
-          payload,
-        });
-      } catch (error) {
-        logger.error('YunCMS audit write failed after committed mutation', { event, requestId: context.requestId ?? null, code: error?.code, error });
-      }
-    }, { extensionId: 'core.audit', priority: 1000 });
-  }
-}
-
 async function start() {
   await assertDatabaseCompatible(pool);
   const aiKey = await loadOrCreateAiSettingsKey();
@@ -141,7 +119,7 @@ async function start() {
   const aiRouter = createAiRouter({ assistant: aiAssistant, settingsStore: aiSettingsStore });
   const mcpSettingsStore = new McpSettingsStore({ database: pool });
   mailer?.setEmitter(emitter);
-  registerInternalAudit({ emitter, services });
+  registerInternalAudit({ emitter, services, database: pool, logger });
   const automationOptions = { assistant: aiAssistant, settingsStore: aiSettingsStore, schemaCache };
   const automations = new AiAutomationsService({ ...automationOptions, database: pool,
     accountability: createSystemAccountability(), services, emitter, storage, logger });
@@ -183,7 +161,11 @@ async function start() {
 
   await extensionRuntime.init('app.beforeStart');
   server = await new Promise((resolve, reject) => {
-    const listeningServer = app.listen(config.server.port, config.server.host, () => {
+    const listeningServer = app.listen(config.server.port, config.server.host, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
       logger.info('YunCMS API listening', { host: config.server.host, port: config.server.port });
       resolve(listeningServer);
     });
@@ -233,7 +215,8 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 
 start().catch(async (error) => {
   logger.error('YunCMS API failed to start', { code: error?.code, error });
-  await redisClient?.close().catch(() => {});
-  await closeDatabasePool(pool).catch(() => {});
+  await shutdown('startup-failure').catch((cleanupError) => {
+    logger.error('YunCMS API startup cleanup failed', { code: cleanupError?.code, error: cleanupError });
+  });
   process.exit(1);
 });

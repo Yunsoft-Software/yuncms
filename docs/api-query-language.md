@@ -40,6 +40,8 @@ Unauthenticated requests use the Public role. Public access is deny-by-default u
 
 Unknown parameters are rejected with `INVALID_QUERY` rather than ignored.
 
+`limit` and `offset` each accept one numeric value (a number in service calls or a numeric string in REST queries). Repeated query parameters, arrays, objects and booleans are rejected with HTTP 400 `INVALID_QUERY`. Omitted or empty values use the defaults: `limit=100`, `offset=0`.
+
 ## Fields
 
 ### Select specific scalar fields

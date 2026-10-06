@@ -146,7 +146,8 @@ export class AiAutomationsService {
   async enqueue(event, payload, context) {
     if (!context.collection || context.collection.startsWith('yuncms_')
       || context[AI_AUTOMATION_ORIGIN] === true) return;
-    const [rows] = await this.database.query('SELECT * FROM yuncms_ai_automations WHERE collection = ? AND enabled = 1', [context.collection]);
+    const database = context.database ?? this.database;
+    const [rows] = await database.query('SELECT * FROM yuncms_ai_automations WHERE collection = ? AND enabled = 1', [context.collection]);
     for (const row of rows) {
       const rule = automationFromRow(row);
       if (!matchesAutomation(rule, event, payload, context)) continue;
@@ -154,7 +155,7 @@ export class AiAutomationsService {
       if (payload.key == null) continue;
       const key = String(payload.key);
       if (!key || key.length > 191) continue;
-      await withTransaction(this.database, async (connection) => {
+      await withTransaction(database, async (connection) => {
         const current = await this.read(rule.id, connection, { lock: true });
         if (!current || current.revision !== rule.revision || !current.enabled) return;
         const [pending] = await connection.query(
