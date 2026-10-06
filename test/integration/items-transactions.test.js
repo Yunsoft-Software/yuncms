@@ -88,7 +88,7 @@ test('real MySQL: native transaction-bound Items defer audit and automation, inc
     if (rule) await database.query('DELETE FROM yuncms_ai_automation_runs WHERE automation_id = ?', [rule.id]);
     if (rule) await automation.remove(rule.id);
     await database.query('DELETE FROM yuncms_audit_log WHERE collection = ?', [collection]).catch(() => {});
-    await collections.deleteOne(collection).catch(() => {});
+    await collections.deleteOne(collection, { destructive: true }).catch(() => {});
     if (user) await users.deleteOne(user.id);
     if (role) await roles.deleteOne(role.id);
     await closeDatabasePool(database);
