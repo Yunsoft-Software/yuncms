@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { errorBody, normalizeApiError, statusForError } from '../src/error-response.js';
+import { hashExternalAuthState } from '@yunsoft/yuncms-core';
 
 test('known client errors map to stable http statuses', () => {
   assert.equal(statusForError({ code: 'INVALID_QUERY' }), 400);
@@ -9,6 +10,32 @@ test('known client errors map to stable http statuses', () => {
   assert.equal(statusForError({ code: 'FORBIDDEN' }), 403);
   assert.equal(statusForError({ code: 'COLLECTION_NOT_FOUND' }), 404);
   assert.equal(statusForError({ code: 'DUPLICATE_KEY' }), 409);
+});
+
+test('malformed external auth state is a safe client error', () => {
+  let error;
+  try { hashExternalAuthState('invalid-test'); } catch (caught) { error = caught; }
+  assert.equal(error.code, 'INVALID_AUTH_TRANSACTION');
+  assert.equal(statusForError(error), 400);
+  assert.equal(errorBody(error, 'oauth-test').errors[0].message, 'External auth state is invalid');
+});
+
+test('external auth validation and permission errors have controlled statuses', () => {
+  for (const code of ['INVALID_AUTH_TRANSACTION', 'INVALID_AUTH_PROVIDER', 'INVALID_EXTERNAL_IDENTITY', 'INVALID_REDIRECT_TARGET', 'AUTH_PROVIDER_FLOW_MISMATCH']) {
+    assert.equal(statusForError({ code }), 400, code);
+  }
+  assert.equal(statusForError({ code: 'AUTH_PROVIDER_NOT_FOUND' }), 404);
+  for (const code of ['VERIFIED_EXTERNAL_EMAIL_REQUIRED', 'EXTERNAL_USER_INACTIVE', 'EXTERNAL_ADMIN_LINK_FORBIDDEN', 'EXTERNAL_IDENTITY_NOT_LINKED']) {
+    assert.equal(statusForError({ code }), 403, code);
+  }
+  assert.equal(statusForError({ code: 'EXTERNAL_EMAIL_CONFLICT' }), 409);
+  for (const code of ['INVALID_AUTH_PROVIDER_CONFIG', 'EXTERNAL_JIT_ROLE_REQUIRED', 'INVALID_EXTERNAL_JIT_ROLE']) {
+    assert.equal(statusForError({ code }), 503, code);
+    assert.equal(errorBody({ code, message: 'private configuration detail' }, 'req').errors[0].message, 'Internal server error');
+  }
+  for (const code of ['EXTERNAL_IDENTITY_INVALID', 'EXTERNAL_USERINFO_FAILED']) {
+    assert.equal(statusForError({ code }), 502, code);
+  }
 });
 
 test('unknown internal errors do not expose server messages', () => {
