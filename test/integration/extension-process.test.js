@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { verifyInstalledRuntime } from '../../packages/cli/src/runtime-probe.js';
 
 import {
   ApiTokensService,
@@ -212,6 +213,51 @@ export default {
       await processInfo.exited;
     }
     await new Promise((resolveClose) => occupied.close(resolveClose));
+    await closeDatabasePool(pool);
+    if (projectRoot) await rm(projectRoot, { recursive: true, force: true });
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('native update probe waits for a slow scheduled job and stops its API descendant', {
+  skip: !ENABLED,
+  timeout: 30_000,
+}, async () => {
+  const config = loadConfig(process.env);
+  requireDisposableDatabase(config);
+  const pool = createDatabasePool(config.database);
+  const storageRoot = await mkdtemp(join(tmpdir(), 'yuncms-probe-storage-'));
+  let projectRoot;
+  try {
+    await bootstrapDatabase(pool);
+    projectRoot = await createExtensionProject('slow-probe-job', `
+import { appendFile } from 'node:fs/promises';
+import { join } from 'node:path';
+const record = (event) => appendFile(join(process.cwd(), 'probe-events.txt'), event + '\\n');
+export default {
+  __yuncms_extension__: true, type: 'hook',
+  register({ init, schedule }) {
+    schedule('* * * * *', async () => {
+      await record('job.started');
+      await new Promise(resolve => setTimeout(resolve, 4500));
+      await record('job.finished');
+    }, { id: 'slow-probe-job', mode: 'singleton', accountability: 'system' });
+    init('app.afterStop', () => record('api.stopped'));
+  },
+};
+`);
+    await mkdir(join(projectRoot, 'node_modules', '@yunsoft'), { recursive: true });
+    await symlink(join(ROOT, 'packages', 'cli'), join(projectRoot, 'node_modules', '@yunsoft', 'yuncms'), 'dir');
+    const port = await availablePort();
+    const result = await verifyInstalledRuntime({
+      cwd: projectRoot, port,
+      env: { ...process.env, ...serverEnv(config, storageRoot) },
+    });
+    assert.equal(result.ready, true);
+    assert.deepEqual((await readFile(join(projectRoot, 'probe-events.txt'), 'utf8')).trim().split('\n'),
+      ['job.started', 'job.finished', 'api.stopped']);
+    await assert.rejects(fetch(`http://127.0.0.1:${port}/ready`));
+  } finally {
     await closeDatabasePool(pool);
     if (projectRoot) await rm(projectRoot, { recursive: true, force: true });
     await rm(storageRoot, { recursive: true, force: true });

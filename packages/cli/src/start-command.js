@@ -3,6 +3,9 @@ import { fileURLToPath } from 'node:url';
 
 import { assertMaintenanceStartupAllowed } from '@yunsoft/yuncms-core';
 
+// Internal updater transport flag: the probe owns the entire process group.
+export const ATTACHED_RUNTIME_ENV = 'YUNCMS_CLI_ATTACHED_RUNTIME';
+
 export async function runStartCommand({
   env = process.env,
   cwd = process.cwd(),
@@ -21,7 +24,7 @@ export async function runStartCommand({
     cwd,
     env: { ...env },
     stdio: 'inherit',
-    detached: process.platform !== 'win32',
+    detached: process.platform !== 'win32' && env[ATTACHED_RUNTIME_ENV] !== '1',
   });
 
   return new Promise((resolve, reject) => {

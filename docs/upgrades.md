@@ -48,6 +48,8 @@ YUNCMS_DB_TOOL_TIMEOUT_MS=7200000
 
 The first value covers npm/package/bootstrap commands (15 minutes by default). The second covers `mysql`/`mysqldump` (2 hours by default). On timeout YunCMS requests `SIGTERM`, escalates to `SIGKILL` after a grace period and returns a timeout error. The temporary readiness runtime also has a bounded TERM/KILL shutdown after `/ready`; an unresponsive probe fails the update instead of holding maintenance locks forever.
 
+The temporary runtime receives a 12-second graceful shutdown budget, covering the API's normal 10-second limit and in-flight extension jobs. If it must be force-stopped, the updater terminates the CLI and its API descendants together. A successful readiness check followed by shutdown failure reports `UPDATE_PROBE_SHUTDOWN_FAILED` (or `UPDATE_PROBE_SHUTDOWN_TIMEOUT`); the subprocess exit status is kept separately as `exitCode`.
+
 Increase these only after measuring a verified large production install/database. Do not use an arbitrarily huge value merely to hide a hung command.
 
 ## Dry run

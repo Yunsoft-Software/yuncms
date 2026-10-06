@@ -118,6 +118,21 @@ test('start command treats an explicitly forwarded shutdown signal as a clean ex
   assert.equal(signalSource.listenerCount('SIGINT'), 0);
 });
 
+test('updater attached runtime keeps the API in the probe process group', async () => {
+  const child = new EventEmitter();
+  let options;
+  await runStartCommand({
+    env: { YUNCMS_CLI_ATTACHED_RUNTIME: '1' },
+    output: { log() {} }, signalSource: new EventEmitter(),
+    spawnProcess(_runtime, _args, spawnOptions) {
+      options = spawnOptions;
+      queueMicrotask(() => child.emit('exit', 0, null));
+      return child;
+    },
+  });
+  assert.equal(options.detached, false);
+});
+
 test('env serialization quotes values and rejects multiline secrets', () => {
   const serialized = serializeEnv({
     DB_HOST: '127.0.0.1',
