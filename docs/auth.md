@@ -84,8 +84,6 @@ API tokens resolve the owning user's current role when authenticated. Disabling 
 
 ## Public accountability
 
-External authentication validation failures use controlled HTTP responses. Malformed, missing, expired or already consumed OAuth/OIDC/SAML transaction state returns HTTP 400 with `INVALID_AUTH_TRANSACTION` and a safe reason; no session is created. Invalid provider/redirect inputs or the wrong provider flow also return 400, and unknown providers return 404. Identity linking restrictions and inactive users return 403; an existing-email linking conflict returns 409. Provider configuration failures remain 503 and invalid upstream identities/profile responses return 502, with internal details hidden.
-
 A request without a Bearer token is not treated as Administrator. It resolves to explicit Public accountability and the configured Public role. Public access is deny-by-default until permissions are intentionally granted.
 
 This applies to normal Items reads and to system resources that explicitly support delegated/Public permissions, including Files.
@@ -208,6 +206,8 @@ POST /auth/exchange
 ```
 
 Browser providers require `AUTH_STATE_SECRET` with at least 32 characters. Provider URLs must use HTTPS.
+
+External authentication validation failures use controlled HTTP responses. Malformed, missing, expired or already consumed OAuth/OIDC/SAML transaction state returns HTTP 400 with `INVALID_AUTH_TRANSACTION` and a safe reason; no session is created. Invalid provider/redirect inputs or the wrong provider flow also return 400, and unknown providers return 404. Identity linking restrictions and inactive users return 403; an existing-email linking conflict returns 409. Provider configuration failures remain 503 and invalid upstream identities/profile responses return 502, with internal details hidden.
 
 ## LDAP flow
 
