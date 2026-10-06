@@ -183,7 +183,11 @@ async function start() {
 
   await extensionRuntime.init('app.beforeStart');
   server = await new Promise((resolve, reject) => {
-    const listeningServer = app.listen(config.server.port, config.server.host, () => {
+    const listeningServer = app.listen(config.server.port, config.server.host, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
       logger.info('YunCMS API listening', { host: config.server.host, port: config.server.port });
       resolve(listeningServer);
     });
@@ -233,7 +237,8 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 
 start().catch(async (error) => {
   logger.error('YunCMS API failed to start', { code: error?.code, error });
-  await redisClient?.close().catch(() => {});
-  await closeDatabasePool(pool).catch(() => {});
+  await shutdown('startup-failure').catch((cleanupError) => {
+    logger.error('YunCMS API startup cleanup failed', { code: cleanupError?.code, error: cleanupError });
+  });
   process.exit(1);
 });

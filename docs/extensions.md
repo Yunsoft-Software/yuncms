@@ -205,6 +205,8 @@ app.afterStart
 
 `app.beforeStart` fires after extensions are loaded but before the HTTP server listens. `app.afterStart` fires after the server has successfully started listening.
 
+If binding the configured port fails (for example `EADDRINUSE`), startup exits with an error. `app.afterStart`, scheduled jobs and the AI automation worker do not start. Initialized resources are stopped through the normal shutdown path, including `app.beforeStop` and `app.afterStop` for a loaded extension runtime.
+
 # Scheduled jobs
 
 Hook extensions can register five-field cron schedules:
