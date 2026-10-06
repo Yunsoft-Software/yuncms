@@ -14,7 +14,7 @@ import {
 } from '../query.js';
 import { SchemaCache } from '../schema.js';
 import { isSystemManagedField, systemMutationEntries } from '../system-fields.js';
-import { withTransaction } from '../transaction.js';
+import { dispatchAfterCommit, transactionContext, withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { PermissionsService } from './permissions-service.js';
 
@@ -139,6 +139,8 @@ export class ItemsService extends BaseService {
       accountability: this.accountability,
       collection: this.collection,
       requestId: this.requestId,
+      database: this.database,
+      transaction: transactionContext(this.database),
       ...extra,
     };
   }
@@ -150,7 +152,10 @@ export class ItemsService extends BaseService {
 
   async actionMutation(event, payload, context = {}) {
     if (!this.emitter) return;
-    await this.emitter.action(event, payload, this.hookContext(context));
+    const eventContext = this.hookContext(context);
+    const eventPayload = eventContext.transaction ? structuredClone(payload) : payload;
+    await dispatchAfterCommit(this.database, (database, transaction) =>
+      this.emitter.action(event, eventPayload, { ...eventContext, database, transaction }));
   }
 
   async getCollectionSchema(database = this.database) {

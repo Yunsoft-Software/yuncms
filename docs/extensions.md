@@ -196,6 +196,25 @@ A transformed payload is still checked by normal schema, role, write-field and v
 
 Hook event context carries the active accountability, collection/operation metadata, relevant keys/filters and hook-chain metadata in addition to the base runtime context.
 
+For atomic Items mutations, bind the service to the connection supplied by the native transaction helpers:
+
+```js
+import { withTransaction } from '@yunsoft/yuncms-core';
+
+await withTransaction(context.database, async (connection) => {
+  const options = await context.serviceOptions(req);
+  const items = new context.services.ItemsService('orders', { ...options, database: connection });
+  await items.createOne({ title: 'New order' });
+  // Other database mutations on this connection participate in the same transaction.
+});
+```
+
+`withTransaction(pool, operation)` borrows and releases a connection. `withConnectionTransaction(connection, operation)` keeps connection ownership with the caller. Nested helper calls on an active managed connection join the outer transaction, without separate commits or savepoints; they cannot change its isolation level. Let failures escape the outer operation to roll back all its writes.
+
+Items filters execute inside the transaction. Items success actions (including native audit writes and AI automation enqueueing) wait for the outer commit, preserve mutation order, and are discarded on rollback or commit failure. The helper waits for these actions before returning. Post-commit action failure cannot roll back data that has already committed; actions are best-effort effects rather than a durable event queue.
+
+For Items mutation hooks, `context.database` is the active connection in filters and a usable post-commit database handle in actions. `context.transaction` is `{ managed: true, state: 'active' }` for transactional filters, `{ managed: true, state: 'committed' }` for deferred actions, and `null` for ordinary autocommit calls. Read hooks still run at the read itself. Raw `beginTransaction()` calls outside the native helpers are not tracked; use the helpers for deferred action handling.
+
 ## Startup events
 
 ```text
