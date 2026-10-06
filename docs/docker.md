@@ -6,7 +6,7 @@ Need help deploying, integrating or migrating? [Contact Yunsoft](https://yunsoft
 
 YunCMS publishes a Linux container image at [`yunsoftofficial/yuncms`](https://hub.docker.com/r/yunsoftofficial/yuncms). The image contains the YunCMS CLI, the built React Studio and the MySQL client tools required by `backup` and `restore`.
 
-The supported architectures are `linux/amd64` and `linux/arm64`. Use a version tag such as `0.1.24` for a controlled deployment. `latest` follows the newest published YunCMS release and is convenient for evaluation, but production deployments should not update implicitly.
+The supported architectures are `linux/amd64` and `linux/arm64`. Use a version tag such as `0.1.25` for a controlled deployment. `latest` follows the newest published YunCMS release and is convenient for evaluation, but production deployments should not update implicitly.
 
 ## Requirements
 
@@ -135,7 +135,7 @@ Container deployments update by replacing the image, not by running `yuncms upda
 ```bash
 docker compose stop yuncms
 docker compose run --rm yuncms backup
-# Edit YUNCMS_IMAGE in .env, for example yunsoftofficial/yuncms:0.1.24
+# Edit YUNCMS_IMAGE in .env, for example yunsoftofficial/yuncms:0.1.25
 docker compose pull yuncms
 docker compose run --rm yuncms bootstrap
 docker compose up -d yuncms

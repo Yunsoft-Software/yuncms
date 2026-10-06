@@ -26,15 +26,21 @@ test('GitHub funding button leads to the active organization Sponsors profile', 
   assert.match(funding, /^github: \[Yunsoft-Software\]$/m);
 });
 
-test('production mail and MCP dependencies stay above audited security baselines', async () => {
-  const [coreManifest, lockfile] = await Promise.all([
+test('runtime and Studio dependencies stay above audited security baselines', async () => {
+  const [coreManifest, lockfile, apiManifest, studioManifest] = await Promise.all([
     readFile(resolve(PACKAGES_ROOT, 'core/package.json'), 'utf8').then(JSON.parse),
     readFile(resolve(PACKAGES_ROOT, '../package-lock.json'), 'utf8').then(JSON.parse),
+    readFile(resolve(PACKAGES_ROOT, 'api/package.json'), 'utf8').then(JSON.parse),
+    readFile(resolve(PACKAGES_ROOT, '../apps/studio/package.json'), 'utf8').then(JSON.parse),
   ]);
 
   assert.equal(coreManifest.dependencies.nodemailer, '10.0.13');
   assert.equal(lockfile.packages['node_modules/nodemailer'].version, '10.0.13');
   assert.equal(lockfile.packages['node_modules/hono'].version, '4.13.7');
+  assert.equal(apiManifest.dependencies['proxy-addr'], '2.0.8');
+  assert.equal(lockfile.packages['node_modules/proxy-addr'].version, '2.0.8');
+  assert.equal(studioManifest.devDependencies['source-map-js'], '1.2.2');
+  assert.equal(lockfile.packages['node_modules/source-map-js'].version, '1.2.2');
 });
 
 test('release verification serializes integration files that share the MySQL fixture', async () => {
@@ -44,4 +50,25 @@ test('release verification serializes integration files that share the MySQL fix
     verifySource,
     /real MySQL\/API integration suite[\s\S]*?\{ concurrency: 1 \}/,
   );
+});
+
+test('release workspace versions, native dependencies and Docker defaults stay aligned', async () => {
+  const root = resolve(PACKAGES_ROOT, '..');
+  const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
+  for (const directory of [...PUBLIC_PACKAGES.map(name => `packages/${name}`), 'apps/studio']) {
+    const current = JSON.parse(await readFile(resolve(root, directory, 'package.json'), 'utf8'));
+    assert.equal(current.version, manifest.version, current.name);
+    for (const [name, version] of Object.entries(current.dependencies ?? {})) {
+      if (name.startsWith('@yunsoft/yuncms')) assert.equal(version, manifest.version, `${current.name} -> ${name}`);
+    }
+  }
+  const expectedImage = `yunsoftofficial/yuncms:${manifest.version}`;
+  for (const file of ['compose.yaml', 'docker.env.example']) {
+    assert.ok((await readFile(resolve(root, file), 'utf8')).includes(expectedImage), file);
+  }
+  const lock = JSON.parse(await readFile(resolve(root, 'package-lock.json'), 'utf8'));
+  assert.equal(lock.version, manifest.version);
+  for (const directory of ['packages/core', 'packages/api', 'packages/cli', 'packages/extensions-sdk', 'apps/studio']) {
+    assert.equal(lock.packages[directory].version, manifest.version, directory);
+  }
 });
