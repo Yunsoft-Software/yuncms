@@ -57,6 +57,13 @@ test('items query parser rejects unknown parameters and clamps shape', () => {
   assert.throws(() => parseItemsQuery({ limit: 9999 }), /limit must be an integer/);
   assert.throws(() => parseItemsQuery({ limit: ['25'] }), /limit must be an integer/);
   assert.throws(() => parseItemsQuery({ offset: ['10'] }), /offset must be an integer/);
+  for (const field of ['limit', 'offset']) {
+    for (const value of [true, false, {}, { valueOf: () => 10 }, [], ['10', '20']]) {
+      assert.throws(() => parseItemsQuery({ [field]: value }), (error) => error.code === 'INVALID_QUERY');
+    }
+  }
+  assert.equal(parseItemsQuery({ limit: '25', offset: '10' }).limit, 25);
+  assert.equal(parseItemsQuery({ limit: 25, offset: 0 }).offset, 0);
   assert.throws(
     () => parseItemsQuery({ offset: QUERY_LIMITS.maxOffset + 1 }),
     /offset must be an integer/,
