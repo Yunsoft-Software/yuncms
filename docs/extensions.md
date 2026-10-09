@@ -190,6 +190,16 @@ items.delete
 
 A transformed payload is still checked by normal schema, role, write-field and validation rules. A filter is not an authorization bypass.
 
+### Read query hooks
+
+`filter('items.query', handler)` transforms the normalized query for root collection list reads and single-item reads, including `ItemsService.readOne()` and `GET /items/:collection/:id`. Its context contains `operation: 'read'`; single-item reads also provide `single: true` and `key` with the requested primary key. The hook output is parsed again and remains subject to query-cost and native field/row permissions.
+
+For a single-item read, hook `fields`, `filter` and `search` affect the selected record. The requested primary key is enforced separately and cannot be replaced by the hook. Pagination and sorting do not change this lookup; aggregate output is rejected with `INVALID_QUERY`. A record excluded by the hook returns `null` from the service or HTTP 404 from the item endpoint. The read performed to return a created or updated item uses the same hook.
+
+`items.query` does not run for internal batched relation expansion lookups. Use native permission row filters for constraints that must also protect expanded related records.
+
+`action('items.read', handler)` receives bounded read metadata (`collection`, `query`, `keys`, `count`, `single`) rather than the response data. A single-item read excluded by a query hook does not emit this action.
+
 ### Actions
 
 `action(event, handler)` runs after a successful mutation. Failed/rejected mutations do not emit a success action. For bulk creates, actions run after the transaction commits.

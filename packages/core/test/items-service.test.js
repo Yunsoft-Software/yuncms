@@ -219,8 +219,8 @@ test('JSON mutation values are serialized for MySQL without changing the service
     schema,
     accountability: createSystemAccountability(),
     emitter: {
-      async filter(_event, payload) {
-        filteredSettings = payload.settings;
+      async filter(event, payload) {
+        if (event === 'items.create') filteredSettings = payload.settings;
         return payload;
       },
       async action() {},

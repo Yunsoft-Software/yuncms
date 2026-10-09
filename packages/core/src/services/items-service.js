@@ -231,10 +231,10 @@ export class ItemsService extends BaseService {
     return combineCompiledFilters(permissionSql, userSql, searchSql);
   }
 
-  async normalizeReadQuery(rawQuery) {
+  async normalizeReadQuery(rawQuery, context = {}) {
     const parsed = parseItemsQuery(rawQuery);
     const filtered = this.emitter
-      ? await this.emitter.filter('items.query', parsed, this.hookContext({ operation: 'read' }))
+      ? await this.emitter.filter('items.query', parsed, this.hookContext({ ...context, operation: 'read' }))
       : parsed;
     const query = parseItemsQuery(filtered);
     assertQueryCost(query);
@@ -363,14 +363,18 @@ export class ItemsService extends BaseService {
 
   async readOne(id, { fields = null } = {}) {
     const schema = await this.getCollectionSchema();
+    const query = await this.normalizeReadQuery({ fields, limit: 1 }, { single: true, key: id });
+    if (query.aggregate) {
+      throw serviceError('INVALID_QUERY', 'Single-item reads do not support aggregate queries', 'aggregate');
+    }
     const permission = await this.resolvePermission('read');
     const accessSchema = schemaForFields(schema, permission.fields);
-    const selected = compileSelectFields(normalizeFields(fields), accessSchema);
+    const selected = compileSelectFields(query.fields, accessSchema);
     const table = quoteIdentifier(this.collection, 'collection name');
     const primaryKey = schema.primary_key;
     const dynamicVariables = this.dynamicVariables();
     const filter = combineCompiledFilters(
-      compileFilter(permission.filter, schema, { dynamicVariables }),
+      this.compileActionFilters(query.filter, permission.filter, accessSchema, schema, query.search, dynamicVariables),
       compileFilter({ [primaryKey]: { _eq: id } }, schema),
     );
     const [rows] = await this.database.query(
@@ -378,7 +382,7 @@ export class ItemsService extends BaseService {
       filter.params,
     );
     const record = rows[0] ?? null;
-    if (record) await this.emitReadAction({ fields: normalizeFields(fields) }, [record], schema, { single: true });
+    if (record) await this.emitReadAction(query, [record], schema, { single: true });
     return record;
   }
 
