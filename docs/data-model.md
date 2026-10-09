@@ -247,6 +247,12 @@ GET /items/articles?fields=id,title,tags.id,tags.name
 
 The junction remains part of authorization: a caller must be allowed to read the source, junction and target data required for the projection.
 
+## Native system resource references
+
+The dynamic relation API supports relations between project collections. M2O, O2O and M2M declarations involving a native system collection such as `yuncms_users`, `yuncms_roles` or `yuncms_files` are rejected with HTTP 403 `SYSTEM_SCHEMA_READ_ONLY`, including for Administrators. YunCMS-generated `created_by` and `updated_by` references are managed by the platform and are not custom dynamic relations.
+
+For a custom user/role reference, store a UUID field and validate the reference through `UsersService` or `RolesService` in an extension using the caller's service options. These UUID fields have no dynamic foreign key or nested Items expansion. Files-backed controls can store native Files IDs; access to the file itself remains authorized through `FilesService` and the Files API. Generic Items CRUD cannot be used to access native system resources. See [Extensions](extensions.md) and [Files](files.md).
+
 ## Relation deletion behavior
 
 Choose foreign-key deletion behavior deliberately. For example, `SET NULL` preserves the child row when the parent is removed while clearing its relation. Destructive schema removal is separately guarded by schema-admin permissions and explicit destructive flags on relevant REST endpoints.

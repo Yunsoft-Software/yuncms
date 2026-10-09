@@ -67,6 +67,12 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
   let uploadedFileId;
   const signatureFileIds = [];
   let apiTokenId;
+  let restrictPublicReads = false;
+  const emitter = new HookEmitter();
+  emitter.registerFilter('items.query', (query, context) => {
+    if (!restrictPublicReads || context.collection !== names.articles || !context.accountability.public) return query;
+    return { ...query, filter: { title: { _eq: 'Hidden by query hook' } } };
+  });
 
   try {
     await bootstrapDatabase(pool);
@@ -96,7 +102,7 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
       config,
       serviceRegistry: createCoreServiceRegistry(),
       schemaCache: new SchemaCache(),
-      emitter: new HookEmitter(),
+      emitter,
       storage,
       logger: { info() {}, warn() {}, error() {} },
     });
@@ -199,6 +205,15 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
     });
     assert.equal(m2o.response.status, 201);
 
+    for (const target of ['yuncms_users', 'yuncms_roles', 'yuncms_files']) {
+      const protectedRelation = await request('/schema/relations/m2o', {
+        method: 'POST', token: accessToken,
+        body: { manyCollection: names.articles, manyField: 'author_id', oneCollection: target, onDelete: 'RESTRICT' },
+      });
+      assert.equal(protectedRelation.response.status, 403);
+      assert.equal(protectedRelation.payload.errors[0].code, 'SYSTEM_SCHEMA_READ_ONLY');
+    }
+
     const m2m = await request('/schema/relations/m2m', {
       method: 'POST',
       token: accessToken,
@@ -299,6 +314,21 @@ test('real MySQL/API flow covers auth, schema, content, public RBAC, files and t
     assert.equal(anonymousRead.payload.data.length, 1);
     assert.equal(anonymousRead.payload.data[0].title, 'Published');
     assert.equal(Object.hasOwn(anonymousRead.payload.data[0], 'author_id'), false);
+
+    const anonymousSingle = await request(`/items/${names.articles}/${published.payload.data.id}`);
+    assert.equal(anonymousSingle.response.status, 200);
+    assert.equal(anonymousSingle.payload.data.title, 'Published');
+    restrictPublicReads = true;
+    const hookFilteredList = await request(`/items/${names.articles}`);
+    assert.equal(hookFilteredList.response.status, 200);
+    assert.deepEqual(hookFilteredList.payload.data, []);
+    const hookFilteredSingle = await request(`/items/${names.articles}/${published.payload.data.id}`);
+    assert.equal(hookFilteredSingle.response.status, 404);
+    const unaffectedAdmin = await request(`/items/${names.articles}/${published.payload.data.id}`, { token: accessToken });
+    assert.equal(unaffectedAdmin.response.status, 200);
+    restrictPublicReads = false;
+    const nativeFilteredSingle = await request(`/items/${names.articles}/${draft.payload.data.id}`);
+    assert.equal(nativeFilteredSingle.response.status, 404);
 
     const anonymousWrite = await request(`/items/${names.articles}`, {
       method: 'POST', body: { title: 'Nope', status: 'published' },

@@ -14,6 +14,33 @@ function forbiddenDatabase() {
   };
 }
 
+test('dynamic M2O relations preserve system schema protection even for administrators', async () => {
+  for (const target of ['yuncms_users', 'yuncms_roles', 'yuncms_files']) {
+    const calls = [];
+    let released = false;
+    const connection = {
+      async query(sql, params) {
+        calls.push(sql);
+        if (sql.includes('GET_LOCK')) return [[{ acquired: 1 }]];
+        if (sql.includes('RELEASE_LOCK')) return [[{ released: 1 }]];
+        if (sql.includes('FROM yuncms_collections')) {
+          return [[{ collection: params[0], primary_key: 'id', system: params[0] === target ? 1 : 0 }]];
+        }
+        throw new Error(`Unexpected database access: ${sql}`);
+      },
+      release() { released = true; },
+    };
+    const service = new RelationsService({ ...adminOptions(), database: { async getConnection() { return connection; } } });
+    await assert.rejects(
+      service.createM2O({ manyCollection: 'memberships', manyField: 'user_id', oneCollection: target }),
+      (error) => error.code === 'SYSTEM_SCHEMA_READ_ONLY',
+    );
+    assert.equal(calls.some((sql) => /ALTER TABLE|INSERT|DELETE/.test(sql)), false);
+    assert.equal(released, true);
+    assert.equal(calls.some((sql) => sql.includes('RELEASE_LOCK')), true);
+  }
+});
+
 const publicOptions = () => ({
   accountability: createPublicAccountability(),
   database: forbiddenDatabase(),
