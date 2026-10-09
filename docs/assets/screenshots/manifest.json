@@ -1,7 +1,7 @@
 {
-  "yuncmsVersion": "0.1.25",
+  "yuncmsVersion": "0.1.26",
   "capturedAt": "2026-09-30",
-  "source": "Documentation images captured on 0.1.24 and revalidated against 0.1.25 authenticated desktop and mobile Studio; this release preserves the documented Studio workflows.",
+  "source": "Documentation images captured on 0.1.24 and revalidated in authenticated desktop and mobile Studio on 0.1.25. Studio UI source remains unchanged in 0.1.26; source-contract tests and the production build verify the documented workflows.",
   "files": [
     "studio-content.png",
     "studio-data-model.png",
@@ -11,5 +11,5 @@
     "studio-mobile-menu.png",
     "studio-automations.jpg"
   ],
-  "verifiedAt": "2026-10-06"
+  "verifiedAt": "2026-10-10"
 }
