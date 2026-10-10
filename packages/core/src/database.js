@@ -3,12 +3,14 @@ import mysql from 'mysql2/promise';
 export function createDatabasePool(config) {
   if (!config) throw new Error('Database config is required');
 
-  return mysql.createPool({
+  const pool = mysql.createPool({
     host: config.host,
     port: config.port,
     database: config.database,
     user: config.user,
     password: config.password,
+    timezone: 'Z',
+    dateStrings: ['DATE'],
     waitForConnections: true,
     connectionLimit: config.connectionLimit ?? 10,
     queueLimit: 0,
@@ -19,6 +21,16 @@ export function createDatabasePool(config) {
     multipleStatements: false,
     ssl: config.ssl ? { minVersion: 'TLSv1.2' } : undefined,
   });
+
+  pool.on('connection', (connection) => {
+    connection.query("SET SESSION time_zone = '+00:00'", (err) => {
+      if (err) {
+        connection.destroy(err);
+      }
+    });
+  });
+
+  return pool;
 }
 
 export async function pingDatabase(pool) {

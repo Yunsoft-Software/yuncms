@@ -10,6 +10,7 @@ import {
   RelationPicker,
   useConfirmDialog,
 } from '../components/index.js';
+import { formatDateFieldValue } from '../date-format.js';
 import { contentTableFields, defaultContentColumnKeys, isFileField, isImageField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
@@ -121,12 +122,9 @@ function renderValue(field, record, relationLookups, t, locale) {
     );
   }
   if (['date', 'datetime', 'timestamp'].includes(field.type)) {
-    const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) {
-      const formatter = new Intl.DateTimeFormat(locale === 'tr' ? 'tr-TR' : 'en-US', field.type === 'date'
-        ? { dateStyle: 'medium' }
-        : { dateStyle: 'medium', timeStyle: 'short' });
-      return <time className="content-value-date" dateTime={date.toISOString()}>{formatter.format(date)}</time>;
+    const formatted = formatDateFieldValue(field.type, value, locale);
+    if (formatted) {
+      return <time className="content-value-date" dateTime={formatted.dateTime}>{formatted.formatted}</time>;
     }
   }
   if (field.field === 'status' || field.field.endsWith('_status')) {

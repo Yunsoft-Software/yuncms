@@ -12,7 +12,12 @@ For versions that contain the managed-upgrade startup gate, `backup`, `update` a
 
 This startup gate is defense in depth, **not permission to leave the supervisor enabled**. A runtime older than the startup-gate feature does not know how to read the new lock. The one-time transition from such an old version therefore requires the supervisor to be fully stopped for the entire maintenance operation.
 
-Project maintenance identity is based on the physical project path, so symlink aliases to the same project resolve to the same operation lock.
+### Maintenance lock contract and layout
+
+- **Operating-system user and `TMPDIR`**: The YunCMS API and CLI operations must run under the same operating-system user and observe the same `TMPDIR`. If the CLI runs under a different user or with a mismatched `TMPDIR`, it will not be able to coordinate maintenance locks with the API.
+- **Per-user private layout**: Project maintenance locks reside in a private per-OS-user directory under the operating system temporary directory: `<tmpdir>/yuncms-update-locks-<uid>/<projectKey>.lock`. The directory is created with mode `0700` and the lock file with mode `0600`. On Unix, `<uid>` is derived from `process.getuid()`; on non-Unix systems, a deterministic hash of the username is used. Different Unix users sharing `/tmp` on the same host maintain separate, isolated lock directories without permission conflicts.
+- **Physical project identity**: Project maintenance identity is based on the canonical physical project path, so symlink aliases to the same project resolve to the same operation lock.
+- **Rolling upgrade & legacy compatibility**: When upgrading from releases prior to per-user isolation (such as 0.1.26, which used shared `<tmpdir>/yuncms-update-locks/`), YunCMS probes both legacy and new lock paths. An accessible active or malformed legacy lock continues to block API startup and prevents new CLI lock acquisitions without removing or overwriting the legacy lock. If reading the legacy lock returns `EACCES`, YunCMS inspects the legacy parent directory: if it is a non-symlink private directory (`0700`) owned by a foreign UID with no group or world traversal permissions, the foreign access denial is safely ignored; any inaccessible or insecure directory owned by the current user or exposing group/world traversal fails closed.
 
 YunCMS also holds a MySQL `GET_LOCK` maintenance lock for real backup/update/restore operations. This prevents two YunCMS maintenance commands from concurrently mutating the same database even when they were launched from different project directories. The lock connection is rechecked during the operation; ownership loss fails closed.
 
@@ -27,7 +32,7 @@ The project must:
 - use Node.js 24 LTS;
 - have `@yunsoft/yuncms` declared in project `package.json`;
 - have the package installed in project `node_modules`;
-- have `npm`, `mysqldump` and `mysql` available on `PATH`;
+- have native MySQL 8.4+ client tools (`mysqldump` and `mysql`) available on `PATH` (official MySQL client binaries; do not use MariaDB client tools, which can emit literal `INSERT` values for `STORED` or `VIRTUAL` generated columns such as `yuncms_roles.public_singleton` and trigger MySQL error 3105 on restore);
 - use a MySQL account that can dump the YunCMS database and perform the DDL YunCMS already requires for schema management;
 - use a database whose complete contents are owned/recoverable by this YunCMS deployment;
 - have enough local disk for the database dump, local Files/extensions/project metadata snapshot and safety headroom;
@@ -269,6 +274,10 @@ Only then does it reset current database tables/views and import the dump.
 
 When the backup contains `package-lock.json`, run `npm ci` after restore and before starting YunCMS. Manual restore replaces the recorded package files but does not mutate `node_modules`; this explicit reinstall makes the installed dependency graph match the restored runtime. If the snapshot contains only `package.json`, run `npm install` instead. The CLI prints the same reminder after a successful restore.
 
+### Legacy MariaDB dump compatibility note
+
+Both container deployments and host operators running npm installations require official native MySQL `mysqldump` and `mysql` client tools (8.4+). MariaDB 10.11 tools emit invalid literal `INSERT` syntax for generated columns such as `yuncms_roles.public_singleton`, causing MySQL `ERROR 3105` during restore; this cannot be bypassed merely with `--complete-insert` on MariaDB 10.11 or retroactively repaired by upgrading the client image later. Operators must recreate and verify fresh backups using native MySQL 8.4+ tools after upgrade.
+
 ## Starting production again
 
 A successful `yuncms update` verifies the new runtime and then stops that temporary process. Start YunCMS with the same production supervisor used before the maintenance window.
@@ -280,6 +289,26 @@ systemctl start my-yuncms.service
 ```
 
 YunCMS intentionally does not execute arbitrary shell/service-manager restart commands from the update command.
+
+## UTC deadline transition and migration 0022
+
+Migration `0022-utc-auth-deadlines` establishes strict UTC deadline evaluation across the authentication engine using MySQL's `UTC_TIMESTAMP(3)`.
+
+### Authentication credential cleanup
+
+When moving to UTC deadline evaluation, previously stored expiration timestamps that were recorded in a local timezone could be artificially extended by hours or days if evaluated directly against UTC. To eliminate this risk and enforce clean deadline semantics:
+
+- **Sessions (`yuncms_sessions`)**: All active sessions are revoked during the upgrade. Users sign in again to obtain fresh UTC-backed sessions.
+- **Pending action tokens (`yuncms_auth_tokens`)**: In-flight password-reset and email-verification links are cleared. Users request a new link if needed.
+- **OAuth transactions (`yuncms_auth_transactions`)**: In-flight external authentication handshakes are cleared.
+- **Expiring API tokens**: API tokens with an explicit expiration date (`expires_at IS NOT NULL`) are revoked and must be reissued by operators or users.
+- **Preserved credentials & data**: Non-expiring API tokens (`expires_at IS NULL`), user accounts, roles, permissions, and external identity links (`yuncms_auth_identities`) are preserved without modification.
+
+### Historical content DATETIME values
+
+YunCMS does **not** automatically rewrite historical content `DATETIME` or `TIMESTAMP` values in user collections during this migration.
+
+Because naive historical timestamps cannot be programmatically disambiguated (they may represent wall-clock time or UTC depending on how they were originally inserted), automatic alterations could corrupt application data. Operators whose user collections rely on historical local-time timestamps should review those fields independently to decide whether timezone normalization is required for their specific application domain.
 
 ## S3 note
 

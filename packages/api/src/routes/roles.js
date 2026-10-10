@@ -17,7 +17,7 @@ export function createRolesRouter() {
   const router = express.Router();
 
   router.get('/', async (req, res) => {
-    res.json({ data: await rolesService(req).readMany() });
+    res.json({ data: await rolesService(req).readMany(req.query) });
   });
 
   router.post('/', async (req, res) => {

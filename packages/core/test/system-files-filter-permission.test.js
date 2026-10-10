@@ -187,4 +187,16 @@ test('Files content outside a read filter is hidden and never reaches storage', 
     (error) => error.code === 'FILE_NOT_FOUND',
   );
   assert.equal(storageReads, 0);
+
+  await assert.rejects(
+    service.readContentInfo('private-file'),
+    (error) => error.code === 'FILE_NOT_FOUND',
+  );
+  assert.equal(storageReads, 0);
+
+  await assert.rejects(
+    service.readContentStream('private-file'),
+    (error) => error.code === 'FILE_NOT_FOUND',
+  );
+  assert.equal(storageReads, 0);
 });

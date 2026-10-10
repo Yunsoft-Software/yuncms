@@ -29,6 +29,7 @@ export class SingletonItemsService extends ItemsService {
   async createOne(payload = {}) {
     const schema = await this.getCollectionSchema();
     if (!schema.singleton) return super.createOne(payload);
+    await this.resolvePermission('create');
     return withAdvisoryLock(
       this.database,
       singletonLockName(this.collection),
@@ -43,6 +44,7 @@ export class SingletonItemsService extends ItemsService {
   async createMany(payloads = []) {
     const schema = await this.getCollectionSchema();
     if (!schema.singleton) return super.createMany(payloads);
+    await this.resolvePermission('create');
     if (!Array.isArray(payloads) || payloads.length !== 1) {
       throw singletonError('SINGLETON_BULK_CREATE_FORBIDDEN', 'Singleton collections accept exactly one create payload');
     }

@@ -1,7 +1,7 @@
 {
-  "yuncmsVersion": "0.1.26",
+  "yuncmsVersion": "0.1.27",
   "capturedAt": "2026-09-30",
-  "source": "Documentation images captured on 0.1.24 and revalidated in authenticated desktop and mobile Studio on 0.1.25. Studio UI source remains unchanged in 0.1.26; source-contract tests and the production build verify the documented workflows.",
+  "source": "Documentation images captured on 0.1.24; current 0.1.27 working-tree workflows revalidated 2026-10-10 in authenticated desktop and mobile Studio environments, preserving original capture provenance. Source-contract tests, production builds, and physical browser checks verify the documented workflows.",
   "files": [
     "studio-content.png",
     "studio-data-model.png",

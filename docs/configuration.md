@@ -36,6 +36,13 @@ YunCMS supports MySQL for its application database. Give the runtime database us
 
 `DB_CONNECTION_LIMIT` controls the mysql2 pool size for a process. Size this together with the number of application replicas and the MySQL server's connection budget.
 
+### Timezone handling
+
+YunCMS connects to MySQL with `timezone: 'Z'` and `dateStrings: ['DATE']`. In addition, every connection queues `SET SESSION time_zone = '+00:00'` on establishment.
+
+- `DATE` values are handled as exact calendar strings (`YYYY-MM-DD`). They never drift based on the Node server's host timezone or `TZ` environment variable.
+- `DATETIME(3)` and `TIMESTAMP(3)` values represent UTC instants. When API consumers submit timestamp strings bearing timezone offsets (e.g. `2026-10-10T15:30:00+03:00`), YunCMS normalizes them to UTC (`2026-10-10T12:30:00.000Z`) before persisting. Returned values are standard ISO strings in UTC.
+
 ## Redis shared state
 
 A single-process installation can use in-memory cache and rate-limit state. Multi-process/multi-replica deployments can move those stores to Redis.

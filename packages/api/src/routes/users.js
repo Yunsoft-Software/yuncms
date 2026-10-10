@@ -17,7 +17,7 @@ export function createUsersRouter() {
   const router = express.Router();
 
   router.get('/', async (req, res) => {
-    res.json({ data: await usersService(req).readMany() });
+    res.json({ data: await usersService(req).readMany(req.query) });
   });
 
   router.post('/', async (req, res) => {

@@ -77,8 +77,8 @@ export class SessionsService extends BaseService {
        INNER JOIN yuncms_users u ON u.id = s.user
        LEFT JOIN yuncms_roles r ON r.id = u.role
        WHERE s.access_token_hash = ?
-         AND s.access_expires_at > CURRENT_TIMESTAMP(3)
-         AND s.expires_at > CURRENT_TIMESTAMP(3)
+         AND s.access_expires_at > UTC_TIMESTAMP(3)
+         AND s.expires_at > UTC_TIMESTAMP(3)
          AND u.status = 'active'
        LIMIT 1`,
       [hash],
@@ -89,7 +89,7 @@ export class SessionsService extends BaseService {
     await this.database.query(
       `UPDATE yuncms_sessions s
        INNER JOIN yuncms_users u ON u.id = s.user
-       SET s.last_used_at = CURRENT_TIMESTAMP(3), u.last_access = CURRENT_TIMESTAMP(3)
+       SET s.last_used_at = UTC_TIMESTAMP(3), u.last_access = UTC_TIMESTAMP(3)
        WHERE s.id = ?`,
       [row.session_id],
     );
@@ -111,7 +111,7 @@ export class SessionsService extends BaseService {
        INNER JOIN yuncms_users u ON u.id = s.user
        LEFT JOIN yuncms_roles r ON r.id = u.role
        WHERE s.token_hash = ?
-         AND s.expires_at > CURRENT_TIMESTAMP(3)
+         AND s.expires_at > UTC_TIMESTAMP(3)
          AND u.status = 'active'
        LIMIT 1`,
       [oldHash],
@@ -126,7 +126,7 @@ export class SessionsService extends BaseService {
     const [result] = await this.database.query(
       `UPDATE yuncms_sessions
        SET token_hash = ?, access_token_hash = ?, access_expires_at = ?, expires_at = ?,
-           last_used_at = CURRENT_TIMESTAMP(3)
+           last_used_at = UTC_TIMESTAMP(3)
        WHERE id = ? AND token_hash = ?`,
       [
         refresh.hash,

@@ -279,6 +279,16 @@ A collection can be presented as a singleton when your application needs exactly
 
 Permissions still apply to the underlying collection and record.
 
+### Singleton authorization and creation contract
+
+Singleton collections enforce single-record cardinality at the application and service layer:
+
+- **Authorization checked first**: YunCMS evaluates the caller's `create` permission before checking collection occupancy or acquiring any advisory mutation locks.
+- **Consistent denial**: Unauthorized requests (such as public callers without create permission or read-only roles) receive HTTP 403 `FORBIDDEN` regardless of whether the singleton collection is empty or occupied. This prevents occupancy disclosure or unnecessary mutation lock contention.
+- **Bulk cardinality**: For authorized callers, singleton collections accept exactly one create payload. The native `ItemsService.createMany()` method rejects bulk creation attempts on singleton collections with `SINGLETON_BULK_CREATE_FORBIDDEN` if cardinality is not exactly 1.
+- **Single REST creation**: An authorized caller creating a singleton item via `POST /items/:collection` (`createOne`) succeeds when the collection is empty.
+- **Concurrency serialization**: Once authorized, a MySQL advisory lock serializes concurrent creation attempts. If the singleton collection is already occupied, authorized callers receive HTTP 409 `SINGLETON_ITEM_EXISTS`.
+
 ## Collection visibility and navigation
 
 Collection visibility in Studio is presentation, not authorization. Hiding a collection from navigation does not grant or revoke API access; roles and permissions remain authoritative.

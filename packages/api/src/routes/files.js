@@ -1,5 +1,7 @@
+import { pipeline } from 'node:stream/promises';
 import express from 'express';
 
+import { evaluateRangeRequest } from '../byte-range.js';
 import { serviceOptionsFromRequest } from '../service-options.js';
 
 function filesService(req) {
@@ -34,6 +36,52 @@ function attachmentHeader(filename) {
     .replace(/[\r\n]/g, '')
     .replace(/["\\]/g, '_');
   return `attachment; filename="${safe.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(safe)}`;
+}
+
+async function pipeStreamToResponse(stream, res) {
+  let upstreamDestroyed = false;
+  const destroyUpstream = () => {
+    if (upstreamDestroyed) return;
+    upstreamDestroyed = true;
+    if (stream && typeof stream.destroy === 'function' && !stream.destroyed) {
+      try {
+        stream.destroy();
+      } catch {}
+    }
+  };
+
+  const onClose = () => {
+    if (!res.writableEnded) {
+      destroyUpstream();
+    }
+  };
+
+  res.on('close', onClose);
+
+  try {
+    await pipeline(stream, res);
+  } catch (error) {
+    destroyUpstream();
+    if (res.headersSent || res.destroyed) {
+      return;
+    }
+    throw error;
+  } finally {
+    res.off('close', onClose);
+    if (!res.writableEnded) {
+      destroyUpstream();
+    }
+  }
+}
+
+function clearFileHeaders(res) {
+  res.removeHeader('accept-ranges');
+  res.removeHeader('content-type');
+  res.removeHeader('content-disposition');
+  res.removeHeader('content-length');
+  res.removeHeader('content-range');
+  res.removeHeader('etag');
+  res.removeHeader('last-modified');
 }
 
 export function createFilesRouter({ maxUploadBytes = 25 * 1024 * 1024 } = {}) {
@@ -74,12 +122,92 @@ export function createFilesRouter({ maxUploadBytes = 25 * 1024 * 1024 } = {}) {
     res.json({ data });
   });
 
+  router.head('/:id/content', async (req, res) => {
+    const info = await filesService(req).readContentInfo(req.params.id);
+    res.set('etag', info.etag);
+    if (info.modifiedAt) {
+      res.set('last-modified', info.modifiedAt.toUTCString());
+    }
+    res.set('accept-ranges', 'bytes');
+    res.set('content-type', info.file.mimetype || 'application/octet-stream');
+    res.set('content-disposition', attachmentHeader(info.file.filename_download));
+    if (req.fresh) {
+      return res.status(304).end();
+    }
+    res.set('content-length', String(info.size));
+    res.status(200).end();
+  });
+
   router.get('/:id/content', async (req, res) => {
-    const result = await filesService(req).readContent(req.params.id);
-    res.set('content-type', result.file.mimetype || 'application/octet-stream');
-    res.set('content-length', String(result.contents.byteLength));
-    res.set('content-disposition', attachmentHeader(result.file.filename_download));
-    res.send(result.contents);
+    const service = filesService(req);
+    const info = await service.readContentInfo(req.params.id);
+
+    res.set('etag', info.etag);
+    if (info.modifiedAt) {
+      res.set('last-modified', info.modifiedAt.toUTCString());
+    }
+
+    if (req.fresh) {
+      res.set('accept-ranges', 'bytes');
+      res.set('content-type', info.file.mimetype || 'application/octet-stream');
+      res.set('content-disposition', attachmentHeader(info.file.filename_download));
+      return res.status(304).end();
+    }
+
+    if (req.method === 'HEAD') {
+      res.set('accept-ranges', 'bytes');
+      res.set('content-type', info.file.mimetype || 'application/octet-stream');
+      res.set('content-disposition', attachmentHeader(info.file.filename_download));
+      res.set('content-length', String(info.size));
+      return res.status(200).end();
+    }
+
+    const evaluation = evaluateRangeRequest({
+      rangeHeader: req.get('range'),
+      ifRangeHeader: req.get('if-range'),
+      size: info.size,
+      etag: info.etag,
+      modifiedAt: info.modifiedAt,
+    });
+
+    if (evaluation.status === 416) {
+      res.set('accept-ranges', 'bytes');
+      res.set('content-type', info.file.mimetype || 'application/octet-stream');
+      res.set('content-disposition', attachmentHeader(info.file.filename_download));
+      res.set('content-range', evaluation.contentRange);
+      res.set('content-length', '0');
+      return res.status(416).end();
+    }
+
+    let streamResult;
+    try {
+      if (evaluation.status === 206) {
+        streamResult = await service.readContentStream(req.params.id, {
+          start: evaluation.start,
+          end: evaluation.end,
+        });
+      } else {
+        streamResult = await service.readContentStream(req.params.id);
+      }
+    } catch (streamError) {
+      clearFileHeaders(res);
+      throw streamError;
+    }
+
+    res.set('accept-ranges', 'bytes');
+    res.set('content-type', info.file.mimetype || 'application/octet-stream');
+    res.set('content-disposition', attachmentHeader(info.file.filename_download));
+
+    if (evaluation.status === 206) {
+      res.status(206);
+      res.set('content-range', evaluation.contentRange);
+      res.set('content-length', String(evaluation.contentLength));
+      return pipeStreamToResponse(streamResult.stream, res);
+    }
+
+    res.status(200);
+    res.set('content-length', String(info.size));
+    return pipeStreamToResponse(streamResult.stream, res);
   });
 
   router.patch('/:id', async (req, res) => {

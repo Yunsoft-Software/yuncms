@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
+FROM mysql:8.4 AS mysql-client
+
 FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS studio-build
 
 WORKDIR /opt/yuncms
@@ -51,10 +53,30 @@ LABEL org.opencontainers.image.title="YunCMS" \
   org.opencontainers.image.revision="${VCS_REF}"
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends default-mysql-client tini \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libncurses6 \
+    libssl3 \
+    libstdc++6 \
+    libtinfo6 \
+    tini \
+    zlib1g \
   && rm -rf /var/lib/apt/lists/* \
   && mkdir -p /data/uploads /data/extensions \
   && chown -R node:node /data
+
+COPY --from=mysql-client /usr/bin/mysql /usr/bin/mysql
+COPY --from=mysql-client /usr/bin/mysqldump /usr/bin/mysqldump
+COPY --from=mysql-client /usr/share/doc/mysql-community-server-minimal/LICENSE /usr/share/doc/yuncms-mysql-client/LICENSE
+
+RUN ldd /usr/bin/mysql \
+  && ldd /usr/bin/mysqldump \
+  && mysql --version \
+  && mysqldump --version \
+  && mysql --version | grep -qi "mysql" \
+  && ! mysql --version | grep -qi "mariadb" \
+  && mysqldump --version | grep -qi "mysql" \
+  && ! mysqldump --version | grep -qi "mariadb"
 
 WORKDIR /data
 

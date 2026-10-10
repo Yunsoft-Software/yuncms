@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
+import {
+  buildSystemListQuery,
+  ROLE_SAFE_SELECT_COLUMNS,
+  ROLE_SYSTEM_SEARCH_SCHEMA,
+} from '../system-list-query.js';
 import { BaseService } from './base-service.js';
 import { resolveSystemResourceAccess } from './system-resource-access.js';
 
@@ -48,13 +53,15 @@ export class RolesService extends BaseService {
     return rows[0] ?? null;
   }
 
-  async readMany() {
+  async readMany(query = {}) {
     await resolveSystemResourceAccess(this, 'read', 'yuncms_roles');
-    const [rows] = await this.database.query(
-      `SELECT id, name, description, admin, public, created_at, updated_at
-       FROM yuncms_roles
-       ORDER BY name ASC`,
-    );
+    const { sql, params } = buildSystemListQuery(query, {
+      table: 'yuncms_roles',
+      columns: ROLE_SAFE_SELECT_COLUMNS,
+      orderBy: 'name ASC, id ASC',
+      searchSchema: ROLE_SYSTEM_SEARCH_SCHEMA,
+    });
+    const [rows] = await this.database.query(sql, params);
     return rows;
   }
 
