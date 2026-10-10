@@ -76,6 +76,22 @@ export class S3StorageDriver {
     return bodyToBuffer(response.Body);
   }
 
+  async getStream(key, { start, end } = {}) {
+    const safeKey = assertStorageKey(key);
+    const commandInput = {
+      Bucket: this.bucket,
+      Key: safeKey,
+    };
+    if (typeof end === 'number') {
+      const rangeStart = typeof start === 'number' ? start : 0;
+      commandInput.Range = `bytes=${rangeStart}-${end}`;
+    } else if (typeof start === 'number') {
+      commandInput.Range = `bytes=${start}-`;
+    }
+    const response = await this.client.send(new GetObjectCommand(commandInput));
+    return response.Body;
+  }
+
   async stat(key) {
     const safeKey = assertStorageKey(key);
     try {

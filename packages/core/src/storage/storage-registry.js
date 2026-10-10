@@ -4,6 +4,9 @@ function assertDriver(name, driver) {
       throw new Error(`Storage driver ${name} must implement ${method}()`);
     }
   }
+  if (driver.getStream != null && typeof driver.getStream !== 'function') {
+    throw new Error(`Storage driver ${name} getStream must be a function when provided`);
+  }
   return driver;
 }
 

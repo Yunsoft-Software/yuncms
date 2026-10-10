@@ -1,3 +1,4 @@
+import { createReadStream } from 'node:fs';
 import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 
@@ -44,6 +45,17 @@ export class LocalStorageDriver {
 
   async get(key) {
     return readFile(this.pathFor(key));
+  }
+
+  async getStream(key, { start, end } = {}) {
+    const path = this.pathFor(key);
+    const options = { highWaterMark: 64 * 1024 };
+    if (typeof start === 'number') options.start = start;
+    if (typeof end === 'number') {
+      options.end = end;
+      if (typeof start !== 'number') options.start = 0;
+    }
+    return createReadStream(path, options);
   }
 
   async stat(key) {

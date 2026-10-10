@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Readable } from 'node:stream';
 
 import { compileFilter } from '../query.js';
 import { BaseService } from './base-service.js';
@@ -71,6 +72,26 @@ function decodeJson(value) {
 
 function normalizeRow(row) {
   return row ? { ...row, metadata: decodeJson(row.metadata) } : null;
+}
+
+function normalizeModifiedAt(rawDate) {
+  if (!rawDate) return null;
+  const date = rawDate instanceof Date ? rawDate : new Date(rawDate);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+const STRONG_ETAG_PATTERN = /^"[!\x23-\x7e\x80-\xff]*"$/;
+
+function isValidStrongEtag(value) {
+  return typeof value === 'string' && STRONG_ETAG_PATTERN.test(value);
+}
+
+function resolveContentEtag(file, size, modifiedAt, providerEtag) {
+  if (isValidStrongEtag(providerEtag)) {
+    return providerEtag;
+  }
+  const mtimeMs = modifiedAt ? modifiedAt.getTime() : 0;
+  return `"${file.id}-${size.toString(16)}-${mtimeMs.toString(16)}"`;
 }
 
 export class FilesService extends BaseService {
@@ -229,6 +250,91 @@ export class FilesService extends BaseService {
     const driver = this.storage.get(file.storage);
     const contents = await driver.get(file.filename_disk);
     return { file, contents };
+  }
+
+  async readContentInfo(id) {
+    const permission = await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
+    const file = await this.#readOneAuthorized(id, permission);
+    if (!file) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+    const driver = this.storage.get(file.storage);
+    const stat = await driver.stat(file.filename_disk);
+    if (!stat) throw fileError('FILE_NOT_FOUND', `File content missing for file: ${id}`);
+    const size = Number(stat.size);
+    if (!Number.isSafeInteger(size) || size < 0) {
+      throw fileError('INVALID_FILE_SIZE', `Physical file size is invalid: ${stat.size}`);
+    }
+    const modifiedAt = normalizeModifiedAt(stat.modifiedAt ?? file.uploaded_at);
+    const etag = resolveContentEtag(file, size, modifiedAt, stat.etag);
+    return {
+      file,
+      size,
+      modifiedAt,
+      etag,
+    };
+  }
+
+  async readContentStream(id, { start, end } = {}) {
+    const permission = await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
+    const file = await this.#readOneAuthorized(id, permission);
+    if (!file) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+    const driver = this.storage.get(file.storage);
+    const stat = await driver.stat(file.filename_disk);
+    if (!stat) throw fileError('FILE_NOT_FOUND', `File content missing for file: ${id}`);
+    const size = Number(stat.size);
+    if (!Number.isSafeInteger(size) || size < 0) {
+      throw fileError('INVALID_FILE_SIZE', `Physical file size is invalid: ${stat.size}`);
+    }
+
+    const rangeStart = typeof start === 'number' ? start : 0;
+    if (start !== undefined) {
+      if (!Number.isSafeInteger(start) || start < 0) {
+        throw fileError('INVALID_RANGE', 'Range start must be a non-negative integer');
+      }
+      if (size === 0 || start >= size) {
+        throw fileError('INVALID_RANGE', 'Range start is out of bounds');
+      }
+    }
+
+    if (end !== undefined) {
+      if (!Number.isSafeInteger(end) || end < rangeStart) {
+        throw fileError('INVALID_RANGE', 'Range end must be greater than or equal to start');
+      }
+      if (size === 0 || end >= size) {
+        throw fileError('INVALID_RANGE', 'Range end is out of bounds');
+      }
+    }
+
+    let stream;
+    if (typeof driver.getStream === 'function') {
+      stream = await driver.getStream(file.filename_disk, { start, end });
+      if (!stream) throw fileError('FILE_NOT_FOUND', `File content missing for file: ${id}`);
+      if (!(stream instanceof Readable)) {
+        throw fileError('INVALID_STREAM', 'Storage getStream must return a Node Readable stream');
+      }
+    } else {
+      const raw = await driver.get(file.filename_disk);
+      if (!Buffer.isBuffer(raw) && !(raw instanceof Uint8Array)) {
+        throw fileError('INVALID_FILE_CONTENT', 'Storage get must return Buffer or Uint8Array');
+      }
+      const buffer = Buffer.isBuffer(raw)
+        ? raw
+        : Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength);
+      const slice = typeof end === 'number'
+        ? buffer.subarray(rangeStart, end + 1)
+        : (typeof start === 'number' ? buffer.subarray(start) : buffer);
+      stream = Readable.from([slice]);
+    }
+
+    const modifiedAt = normalizeModifiedAt(stat.modifiedAt ?? file.uploaded_at);
+    const etag = resolveContentEtag(file, size, modifiedAt, stat.etag);
+
+    return {
+      file,
+      stream,
+      size,
+      modifiedAt,
+      etag,
+    };
   }
 
   async updateOne(id, patch = {}) {

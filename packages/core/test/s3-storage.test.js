@@ -89,3 +89,42 @@ test('S3 storage driver rejects unsafe object keys before SDK call', async () =>
   );
   assert.equal(client.commands.length, 0);
 });
+
+test('S3 storage driver getStream issues GetObjectCommand with Range and keeps body streamed', async () => {
+  const fakeStream = {
+    [Symbol.asyncIterator]: async function* () {
+      yield Buffer.from('chunk');
+    },
+    pipe() {},
+  };
+  const client = new FakeS3Client([
+    { Body: fakeStream },
+    { Body: fakeStream },
+    { Body: fakeStream },
+    { Body: fakeStream },
+  ]);
+  const driver = new S3StorageDriver({ bucket: 'bucket', client });
+  const key = '550e8400-e29b-41d4-a716-446655440000';
+
+  // Subrange start and end
+  const stream1 = await driver.getStream(key, { start: 10, end: 20 });
+  assert.equal(client.commands[0].input.Bucket, 'bucket');
+  assert.equal(client.commands[0].input.Key, key);
+  assert.equal(client.commands[0].input.Range, 'bytes=10-20');
+  assert.equal(stream1, fakeStream); // returned directly without buffering
+
+  // Open-ended subrange start
+  const stream2 = await driver.getStream(key, { start: 50 });
+  assert.equal(client.commands[1].input.Range, 'bytes=50-');
+  assert.equal(stream2, fakeStream);
+
+  // Full stream (no range)
+  const stream3 = await driver.getStream(key);
+  assert.equal(client.commands[2].input.Range, undefined);
+  assert.equal(stream3, fakeStream);
+
+  // End-only subrange { end: 3 }
+  const stream4 = await driver.getStream(key, { end: 3 });
+  assert.equal(client.commands[3].input.Range, 'bytes=0-3');
+  assert.equal(stream4, fakeStream);
+});

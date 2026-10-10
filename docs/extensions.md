@@ -319,6 +319,33 @@ Operational rules:
 - use YunCMS services instead of direct SQL for normal project-data operations so permissions, hooks and schema behavior remain consistent;
 - avoid synchronous/blocking work that would stall the API process.
 
+# Storage contract
+
+Storage drivers provide the binary persistence layer used by `FilesService`. Custom drivers implement the storage interface:
+
+```js
+class CustomStorageDriver {
+  async put(key, contents) {} // stores Buffer/Uint8Array
+  async get(key) {}          // returns Buffer
+  async delete(key) {}       // deletes object
+  async stat(key) {}         // returns { key, size, modifiedAt } or null
+  async getSignedUrl(key) {} // returns string or null
+  // Optional:
+  async getStream(key, { start, end } = {}) {} // returns Readable stream
+}
+```
+
+### Streaming and fallback buffering
+
+Built-in storage drivers implement streaming directly:
+- `LocalStorageDriver` uses Node's `fs.createReadStream` with bounded chunk buffers (`highWaterMark`) and optional inclusive `{ start, end }`.
+- `S3StorageDriver` passes byte ranges to `GetObjectCommand` via AWS SDK's `Range` header, returning the Node `Readable` body directly without memory buffering.
+
+Custom and legacy storage drivers are **not required** to implement `getStream()`:
+- When implemented, `getStream()` must return a Node `Readable` stream.
+- When `getStream()` is omitted, `FilesService.readContentStream()` automatically falls back to buffering via `driver.get()` and streams the full buffer or subrange slice (`fullBuffer.subarray(start, end + 1)`) as a byte stream through `Readable.from()`.
+- Metadata queries (`readContentInfo()`, HTTP `HEAD`) use `driver.stat()` and never open or buffer the file body.
+
 ## Related guides
 
 - [REST API](rest-api.md)
