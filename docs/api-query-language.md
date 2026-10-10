@@ -350,6 +350,21 @@ sort=-created_at,title
 
 Sort fields must exist and be readable. Relation-path sorting is not accepted.
 
+### Two-phase sorting for large fields
+
+When a non-aggregate collection query combines explicit `sort` with selected `json` or `text` fields (such as full-collection reads `fields=*`, omitted `fields`, or explicit projection containing large fields), YunCMS automatically performs a two-phase execution:
+
+1. **Identifier-only sort phase**: YunCMS first selects only the primary key column alongside all caller, permission, and search filters, applying the requested `sort`, `limit`, and `offset`. Because large payload columns are excluded from MySQL's sort buffer during filesort, this avoids sort memory exhaustion (such as `ER_OUT_OF_SORTMEMORY`) when sorting collections containing large JSON documents or lengthy text entries.
+2. **Materialization phase**: YunCMS fetches the requested projection for the bounded primary keys from the first phase without SQL `ORDER BY` or pagination, reapplying the same compiled filters. Rows are reordered in memory to maintain the exact sort order from the first phase.
+
+If the primary key was not requested in `fields` or is not permitted by role permissions, YunCMS strips the internal primary key before returning rows or emitting `items.read` action events. When an empty page is returned by the first phase, the materialization query is skipped entirely.
+
+Queries selecting only compact scalar fields (no `json` or `text`) and queries without an explicit `sort` execute through the single-query path directly.
+
+### Explicit field projection guidance
+
+For optimal performance and minimal memory usage, API consumers should explicitly project only the fields necessary for listing or index views (for example, `fields=id,title,status`) rather than requesting full records (`fields=*`) on collections with large JSON or text fields. Omitting large fields from sorted queries allows YunCMS to run a single database query and bypass the secondary materialization query entirely.
+
 ## Pagination
 
 ```text

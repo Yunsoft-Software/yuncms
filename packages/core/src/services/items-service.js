@@ -298,10 +298,65 @@ export class ItemsService extends BaseService {
     const requestedFields = normalizeFields(query.fields);
     const selected = compileSelectFields(requestedFields, accessSchema);
     const sortSql = compileSort(query.sort, accessSchema);
-    const [rows] = await this.database.query(
-      `SELECT ${selected.sql} FROM ${table}${filter.sql}${sortSql} LIMIT ? OFFSET ?`,
-      [...filter.params, query.limit, query.offset],
-    );
+    const hasExplicitSort = Boolean(query.sort && query.sort.length > 0);
+    const hasLargeField = selected.fields.some((fieldName) => {
+      const fieldType = accessSchema.fields[fieldName]?.type ?? schema.fields[fieldName]?.type;
+      return fieldType === 'json' || fieldType === 'text';
+    });
+
+    let rows;
+
+    if (hasExplicitSort && hasLargeField) {
+      const primaryKey = schema.primary_key;
+      const pkSql = quoteIdentifier(primaryKey, 'primary key');
+      const [idRows] = await this.database.query(
+        `SELECT ${pkSql} FROM ${table}${filter.sql}${sortSql} LIMIT ? OFFSET ?`,
+        [...filter.params, query.limit, query.offset],
+      );
+
+      const pageIds = idRows.map((row) => row[primaryKey]).filter((id) => id != null);
+      rows = [];
+
+      if (pageIds.length > 0) {
+        const primaryKeyRequestedAndAllowed = selected.fields.includes(primaryKey);
+        const materializationSql = primaryKeyRequestedAndAllowed
+          ? selected.sql
+          : `${selected.sql}, ${pkSql}`;
+        const idFilter = {
+          sql: ` WHERE ${pkSql} IN (${pageIds.map(() => '?').join(', ')})`,
+          params: pageIds,
+        };
+        const secondFilter = combineCompiledFilters(filter, idFilter);
+        const [materializedRows] = await this.database.query(
+          `SELECT ${materializationSql} FROM ${table}${secondFilter.sql}`,
+          secondFilter.params,
+        );
+
+        const rowMap = new Map();
+        for (const row of materializedRows) {
+          rowMap.set(row[primaryKey], row);
+        }
+
+        for (const id of pageIds) {
+          const row = rowMap.get(id);
+          if (row) {
+            if (!primaryKeyRequestedAndAllowed) {
+              const { [primaryKey]: _ignored, ...rest } = row;
+              rows.push(rest);
+            } else {
+              rows.push(row);
+            }
+          }
+        }
+      }
+    } else {
+      const [resultRows] = await this.database.query(
+        `SELECT ${selected.sql} FROM ${table}${filter.sql}${sortSql} LIMIT ? OFFSET ?`,
+        [...filter.params, query.limit, query.offset],
+      );
+      rows = resultRows;
+    }
+
     const [countRows] = await this.database.query(
       `SELECT COUNT(*) AS total_count FROM ${table}${filter.sql}`,
       filter.params,
