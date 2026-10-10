@@ -74,10 +74,35 @@ test('real MySQL accepts ISO datetime filters for reads and strict bulk mutation
     await assert.rejects(items.deleteMany({ at: { _lt: '2026-02-30T00:00:00Z' } }), (error) => error.code === 'INVALID_QUERY');
     assert.equal((await items.readMany()).length, 1);
   } finally {
-    if (roleId) await pool.query('DELETE FROM yuncms_permissions WHERE role = ?', [roleId]);
-    if (roleId) await roles.deleteOne(roleId);
-    await collections.deleteOne(collection).catch(() => {});
-    await closeDatabasePool(pool);
+    const cleanupErrors = [];
+    if (roleId) {
+      try {
+        await pool.query('DELETE FROM yuncms_permissions WHERE role = ?', [roleId]);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (roleId) {
+      try {
+        await roles.deleteOne(roleId);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    try {
+      await collections.deleteOne(collection, { destructive: true });
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+    try {
+      await closeDatabasePool(pool);
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+    if (cleanupErrors.length > 0) {
+      if (cleanupErrors.length === 1) throw cleanupErrors[0];
+      throw new AggregateError(cleanupErrors, `Cleanup failed with ${cleanupErrors.length} error(s)`);
+    }
   }
 });
 

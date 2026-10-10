@@ -144,13 +144,80 @@ test('real MySQL: AI automations preserve permissions, queue/restart/rollback bo
     const ownerToken = await login(ownerEmail, 'Disposable-Ai-Owner-9417!');
     assert.equal((await fetch(`${origin}/automations`, { headers: { authorization: `Bearer ${ownerToken}` } })).status, 200);
   } finally {
-    if (server) await new Promise((resolve) => server.close(resolve));
-    if (rule) await database.query('DELETE FROM yuncms_ai_automations WHERE id = ?', [rule.id]);
-    await collections.deleteOne(collection).catch(() => {});
-    if (actor) await users.deleteOne(actor.id).catch(() => {});
-    if (role) await roles.deleteOne(role.id).catch(() => {});
-    if (owner) await users.deleteOne(owner.id).catch(() => {});
-    if (ownerRole) await roles.deleteOne(ownerRole.id).catch(() => {});
-    await closeDatabasePool(database);
+    const cleanupErrors = [];
+    if (server) {
+      try {
+        await new Promise((resolve, reject) => {
+          server.close((error) => (error ? reject(error) : resolve()));
+        });
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (rule) {
+      try {
+        await database.query('DELETE FROM yuncms_ai_automations WHERE id = ?', [rule.id]);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    try {
+      await collections.deleteOne(collection, { destructive: true });
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+    if (actor) {
+      try {
+        await users.deleteOne(actor.id);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (role) {
+      try {
+        await roles.deleteOne(role.id);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (owner) {
+      try {
+        await users.deleteOne(owner.id);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    // Native V1 RolesService.deleteOne deliberately rejects deleting administrator roles (PROTECTED_ROLE),
+    // and V1 provides no admin demotion operation. For disposable integration test fixture teardown only,
+    // explicitly remove the synthetic admin role via SQL after verifying synthetic ownership and zero remaining users.
+    if (ownerRole?.id) {
+      try {
+        if (!ownerRole.name?.startsWith('AI Owner ') || !ownerRole.admin) {
+          throw new Error(`Untracked or non-synthetic admin role encountered during teardown: ${ownerRole.name}`);
+        }
+        const [remainingUsers] = await database.query(
+          'SELECT COUNT(*) AS count FROM yuncms_users WHERE role = ?',
+          [ownerRole.id],
+        );
+        if (Number(remainingUsers?.[0]?.count ?? 0) > 0) {
+          throw new Error(`Cannot teardown synthetic admin role ${ownerRole.id} while fixture users remain attached`);
+        }
+        await database.query(
+          'DELETE FROM yuncms_roles WHERE id = ? AND name = ? AND admin = 1',
+          [ownerRole.id, ownerRole.name],
+        );
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    try {
+      await closeDatabasePool(database);
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+    if (cleanupErrors.length > 0) {
+      if (cleanupErrors.length === 1) throw cleanupErrors[0];
+      throw new AggregateError(cleanupErrors, `Cleanup failed with ${cleanupErrors.length} error(s)`);
+    }
   }
 });
