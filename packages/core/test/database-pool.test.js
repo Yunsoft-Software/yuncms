@@ -65,6 +65,7 @@ test('wire server: pool connection fails closed when SET SESSION time_zone fails
       capabilityFlags: 0xffffff,
       authCallback: (params, cb) => {
         cb(null);
+        conn.sequenceId = 0;
       },
     });
 
@@ -90,6 +91,17 @@ test('wire server: pool connection fails closed when SET SESSION time_zone fails
     database: 'yuncms_wire_test',
     user: 'test_user',
     password: '',
+  });
+
+  let destroyedCause = null;
+  pool.pool.on('connection', (clientConn) => {
+    const originalDestroy = clientConn.destroy.bind(clientConn);
+    clientConn.destroy = (err) => {
+      if (err) {
+        destroyedCause = err;
+      }
+      return originalDestroy(err);
+    };
   });
 
   let timer;
@@ -132,6 +144,9 @@ test('wire server: pool connection fails closed when SET SESSION time_zone fails
     'WIRE_QUERY_TIMEOUT',
     'Rejection must come from pool/connection failure, not from wire query timeout',
   );
+  assert.ok(destroyedCause, 'Client connection must be destroyed with error');
+  assert.equal(destroyedCause.errno, 1298, 'Destroy cause errno must be 1298');
+  assert.equal(destroyedCause.code, 'ER_UNKNOWN_TIME_ZONE', 'Destroy cause code must be ER_UNKNOWN_TIME_ZONE');
   assert.equal(
     receivedQueries.includes('SELECT 1 AS probe_unreachable'),
     false,
