@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
 import { hashPassword } from '../auth/password.js';
+import {
+  buildSystemListQuery,
+  USER_SAFE_SELECT_COLUMNS,
+  USER_SYSTEM_SEARCH_SCHEMA,
+} from '../system-list-query.js';
 import { withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { resolveSystemResourceAccess } from './system-resource-access.js';
@@ -118,13 +123,15 @@ export class UsersService extends BaseService {
     return rows[0] ?? null;
   }
 
-  async readMany() {
+  async readMany(query = {}) {
     await resolveSystemResourceAccess(this, 'read', 'yuncms_users');
-    const [rows] = await this.database.query(
-      `SELECT id, email, role, status, email_verified_at, last_access, created_at, updated_at
-       FROM yuncms_users
-       ORDER BY email ASC`,
-    );
+    const { sql, params } = buildSystemListQuery(query, {
+      table: 'yuncms_users',
+      columns: USER_SAFE_SELECT_COLUMNS,
+      orderBy: 'email ASC, id ASC',
+      searchSchema: USER_SYSTEM_SEARCH_SCHEMA,
+    });
+    const [rows] = await this.database.query(sql, params);
     return rows;
   }
 

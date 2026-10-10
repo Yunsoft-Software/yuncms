@@ -427,6 +427,36 @@ DELETE /users/:id
 
 Management-created accounts are treated as verified management users. Delegated user-management permissions still enforce protected Administrator/Public role invariants.
 
+### Query parameters (`GET /users`)
+
+`GET /users` supports bounded pagination and search queries while maintaining backward compatibility with Studio client-side paging:
+
+- **Empty query compatibility contract**: When called with no query parameters (`GET /users`), the endpoint returns the unbounded user list, preserving full-list compatibility for Studio client-side paging.
+- **Bounded mode**: Providing any query parameter activates bounded mode with pagination and search limits.
+- **Supported parameters**:
+  - `limit`: Integer, defaults to `100`, minimum `1`, maximum `500`.
+  - `offset`: Integer, defaults to `0`, minimum `0`, maximum `1000000`.
+  - `search`: String, maximum `200` characters. Performs a substring search across user `email`. Special characters (`%`, `_`, `\`) are escaped and matched literally.
+- **Validation**: Unknown keys (such as `fields`, `filter`, `sort`), array/object/boolean parameters, negative numbers, and out-of-range values are rejected with HTTP 400 (`INVALID_QUERY`).
+- **Stable ordering**: Results are consistently ordered by `email ASC, id ASC`.
+- **Safe output**: User listings never expose `password_hash`, tokens, or credentials.
+
+Example URLs:
+
+```bash
+# Full list (unbounded, Studio compatibility)
+curl 'http://localhost:3008/users' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+
+# Bounded pagination
+curl 'http://localhost:3008/users?limit=25&offset=0' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+
+# Search by email
+curl 'http://localhost:3008/users?search=admin@example.com' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
+
 # Roles and permissions
 
 ```text
@@ -448,6 +478,35 @@ A permission is scoped to a role, collection/resource and action (`read`, `creat
 Selected system resources such as users, files and roles can be explicitly delegated through their dedicated services while protected resource invariants remain enforced.
 
 See [`permissions.md`](permissions.md).
+
+### Query parameters (`GET /roles`)
+
+`GET /roles` supports bounded pagination and search queries:
+
+- **Empty query compatibility contract**: An empty query (`GET /roles`) preserves the current unbounded list for Studio client-side paging compatibility.
+- **Bounded mode**: Any query parameter activates bounded mode.
+- **Supported parameters**:
+  - `limit`: Integer, defaults to `100`, minimum `1`, maximum `500`.
+  - `offset`: Integer, defaults to `0`, minimum `0`, maximum `1000000`.
+  - `search`: String, maximum `200` characters. Searches across role `name` and `description`. Special characters (`%`, `_`, `\`) are escaped and matched literally.
+- **Validation**: Unknown query keys, non-string searches, arrays/objects/booleans, and out-of-range values return HTTP 400 (`INVALID_QUERY`).
+- **Stable ordering**: Results are consistently ordered by `name ASC, id ASC`.
+
+Example URLs:
+
+```bash
+# Full list (unbounded)
+curl 'http://localhost:3008/roles' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+
+# Bounded pagination
+curl 'http://localhost:3008/roles?limit=50&offset=0' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+
+# Search by name or description
+curl 'http://localhost:3008/roles?search=editor' \
+  -H 'Authorization: Bearer YOUR_TOKEN'
+```
 
 # Files
 
