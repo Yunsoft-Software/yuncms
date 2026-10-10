@@ -14,6 +14,7 @@ async function readRootFile(path) {
 test('Docker runtime is a Node 24 non-root image with the complete YunCMS CLI contract', async () => {
   const dockerfile = await readRootFile('Dockerfile');
 
+  assert.match(dockerfile, /^FROM mysql:8\.4 AS mysql-client$/m);
   assert.match(dockerfile, /^FROM node:24-bookworm-slim AS build$/m);
   assert.match(dockerfile, /^FROM --platform=\$BUILDPLATFORM node:24-bookworm-slim AS studio-build$/m);
   assert.match(dockerfile, /^FROM node:24-bookworm-slim AS runtime$/m);
@@ -22,7 +23,20 @@ test('Docker runtime is a Node 24 non-root image with the complete YunCMS CLI co
   assert.match(dockerfile, /^COPY --from=studio-build \/opt\/yuncms\/packages\/api\/studio-dist \/opt\/yuncms\/packages\/api\/studio-dist$/m);
   const dependencyStage = dockerfile.split('FROM node:24-bookworm-slim AS build')[1].split('FROM node:24-bookworm-slim AS runtime')[0];
   assert.doesNotMatch(dependencyStage, /npm run build:studio|npm ci\s*$/m);
-  assert.match(dockerfile, /default-mysql-client tini/);
+  assert.doesNotMatch(dockerfile, /default-mysql-client/);
+  for (const pkg of ['ca-certificates', 'libncurses6', 'libssl3', 'libstdc++6', 'libtinfo6', 'tini', 'zlib1g']) {
+    const escaped = pkg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(dockerfile, new RegExp(`\\b${escaped}\\b`));
+  }
+  assert.match(dockerfile, /^COPY --from=mysql-client \/usr\/bin\/mysql \/usr\/bin\/mysql$/m);
+  assert.match(dockerfile, /^COPY --from=mysql-client \/usr\/bin\/mysqldump \/usr\/bin\/mysqldump$/m);
+  assert.match(dockerfile, /^COPY --from=mysql-client \/usr\/share\/doc\/mysql-community-server-minimal\/LICENSE \/usr\/share\/doc\/yuncms-mysql-client\/LICENSE$/m);
+  assert.match(dockerfile, /ldd \/usr\/bin\/mysql/);
+  assert.match(dockerfile, /ldd \/usr\/bin\/mysqldump/);
+  assert.match(dockerfile, /mysql --version/);
+  assert.match(dockerfile, /mysqldump --version/);
+  assert.match(dockerfile, /! mysql --version \| grep -qi "mariadb"/);
+  assert.match(dockerfile, /! mysqldump --version \| grep -qi "mariadb"/);
   assert.match(dockerfile, /^USER node$/m);
   assert.match(dockerfile, /^VOLUME \["\/data"\]$/m);
   assert.match(dockerfile, /^EXPOSE 3008$/m);

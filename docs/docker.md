@@ -4,7 +4,7 @@ AI automations run in the same container and persist their rules/queue in MySQL.
 
 Need help deploying, integrating or migrating? [Contact Yunsoft](https://yunsoft.com/contact?utm_source=docker-docs&utm_medium=yuncms&utm_campaign=yuncms-services), [star YunCMS on GitHub](https://github.com/Yunsoft-Software/yuncms), or [sponsor YunCMS](https://github.com/sponsors/Yunsoft-Software).
 
-YunCMS publishes a Linux container image at [`yunsoftofficial/yuncms`](https://hub.docker.com/r/yunsoftofficial/yuncms). The image contains the YunCMS CLI, the built React Studio and the MySQL client tools required by `backup` and `restore`.
+YunCMS publishes a Linux container image at [`yunsoftofficial/yuncms`](https://hub.docker.com/r/yunsoftofficial/yuncms). The image contains the YunCMS CLI, the built React Studio and official native MySQL 8.4 client binaries (`mysql` and `mysqldump` copied from `mysql:8.4` for the target architecture, rather than Debian's `default-mysql-client` / MariaDB package). This ensures verified generated columns, check constraints, and UTF-8 characters during `backup` and `restore`.
 
 The supported architectures are `linux/amd64` and `linux/arm64`. Use a version tag such as `0.1.27` for a controlled deployment. `latest` follows the newest published YunCMS release and is convenient for evaluation, but production deployments should not update implicitly.
 
@@ -144,6 +144,10 @@ curl http://localhost:3008/ready
 
 Do not use a floating `latest` tag for unattended production updates. Review release notes and test the exact version in staging first.
 
+### Generated columns and legacy MariaDB backups
+
+Older container images or host environments that relied on Debian's `default-mysql-client` (MariaDB client tools) emitted invalid literal `INSERT` values for MySQL generated columns (such as `yuncms_roles.public_singleton`), causing MySQL `ERROR 3105` during `restore`. The YunCMS container now ships official native MySQL 8.4 client binaries. Upgrading the container image resolves client dump generation going forward, but does not repair already-faulty SQL dump files created by older MariaDB tools. After upgrading, recreate and test fresh backups using the updated container image.
+
 ## Build the image from source
 
 From a YunCMS source checkout:
@@ -168,3 +172,17 @@ npm run docker:publish
 ```
 
 Publishing targets `linux/amd64` and `linux/arm64`, includes OCI provenance/SBOM attestations, and pushes the versioned and `latest` tags. Set `YUNCMS_DOCKER_IMAGE` when publishing outside the official namespace.
+
+## Integration testing with Docker
+
+YunCMS includes an opt-in end-to-end backup and restore regression fixture against disposable MySQL 8.4 containers. The fixture requires a prebuilt candidate image tag passed via `YUNCMS_TEST_DOCKER_IMAGE` and does not build or publish images itself:
+
+```bash
+# 1. Build the candidate container image from source
+npm run docker:build
+
+# 2. Run the guarded Docker backup and restore test
+YUNCMS_TEST_DOCKER=1 YUNCMS_TEST_DOCKER_IMAGE=yunsoftofficial/yuncms:0.1.27 node --test test/integration/docker-backup-restore.test.js
+```
+
+The fixture provisions an isolated Docker network, a disposable MySQL 8.4 instance, and dedicated volumes. It tests `bootstrap`, generated `STORED` and `VIRTUAL` columns, system roles, and uploaded files, executes `backup`, mutates state, executes `restore --yes`, and verifies that all schema constraints, computed columns, roles, and file payloads are preserved.

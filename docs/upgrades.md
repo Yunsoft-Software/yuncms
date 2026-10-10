@@ -32,7 +32,7 @@ The project must:
 - use Node.js 24 LTS;
 - have `@yunsoft/yuncms` declared in project `package.json`;
 - have the package installed in project `node_modules`;
-- have `npm`, `mysqldump` and `mysql` available on `PATH`;
+- have native MySQL 8.4+ client tools (`mysqldump` and `mysql`) available on `PATH` (official MySQL client binaries; do not use MariaDB client tools, which can emit literal `INSERT` values for `STORED` or `VIRTUAL` generated columns such as `yuncms_roles.public_singleton` and trigger MySQL error 3105 on restore);
 - use a MySQL account that can dump the YunCMS database and perform the DDL YunCMS already requires for schema management;
 - use a database whose complete contents are owned/recoverable by this YunCMS deployment;
 - have enough local disk for the database dump, local Files/extensions/project metadata snapshot and safety headroom;
@@ -273,6 +273,10 @@ Before destructive reset, restore:
 Only then does it reset current database tables/views and import the dump.
 
 When the backup contains `package-lock.json`, run `npm ci` after restore and before starting YunCMS. Manual restore replaces the recorded package files but does not mutate `node_modules`; this explicit reinstall makes the installed dependency graph match the restored runtime. If the snapshot contains only `package.json`, run `npm install` instead. The CLI prints the same reminder after a successful restore.
+
+### Legacy MariaDB dump compatibility note
+
+Both container deployments and host operators running npm installations require official native MySQL `mysqldump` and `mysql` client tools (8.4+). MariaDB 10.11 tools emit invalid literal `INSERT` syntax for generated columns such as `yuncms_roles.public_singleton`, causing MySQL `ERROR 3105` during restore; this cannot be bypassed merely with `--complete-insert` on MariaDB 10.11 or retroactively repaired by upgrading the client image later. Operators must recreate and verify fresh backups using native MySQL 8.4+ tools after upgrade.
 
 ## Starting production again
 
