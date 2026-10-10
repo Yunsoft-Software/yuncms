@@ -2,10 +2,20 @@ import { readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
+import {
+  assertTestFilesExist,
+  evaluateStrictSuiteResult,
+  formatTestSummary,
+  isStrictVerificationMode,
+  parseTestSummary,
+  validateStrictProfile,
+} from './verification-profile.mjs';
+
 const ROOT = resolve(import.meta.dirname, '..');
 const MODE = process.argv[2] || 'full';
 const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const MAX_BUFFER = 16 * 1024 * 1024;
+const isStrict = isStrictVerificationMode(MODE, process.env);
 
 const TEST_ROOTS = [
   'packages/core/test',
@@ -18,15 +28,22 @@ const TEST_ROOTS = [
 const FAST_TESTS = [
   'packages/core/test/core.test.js',
   'packages/core/test/bootstrap.test.js',
+  'packages/core/test/database-pool.test.js',
+  'packages/core/test/files-service.test.js',
+  'packages/core/test/items-large-fields.test.js',
   'packages/core/test/maintenance-state.test.js',
   'packages/core/test/production-config.test.js',
+  'packages/core/test/s3-storage.test.js',
   'packages/core/test/schema-query.test.js',
   'packages/core/test/schema-access.test.js',
   'packages/core/test/schema-key.test.js',
   'packages/core/test/schema-metadata-interface.test.js',
   'packages/core/test/collection-visibility.test.js',
+  'packages/core/test/storage.test.js',
   'packages/core/test/system-fields.test.js',
   'packages/core/test/system-collection-fields.test.js',
+  'packages/core/test/system-files-filter-permission.test.js',
+  'packages/core/test/system-list-query.test.js',
   'packages/core/test/timestamp-fields.test.js',
   'packages/core/test/public-access.test.js',
   'packages/core/test/system-permissions.test.js',
@@ -46,9 +63,12 @@ const FAST_TESTS = [
 
   'packages/api/test/authentication.test.js',
   'packages/api/test/automations.test.js',
+  'packages/api/test/byte-range.test.js',
   'packages/api/test/error-response.test.js',
   'packages/api/test/extension-discovery-matrix.test.js',
   'packages/api/test/external-auth-response.test.js',
+  'packages/api/test/files-cors.test.js',
+  'packages/api/test/files-streaming.test.js',
   'packages/api/test/maintenance-startup.test.js',
   'packages/api/test/request-identity.test.js',
   'packages/api/test/schema-cache.test.js',
@@ -59,6 +79,7 @@ const FAST_TESTS = [
   'packages/api/test/security-headers.test.js',
   'packages/api/test/studio-settings.test.js',
   'packages/api/test/studio.test.js',
+  'packages/api/test/users-roles-query.test.js',
 
   'packages/cli/test/backup-integrity.test.js',
   'packages/cli/test/cli.test.js',
@@ -81,6 +102,7 @@ const FAST_TESTS = [
   'packages/cli/test/update-preflight.test.js',
   'packages/cli/test/update-same-version.test.js',
   'packages/cli/test/upgrade.test.js',
+  'packages/cli/test/verification-runner.test.js',
 
   'packages/extensions-sdk/test/sdk.test.js',
 
@@ -102,6 +124,8 @@ const FAST_TESTS = [
   'apps/studio/test/roles-permissions-ui.test.js',
   'apps/studio/test/permission-resource-ui.test.js',
   'apps/studio/test/users-access-ui.test.js',
+  'apps/studio/test/content-values.test.js',
+  'apps/studio/test/date-format.test.js',
 ];
 
 function collectTests(path) {
@@ -129,7 +153,7 @@ function spawn(command, args, env) {
   });
 }
 
-function run(command, args, { label, env = process.env, failureArgs = null } = {}) {
+function run(command, args, { label, env = process.env } = {}) {
   const started = Date.now();
   const result = spawn(command, args, env);
   const elapsed = ((Date.now() - started) / 1000).toFixed(1);
@@ -140,22 +164,40 @@ function run(command, args, { label, env = process.env, failureArgs = null } = {
   }
 
   console.error(`✗ ${label || commandLabel(command, args)} (${elapsed}s)`);
-  const rerun = failureArgs ? spawn(command, failureArgs, env) : result;
-  const output = [rerun.stdout, rerun.stderr].filter(Boolean).join('\n').trim();
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
   if (output) console.error(output);
   process.exit(result.status || 1);
 }
 
-function runNodeTests(files, label, { concurrency = null } = {}) {
+function runNodeTests(files, label, { concurrency = null, strict = isStrict } = {}) {
+  const started = Date.now();
   const concurrencyArgs = concurrency == null ? [] : [`--test-concurrency=${concurrency}`];
-  run(
+  const result = spawn(
     process.execPath,
-    ['--test', '--test-reporter=dot', ...concurrencyArgs, ...files],
-    {
-      label,
-      failureArgs: ['--test', '--test-reporter=spec', ...concurrencyArgs, ...files],
-    },
+    ['--test', '--test-reporter=tap', ...concurrencyArgs, ...files],
+    process.env,
   );
+  const elapsed = ((Date.now() - started) / 1000).toFixed(1);
+  const summary = parseTestSummary(result.stdout);
+  const summaryText = summary ? ` [${formatTestSummary(summary)}]` : '';
+
+  if (strict) {
+    const evaluation = evaluateStrictSuiteResult(result.status, summary);
+    if (!evaluation.ok) {
+      console.error(`✗ ${label} (${elapsed}s)${summaryText}`);
+      console.error(`  strict release requirement failed: ${evaluation.reason}`);
+      const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+      if (output) console.error(output);
+      process.exit(result.status || 1);
+    }
+  } else if (result.status !== 0) {
+    console.error(`✗ ${label} (${elapsed}s)${summaryText}`);
+    const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+    if (output) console.error(output);
+    process.exit(result.status || 1);
+  }
+
+  console.log(`✓ ${label} (${elapsed}s)${summaryText}`);
 }
 
 function assertRuntime() {
@@ -182,20 +224,33 @@ function runPackChecks() {
 
 assertRuntime();
 
-if (!['fast', 'full', 'release'].includes(MODE)) {
-  console.error('Usage: node scripts/verify.mjs [fast|full|release]');
+if (!['fast', 'full', 'release', 'strict'].includes(MODE)) {
+  console.error('Usage: node scripts/verify.mjs [fast|full|release|strict]');
   process.exit(2);
 }
 
+if (isStrict) {
+  const validation = validateStrictProfile(process.env);
+  if (!validation.ok) {
+    console.error('✗ Strict release profile rejected:');
+    for (const error of validation.errors) {
+      console.error(`  - ${error}`);
+    }
+    process.exit(1);
+  }
+}
+
 if (MODE === 'fast') {
+  assertTestFilesExist(FAST_TESTS, ROOT);
   runNodeTests(FAST_TESTS, `fast regression suite (${FAST_TESTS.length} files)`);
   process.exit(0);
 }
 
 const allTests = TEST_ROOTS.flatMap(collectTests).sort();
+assertTestFilesExist(allTests, ROOT);
 runNodeTests(allTests, `complete source suite (${allTests.length} files)`);
 
-if (MODE === 'release') {
+if (MODE === 'release' || MODE === 'strict') {
   run(NPM, ['run', 'build:studio'], { label: 'Studio production build' });
   runPackChecks();
 

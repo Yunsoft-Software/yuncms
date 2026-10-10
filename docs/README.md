@@ -25,7 +25,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 | Connect an application | [REST API](rest-api.md) | Authentication, CRUD, schema, Files and system endpoints. |
 | Query content safely | [Items Query Language](api-query-language.md) | Fields, relations, filters, search, sorting, pagination and aggregation. |
 | Automate repeated content tasks with AI | [AI Automations](ai-automations.md) | Input/output fields, preview, restricted execution users, persistent runs and MCP setup. |
-| Put YunCMS in production | [Production Readiness](production-readiness.md) | Preflight checklist, backups, storage, proxy, security and upgrade verification. |
+| Put YunCMS in production | [Production Readiness](production-readiness.md) | Verification commands, test gates, dedicated test databases and environment readiness. |
 
 ## Start here
 
@@ -75,7 +75,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 - [Upgrades](upgrades.md) — managed update, backup/restore safety and maintenance behavior.
 - [Database operations](database.md) — MySQL requirements, backup concerns and database-level behavior.
 - [Security](security.md) — authentication, authorization, headers, rate limiting, pressure control, request ids and secret handling.
-- [Production readiness](production-readiness.md) — operator checklist before exposing a deployment to production traffic.
+- [Production readiness](production-readiness.md) — operator verification gates, test profiles, acceptance boundaries, and environment readiness requirements.
 - [Architecture](architecture.md) — technical reference for operators and extension/integration authors who need to understand the service boundaries.
 
 ## Fast API examples
