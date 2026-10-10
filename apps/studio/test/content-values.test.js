@@ -10,7 +10,7 @@ const valueCss = readFileSync(resolve(SRC, 'content-values.css'), 'utf8');
 test('Content renders booleans, dates and statuses as typed values', () => {
   assert.match(contentSource, /field\.type === 'boolean'/);
   assert.match(contentSource, /content-value-boolean/);
-  assert.match(contentSource, /Intl\.DateTimeFormat/);
+  assert.match(contentSource, /formatDateFieldValue/);
   assert.match(contentSource, /content-value-date/);
   assert.match(contentSource, /field\.field === 'status'/);
   assert.match(contentSource, /content-value-status/);

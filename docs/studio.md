@@ -96,6 +96,14 @@ The Content workbench opens with a bounded collection identity surface showing l
 
 Only operations allowed by your effective role are available. If an API permission prevents an action, the backend remains authoritative even if a client attempts the request manually.
 
+### Date and timestamp display
+
+Studio distinguishes calendar dates from temporal instants:
+
+- **`date` fields (`YYYY-MM-DD`)**: Treated as calendar days. Component values are validated via UTC round-trip and formatted with `timeZone: 'UTC'` to preserve the exact calendar date across all browser timezones (for example, `2026-10-10` displays as October 10 in all client timezones without shifting to October 9 in negative-offset timezones like `America/New_York`). The `<time>` element retains the original `YYYY-MM-DD` string in its `dateTime` attribute.
+- **`datetime` and `timestamp` fields**: Formatted as specific moments in time using the browser's local timezone and locale (`en-US` or `tr-TR`), with the full ISO timestamp preserved in the `dateTime` attribute.
+- **Empty and invalid values**: Empty values display the standard placeholder (`—`), and invalid dates fall back safely without inventing arbitrary corrected values.
+
 ## Search, filter and view options
 
 Search uses readable text fields in the current collection. Filters can be added without keeping the full filter builder permanently open, and active filters remain visible as removable chips.
