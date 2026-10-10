@@ -50,6 +50,19 @@ At startup YunCMS discovers:
 
 The default local directory is `extensions`.
 
+### Dependency lookup and failure contract
+
+When discovering npm dependency extensions, YunCMS inspects root `dependencies`, `optionalDependencies`, and `devDependencies`. Package locations are resolved sequentially across node module lookup directories (`require.resolve.paths`), supporting direct installations, hoisted monorepo workspace dependencies, scoped packages, packages exporting only subpaths, and symlinked packages.
+
+Installed packages lacking a `yuncms` manifest in their `package.json` are treated as ordinary dependencies and ignored.
+
+Startup failure behavior is strict:
+
+- **Missing required dependency**: If a declared dependency cannot be resolved, startup fails with `EXTENSION_PACKAGE_NOT_RESOLVED`.
+- **Missing optional dependency**: Unresolvable packages listed in `optionalDependencies` are skipped silently without stopping startup.
+- **Malformed manifest**: Packages with invalid extension types, ids not matching identifier rules, missing entries, or entries escaping the package root fail startup immediately with `INVALID_EXTENSION_MANIFEST`.
+- **Duplicate identifiers**: Colliding extension ids across local or dependency extensions fail startup with `DUPLICATE_EXTENSION_ID`.
+
 Example packages in the repository live under:
 
 ```text
