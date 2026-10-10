@@ -144,7 +144,7 @@ export class AuthService extends BaseService {
        INNER JOIN yuncms_users u ON u.id = t.user
        LEFT JOIN yuncms_roles r ON r.id = u.role
        WHERE t.token_hash = ?
-         AND (t.expires_at IS NULL OR t.expires_at > CURRENT_TIMESTAMP(3))
+         AND (t.expires_at IS NULL OR t.expires_at > UTC_TIMESTAMP(3))
          AND u.status = 'active'
        LIMIT 1`,
       [hashToken(token)],
@@ -155,7 +155,7 @@ export class AuthService extends BaseService {
     await this.database.query(
       `UPDATE yuncms_api_tokens t
        INNER JOIN yuncms_users u ON u.id = t.user
-       SET t.last_used_at = CURRENT_TIMESTAMP(3), u.last_access = CURRENT_TIMESTAMP(3)
+       SET t.last_used_at = UTC_TIMESTAMP(3), u.last_access = UTC_TIMESTAMP(3)
        WHERE t.id = ?`,
       [row.api_token_id],
     );

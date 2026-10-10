@@ -123,7 +123,7 @@ export class ExternalAuthService extends BaseService {
       }
       const [result] = await connection.query(
         `UPDATE yuncms_auth_transactions
-         SET used_at = CURRENT_TIMESTAMP(3)
+         SET used_at = UTC_TIMESTAMP(3)
          WHERE id = ? AND used_at IS NULL`,
         [transaction.id],
       );
@@ -147,7 +147,7 @@ export class ExternalAuthService extends BaseService {
     if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 5000) throw new Error('Invalid auth transaction cleanup batch size');
     const [rows] = await this.database.query(
       `SELECT id FROM yuncms_auth_transactions
-       WHERE expires_at < CURRENT_TIMESTAMP(3) OR used_at IS NOT NULL
+       WHERE expires_at < UTC_TIMESTAMP(3) OR used_at IS NOT NULL
        ORDER BY created_at ASC
        LIMIT ?`,
       [batchSize],
@@ -226,7 +226,7 @@ export class ExternalAuthService extends BaseService {
           await connection.query(
             `INSERT INTO yuncms_users
              (id, email, password_hash, role, status, email_verified_at)
-             VALUES (?, ?, NULL, ?, 'active', CURRENT_TIMESTAMP(3))`,
+             VALUES (?, ?, NULL, ?, 'active', UTC_TIMESTAMP(3))`,
             [localUserId, normalizedEmail, role.id],
           );
         }
@@ -234,7 +234,7 @@ export class ExternalAuthService extends BaseService {
         await connection.query(
           `INSERT INTO yuncms_auth_identities
            (id, provider, subject, user, email, profile, last_login_at)
-           VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+           VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(3))`,
           [randomUUID(), providerId, subjectId, localUserId, normalizedEmail, sanitizedProfile == null ? null : JSON.stringify(sanitizedProfile)],
         );
         return localUserId;
@@ -287,7 +287,7 @@ export class ExternalAuthService extends BaseService {
     } else {
       await this.database.query(
         `UPDATE yuncms_auth_identities
-         SET email = COALESCE(?, email), profile = COALESCE(?, profile), last_login_at = CURRENT_TIMESTAMP(3)
+         SET email = COALESCE(?, email), profile = COALESCE(?, profile), last_login_at = UTC_TIMESTAMP(3)
          WHERE id = ?`,
         [normalizedEmail, sanitizedProfile == null ? null : JSON.stringify(sanitizedProfile), user.identity_id],
       );

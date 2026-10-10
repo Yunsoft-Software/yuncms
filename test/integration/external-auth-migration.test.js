@@ -40,7 +40,7 @@ async function countById(pool, table, id) {
   return Number(rows[0]?.count ?? 0);
 }
 
-test('real MySQL applies 0013 and every later migration once while preserving pre-0013 auth state', {
+test('real MySQL applies 0013 and every later migration once, revoking legacy sessions in 0022 while preserving users/roles/permissions', {
   skip: !ENABLED,
   timeout: 90_000,
 }, async () => {
@@ -102,7 +102,13 @@ test('real MySQL applies 0013 and every later migration once while preserving pr
     assert.equal(await countById(pool, 'yuncms_roles', role.id), 1);
     assert.equal(await countById(pool, 'yuncms_users', user.id), 1);
     assert.equal(await countById(pool, 'yuncms_permissions', permission.id), 1);
-    assert.equal(await countById(pool, 'yuncms_sessions', session.session), 1);
+    assert.equal(await countById(pool, 'yuncms_sessions', session.session), 0);
+
+    const postUpgradeSessions = new SessionsService({ accountability: system, database: pool });
+    const freshSession = await postUpgradeSessions.createForUser(user);
+    const freshIdentity = await postUpgradeSessions.authenticateAccessToken(freshSession.access_token);
+    assert.equal(freshIdentity.user, user.id);
+    assert.equal(await countById(pool, 'yuncms_sessions', freshSession.session), 1);
 
     const external = new ExternalAuthService({
       accountability: system,
@@ -135,7 +141,7 @@ test('real MySQL applies 0013 and every later migration once while preserving pr
     const expiredState = `expired-${randomUUID()}`;
     const expired = await external.beginTransaction({ provider: 'integration-oidc', state: expiredState });
     await pool.query(
-      'UPDATE yuncms_auth_transactions SET expires_at = DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 1 SECOND) WHERE id = ?',
+      'UPDATE yuncms_auth_transactions SET expires_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 SECOND) WHERE id = ?',
       [expired.id],
     );
     await assert.rejects(
@@ -157,7 +163,21 @@ test('real MySQL applies 0013 and every later migration once while preserving pr
       (error) => error.code === 'ER_DUP_ENTRY',
     );
   } finally {
-    if (pool) await closeDatabasePool(pool).catch(() => {});
-    await resetDatabaseObjects({ config: config.database }).catch(() => {});
+    const cleanupErrors = [];
+    if (pool) {
+      try {
+        await closeDatabasePool(pool);
+      } catch (err) {
+        cleanupErrors.push(err);
+      }
+    }
+    try {
+      await resetDatabaseObjects({ config: config.database });
+    } catch (err) {
+      cleanupErrors.push(err);
+    }
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(cleanupErrors, `Integration cleanup failed with ${cleanupErrors.length} error(s)`);
+    }
   }
 });

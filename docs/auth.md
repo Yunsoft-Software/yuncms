@@ -34,7 +34,7 @@ Unknown user, wrong password and inactive-user attempts intentionally produce th
 
 ## Sessions
 
-A successful local or external login creates a server-side session with hashed access/refresh credentials and expiries plus optional request metadata.
+A successful local or external login creates a server-side session with hashed access/refresh credentials and expiries plus optional request metadata. All token expirations and session activity timestamps evaluate against MySQL's `UTC_TIMESTAMP(3)`.
 
 Default lifetime:
 
@@ -46,6 +46,9 @@ Use the returned access token for ordinary API requests:
 ```http
 Authorization: Bearer yca_...
 ```
+
+> [!NOTE]
+> When upgrading to the UTC deadline engine (migration `0022-utc-auth-deadlines`), all existing active sessions, pending action tokens, and in-flight external OAuth transactions were revoked to prevent pre-upgrade local-time deadlines from being artificially extended. Users establish fresh UTC-backed sessions by logging in again. Non-expiring API tokens, user accounts, roles, and permissions are fully preserved. Finite API tokens with expiration dates are revoked at migration and must be reissued.
 
 ### Refresh
 

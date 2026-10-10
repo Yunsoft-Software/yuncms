@@ -8,6 +8,16 @@ YunCMS V1 is intentionally MySQL-only and uses `mysql2/promise` directly. There 
 
 The pool disables multi-statements. Dynamic identifiers are validated/quoted separately from data values. Data values use placeholders.
 
+### Timezone and date contracts
+
+YunCMS enforces a strict UTC database runtime contract:
+
+- **Pool configuration**: `createDatabasePool` configures `timezone: 'Z'` and `dateStrings: ['DATE']`.
+- **Session initialization**: On every newly created connection in the pool, `SET SESSION time_zone = '+00:00'` is queued before any application query. If session time_zone setup fails, the connection is immediately destroyed (`connection.destroy(err)`), failing closed. YunCMS never mutates `GLOBAL time_zone`.
+- **`DATE` columns**: MySQL `DATE` columns are deserialized directly as literal calendar strings (`YYYY-MM-DD`). They do not undergo JavaScript `Date` conversion or shift across different Node process `TZ` settings.
+- **`DATETIME(3)` and `TIMESTAMP(3)` columns**: These represent UTC instants. Incoming ISO strings with timezone offsets are parsed and stored in UTC, and serialized as UTC ISO strings (`...Z`).
+- **Authentication deadlines**: All system token expiries, session checks, and last-used updates evaluate with MySQL's `UTC_TIMESTAMP(3)`.
+
 ## Bootstrap
 
 After configuring `.env`:

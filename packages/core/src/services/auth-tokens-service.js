@@ -116,7 +116,7 @@ export class AuthTokensService extends BaseService {
          WHERE token_hash = ?
            AND type = ?
            AND used_at IS NULL
-           AND expires_at > CURRENT_TIMESTAMP(3)
+           AND expires_at > UTC_TIMESTAMP(3)
          LIMIT 1
          FOR UPDATE`,
         [hashToken(token), TOKEN_TYPES.reset],
@@ -133,7 +133,7 @@ export class AuthTokensService extends BaseService {
       if (result.affectedRows !== 1) throw invalidActionToken();
 
       await connection.query(
-        'UPDATE yuncms_auth_tokens SET used_at = CURRENT_TIMESTAMP(3) WHERE id = ?',
+        'UPDATE yuncms_auth_tokens SET used_at = UTC_TIMESTAMP(3) WHERE id = ?',
         [actionToken.id],
       );
       await connection.query('DELETE FROM yuncms_sessions WHERE user = ?', [actionToken.user]);
@@ -203,7 +203,7 @@ export class AuthTokensService extends BaseService {
          WHERE token_hash = ?
            AND type = ?
            AND used_at IS NULL
-           AND expires_at > CURRENT_TIMESTAMP(3)
+           AND expires_at > UTC_TIMESTAMP(3)
          LIMIT 1
          FOR UPDATE`,
         [hashToken(token), TOKEN_TYPES.verify],
@@ -213,14 +213,14 @@ export class AuthTokensService extends BaseService {
 
       const [result] = await connection.query(
         `UPDATE yuncms_users
-         SET email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP(3))
+         SET email_verified_at = COALESCE(email_verified_at, UTC_TIMESTAMP(3))
          WHERE id = ? AND status = 'active'`,
         [actionToken.user],
       );
       if (result.affectedRows !== 1) throw invalidActionToken();
 
       await connection.query(
-        'UPDATE yuncms_auth_tokens SET used_at = CURRENT_TIMESTAMP(3) WHERE id = ?',
+        'UPDATE yuncms_auth_tokens SET used_at = UTC_TIMESTAMP(3) WHERE id = ?',
         [actionToken.id],
       );
       await connection.query(

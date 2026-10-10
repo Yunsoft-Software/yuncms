@@ -281,6 +281,26 @@ systemctl start my-yuncms.service
 
 YunCMS intentionally does not execute arbitrary shell/service-manager restart commands from the update command.
 
+## UTC deadline transition and migration 0022
+
+Migration `0022-utc-auth-deadlines` establishes strict UTC deadline evaluation across the authentication engine using MySQL's `UTC_TIMESTAMP(3)`.
+
+### Authentication credential cleanup
+
+When moving to UTC deadline evaluation, previously stored expiration timestamps that were recorded in a local timezone could be artificially extended by hours or days if evaluated directly against UTC. To eliminate this risk and enforce clean deadline semantics:
+
+- **Sessions (`yuncms_sessions`)**: All active sessions are revoked during the upgrade. Users sign in again to obtain fresh UTC-backed sessions.
+- **Pending action tokens (`yuncms_auth_tokens`)**: In-flight password-reset and email-verification links are cleared. Users request a new link if needed.
+- **OAuth transactions (`yuncms_auth_transactions`)**: In-flight external authentication handshakes are cleared.
+- **Expiring API tokens**: API tokens with an explicit expiration date (`expires_at IS NOT NULL`) are revoked and must be reissued by operators or users.
+- **Preserved credentials & data**: Non-expiring API tokens (`expires_at IS NULL`), user accounts, roles, permissions, and external identity links (`yuncms_auth_identities`) are preserved without modification.
+
+### Historical content DATETIME values
+
+YunCMS does **not** automatically rewrite historical content `DATETIME` or `TIMESTAMP` values in user collections during this migration.
+
+Because naive historical timestamps cannot be programmatically disambiguated (they may represent wall-clock time or UTC depending on how they were originally inserted), automatic alterations could corrupt application data. Operators whose user collections rely on historical local-time timestamps should review those fields independently to decide whether timezone normalization is required for their specific application domain.
+
 ## S3 note
 
 Database/file metadata backup is not the same as object backup. For S3-compatible storage use provider-side capabilities such as bucket versioning, snapshots or a separately verified replication/backup policy.
