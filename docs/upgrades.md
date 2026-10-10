@@ -12,7 +12,12 @@ For versions that contain the managed-upgrade startup gate, `backup`, `update` a
 
 This startup gate is defense in depth, **not permission to leave the supervisor enabled**. A runtime older than the startup-gate feature does not know how to read the new lock. The one-time transition from such an old version therefore requires the supervisor to be fully stopped for the entire maintenance operation.
 
-Project maintenance identity is based on the physical project path, so symlink aliases to the same project resolve to the same operation lock.
+### Maintenance lock contract and layout
+
+- **Operating-system user and `TMPDIR`**: The YunCMS API and CLI operations must run under the same operating-system user and observe the same `TMPDIR`. If the CLI runs under a different user or with a mismatched `TMPDIR`, it will not be able to coordinate maintenance locks with the API.
+- **Per-user private layout**: Project maintenance locks reside in a private per-OS-user directory under the operating system temporary directory: `<tmpdir>/yuncms-update-locks-<uid>/<projectKey>.lock`. The directory is created with mode `0700` and the lock file with mode `0600`. On Unix, `<uid>` is derived from `process.getuid()`; on non-Unix systems, a deterministic hash of the username is used. Different Unix users sharing `/tmp` on the same host maintain separate, isolated lock directories without permission conflicts.
+- **Physical project identity**: Project maintenance identity is based on the canonical physical project path, so symlink aliases to the same project resolve to the same operation lock.
+- **Rolling upgrade & legacy compatibility**: When upgrading from releases prior to per-user isolation (such as 0.1.26, which used shared `<tmpdir>/yuncms-update-locks/`), YunCMS probes both legacy and new lock paths. An accessible active or malformed legacy lock continues to block API startup and prevents new CLI lock acquisitions without removing or overwriting the legacy lock. If reading the legacy lock returns `EACCES`, YunCMS inspects the legacy parent directory: if it is a non-symlink private directory (`0700`) owned by a foreign UID with no group or world traversal permissions, the foreign access denial is safely ignored; any inaccessible or insecure directory owned by the current user or exposing group/world traversal fails closed.
 
 YunCMS also holds a MySQL `GET_LOCK` maintenance lock for real backup/update/restore operations. This prevents two YunCMS maintenance commands from concurrently mutating the same database even when they were launched from different project directories. The lock connection is rechecked during the operation; ownership loss fails closed.
 

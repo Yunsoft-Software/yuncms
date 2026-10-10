@@ -23,6 +23,9 @@ export { withDatabaseRetry } from './retry.js';
 export {
   MAINTENANCE_BYPASS_ENV,
   maintenanceLockPath,
+  legacyMaintenanceLockPath,
+  probeLegacyMaintenanceLock,
+  assertSecureUserParentDir,
   hashMaintenanceBypassToken,
   assertMaintenanceStartupAllowed,
 } from './maintenance-state.js';
