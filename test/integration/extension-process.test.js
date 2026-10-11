@@ -217,7 +217,7 @@ export default defineHook(({ filter }) => {
     assert.equal((await jsonRequest(port, admin.token.token, '/schema/collections', {
       method: 'POST', body: { collection },
     })).response.status, 201);
-    assert.equal((await jsonRequest(port, admin.token.token, `/schema/fields/${collection}`, {
+    assert.equal((await jsonRequest(port, admin.token.token, `/schema/collections/${collection}/fields`, {
       method: 'POST', body: { field: 'title', type: 'string' },
     })).response.status, 201);
     const rejected = await jsonRequest(port, admin.token.token, `/items/${collection}`, {
@@ -247,17 +247,21 @@ export default defineHook(({ filter }) => {
     const [after] = await pool.query(`SELECT COUNT(*) AS total FROM ${quoteIdentifier(collection)}`);
     assert.equal(Number(after[0].total), 1);
   } finally {
-    await stopApi(processInfo);
-    const options = { database: pool, accountability: createSystemAccountability() };
-    try { await new CollectionsService(options).deleteOne(collection, { destructive: true }); }
-    catch (error) { if (error.code !== 'COLLECTION_NOT_FOUND') throw error; }
-    if (admin) {
-      await new UsersService(options).deleteOne(admin.user.id);
-      await new RolesService(options).deleteOne(admin.role.id);
+    try {
+      await stopApi(processInfo);
+      const options = { database: pool, accountability: createSystemAccountability() };
+      try { await new CollectionsService(options).deleteOne(collection, { destructive: true }); }
+      catch (error) { if (error.code !== 'COLLECTION_NOT_FOUND') throw error; }
+      if (admin) {
+        await pool.query('DELETE FROM yuncms_api_tokens WHERE user = ?', [admin.user.id]);
+        await pool.query('DELETE FROM yuncms_users WHERE id = ?', [admin.user.id]);
+        await pool.query('DELETE FROM yuncms_roles WHERE id = ?', [admin.role.id]);
+      }
+    } finally {
+      await closeDatabasePool(pool);
+      if (projectRoot) await rm(projectRoot, { recursive: true, force: true });
+      await rm(storageRoot, { recursive: true, force: true });
     }
-    await closeDatabasePool(pool);
-    if (projectRoot) await rm(projectRoot, { recursive: true, force: true });
-    await rm(storageRoot, { recursive: true, force: true });
   }
 });
 
