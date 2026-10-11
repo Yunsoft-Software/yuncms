@@ -1,5 +1,5 @@
-import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { link, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 const KEY_BYTES = 32;
@@ -42,15 +42,20 @@ export async function loadOrCreateAiSettingsKey({ cwd = process.cwd(), path = DE
   await mkdir(dirname(absolutePath), { recursive: true, mode: 0o700 });
   const generated = randomBytes(KEY_BYTES);
   const encoded = `${generated.toString('base64')}\n`;
+  const temporaryPath = `${absolutePath}.${randomUUID()}.tmp`;
 
   try {
-    await writeFile(absolutePath, encoded, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    await writeFile(temporaryPath, encoded, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    // Publish complete contents atomically without replacing a competing creator's key.
+    await link(temporaryPath, absolutePath);
     return { key: generated, path: absolutePath, created: true };
   } catch (error) {
     if (error?.code !== 'EEXIST') throw keyError('YunCMS AI settings key could not be created', error);
     const raced = await readExisting(absolutePath);
     if (!raced) throw keyError('YunCMS AI settings key disappeared during creation');
     return { key: raced, path: absolutePath, created: false };
+  } finally {
+    await rm(temporaryPath, { force: true });
   }
 }
 

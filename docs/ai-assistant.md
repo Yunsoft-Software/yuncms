@@ -37,7 +37,7 @@ The `.yuncms/` directory is ignored by Git. The key file is created with restric
 
 The encryption key is operationally important. Restoring the database without the corresponding key makes the saved provider API key intentionally undecryptable. Back up this key with the deployment's protected state/secrets and restore it before starting YunCMS against that database.
 
-Multiple API processes sharing one database must use the same AI settings key. Processes using one installation directory naturally share the file; separate hosts/containers must receive the same protected key through deployment secret/state handling.
+Multiple API processes sharing one database must use the same AI settings key. Processes using one installation directory naturally share the file, including simultaneous first startup: YunCMS writes the complete key to a restrictive temporary file and publishes it atomically without replacing an existing key. The state filesystem must support hard links within the key directory. An existing malformed key fails startup and is never regenerated automatically. Separate hosts/containers must receive the same protected key through deployment secret/state handling.
 
 ## Studio experience
 

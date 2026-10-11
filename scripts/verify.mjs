@@ -62,6 +62,7 @@ const FAST_TESTS = [
   'packages/core/test/relation-expansion.test.js',
 
   'packages/api/test/authentication.test.js',
+  'packages/api/test/ai-secret-key.test.js',
   'packages/api/test/automations.test.js',
   'packages/api/test/byte-range.test.js',
   'packages/api/test/error-response.test.js',
