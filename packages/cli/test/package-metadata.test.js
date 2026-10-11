@@ -41,6 +41,10 @@ test('runtime and Studio dependencies stay above audited security baselines', as
   assert.equal(lockfile.packages['node_modules/proxy-addr'].version, '2.0.8');
   assert.equal(studioManifest.devDependencies['source-map-js'], '1.2.2');
   assert.equal(lockfile.packages['node_modules/source-map-js'].version, '1.2.2');
+  const rootManifest = JSON.parse(await readFile(resolve(PACKAGES_ROOT, '../package.json'), 'utf8'));
+  assert.equal(rootManifest.devDependencies['@modelcontextprotocol/client'], '2.3.1');
+  assert.equal(lockfile.packages['node_modules/@modelcontextprotocol/client'].version, '2.3.1');
+  assert.equal(lockfile.packages['node_modules/@modelcontextprotocol/client/node_modules/@modelcontextprotocol/core'].version, '2.3.1');
 });
 
 test('release verification serializes integration files that share the MySQL fixture', async () => {
