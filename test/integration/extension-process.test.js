@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { verifyInstalledRuntime } from '../../packages/cli/src/runtime-probe.js';
 
@@ -14,6 +14,7 @@ import {
   closeDatabasePool,
   createDatabasePool,
   createSystemAccountability,
+  CollectionsService,
   loadConfig,
   quoteIdentifier,
   RolesService,
@@ -169,6 +170,96 @@ async function jsonRequest(port, token, path, { body, ...options } = {}) {
   const text = response.status === 204 ? '' : await response.text();
   return { response, payload: text ? JSON.parse(text) : null };
 }
+
+test('symlinked native hooks preserve typed 4xx business errors and reject writes safely', {
+  skip: !ENABLED,
+  timeout: 60_000,
+}, async () => {
+  const config = loadConfig(process.env);
+  requireDisposableDatabase(config);
+  const pool = createDatabasePool(config.database);
+  const runId = suffix();
+  const collection = safeName('it_business_error', runId);
+  const storageRoot = await mkdtemp(join(tmpdir(), 'yuncms-business-storage-'));
+  let projectRoot;
+  let processInfo;
+  let admin;
+  try {
+    await bootstrapDatabase(pool);
+    admin = await createAdmin(pool, runId);
+    const sdkEntry = `${pathToFileURL(join(ROOT, 'packages/extensions-sdk/src/index.js')).href}?extension-copy`;
+    projectRoot = await createExtensionProject('business-errors', `
+import { defineHook, ExtensionError } from ${JSON.stringify(sdkEntry)};
+export default defineHook(({ filter }) => {
+  filter('items.create', (payload, context) => {
+    if (context.collection !== '${collection}') return payload;
+    if (payload.title === 'invalid') {
+      throw new ExtensionError('WORKFLOW_INITIAL_STATE_INVALID', 'New records must start as drafts.', {
+        status: 422, path: 'title', cause: new Error('private cause must stay hidden'),
+      });
+    }
+    if (payload.title === 'internal') {
+      throw Object.assign(new Error('private connection details'), {
+        code: 'CUSTOM_INTERNAL_FAILURE', status: 422, statusCode: 422,
+      });
+    }
+    return payload;
+  });
+});
+`);
+    const externalRoot = join(projectRoot, 'workspace-hook');
+    const extensionRoot = join(projectRoot, 'extensions/business-errors');
+    await rename(extensionRoot, externalRoot);
+    await symlink(externalRoot, extensionRoot, 'dir');
+    const port = await availablePort();
+    processInfo = startApi(projectRoot, port, serverEnv(config, storageRoot));
+    await waitForReady(processInfo);
+    assert.equal((await jsonRequest(port, admin.token.token, '/schema/collections', {
+      method: 'POST', body: { collection },
+    })).response.status, 201);
+    assert.equal((await jsonRequest(port, admin.token.token, `/schema/fields/${collection}`, {
+      method: 'POST', body: { field: 'title', type: 'string' },
+    })).response.status, 201);
+    const rejected = await jsonRequest(port, admin.token.token, `/items/${collection}`, {
+      method: 'POST', body: { title: 'invalid' },
+    });
+    assert.equal(rejected.response.status, 422);
+    assert.equal(rejected.payload.errors[0].code, 'WORKFLOW_INITIAL_STATE_INVALID');
+    assert.equal(rejected.payload.errors[0].message, 'New records must start as drafts.');
+    assert.equal(rejected.payload.errors[0].path, 'title');
+    assert.ok(rejected.payload.errors[0].request_id);
+    assert.doesNotMatch(JSON.stringify(rejected.payload), /private|cause|stack/);
+    const internal = await jsonRequest(port, admin.token.token, `/items/${collection}`, {
+      method: 'POST', body: { title: 'internal' },
+    });
+    assert.equal(internal.response.status, 500);
+    assert.equal(internal.payload.errors[0].message, 'Internal server error');
+    const denied = await jsonRequest(port, null, `/items/${collection}`, {
+      method: 'POST', body: { title: 'invalid' },
+    });
+    assert.equal(denied.response.status, 403);
+    const [before] = await pool.query(`SELECT COUNT(*) AS total FROM ${quoteIdentifier(collection)}`);
+    assert.equal(Number(before[0].total), 0, 'all rejected creates must leave the collection empty');
+    const accepted = await jsonRequest(port, admin.token.token, `/items/${collection}`, {
+      method: 'POST', body: { title: 'draft' },
+    });
+    assert.equal(accepted.response.status, 201);
+    const [after] = await pool.query(`SELECT COUNT(*) AS total FROM ${quoteIdentifier(collection)}`);
+    assert.equal(Number(after[0].total), 1);
+  } finally {
+    await stopApi(processInfo);
+    const options = { database: pool, accountability: createSystemAccountability() };
+    try { await new CollectionsService(options).deleteOne(collection, { destructive: true }); }
+    catch (error) { if (error.code !== 'COLLECTION_NOT_FOUND') throw error; }
+    if (admin) {
+      await new UsersService(options).deleteOne(admin.user.id);
+      await new RolesService(options).deleteOne(admin.role.id);
+    }
+    await closeDatabasePool(pool);
+    if (projectRoot) await rm(projectRoot, { recursive: true, force: true });
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
 
 test('occupied port rejects startup without afterStart or schedules and cleans initialized extensions', {
   skip: !ENABLED,

@@ -36,6 +36,7 @@
     "@modelcontextprotocol/server": "2.0.0",
     "@node-saml/node-saml": "5.1.0",
     "@yunsoft/yuncms-core": "0.1.27",
+    "@yunsoft/yuncms-extensions-sdk": "0.1.27",
     "express": "5.2.1",
     "ldapts": "9.0.0",
     "openid-client": "6.8.7",

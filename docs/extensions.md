@@ -12,10 +12,35 @@ Install/use the extension SDK in an extension package:
 import {
   defineEndpoint,
   defineHook,
+  ExtensionError,
 } from '@yunsoft/yuncms-extensions-sdk';
 ```
 
 The SDK defines the public extension shape. Runtime services remain supplied by YunCMS so extensions use the same schema, authorization, hooks, Files storage and database process boundary as the main application.
+
+### Public business errors
+
+Trusted endpoint extensions and filter hooks can reject a request with a typed `ExtensionError`. Use a public message that is safe to return to the caller:
+
+```js
+import { defineHook, ExtensionError } from '@yunsoft/yuncms-extensions-sdk';
+
+export default defineHook(({ filter }) => {
+  filter('items.create', (payload, context) => {
+    if (context.collection === 'orders' && payload.status !== 'draft') {
+      throw new ExtensionError('WORKFLOW_INITIAL_STATE_INVALID', 'New orders must start as drafts.', {
+        status: 422,
+        path: 'status',
+      });
+    }
+    return payload;
+  });
+});
+```
+
+The constructor accepts `(code, message, { status = 400, path, cause } = {})`. Codes are uppercase identifiers with letters, digits and underscores, at most 64 characters. Status must be an integer from 400 to 499. An optional path identifies the rejected field. The standard API error envelope preserves the custom code, public message, path and request id; the cause is never included in the response. Native YunCMS error codes retain their documented HTTP status even inside an `ExtensionError`.
+
+An ordinary exception with an unknown code remains a sanitized HTTP 500, even when it has `status` or `statusCode` properties. Use the SDK type to opt into public business errors. Rejected filter mutations do not proceed to the database write; action hooks run after a successful mutation and cannot undo it.
 
 ## Package manifest
 
@@ -49,6 +74,8 @@ At startup YunCMS discovers:
 2. installed dependencies, optional dependencies and development dependencies in the root project when they contain a valid `yuncms` manifest.
 
 The default local directory is `extensions`.
+
+Local extension directories may be symlinks to trusted workspace packages outside the runtime directory. YunCMS resolves the package root before validating its manifest. For linked packages, the entry must resolve to a regular file inside that resolved root, including when the entry itself is a symlink. Duplicate ids still fail discovery. Dangling or inaccessible directory links fail startup with `INVALID_EXTENSION_PATH`; links to ordinary files are ignored. Missing or escaping linked entries fail with `INVALID_EXTENSION_MANIFEST`.
 
 ### Dependency lookup and failure contract
 

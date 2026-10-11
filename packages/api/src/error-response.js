@@ -1,4 +1,5 @@
 import { normalizeDatabaseError } from '@yunsoft/yuncms-core';
+import { isExtensionError } from '@yunsoft/yuncms-extensions-sdk';
 
 const STATUS_BY_CODE = new Map([
   ['INVALID_CREDENTIALS', 401],
@@ -146,7 +147,7 @@ function normalizeApiError(error) {
 }
 
 export function statusForError(error) {
-  return STATUS_BY_CODE.get(error?.code) ?? 500;
+  return STATUS_BY_CODE.get(error?.code) ?? (isExtensionError(error) ? error.status : 500);
 }
 
 export function errorBody(error, requestId) {

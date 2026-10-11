@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
-import { access, readFile, readdir } from 'node:fs/promises';
+import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 
 import { validateExtensionManifest } from './manifest.js';
 
@@ -87,14 +87,38 @@ async function discoverLocalExtensions(rootDir, localDirectory) {
   const discovered = [];
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const packageRoot = join(directory, entry.name);
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+    let packageRoot = join(directory, entry.name);
+    if (entry.isSymbolicLink()) {
+      try {
+        packageRoot = await realpath(packageRoot);
+        if (!(await stat(packageRoot)).isDirectory()) continue;
+      } catch (cause) {
+        const error = new Error(`Unable to resolve local extension directory: ${entry.name}`, { cause });
+        error.code = 'INVALID_EXTENSION_PATH';
+        throw error;
+      }
+    }
     const packagePath = join(packageRoot, 'package.json');
     if (!(await exists(packagePath))) continue;
 
     const packageJson = await readJson(packagePath);
     const manifest = validateExtensionManifest(packageJson, packageRoot);
-    if (manifest) discovered.push({ ...manifest, source: 'local' });
+    if (manifest) {
+      if (entry.isSymbolicLink()) {
+        try {
+          const physicalEntry = await realpath(manifest.entry);
+          if (!physicalEntry.startsWith(`${packageRoot}${sep}`) || !(await stat(physicalEntry)).isFile()) {
+            throw new Error('Entry must be a file inside the resolved package root');
+          }
+        } catch (cause) {
+          const error = new Error(`Extension ${manifest.id} entry must resolve to a file inside its package root`, { cause });
+          error.code = 'INVALID_EXTENSION_MANIFEST';
+          throw error;
+        }
+      }
+      discovered.push({ ...manifest, source: 'local' });
+    }
   }
 
   return discovered;

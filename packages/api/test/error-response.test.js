@@ -3,6 +3,32 @@ import assert from 'node:assert/strict';
 
 import { errorBody, normalizeApiError, statusForError } from '../src/error-response.js';
 import { hashExternalAuthState } from '@yunsoft/yuncms-core';
+import { ExtensionError } from '@yunsoft/yuncms-extensions-sdk';
+
+test('typed extension business rejections preserve custom code, status and public details', () => {
+  const error = new ExtensionError('WORKFLOW_INITIAL_STATE_INVALID', 'Start in the initial state.', {
+    status: 422, path: 'status',
+  });
+  assert.equal(statusForError(error), 422);
+  assert.deepEqual(errorBody(error, 'hook-request').errors[0], {
+    code: 'WORKFLOW_INITIAL_STATE_INVALID', message: 'Start in the initial state.',
+    path: 'status', request_id: 'hook-request',
+  });
+});
+
+test('untyped status and statusCode properties cannot expose unknown exceptions', () => {
+  for (const status of [400, 422, 503]) {
+    const error = Object.assign(new Error('private database detail'), {
+      code: 'UNKNOWN_EXTENSION_FAILURE', status, statusCode: status,
+    });
+    assert.equal(statusForError(error), 500);
+    assert.equal(errorBody(error, 'request').errors[0].message, 'Internal server error');
+  }
+});
+
+test('typed errors cannot override native error-code statuses', () => {
+  assert.equal(statusForError(new ExtensionError('FORBIDDEN', 'Denied', { status: 422 })), 403);
+});
 
 test('known client errors map to stable http statuses', () => {
   assert.equal(statusForError({ code: 'INVALID_QUERY' }), 400);
