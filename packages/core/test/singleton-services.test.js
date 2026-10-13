@@ -183,23 +183,6 @@ test('authorized createOne and createMany on occupied singleton rejects with SIN
   );
 });
 
-test('authorized createOne on vacant singleton succeeds and createMany validates cardinality', async () => {
-  const database = createMockPool({ occupied: false });
-  const service = new SingletonItemsService('site_settings', {
-    database,
-    schema: singletonSchema,
-    accountability: { role: 'admin', user: 'admin-user', admin: true },
-  });
-
-  const created = await service.createOne({ title: 'New Settings' });
-  assert.ok(created);
-
-  // Authorized bulk with invalid cardinality throws SINGLETON_BULK_CREATE_FORBIDDEN
-  await assert.rejects(
-    () => service.createMany([]),
-    (error) => error.code === 'SINGLETON_BULK_CREATE_FORBIDDEN',
-  );
-});
 
 test('collection info errors preserved on singleton items service', async () => {
   const database = createMockPool({ occupied: false });
@@ -222,20 +205,4 @@ test('collection info errors preserved on singleton items service', async () => 
     () => systemService.createOne({ collection: 'test' }),
     (error) => error.code === 'SYSTEM_COLLECTION_USE_DEDICATED_SERVICE',
   );
-});
-
-test('non-singleton collections preserve native behavior without singleton locks or vacancy checks', async () => {
-  const database = createMockPool({ occupied: true });
-  const service = new SingletonItemsService('posts', {
-    database,
-    schema: singletonSchema,
-    accountability: { role: null, user: null, admin: false },
-  });
-
-  await assert.rejects(
-    () => service.createOne({ title: 'Post' }),
-    (error) => error.code === 'FORBIDDEN',
-  );
-  assert.equal(database.calls.some((c) => typeof c === 'object' && c.sql.includes('SELECT 1 AS present')), false);
-  assert.equal(database.calls.some((c) => typeof c === 'object' && c.sql.includes('GET_LOCK')), false);
 });

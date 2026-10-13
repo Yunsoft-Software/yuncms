@@ -133,3 +133,5 @@ YunCMS does not intentionally send the provider API key, YunCMS access/refresh t
 - [Configuration](configuration.md)
 - [Security](security.md)
 - [Using Studio](studio.md)
+
+Native chat can be governed by extension admission and per-provider reservation hooks; see [AI policy lifecycle](extensions.md#ai-policy-lifecycle). Hook-enabled HTTP responses include provider usage when reported, or an explicitly marked estimate.

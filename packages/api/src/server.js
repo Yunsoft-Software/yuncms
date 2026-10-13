@@ -115,7 +115,7 @@ async function start() {
     database: pool,
     logger,
   });
-  const aiAssistant = new AiAssistantService({ settingsStore: aiSettingsStore, logger });
+  const aiAssistant = new AiAssistantService({ settingsStore: aiSettingsStore, logger, emitter });
   const aiRouter = createAiRouter({ assistant: aiAssistant, settingsStore: aiSettingsStore });
   const mcpSettingsStore = new McpSettingsStore({ database: pool });
   mailer?.setEmitter(emitter);

@@ -269,9 +269,9 @@ await withTransaction(context.database, async (connection) => {
 
 `withTransaction(pool, operation)` borrows and releases a connection. `withConnectionTransaction(connection, operation)` keeps connection ownership with the caller. Nested helper calls on an active managed connection join the outer transaction, without separate commits or savepoints; they cannot change its isolation level. Let failures escape the outer operation to roll back all its writes.
 
-Items filters execute inside the transaction. Items success actions (including native audit writes and AI automation enqueueing) wait for the outer commit, preserve mutation order, and are discarded on rollback or commit failure. The helper waits for these actions before returning. Post-commit action failure cannot roll back data that has already committed; actions are best-effort effects rather than a durable event queue.
+Native MySQL2 pool/connection item mutations automatically open or join a managed transaction, including single and bulk create/update/delete. Bulk pre-write staging runs inside that transaction. Items filters execute inside the transaction. Items success actions (including native audit writes and AI automation enqueueing) wait for the outer commit, preserve mutation order, and are discarded on rollback or commit failure. The helper waits for these actions before returning. Post-commit action failure cannot roll back data that has already committed; actions are best-effort effects rather than a durable event queue.
 
-For Items mutation hooks, `context.database` is the active connection in filters and a usable post-commit database handle in actions. `context.transaction` is `{ managed: true, state: 'active' }` for transactional filters, `{ managed: true, state: 'committed' }` for deferred actions, and `null` for ordinary autocommit calls. Read hooks still run at the read itself. Raw `beginTransaction()` calls outside the native helpers are not tracked; use the helpers for deferred action handling.
+For Items mutation hooks, `context.database` is the active connection in filters and a usable post-commit database handle in actions. `context.transaction` is `{ managed: true, state: 'active' }` for transactional filters, `{ managed: true, state: 'committed' }` for deferred actions, and `null` only for non-transactional custom SQL adapters. Native MySQL2 mutation calls are transactional without an explicit outer helper. Read hooks still run at the read itself. Raw `beginTransaction()` calls outside the native helpers are not tracked; use the helpers for deferred action handling.
 
 ## Startup events
 
@@ -388,3 +388,18 @@ Custom and legacy storage drivers are **not required** to implement `getStream()
 - [Roles and permissions](permissions.md)
 - [Files](files.md)
 - [Architecture](architecture.md)
+
+## AI policy lifecycle
+
+Native AI chat authentication and tool authorization remain in the API. Hook-enabled assistant instances dispatch veto-only admission filters before provider work. Admission filter return values do not change caller write/delete flags.
+
+- `ai.chat.before`: request messages, locale and caller access flags; throw a typed error to deny the chat.
+- `ai.chat.completed`: successful final message, operations and aggregate usage; a filter may add a receipt or reject completion persistence.
+- `ai.chat.failed`: error code, including admission/completion failures.
+- `ai.provider.before`: one provider round's server-generated `call_id`, configured maximum output and conservative `estimated_max_tokens` (UTF-8 input/tool bytes plus output and protocol allowance). Reserve application capacity here.
+- `ai.provider.completed`: the same `call_id` and `usage: { totalTokens, estimated }`. Reconcile the reservation before the round returns.
+- `ai.provider.failed`: the same `call_id` and safe error code; release unfinished reservations. A later chat/tool failure does not undo provider rounds that have already completed.
+
+Context carries the verified caller, request id, native database/schema/services and storage through normal request service options. Provider credentials are absent from payloads. `totalTokens` uses reported non-negative integer usage when available; otherwise it is an explicitly marked estimate. Native HTTP chat responses expose aggregate `usage: { total_tokens, estimated }`. Internal assistant instances without a hook emitter retain the previous response shape.
+
+Business ledgers, reservations, expiry and failure recovery belong to extensions. Hooks alone do not provide a durable event queue or guarantee exact provider billing; preserve pending reservations and reconciliation evidence across crashes.

@@ -463,6 +463,9 @@ export class ItemsService extends BaseService {
   }
 
   async createOne(payload = {}) {
+    if (!transactionContext(this.database) && (typeof this.database.getConnection === 'function' || typeof this.database.beginTransaction === 'function')) {
+      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).createOne(payload));
+    }
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('create');
     const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create' });
@@ -490,6 +493,9 @@ export class ItemsService extends BaseService {
   }
 
   async createMany(payloads = []) {
+    if (!transactionContext(this.database) && (typeof this.database.getConnection === 'function' || typeof this.database.beginTransaction === 'function')) {
+      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).createMany(payloads));
+    }
     if (!Array.isArray(payloads) || payloads.length === 0) {
       throw serviceError('INVALID_PAYLOAD', 'createMany requires a non-empty array');
     }
@@ -536,6 +542,9 @@ export class ItemsService extends BaseService {
   }
 
   async updateOne(id, payload = {}) {
+    if (!transactionContext(this.database) && (typeof this.database.getConnection === 'function' || typeof this.database.beginTransaction === 'function')) {
+      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).updateOne(id, payload));
+    }
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('update');
     const filteredPayload = await this.filterMutation('items.update', payload, { operation: 'update', key: id });
@@ -571,6 +580,9 @@ export class ItemsService extends BaseService {
   }
 
   async updateMany(filterInput, payload = {}) {
+    if (!transactionContext(this.database) && (typeof this.database.getConnection === 'function' || typeof this.database.beginTransaction === 'function')) {
+      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).updateMany(filterInput, payload));
+    }
     if (!filterInput || typeof filterInput !== 'object' || Array.isArray(filterInput) || Object.keys(filterInput).length === 0) {
       throw serviceError('FILTER_REQUIRED', 'updateMany requires an explicit non-empty filter');
     }
@@ -612,6 +624,9 @@ export class ItemsService extends BaseService {
   }
 
   async deleteOne(id) {
+    if (!transactionContext(this.database) && (typeof this.database.getConnection === 'function' || typeof this.database.beginTransaction === 'function')) {
+      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).deleteOne(id));
+    }
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('delete');
     const filtered = await this.filterMutation('items.delete', { key: id }, { operation: 'delete', key: id });
@@ -629,6 +644,9 @@ export class ItemsService extends BaseService {
   }
 
   async deleteMany(filterInput) {
+    if (!transactionContext(this.database) && (typeof this.database.getConnection === 'function' || typeof this.database.beginTransaction === 'function')) {
+      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).deleteMany(filterInput));
+    }
     if (!filterInput || typeof filterInput !== 'object' || Array.isArray(filterInput) || Object.keys(filterInput).length === 0) {
       throw serviceError('FILTER_REQUIRED', 'deleteMany requires an explicit non-empty filter');
     }

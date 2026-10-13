@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { serviceOptionsFromRequest } from '../service-options.js';
 import { canonicalStudioLocale, STUDIO_LOCALE_CODES } from '@yunsoft/yuncms-core';
 
 import {
@@ -122,13 +124,14 @@ function providerAssistantMessage(message, toolCalls) {
 }
 
 export class AiAssistantService {
-  constructor({ config = null, settingsStore = null, logger = console, fetchImpl = globalThis.fetch } = {}) {
+  constructor({ config = null, settingsStore = null, logger = console, fetchImpl = globalThis.fetch, emitter = null } = {}) {
     if (!config && !settingsStore) throw new Error('AI assistant config or settings store is required');
     if (typeof fetchImpl !== 'function') throw new Error('AI assistant requires fetch');
     this.config = config;
     this.settingsStore = settingsStore;
     this.logger = logger;
     this.fetchImpl = fetchImpl;
+    this.emitter = emitter;
   }
 
   async settings() {
@@ -146,7 +149,23 @@ export class AiAssistantService {
     };
   }
 
-  async #providerCompletion(messages, tools, config) {
+  async #providerCompletion(messages, tools, config, req = null) {
+    if (!this.emitter || !req) return this.#executeProviderRequest(messages, tools, config);
+    const context = { ...serviceOptionsFromRequest(req), services: req.context.services };
+    const admission = { call_id: randomUUID(), max_output_tokens: config.maxOutputTokens,
+      estimated_max_tokens: Buffer.byteLength(JSON.stringify(messages) + JSON.stringify(tools), 'utf8') + config.maxOutputTokens + 1024 };
+    try {
+      await this.emitter.filter('ai.provider.before', admission, context);
+      const result = await this.#executeProviderRequest(messages, tools, config);
+      await this.emitter.filter('ai.provider.completed', { call_id: admission.call_id, usage: result.nativeUsage }, context);
+      return result;
+    } catch (error) {
+      await this.emitter.action('ai.provider.failed', { call_id: admission.call_id, code: error.code || 'AI_PROVIDER_UNAVAILABLE' }, context);
+      throw error;
+    }
+  }
+
+  async #executeProviderRequest(messages, tools, config) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
     timeout.unref?.();
@@ -198,7 +217,7 @@ export class AiAssistantService {
     if (!message || message.role !== 'assistant') {
       throw aiError('AI_PROVIDER_RESPONSE_INVALID', 'AI provider returned an invalid completion');
     }
-    return message;
+    return { ...message, nativeUsage: { totalTokens: Number.isSafeInteger(payload.usage?.total_tokens) && payload.usage.total_tokens >= 0 ? payload.usage.total_tokens : Math.ceil((JSON.stringify(messages).length + JSON.stringify(message).length) / 4), estimated: !Number.isSafeInteger(payload.usage?.total_tokens) || payload.usage.total_tokens < 0 } };
   }
 
   async generateFields({ instruction, input, outputFields }) {
@@ -216,7 +235,21 @@ export class AiAssistantService {
     return safeJsonParse(normalizeAssistantContent(message.content));
   }
 
-  async chat(req, {
+  async chat(req, input = {}) {
+    if (!this.emitter) return this.#executeChat(req, input);
+    if (req?.authMethod === 'public' || !req?.accountability?.user) throw aiError('UNAUTHORIZED', 'The AI assistant requires an authenticated YunCMS account');
+    const context = { ...serviceOptionsFromRequest(req), services: req.context.services };
+    try {
+      await this.emitter.filter('ai.chat.before', structuredClone(input), context);
+      const result = await this.#executeChat(req, input);
+      return await this.emitter.filter('ai.chat.completed', result, context);
+    } catch (error) {
+      await this.emitter.action('ai.chat.failed', { code: error.code || 'AI_PROVIDER_UNAVAILABLE' }, context);
+      throw error;
+    }
+  }
+
+  async #executeChat(req, {
     messages,
     locale = 'en',
     allowWrites = false,
@@ -244,9 +277,12 @@ export class AiAssistantService {
       ...conversation,
     ];
     const operations = [];
+    let totalTokens = 0, estimated = false;
 
     for (let round = 0; round <= config.maxToolRounds; round += 1) {
-      const assistantMessage = await this.#providerCompletion(providerMessages, tools, config);
+      const assistantMessage = await this.#providerCompletion(providerMessages, tools, config, req);
+      totalTokens += assistantMessage.nativeUsage.totalTokens;
+      estimated ||= assistantMessage.nativeUsage.estimated;
       const toolCalls = normalizeToolCalls(
         assistantMessage.tool_calls,
         config.maxToolCallsPerRound ?? 8,
@@ -256,6 +292,7 @@ export class AiAssistantService {
         if (!content) throw aiError('AI_PROVIDER_RESPONSE_INVALID', 'AI provider returned an empty response');
         return {
           message: content,
+          ...(this.emitter ? { usage: { total_tokens: totalTokens, estimated } } : {}),
           operations,
           writes_enabled: writesEnabled,
           deletes_enabled: deletesEnabled,
