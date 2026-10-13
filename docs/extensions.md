@@ -61,6 +61,7 @@ Each package needs a `yuncms` block in `package.json`:
 Manifest rules:
 
 - `type` is `endpoint` or `hook`;
+- endpoint manifests may opt into `"rawBody": true`. For JSON requests to that endpoint, `req.rawBody` is a Buffer containing the original bytes and `req.body` remains parsed JSON. The normal 1 MiB limit, authentication, request context and error handling apply. Signature verification must use `req.rawBody`, never reserialized JSON; the extension must validate its provider signature and replay policy before side effects. This option accepts identity content encoding only (compressed requests return 415), preserving received bytes. Other endpoint/core requests do not receive `rawBody`;
 - `id` uses URL-safe lowercase letters, numbers, `_` or `-` and is at most 64 characters;
 - `entry` must resolve inside the extension package root;
 - duplicate extension ids fail startup;

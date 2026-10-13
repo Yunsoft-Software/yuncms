@@ -145,7 +145,23 @@ export function createApp({
   app.use(securityHeaders);
   app.use(studioCors(config));
   app.use(requestIdentity);
-  app.use(express.json({ limit: '1mb' }));
+  const rawBodyPrefixes = endpointExtensions.filter(extension => extension.manifest?.rawBody === true)
+    .map(extension => `/extensions/${encodeURIComponent(extension.id)}`.toLowerCase());
+  function wantsRawBody(req) {
+    const path = req.path.toLowerCase();
+    return rawBodyPrefixes.some(prefix => path === prefix || path.startsWith(`${prefix}/`));
+  }
+  app.use((req, _res, next) => {
+    if (wantsRawBody(req) && req.headers['content-encoding'] && req.headers['content-encoding'].toLowerCase() !== 'identity') {
+      const error = new Error('Signed raw-body extension requests require identity content encoding');
+      error.code = 'UNSUPPORTED_CONTENT_ENCODING';
+      return next(error);
+    }
+    next();
+  });
+  app.use(express.json({ limit: '1mb', verify(req, _res, buffer) {
+    if (wantsRawBody(req)) Object.defineProperty(req, 'rawBody', { value: Buffer.from(buffer) });
+  } }));
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', request_id: req.id });

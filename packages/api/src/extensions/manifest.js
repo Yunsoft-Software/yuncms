@@ -23,6 +23,9 @@ export function validateExtensionManifest(packageJson, packageRoot) {
   }
 
   const manifest = packageJson.yuncms;
+  if (manifest.rawBody !== undefined && (typeof manifest.rawBody !== 'boolean' || manifest.type !== 'endpoint')) {
+    throw extensionError('INVALID_EXTENSION_MANIFEST', 'rawBody must be a boolean on an endpoint extension');
+  }
   const type = manifest.type;
   if (!TYPES.has(type)) {
     throw extensionError(
@@ -61,5 +64,6 @@ export function validateExtensionManifest(packageJson, packageRoot) {
     entry,
     packageName: packageJson.name ?? id,
     packageRoot: root,
+    ...(manifest.rawBody === true ? { rawBody: true } : {}),
   });
 }
