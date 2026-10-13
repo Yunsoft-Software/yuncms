@@ -154,13 +154,15 @@ export class AiAssistantService {
     const context = { ...serviceOptionsFromRequest(req), services: req.context.services };
     const admission = { call_id: randomUUID(), max_output_tokens: config.maxOutputTokens,
       estimated_max_tokens: Buffer.byteLength(JSON.stringify(messages) + JSON.stringify(tools), 'utf8') + config.maxOutputTokens + 1024 };
+    let completedUsage = null;
     try {
       await this.emitter.filter('ai.provider.before', admission, context);
       const result = await this.#executeProviderRequest(messages, tools, config);
+      completedUsage = result.nativeUsage;
       await this.emitter.filter('ai.provider.completed', { call_id: admission.call_id, usage: result.nativeUsage }, context);
       return result;
     } catch (error) {
-      await this.emitter.action('ai.provider.failed', { call_id: admission.call_id, code: error.code || 'AI_PROVIDER_UNAVAILABLE' }, context);
+      await this.emitter.action('ai.provider.failed', { call_id: admission.call_id, code: error.code || 'AI_PROVIDER_UNAVAILABLE', provider_completed: completedUsage !== null, usage: completedUsage }, context);
       throw error;
     }
   }

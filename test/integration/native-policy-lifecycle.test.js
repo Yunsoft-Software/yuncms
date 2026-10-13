@@ -79,10 +79,11 @@ test('real native API/provider: AI admission denies before work and exposes comp
     apiKey: provider.OPENROUTER_API_KEY || provider.OPENROUTER_KEY || provider.AI_API_KEY,
     model: provider.AI_CHAT_MODEL, baseUrl: provider.OPENROUTER_BASE_URL || provider.AI_BASE_URL || 'https://openrouter.ai/api/v1',
   }, emitter });
+  const providerFailurePayloads = [];
   let deny = true, complete = 0, failed = 0, providerStarted = 0, providerCompleted = 0, providerFailed = 0;
   emitter.registerFilter('ai.provider.before', payload => { providerStarted++; assert.ok(payload.estimated_max_tokens > 0); assert.match(payload.call_id, /^[a-f0-9-]{36}$/); return payload; });
   emitter.registerFilter('ai.provider.completed', payload => { providerCompleted++; assert.ok(payload.usage.totalTokens >= 0); return payload; });
-  emitter.registerAction('ai.provider.failed', () => { providerFailed++; });
+  emitter.registerAction('ai.provider.failed', payload => { providerFailed++; providerFailurePayloads.push(payload); });
   emitter.registerFilter('ai.chat.before', (payload, context) => {
     assert.equal(context.accountability.user, user.id);
     assert.equal(context.database, database);
@@ -115,9 +116,15 @@ test('real native API/provider: AI admission denies before work and exposes comp
   assert.equal((await request()).status, 409);
   assert.equal(failed, 2);
   remove();
+  const removeProviderFailure = emitter.registerFilter('ai.provider.completed', () => { throw new ExtensionError('COMPLETION_STORAGE_UNAVAILABLE', 'Cannot settle usage.', { status: 409 }); });
+  assert.equal((await request()).status, 409);
+  assert.equal(providerFailurePayloads[0].provider_completed, true);
+  assert.ok(providerFailurePayloads[0].usage.totalTokens > 0);
+  removeProviderFailure();
   assistant.config.model = 'invalid-model-' + randomUUID();
   assert.equal((await request()).status, 502);
-  assert.equal(providerStarted, 3);
-  assert.equal(providerCompleted, 2);
-  assert.equal(providerFailed, 1);
+  assert.equal(providerStarted, 4);
+  assert.equal(providerCompleted, 3);
+  assert.equal(providerFailed, 2);
+  assert.equal(providerFailurePayloads[1].provider_completed, false);
 });
