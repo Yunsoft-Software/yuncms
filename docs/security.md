@@ -127,3 +127,5 @@ API errors with status 500 or higher return a generic message and omit diagnosti
 ## Production verification
 
 Source controls are not a substitute for execution. Complete the real MySQL, SMTP, S3/reconciliation, auth replay, RBAC/validation, relation expansion, concurrency, logging-redaction, security-header and graceful-shutdown checks in [Production Readiness](production-readiness.md) before exposing a deployment.
+
+For container deployments, also run the per-architecture [OS package scan](docker.md#scan-operating-system-packages) against the deployed digest and review upstream Node.js/MySQL advisories. The image applies Debian package updates and removes inherited SUID/SGID permissions, but scanner findings and deployment boundaries still need assessment.

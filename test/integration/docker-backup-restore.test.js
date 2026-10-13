@@ -103,6 +103,26 @@ test('Docker container backup and restore round trip preserves generated columns
   assert.match(mysqldumpVersion, /MySQL/i, `Container mysqldump client must identify as MySQL, got: ${mysqldumpVersion}`);
   assert.doesNotMatch(mysqldumpVersion, /MariaDB/i, `Container mysqldump client must not identify as MariaDB, got: ${mysqldumpVersion}`);
 
+  // Check the actual image, including the distro security floors from the OS audit.
+  const osVersion = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'sh', imageName,
+    '-c', '. /etc/os-release; printf "%s:%s" "$ID" "$VERSION_ID"']).trim();
+  assert.equal(osVersion, 'debian:13');
+  const privilegedFiles = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'find', imageName,
+    '/usr', '/opt', '-xdev', '-type', 'f', '-perm', '/6000', '-print']).trim();
+  assert.equal(privilegedFiles, '', 'Image must not retain SUID or SGID files');
+  runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'sh', imageName,
+    '-c', 'test ! -e /usr/bin/infocmp']);
+  for (const [pkg, floor] of [
+    ['perl-base', '5.40.1-6+deb13u1'],
+    ['libssl3t64', '3.5.7-1~deb13u3'],
+    ['gzip', '1.13-1+deb13u1'],
+    ['util-linux', '2.41.5-0+deb13u1'],
+  ]) {
+    runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'sh', imageName,
+      '-c', 'installed=$(dpkg-query -W -f="${Version}" "$1"); dpkg --compare-versions "$installed" ge "$2"',
+      'security-floor', pkg, floor]);
+  }
+
   // 3. Track and provision isolated Docker resources
   const created = {
     network: false,

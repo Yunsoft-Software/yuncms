@@ -15,16 +15,16 @@ test('Docker runtime is a Node 24 non-root image with the complete YunCMS CLI co
   const dockerfile = await readRootFile('Dockerfile');
 
   assert.match(dockerfile, /^FROM mysql:8\.4 AS mysql-client$/m);
-  assert.match(dockerfile, /^FROM node:24-bookworm-slim AS build$/m);
-  assert.match(dockerfile, /^FROM --platform=\$BUILDPLATFORM node:24-bookworm-slim AS studio-build$/m);
-  assert.match(dockerfile, /^FROM node:24-bookworm-slim AS runtime$/m);
+  assert.match(dockerfile, /^FROM node:24-trixie-slim AS build$/m);
+  assert.match(dockerfile, /^FROM --platform=\$BUILDPLATFORM node:24-trixie-slim AS studio-build$/m);
+  assert.match(dockerfile, /^FROM node:24-trixie-slim AS runtime$/m);
   assert.match(dockerfile, /npm run build:studio/);
   assert.match(dockerfile, /npm ci --omit=dev/);
   assert.match(dockerfile, /^COPY --from=studio-build \/opt\/yuncms\/packages\/api\/studio-dist \/opt\/yuncms\/packages\/api\/studio-dist$/m);
-  const dependencyStage = dockerfile.split('FROM node:24-bookworm-slim AS build')[1].split('FROM node:24-bookworm-slim AS runtime')[0];
+  const dependencyStage = dockerfile.split('FROM node:24-trixie-slim AS build')[1].split('FROM node:24-trixie-slim AS runtime')[0];
   assert.doesNotMatch(dependencyStage, /npm run build:studio|npm ci\s*$/m);
   assert.doesNotMatch(dockerfile, /default-mysql-client/);
-  for (const pkg of ['ca-certificates', 'libncurses6', 'libssl3', 'libstdc++6', 'libtinfo6', 'tini', 'zlib1g']) {
+  for (const pkg of ['ca-certificates', 'libncurses6', 'libssl3t64', 'libstdc++6', 'libtinfo6', 'tini', 'zlib1g']) {
     const escaped = pkg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     assert.match(dockerfile, new RegExp(`\\b${escaped}\\b`));
   }
@@ -43,6 +43,16 @@ test('Docker runtime is a Node 24 non-root image with the complete YunCMS CLI co
   assert.match(dockerfile, /\/ready/);
   assert.match(dockerfile, /ENTRYPOINT \["tini", "--", "node", "\/opt\/yuncms\/packages\/cli\/bin\/yuncms\.js"\]/);
   assert.match(dockerfile, /^CMD \["start"\]$/m);
+});
+
+test('Docker runtime applies distro updates and removes unused privilege escalation and infocmp', async () => {
+  const dockerfile = await readRootFile('Dockerfile');
+  const runtime = dockerfile.split('FROM node:24-trixie-slim AS runtime')[1];
+  assert.match(runtime, /apt-get update\s*\\\n\s*&& apt-get upgrade -y\s*\\\n\s*&& apt-get install -y --no-install-recommends/);
+  assert.match(runtime, /rm -f \/usr\/bin\/infocmp/);
+  assert.match(runtime, /find \/usr \/opt -xdev -type f -perm \/6000 -exec chmod a-s \{\} \+/);
+  assert.ok(runtime.indexOf('chmod a-s') < runtime.indexOf('\nUSER node'));
+  assert.doesNotMatch(runtime, /allow-unauthenticated|allow-insecure-repositories/);
 });
 
 test('Compose keeps MySQL and YunCMS state persistent and pins the current YunCMS release', async () => {
@@ -89,6 +99,13 @@ test('Docker build command uses versioned and latest tags and multi-platform pub
   assert.ok(build.args.includes('example/yuncms:1.2.3'));
   assert.ok(build.args.includes('example/yuncms:latest'));
   assert.ok(build.args.includes('VCS_REF=abc123'));
+});
+
+test('Docker builds refresh upstream bases in local and publishing modes', () => {
+  for (const options of [{}, { load: true }, { push: true }]) {
+    const build = createDockerBuildArguments({ ...options, version: '1.2.3', revision: 'abc123' });
+    assert.deepEqual(build.args.slice(0, 3), ['buildx', 'build', '--pull']);
+  }
 });
 
 test('Docker build context excludes local dependencies, state and credentials', async () => {

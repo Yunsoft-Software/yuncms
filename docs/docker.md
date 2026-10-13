@@ -16,6 +16,8 @@ The supported architectures are `linux/amd64` and `linux/arm64`. Use a version t
 
 Node.js and npm are already included in the YunCMS image. The Compose stack supplies MySQL 8.4.
 
+The image uses the official Node.js 24 Debian 13 (`trixie-slim`) base. Runtime builds apply available Debian package upgrades before installing the MySQL client libraries. SUID/SGID permission bits are removed from shipped files, and the unused `infocmp` command is excluded; the ncurses libraries required by `mysql` remain available. Container extensions must run with the same unprivileged user as YunCMS.
+
 ## Start with Docker Compose
 
 Create an empty deployment directory and download the maintained Compose files:
@@ -171,7 +173,21 @@ docker login
 npm run docker:publish
 ```
 
-Publishing targets `linux/amd64` and `linux/arm64`, includes OCI provenance/SBOM attestations, and pushes the versioned and `latest` tags. Set `YUNCMS_DOCKER_IMAGE` when publishing outside the official namespace.
+Build commands use `--pull` to refresh upstream base images. Publishing targets `linux/amd64` and `linux/arm64`, includes OCI provenance/SBOM attestations, and pushes the versioned and `latest` tags. Set `YUNCMS_DOCKER_IMAGE` when publishing outside the official namespace.
+
+## Scan operating-system packages
+
+Install a current [Trivy release](https://github.com/aquasecurity/trivy/releases) and scan each architecture of the exact deployed image digest. Replace `<image-digest>` with the manifest digest reported by `docker buildx imagetools inspect yunsoftofficial/yuncms:<version>`:
+
+```bash
+trivy image --download-db-only
+trivy image --image-src remote --platform linux/amd64 --scanners vuln --pkg-types os --ignorefile '' --format json --output os-amd64.json yunsoftofficial/yuncms@sha256:<image-digest>
+trivy image --image-src remote --platform linux/arm64 --scanners vuln --pkg-types os --ignorefile '' --format json --output os-arm64.json yunsoftofficial/yuncms@sha256:<image-digest>
+```
+
+These commands retain all severities and unfixed findings. Record the image digest, scan time and `trivy version` database metadata with the reports. Verify package versions and advisory status against the [Debian Security Tracker](https://security-tracker.debian.org/tracker/): a source-package match may concern a binary or module that is absent from the image, while a deferred vendor fix still requires a documented risk assessment. Do not treat an empty fixable list as proof that every component is secure.
+
+An OS package scan covers Debian-managed packages. The copied official MySQL client binaries, Node.js and its bundled libraries require their own upstream advisory review; npm dependencies require a separate npm audit. Host-kernel, container-engine and deployment configuration security also remain operator responsibilities. Apply later security releases by replacing the image using the update procedure above.
 
 ## Integration testing with Docker
 

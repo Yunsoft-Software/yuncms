@@ -2,7 +2,7 @@
 
 FROM mysql:8.4 AS mysql-client
 
-FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS studio-build
+FROM --platform=$BUILDPLATFORM node:24-trixie-slim AS studio-build
 
 WORKDIR /opt/yuncms
 
@@ -20,7 +20,7 @@ COPY packages packages
 
 RUN npm run build:studio
 
-FROM node:24-bookworm-slim AS build
+FROM node:24-trixie-slim AS build
 
 WORKDIR /opt/yuncms
 
@@ -36,7 +36,7 @@ RUN npm ci --omit=dev
 COPY packages packages
 COPY --from=studio-build /opt/yuncms/packages/api/studio-dist /opt/yuncms/packages/api/studio-dist
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:24-trixie-slim AS runtime
 
 ARG BUILD_DATE
 ARG VERSION=dev
@@ -53,10 +53,11 @@ LABEL org.opencontainers.image.title="YunCMS" \
   org.opencontainers.image.revision="${VCS_REF}"
 
 RUN apt-get update \
+  && apt-get upgrade -y \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     libncurses6 \
-    libssl3 \
+    libssl3t64 \
     libstdc++6 \
     libtinfo6 \
     tini \
@@ -89,6 +90,11 @@ COPY --from=build --chown=node:node /opt/yuncms/package.json /opt/yuncms/package
 COPY --from=build --chown=node:node /opt/yuncms/node_modules /opt/yuncms/node_modules
 COPY --from=build --chown=node:node /opt/yuncms/packages /opt/yuncms/packages
 COPY --chown=node:node LICENSE /opt/yuncms/LICENSE
+
+# YunCMS needs the ncurses libraries, but never executes the infocmp parser.
+# Neither the CLI nor trusted extensions need inherited privilege escalation.
+RUN rm -f /usr/bin/infocmp \
+  && find /usr /opt -xdev -type f -perm /6000 -exec chmod a-s {} +
 
 USER node
 

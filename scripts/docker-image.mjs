@@ -41,6 +41,7 @@ export function createDockerBuildArguments({
   const args = [
     'buildx',
     'build',
+    '--pull',
     '--build-arg',
     `BUILD_DATE=${buildDate}`,
     '--build-arg',
