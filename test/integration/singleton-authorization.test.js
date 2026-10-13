@@ -237,6 +237,8 @@ test('singleton collection enforces create permission before occupancy checks or
     assert.ok(authorizedPost.status === 200 || authorizedPost.status === 201);
     assert.equal(authorizedPost.payload?.data?.title, 'Authorized Initial');
 
+    await assert.rejects(creatorService.createMany([]), error => error.code === 'SINGLETON_BULK_CREATE_FORBIDDEN');
+
     // 6. Occupied singleton: unauthorized HTTP POST and service calls must still receive 403 FORBIDDEN (not 409!)
     const occupiedUnauthorizedPost = await apiRequest(`/items/${collection}`, {
       method: 'POST',

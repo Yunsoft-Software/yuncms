@@ -34,6 +34,7 @@ const FAST_TESTS = [
   'packages/core/test/native-write-filters.test.js',
   'packages/core/test/native-reference.test.js',
   'packages/core/test/native-admission.test.js',
+  'packages/core/test/database-lock-name.test.js',
   'packages/core/test/items-large-fields.test.js',
   'packages/core/test/maintenance-state.test.js',
   'packages/core/test/production-config.test.js',
@@ -67,6 +68,7 @@ const FAST_TESTS = [
 
   'packages/api/test/authentication.test.js',
   'packages/api/test/ai-secret-key.test.js',
+  'packages/api/test/ai-service.test.js',
   'packages/api/test/automations.test.js',
   'packages/api/test/byte-range.test.js',
   'packages/api/test/error-response.test.js',

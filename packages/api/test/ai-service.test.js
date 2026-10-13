@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { STUDIO_LOCALE_CODES } from '@yunsoft/yuncms-core';
+import { HookEmitter } from '@yunsoft/yuncms-core';
+import { ExtensionError } from '@yunsoft/yuncms-extensions-sdk';
 
 import {
   AI_REPLY_LANGUAGE_BY_LOCALE,
@@ -52,6 +54,27 @@ function request(ItemsService = class {}) {
     },
   };
 }
+
+test('native AI admission rejects before provider work and retains verified accountability', async () => {
+  const emitter = new HookEmitter(); let calls = 0, filters = 0;
+  emitter.registerFilter('ai.chat.before', (_payload, context) => { filters++; assert.equal(context.accountability.user, 'user-1'); throw new ExtensionError('CAPACITY_EXHAUSTED', 'Capacity exhausted', { status: 402 }); });
+  const service = new AiAssistantService({ config: config(), emitter, fetchImpl: async () => { calls++; assert.fail('vetoed provider work'); } });
+  await assert.rejects(service.chat(request(), { messages: [{ role: 'user', content: 'hello' }] }), { code: 'CAPACITY_EXHAUSTED', status: 402 });
+  const anonymous = request(); anonymous.authMethod = 'public'; anonymous.accountability.user = null;
+  await assert.rejects(service.chat(anonymous, {}), { code: 'UNAUTHORIZED' });
+  assert.equal(calls, 0); assert.equal(filters, 1);
+});
+
+test('provider round identifiers and usage survive completion-hook failure without exposing secrets', async () => {
+  const emitter = new HookEmitter(), failed = []; let admission;
+  emitter.registerFilter('ai.provider.before', payload => { admission = { ...payload }; assert.ok(payload.estimated_max_tokens > config().maxOutputTokens); });
+  emitter.registerFilter('ai.provider.completed', payload => { assert.equal(payload.call_id, admission.call_id); assert.deepEqual(payload.usage, { totalTokens: 17, estimated: false }); throw new ExtensionError('SETTLEMENT_FAILED', 'Settlement failed', { status: 409 }); });
+  emitter.registerAction('ai.provider.failed', payload => failed.push(payload));
+  const service = new AiAssistantService({ config: config(), emitter, fetchImpl: async () => okResponse({ choices: [{ message: { role: 'assistant', content: 'OK' } }], usage: { total_tokens: 17 } }) });
+  await assert.rejects(service.chat(request(), { messages: [{ role: 'user', content: 'hello' }] }), { code: 'SETTLEMENT_FAILED', status: 409 });
+  assert.match(admission.call_id, /^[a-f0-9-]{36}$/); assert.equal(failed[0].provider_completed, true); assert.equal(failed[0].usage.totalTokens, 17);
+  assert.equal(JSON.stringify({ admission, failed }).includes('top-secret-key'), false);
+});
 
 test('AI conversation accepts only bounded user/assistant history and requires a user turn last', () => {
   const settings = config();

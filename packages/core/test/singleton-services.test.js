@@ -75,6 +75,9 @@ const singletonSchema = {
 function createMockPool({ occupied = false, permission = null } = {}) {
   const calls = [];
   const connection = {
+    async beginTransaction() { calls.push('begin'); },
+    async commit() { calls.push('commit'); },
+    async rollback() { calls.push('rollback'); },
     release() { calls.push('release'); },
     async query(sql, params = []) {
       const normalized = sql.replace(/\s+/g, ' ').trim();

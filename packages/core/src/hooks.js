@@ -8,6 +8,12 @@ function hookError(code, message) {
 }
 
 export const HOOK_EVENTS = Object.freeze({
+  aiProviderBefore: 'ai.provider.before',
+  aiProviderCompleted: 'ai.provider.completed',
+  aiProviderFailed: 'ai.provider.failed',
+  aiChatBefore: 'ai.chat.before',
+  aiChatCompleted: 'ai.chat.completed',
+  aiChatFailed: 'ai.chat.failed',
   itemQuery: 'items.query',
   itemRead: 'items.read',
   itemCreate: 'items.create',

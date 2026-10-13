@@ -115,7 +115,7 @@ test('commit failure discards actions and action failure never rolls back a comm
   assert.deepEqual(committed.calls, ['begin', 'commit', 'release']);
 });
 
-test('transactions preserve deny-by-default authorization and ordinary autocommit actions', async () => {
+test('native mutations preserve deny-by-default authorization and start managed transactions', async () => {
   const f = fixture();
   await assert.rejects(withTransaction(f.pool, connection => new ItemsService('projects', {
     database: connection, schema, emitter: f.emitter, accountability: createPublicAccountability(),
@@ -123,7 +123,7 @@ test('transactions preserve deny-by-default authorization and ordinary autocommi
   assert.equal(f.events.length, 0);
   await f.items(f.pool).createOne({ title: 'Demo' });
   assert.equal(f.events.length, 1);
-  assert.equal(f.events[0].context.transaction, null);
+  assert.deepEqual(f.events[0].context.transaction, { managed: true, state: 'committed' });
 });
 
 test('deferred actions stay isolated across concurrent connections and a reused rolled-back connection', async () => {

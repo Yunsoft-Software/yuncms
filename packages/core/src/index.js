@@ -110,7 +110,7 @@ export {
   compileSearch,
   compileAggregate,
 } from './query.js';
-export { withAdvisoryLock } from './advisory-lock.js';
+export { withAdvisoryLock, databaseAdvisoryLockName } from './advisory-lock.js';
 export {
   ensureMigrationJournal,
   readAppliedMigrations,
