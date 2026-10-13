@@ -10,6 +10,8 @@ YunCMS is developed by [Yunsoft](https://yunsoft.com). Have a project, integrati
 
 Requires **Node.js 24**, npm 11 and MySQL 8. Use a dedicated empty database, never an existing installation. Setup refuses database names outside `yuncms_example_dev_*` and refuses non-empty databases. It never drops data. If setup fails midway, use a new empty example database; it does not attempt a destructive reset.
 
+The development file server denies local account/state/verification files, native `.yuncms` runtime state and `uploads`, alongside environment, certificate and Git files. Protected file bytes must be read through the native Files API. Keep the dev server on loopback; Git ignore rules alone do not prevent HTTP file exposure.
+
 ```bash
 cd examples/react-support-desk
 npm ci

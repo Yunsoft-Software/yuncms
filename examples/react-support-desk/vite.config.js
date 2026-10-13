@@ -6,6 +6,13 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      fs: {
+        deny: [
+          ".env", ".env.*", "*.{crt,pem}", "**/.git/**",
+          "**/.demo-accounts.json", "**/.demo-state.json", "**/.verification*.json",
+          "**/.yuncms/**", "**/uploads/**",
+        ],
+      },
       proxy: {
         "/api": {
           target: env.VITE_CMS_TARGET || "http://127.0.0.1:3058",
