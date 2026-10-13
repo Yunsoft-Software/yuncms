@@ -17,22 +17,27 @@ test('Docker runtime is a Node 24 non-root image with the complete YunCMS CLI co
   assert.match(dockerfile, /^FROM mysql:8\.4 AS mysql-client$/m);
   assert.match(dockerfile, /^FROM node:24-trixie-slim AS build$/m);
   assert.match(dockerfile, /^FROM --platform=\$BUILDPLATFORM node:24-trixie-slim AS studio-build$/m);
-  assert.match(dockerfile, /^FROM node:24-trixie-slim AS runtime$/m);
+  assert.match(dockerfile, /^FROM cgr\.dev\/chainguard\/wolfi-base:latest AS runtime$/m);
   assert.match(dockerfile, /npm run build:studio/);
   assert.match(dockerfile, /npm ci --omit=dev/);
   assert.match(dockerfile, /^COPY --from=studio-build \/opt\/yuncms\/packages\/api\/studio-dist \/opt\/yuncms\/packages\/api\/studio-dist$/m);
-  const dependencyStage = dockerfile.split('FROM node:24-trixie-slim AS build')[1].split('FROM node:24-trixie-slim AS runtime')[0];
+  const dependencyStage = dockerfile.split('FROM node:24-trixie-slim AS build')[1].split('FROM cgr.dev/chainguard/wolfi-base:latest AS runtime')[0];
   assert.doesNotMatch(dependencyStage, /npm run build:studio|npm ci\s*$/m);
   assert.doesNotMatch(dockerfile, /default-mysql-client/);
-  for (const pkg of ['ca-certificates', 'libncurses6', 'libssl3t64', 'libstdc++6', 'libtinfo6', 'tini', 'zlib1g']) {
+  for (const pkg of ['ca-certificates-bundle', 'libcrypto3', 'libssl3', 'libstdc++', 'ncurses', 'tini', 'zlib']) {
     const escaped = pkg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    assert.match(dockerfile, new RegExp(`\\b${escaped}\\b`));
+    assert.match(dockerfile, new RegExp(`^\\s+${escaped} \\\\$`, 'm'));
   }
+  assert.match(dockerfile, /^COPY --from=build \/usr\/local \/usr\/local$/m);
+  assert.match(dockerfile, /addgroup -g 1000 node/);
+  assert.match(dockerfile, /adduser -D -u 1000 -G node node/);
   assert.match(dockerfile, /^COPY --from=mysql-client \/usr\/bin\/mysql \/usr\/bin\/mysql$/m);
   assert.match(dockerfile, /^COPY --from=mysql-client \/usr\/bin\/mysqldump \/usr\/bin\/mysqldump$/m);
   assert.match(dockerfile, /^COPY --from=mysql-client \/usr\/share\/doc\/mysql-community-server-minimal\/LICENSE \/usr\/share\/doc\/yuncms-mysql-client\/LICENSE$/m);
-  assert.match(dockerfile, /ldd \/usr\/bin\/mysql/);
-  assert.match(dockerfile, /ldd \/usr\/bin\/mysqldump/);
+  assert.match(dockerfile, /LD_TRACE_LOADED_OBJECTS=1 \/usr\/local\/bin\/node/);
+  assert.match(dockerfile, /LD_TRACE_LOADED_OBJECTS=1 \/usr\/bin\/mysql/);
+  assert.match(dockerfile, /LD_TRACE_LOADED_OBJECTS=1 \/usr\/bin\/mysqldump/);
+  assert.match(dockerfile, /npm --version/);
   assert.match(dockerfile, /mysql --version/);
   assert.match(dockerfile, /mysqldump --version/);
   assert.match(dockerfile, /! mysql --version \| grep -qi "mariadb"/);
@@ -47,12 +52,12 @@ test('Docker runtime is a Node 24 non-root image with the complete YunCMS CLI co
 
 test('Docker runtime applies distro updates and removes unused privilege escalation and infocmp', async () => {
   const dockerfile = await readRootFile('Dockerfile');
-  const runtime = dockerfile.split('FROM node:24-trixie-slim AS runtime')[1];
-  assert.match(runtime, /apt-get update\s*\\\n\s*&& apt-get upgrade -y\s*\\\n\s*&& apt-get install -y --no-install-recommends/);
+  const runtime = dockerfile.split('FROM cgr.dev/chainguard/wolfi-base:latest AS runtime')[1];
+  assert.match(runtime, /apk upgrade --no-cache\s*\\\n\s*&& apk add --no-cache/);
   assert.match(runtime, /rm -f \/usr\/bin\/infocmp/);
   assert.match(runtime, /find \/usr \/opt -xdev -type f -perm \/6000 -exec chmod a-s \{\} \+/);
   assert.ok(runtime.indexOf('chmod a-s') < runtime.indexOf('\nUSER node'));
-  assert.doesNotMatch(runtime, /allow-unauthenticated|allow-insecure-repositories/);
+  assert.doesNotMatch(runtime, /allow-unauthenticated|allow-insecure-repositories|allow-untrusted|apt-get/);
 });
 
 test('Compose keeps MySQL and YunCMS state persistent and pins the current YunCMS release', async () => {

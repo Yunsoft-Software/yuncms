@@ -16,7 +16,9 @@ The supported architectures are `linux/amd64` and `linux/arm64`. Use a version t
 
 Node.js and npm are already included in the YunCMS image. The Compose stack supplies MySQL 8.4.
 
-The image uses the official Node.js 24 Debian 13 (`trixie-slim`) base. Runtime builds apply available Debian package upgrades before installing the MySQL client libraries. SUID/SGID permission bits are removed from shipped files, and the unused `infocmp` command is excluded; the ncurses libraries required by `mysql` remain available. Container extensions must run with the same unprivileged user as YunCMS.
+The runtime image uses the [Wolfi glibc base](https://images.chainguard.dev/directory/image/wolfi-base/overview). The official Node.js 24 binary and its bundled npm are copied from the official Node build stage; the official MySQL 8.4 clients retain their native glibc ABI. Studio and dependency builds use the official Node.js 24 Debian 13 (`trixie-slim`) image. Runtime builds apply signed APK repository upgrades and install only the required client libraries. SUID/SGID permission bits are removed from shipped files, and the unused `infocmp` command is excluded. Container extensions run with the same unprivileged UID/GID 1000 as YunCMS.
+
+Wolfi is a rolling container distribution; the published YunCMS version tag captures a tested image. Replace the image when applying subsequent package updates. For an extension that requires additional operating-system commands, build a derived image with `apk add --no-cache <package>` as root during the build, then return to `USER node` and test its native dependencies. Debian `apt` package names and util-linux administration tools are not part of the runtime contract.
 
 ## Start with Docker Compose
 
@@ -185,9 +187,9 @@ trivy image --image-src remote --platform linux/amd64 --scanners vuln --pkg-type
 trivy image --image-src remote --platform linux/arm64 --scanners vuln --pkg-types os --ignorefile '' --format json --output os-arm64.json yunsoftofficial/yuncms@sha256:<image-digest>
 ```
 
-These commands retain all severities and unfixed findings. Record the image digest, scan time and `trivy version` database metadata with the reports. Verify package versions and advisory status against the [Debian Security Tracker](https://security-tracker.debian.org/tracker/): a source-package match may concern a binary or module that is absent from the image, while a deferred vendor fix still requires a documented risk assessment. Do not treat an empty fixable list as proof that every component is secure.
+These commands retain all severities and unfixed findings. Record the image digest, scan time and `trivy version` database metadata with the reports. Verify the detected OS and package inventory as well as advisory status against the [Wolfi advisories](https://github.com/wolfi-dev/advisories) and [Trivy Wolfi coverage](https://trivy.dev/docs/latest/coverage/os/wolfi/). For older Debian images, use the [Debian Security Tracker](https://security-tracker.debian.org/tracker/). A source-package match may concern a binary or module that is absent from the image, while a deferred vendor fix still requires a documented risk assessment. Do not treat an empty report as proof that every component is secure.
 
-An OS package scan covers Debian-managed packages. The copied official MySQL client binaries, Node.js and its bundled libraries require their own upstream advisory review; npm dependencies require a separate npm audit. Host-kernel, container-engine and deployment configuration security also remain operator responsibilities. Apply later security releases by replacing the image using the update procedure above.
+An OS package scan covers APK-managed runtime packages. The installed APK database and package license metadata remain in the image for inventory and scanner coverage. The copied official MySQL client binaries, Node.js and its bundled libraries require their own upstream advisory review; npm dependencies require a separate npm audit. Host-kernel, container-engine and deployment configuration security also remain operator responsibilities. Apply later security releases by replacing the image using the update procedure above.
 
 ## Integration testing with Docker
 

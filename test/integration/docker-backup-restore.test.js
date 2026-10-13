@@ -93,7 +93,7 @@ test('Docker container backup and restore round trip preserves generated columns
   assert.match(nodeVersion, /^v24\./, `Container Node version must be 24 LTS, got: ${nodeVersion}`);
 
   const uid = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'id', imageName, '-u']).trim();
-  assert.notEqual(uid, '0', `Container must not execute as root (UID 0), got: ${uid}`);
+  assert.equal(uid, '1000', `Container must execute as the stable unprivileged UID 1000, got: ${uid}`);
 
   const mysqlVersion = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'mysql', imageName, '--version']).trim();
   assert.match(mysqlVersion, /MySQL/i, `Container mysql client must identify as MySQL, got: ${mysqlVersion}`);
@@ -104,24 +104,39 @@ test('Docker container backup and restore round trip preserves generated columns
   assert.doesNotMatch(mysqldumpVersion, /MariaDB/i, `Container mysqldump client must not identify as MariaDB, got: ${mysqldumpVersion}`);
 
   // Check the actual image, including the distro security floors from the OS audit.
-  const osVersion = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'sh', imageName,
-    '-c', '. /etc/os-release; printf "%s:%s" "$ID" "$VERSION_ID"']).trim();
-  assert.equal(osVersion, 'debian:13');
+  const osId = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'sh', imageName,
+    '-c', '. /etc/os-release; printf "%s" "$ID"']).trim();
+  assert.equal(osId, 'wolfi');
   const privilegedFiles = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'find', imageName,
     '/usr', '/opt', '-xdev', '-type', 'f', '-perm', '/6000', '-print']).trim();
   assert.equal(privilegedFiles, '', 'Image must not retain SUID or SGID files');
   runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'sh', imageName,
     '-c', 'test ! -e /usr/bin/infocmp']);
-  for (const [pkg, floor] of [
-    ['perl-base', '5.40.1-6+deb13u1'],
-    ['libssl3t64', '3.5.7-1~deb13u3'],
-    ['gzip', '1.13-1+deb13u1'],
-    ['util-linux', '2.41.5-0+deb13u1'],
-  ]) {
-    runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'sh', imageName,
-      '-c', 'installed=$(dpkg-query -W -f "$3" "$1"); dpkg --compare-versions "$installed" ge "$2"',
-      'security-floor', pkg, floor, '${Version}']);
+  const installedPackages = JSON.parse(runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'node', imageName,
+    '-e', String.raw`const fs = require('node:fs'); const packages = Object.fromEntries(fs.readFileSync('/lib/apk/db/installed', 'utf8').trim().split('\n\n').map(record => { const fields = Object.fromEntries(record.split('\n').filter(line => /^[PV]:/.test(line)).map(line => [line[0], line.slice(2)])); return [fields.P, fields.V]; })); console.log(JSON.stringify(packages));`]));
+  for (const pkg of ['wolfi-base', 'wolfi-baselayout', 'busybox', 'tini', 'ncurses', 'libssl3', 'libcrypto3']) {
+    assert.ok(installedPackages[pkg], `Required runtime package must be present: ${pkg}`);
   }
+  for (const pkg of ['util-linux', 'mount', 'bsdutils', 'login', 'acl', 'libacl1', 'systemd', 'libsystemd0', 'libudev1', 'perl', 'perl-base']) {
+    assert.equal(installedPackages[pkg], undefined, `Unused vulnerable component must not be installed: ${pkg}`);
+  }
+  for (const [pkg, floor] of [
+    ['ncurses', '6.5.20251213-r0'],
+    ['openssl-4.0-libssl', '4.0.3-r0'],
+    ['openssl-4.0-libcrypto', '4.0.3-r0'],
+  ]) {
+    assert.ok(installedPackages[pkg], `Patched library must be present: ${pkg}`);
+    const comparison = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'apk', imageName,
+      'version', '-t', installedPackages[pkg], floor]).trim();
+    assert.ok(['=', '>'].includes(comparison), `Runtime package must meet security floor: ${pkg}`);
+  }
+  const npmVersion = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'npm', imageName, '--version']).trim();
+  assert.ok(Number(npmVersion.split('.')[0]) >= 11, 'Official Node 24 bundled npm must remain executable');
+  const privilegeState = JSON.parse(runDocker(['run', '--rm', '--platform', targetPlatform,
+    '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--read-only', '--entrypoint', 'node', imageName,
+    '-e', String.raw`const fs = require('node:fs'); const status = fs.readFileSync('/proc/self/status', 'utf8'); console.log(JSON.stringify(Object.fromEntries(status.split('\n').filter(line => /^(Cap(Inh|Prm|Eff|Bnd|Amb)|NoNewPrivs):/.test(line)).map(line => line.split(/:\s+/)))));`]));
+  for (const key of ['CapInh', 'CapPrm', 'CapEff', 'CapBnd', 'CapAmb']) assert.match(privilegeState[key], /^0+$/);
+  assert.equal(privilegeState.NoNewPrivs, '1');
 
   // 3. Track and provision isolated Docker resources
   const created = {
@@ -186,6 +201,15 @@ test('Docker container backup and restore round trip preserves generated columns
     if (!mysqlReady) {
       throw new Error(`Disposable MySQL 8.4 container did not accept connections within timeout: ${lastProbeError?.message ?? 'unknown'}`);
     }
+
+    // Exercise the copied MySQL client against the runtime's TLS libraries.
+    const clientArgs = ['run', '--rm', '--platform', targetPlatform, '--network', networkName,
+      '-e', `MYSQL_PWD=${appPassword}`, '--entrypoint', 'mysql', imageName, '-h', 'mysql', '-u', 'yuncms'];
+    const tlsStatus = runDocker([...clientArgs, '--ssl-mode=REQUIRED', '--batch', '--skip-column-names',
+      '-e', "SHOW SESSION STATUS LIKE 'Ssl_cipher'", dbName]).trim();
+    assert.match(tlsStatus, /^Ssl_cipher\s+\S+$/, 'Native MySQL client must negotiate encrypted transport');
+    assert.throws(() => runDocker([...clientArgs, '--ssl-mode=VERIFY_IDENTITY', '-e', 'SELECT 1', dbName]),
+      /SSL connection error|certificate|CA certificate|hostname/i, 'Untrusted auto-generated server certificate must fail verification');
 
     const commonEnv = [
       '-e', 'DB_HOST=mysql',

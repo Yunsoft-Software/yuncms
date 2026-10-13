@@ -36,7 +36,7 @@ RUN npm ci --omit=dev
 COPY packages packages
 COPY --from=studio-build /opt/yuncms/packages/api/studio-dist /opt/yuncms/packages/api/studio-dist
 
-FROM node:24-trixie-slim AS runtime
+FROM cgr.dev/chainguard/wolfi-base:latest AS runtime
 
 ARG BUILD_DATE
 ARG VERSION=dev
@@ -52,26 +52,31 @@ LABEL org.opencontainers.image.title="YunCMS" \
   org.opencontainers.image.version="${VERSION}" \
   org.opencontainers.image.revision="${VCS_REF}"
 
-RUN apt-get update \
-  && apt-get upgrade -y \
-  && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    libncurses6 \
-    libssl3t64 \
-    libstdc++6 \
-    libtinfo6 \
+RUN apk upgrade --no-cache \
+  && apk add --no-cache \
+    ca-certificates-bundle \
+    libcrypto3 \
+    libssl3 \
+    libstdc++ \
+    ncurses \
     tini \
-    zlib1g \
-  && rm -rf /var/lib/apt/lists/* \
+    zlib \
+  && addgroup -g 1000 node \
+  && adduser -D -u 1000 -G node node \
   && mkdir -p /data/uploads /data/extensions \
   && chown -R node:node /data
 
+# Preserve the official Node.js 24 runtime and its bundled npm on the glibc base.
+COPY --from=build /usr/local /usr/local
 COPY --from=mysql-client /usr/bin/mysql /usr/bin/mysql
 COPY --from=mysql-client /usr/bin/mysqldump /usr/bin/mysqldump
 COPY --from=mysql-client /usr/share/doc/mysql-community-server-minimal/LICENSE /usr/share/doc/yuncms-mysql-client/LICENSE
 
-RUN ldd /usr/bin/mysql \
-  && ldd /usr/bin/mysqldump \
+RUN LD_TRACE_LOADED_OBJECTS=1 /usr/local/bin/node \
+  && LD_TRACE_LOADED_OBJECTS=1 /usr/bin/mysql \
+  && LD_TRACE_LOADED_OBJECTS=1 /usr/bin/mysqldump \
+  && node --version \
+  && npm --version \
   && mysql --version \
   && mysqldump --version \
   && mysql --version | grep -qi "mysql" \
