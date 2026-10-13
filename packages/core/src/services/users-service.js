@@ -6,7 +6,7 @@ import {
   USER_SAFE_SELECT_COLUMNS,
   USER_SYSTEM_SEARCH_SCHEMA,
 } from '../system-list-query.js';
-import { withTransaction } from '../transaction.js';
+import { dispatchAfterCommit, transactionContext, withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { resolveSystemResourceAccess } from './system-resource-access.js';
 
@@ -105,11 +105,13 @@ async function assertTargetManageable(database, id, accountability) {
 export class UsersService extends BaseService {
   async action(event, payload) {
     if (!this.emitter) return;
-    await this.emitter.action(event, payload, {
+    await dispatchAfterCommit(this.database, (database, transaction) => this.emitter.action(event, payload, {
       accountability: this.accountability,
       requestId: this.requestId,
       collection: 'yuncms_users',
-    });
+      database,
+      transaction,
+    }));
   }
 
   async #readOneUnsafe(id) {
@@ -142,13 +144,18 @@ export class UsersService extends BaseService {
   }
 
   async createOne(input = {}) {
+    if (this.emitter && !transactionContext(this.database)) {
+      return withTransaction(this.database, database => new UsersService({ ...this, database }).createOne(input));
+    }
     await resolveSystemResourceAccess(this, 'create', 'yuncms_users');
+    const id = randomUUID();
+    input = await this.filter('users.create', input, { collection: 'yuncms_users', key: id });
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw invalid('User payload must be an object');
     const email = normalizeEmail(input.email);
     const status = assertStatus(input.status ?? 'active');
     await assertRoleAssignable(this.database, input.role ?? null, this.accountability);
 
     const passwordHash = await hashPassword(input.password);
-    const id = randomUUID();
     const verifiedAt = new Date();
     await this.database.query(
       `INSERT INTO yuncms_users (id, email, password_hash, role, status, email_verified_at)
@@ -169,6 +176,9 @@ export class UsersService extends BaseService {
   }
 
   async registerPublic(input = {}) {
+    if (this.emitter && !transactionContext(this.database)) {
+      return withTransaction(this.database, database => new UsersService({ ...this, database }).registerPublic(input));
+    }
     if (this.accountability.public !== true) {
       throw forbidden('Public registration is available only to unauthenticated requests');
     }
@@ -202,6 +212,9 @@ export class UsersService extends BaseService {
       throw forbidden('Public registration role is invalid');
     }
 
+    const id = randomUUID();
+    input = await this.filter('users.create', input, { collection: 'yuncms_users', key: id, operation: 'register', publicRegistration: true, role: role.id });
+
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
       throw invalid('Public registration payload must be an object');
     }
@@ -212,7 +225,6 @@ export class UsersService extends BaseService {
 
     const email = normalizeEmail(input.email);
     const passwordHash = await hashPassword(input.password);
-    const id = randomUUID();
     const verifiedAt = settings.public_registration_require_email_verification ? null : new Date();
     await this.database.query(
       `INSERT INTO yuncms_users (id, email, password_hash, role, status, email_verified_at)
@@ -226,8 +238,16 @@ export class UsersService extends BaseService {
   }
 
   async updateOne(id, patch = {}) {
+    if (this.emitter && !transactionContext(this.database)) {
+      return withTransaction(this.database, database => new UsersService({ ...this, database }).updateOne(id, patch));
+    }
     await resolveSystemResourceAccess(this, 'update', 'yuncms_users');
     await assertTargetManageable(this.database, id, this.accountability);
+    if (this.emitter) {
+      const before = await this.#readOneUnsafe(id);
+      if (!before) throw Object.assign(new Error(`Unknown user: ${id}`), { code: 'USER_NOT_FOUND' });
+      patch = await this.filter('users.update', patch, { collection: 'yuncms_users', key: id, before });
+    }
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
       const error = new Error('User patch must be an object');
       error.code = 'INVALID_PAYLOAD';
@@ -296,6 +316,9 @@ export class UsersService extends BaseService {
   }
 
   async deleteOne(id) {
+    if (this.emitter && !transactionContext(this.database)) {
+      return withTransaction(this.database, database => new UsersService({ ...this, database }).deleteOne(id));
+    }
     await resolveSystemResourceAccess(this, 'delete', 'yuncms_users');
     await assertTargetManageable(this.database, id, this.accountability);
     if (this.accountability.user === id) {
@@ -304,6 +327,7 @@ export class UsersService extends BaseService {
       throw error;
     }
     const before = this.emitter ? await this.#readOneUnsafe(id) : null;
+    await this.filter('users.delete', { key: id }, { collection: 'yuncms_users', key: id, before });
     const [result] = await this.database.query('DELETE FROM yuncms_users WHERE id = ?', [id]);
     if (result.affectedRows !== 1) {
       const error = new Error(`Unknown user: ${id}`);

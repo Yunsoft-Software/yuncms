@@ -169,6 +169,7 @@ export class FieldsService extends BaseService {
     const compiled = compileFieldColumn(input);
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      await this.filter('schema.field.create', input, { collection, key: field, database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const collectionMetadata = await metadata.readCollection(collection);
       if (!collectionMetadata) {
@@ -257,6 +258,7 @@ export class FieldsService extends BaseService {
     }
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      await this.filter('schema.field.update', patch, { collection, key: field, database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const [collectionMetadata, existing] = await Promise.all([
         metadata.readCollection(collection),
@@ -300,6 +302,7 @@ export class FieldsService extends BaseService {
     }
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      await this.filter('schema.field.update', patch, { collection, key: field, physical: true, database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const [collectionMetadata, existing, relations] = await Promise.all([
         metadata.readCollection(collection),
@@ -432,6 +435,7 @@ export class FieldsService extends BaseService {
     }
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      await this.filter('schema.field.delete', { destructive }, { collection, key: field, database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const [collectionMetadata, existing, relations] = await Promise.all([
         metadata.readCollection(collection),

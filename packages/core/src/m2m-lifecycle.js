@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { filterNativeMutation } from './native-lifecycle.js';
 
 import { withAdvisoryLock } from './advisory-lock.js';
 import { assertIdentifier, quoteIdentifier } from './identifier.js';
@@ -32,6 +33,8 @@ export async function deleteM2MJunction({
   accountability,
   junctionCollection,
   destructive = false,
+  emitter = null,
+  requestId = null,
 } = {}) {
   assertSchemaManager(accountability);
   if (!database) throw new Error('Database handle is required');
@@ -44,6 +47,7 @@ export async function deleteM2MJunction({
   }
 
   return withAdvisoryLock(database, 'yuncms:schema', async (connection) => {
+    await filterNativeMutation({ database: connection, accountability, emitter, requestId }, 'schema.relation.delete', { junctionCollection, destructive }, { collection: junctionCollection, key: junctionCollection, kind: 'm2m' });
     const metadata = new SchemaMetadataRepository(connection);
     const [collection, allRelations] = await Promise.all([
       metadata.readCollection(junctionCollection),

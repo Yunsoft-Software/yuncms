@@ -115,6 +115,7 @@ export class CollectionsService extends BaseService {
     const systemFields = compileCollectionSystemFields(collection, input.systemFields);
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      await this.filter('schema.collection.create', input, { collection, key: collection, database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const existing = await metadata.readCollection(collection);
       if (existing) {
@@ -203,6 +204,7 @@ export class CollectionsService extends BaseService {
     assertCollectionMetadataPatch(patch);
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      await this.filter('schema.collection.update', patch, { collection, key: collection, database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const existing = await metadata.readCollection(collection);
       if (!existing) {
@@ -234,6 +236,7 @@ export class CollectionsService extends BaseService {
     }
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      await this.filter('schema.collection.delete', { destructive }, { collection, key: collection, database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const existing = await metadata.readCollection(collection);
       if (!existing) {

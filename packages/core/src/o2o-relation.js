@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { filterNativeMutation } from './native-lifecycle.js';
 
 import { withAdvisoryLock } from './advisory-lock.js';
 import { assertIdentifier, quoteIdentifier } from './identifier.js';
@@ -46,7 +47,7 @@ export function o2oUniqueIndexName(collection, field) {
   return `yuo_${digest}`;
 }
 
-export async function createO2ORelation({ database, accountability, input = {} }) {
+export async function createO2ORelation({ database, accountability, input = {}, emitter = null, requestId = null }) {
   assertSchemaManager(accountability);
   const manyCollection = assertIdentifier(input.manyCollection, 'one-to-one source collection');
   const manyField = assertIdentifier(input.manyField, 'one-to-one source field');
@@ -54,6 +55,7 @@ export async function createO2ORelation({ database, accountability, input = {} }
   const onDelete = assertOnDelete(input.onDelete);
 
   return withAdvisoryLock(database, 'yuncms:schema', async (connection) => {
+    await filterNativeMutation({ database: connection, accountability, emitter, requestId }, 'schema.relation.create', input, { collection: manyCollection, key: manyField, kind: 'o2o' });
     const metadata = new SchemaMetadataRepository(connection);
     const [manyCollectionMetadata, oneCollectionMetadata] = await Promise.all([
       metadata.readCollection(manyCollection),
@@ -164,12 +166,13 @@ export async function createO2ORelation({ database, accountability, input = {} }
   });
 }
 
-export async function deleteO2ORelation({ database, accountability, manyCollection, manyField }) {
+export async function deleteO2ORelation({ database, accountability, manyCollection, manyField, emitter = null, requestId = null }) {
   assertSchemaManager(accountability);
   assertIdentifier(manyCollection, 'one-to-one source collection');
   assertIdentifier(manyField, 'one-to-one source field');
 
   return withAdvisoryLock(database, 'yuncms:schema', async (connection) => {
+    await filterNativeMutation({ database: connection, accountability, emitter, requestId }, 'schema.relation.delete', { manyCollection, manyField }, { collection: manyCollection, key: manyField, kind: 'o2o' });
     const metadata = new SchemaMetadataRepository(connection);
     const relation = await metadata.readRelation(manyCollection, manyField);
     if (!relation) {

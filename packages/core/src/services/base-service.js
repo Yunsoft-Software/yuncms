@@ -1,6 +1,11 @@
 import { requireAccountability } from '../accountability.js';
+import { filterNativeMutation } from '../native-lifecycle.js';
 
 export class BaseService {
+  async filter(event, payload, context = {}) {
+    return filterNativeMutation(this, event, payload, context);
+  }
+
   constructor({
     accountability,
     database,

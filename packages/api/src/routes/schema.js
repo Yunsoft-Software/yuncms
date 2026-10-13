@@ -273,8 +273,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
 
   router.post('/relations/o2o', async (req, res) => {
     const data = await createO2ORelation({
-      database: req.context.database,
-      accountability: req.accountability,
+      ...serviceOptionsFromRequest(req),
       input: req.body ?? {},
     });
     clearSchemaCache();
@@ -291,8 +290,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
     const relations = service(req, 'RelationsService');
     const before = await relations.readOne(req.params.manyCollection, req.params.manyField);
     const result = await deleteO2ORelation({
-      database: req.context.database,
-      accountability: req.accountability,
+      ...serviceOptionsFromRequest(req),
       manyCollection: req.params.manyCollection,
       manyField: req.params.manyField,
     });
@@ -324,8 +322,7 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
       (relation) => relation.junction_collection === req.params.junctionCollection,
     );
     const data = await deleteM2MJunction({
-      database: req.context.database,
-      accountability: req.accountability,
+      ...serviceOptionsFromRequest(req),
       junctionCollection: req.params.junctionCollection,
       destructive: destructiveRequested(req),
     });

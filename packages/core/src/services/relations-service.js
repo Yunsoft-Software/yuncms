@@ -102,6 +102,7 @@ export class RelationsService extends BaseService {
     const onDelete = assertOnDelete(input.onDelete);
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      await this.filter('schema.relation.create', input, { collection: manyCollection, key: manyField, kind: 'm2o', database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const [manyCollectionMetadata, oneCollectionMetadata] = await Promise.all([
         metadata.readCollection(manyCollection),
@@ -236,6 +237,7 @@ export class RelationsService extends BaseService {
     }
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      await this.filter('schema.relation.create', input, { collection: junctionCollection, key: junctionCollection, kind: 'm2m', database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const [junctionExisting, leftMetadata, rightMetadata] = await Promise.all([
         metadata.readCollection(junctionCollection),
@@ -405,6 +407,7 @@ export class RelationsService extends BaseService {
     assertIdentifier(manyField, 'many field');
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      await this.filter('schema.relation.delete', { manyCollection, manyField }, { collection: manyCollection, key: manyField, kind: 'm2o', database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const relation = await metadata.readRelation(manyCollection, manyField);
       if (!relation) {
