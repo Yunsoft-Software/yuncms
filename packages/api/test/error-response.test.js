@@ -78,6 +78,15 @@ test('unknown internal errors do not expose server messages', () => {
   });
 });
 
+test('internal errors do not disclose filesystem paths or private diagnostic objects', () => {
+  for (const path of ['/private/server/uploads/missing-file', { password: 'private-fixture' }]) {
+    const error = Object.assign(new Error('private filesystem failure'), { code: 'ENOENT', path });
+    const publicError = errorBody(error, 'request').errors[0];
+    assert.equal(publicError.message, 'Internal server error');
+    assert.equal(Object.hasOwn(publicError, 'path'), false);
+  }
+});
+
 test('client error includes path and request id', () => {
   const error = new Error('Unknown field: secret');
   error.code = 'INVALID_QUERY';

@@ -120,6 +120,8 @@ Audit write failure after a committed mutation is logged rather than converting 
 
 Retention cleanup is explicit, admin-only and batched. Retention environment defaults do not trigger surprise automatic deletion.
 
+API errors with status 500 or higher return a generic message and omit diagnostic `path` values, including filesystem paths. Safe client validation errors and typed extension 4xx errors may include a string field path and request id.
+
 ## Production verification
 
 Source controls are not a substitute for execution. Complete the real MySQL, SMTP, S3/reconciliation, auth replay, RBAC/validation, relation expansion, concurrency, logging-redaction, security-header and graceful-shutdown checks in [Production Readiness](production-readiness.md) before exposing a deployment.

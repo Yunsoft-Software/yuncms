@@ -160,7 +160,7 @@ export function errorBody(error, requestId) {
       {
         code: error?.code ?? 'INTERNAL_ERROR',
         message: exposeMessage ? (error?.message ?? 'Request failed') : 'Internal server error',
-        ...(error?.path ? { path: error.path } : {}),
+        ...(exposeMessage && typeof error?.path === 'string' && error.path ? { path: error.path } : {}),
         request_id: requestId,
       },
     ],
