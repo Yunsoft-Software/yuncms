@@ -107,7 +107,7 @@ test('Docker container backup and restore round trip preserves generated columns
   const osId = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'sh', imageName,
     '-c', '. /etc/os-release; printf "%s" "$ID"']).trim();
   assert.equal(osId, 'wolfi');
-  const privilegedFiles = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'find', imageName,
+  const privilegedFiles = runDocker(['run', '--rm', '--platform', targetPlatform, '--user', 'root', '--read-only', '--entrypoint', 'find', imageName,
     '/usr', '/opt', '-xdev', '-type', 'f', '-perm', '/6000', '-print']).trim();
   assert.equal(privilegedFiles, '', 'Image must not retain SUID or SGID files');
   runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'sh', imageName,
