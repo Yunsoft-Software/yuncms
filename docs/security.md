@@ -25,7 +25,7 @@ HTTP authenticates first, then services receive the same accountability. Trusted
 - prospective-record create/update validation;
 - fail-closed missing-role/missing-permission behavior.
 
-Effective permissions are cached only inside the current request.
+Effective permission rules use the configured bounded memory or Redis cache; caller-dependent filter values are resolved for each service request. Native permission management invalidates the cache.
 
 Direct M2O expansion does not bypass RBAC: the source relation field must be readable and target rows are resolved through `ItemsService` with the same accountability, target row filters and target field allowlists.
 
@@ -33,7 +33,7 @@ Dedicated native user/file references use the corresponding native services and 
 
 Requests to protected system collections through the generic `/items` API return HTTP 403 `SYSTEM_COLLECTION_USE_DEDICATED_SERVICE`; use the corresponding native API.
 
-Schema services and file/maintenance administration require admin/system accountability. User/role/permission management includes current-admin/protected-role guards.
+Schema services and operational maintenance require admin/system accountability. Native Files operations support explicit delegated grants. User/role/permission management includes current-admin/protected-role guards.
 
 ## SQL safety
 
@@ -67,10 +67,10 @@ Collection/field/M2M destructive deletion requires explicit intent.
 - reset/verification tokens are one-time and hashed;
 - public recovery request does not return action-token secrets;
 - login/account recovery avoids intentional account-existence disclosure;
-- login/refresh/action endpoints use process-local rate limits;
+- login/refresh/action endpoints use bounded rate limits with the configured memory or Redis store;
 - all `/auth/*` responses are marked `Cache-Control: no-store`.
 
-Process-local limits are not cluster-wide protection. Multi-instance deployments must add a shared limiter if one global budget is required.
+Memory limits are process-local. Multi-instance deployments requiring one shared budget should configure the Redis auth/API limiter and its failure mode; see [Configuration](configuration.md).
 
 ## Mail
 
@@ -110,7 +110,7 @@ The API disables `X-Powered-By` and applies:
 
 CORS reflects only the configured Studio origin.
 
-HSTS is intentionally configured at the real TLS/reverse-proxy layer rather than forced by an application that does not know whether it is directly serving HTTPS.
+Secure requests receive HSTS. Behind a TLS reverse proxy, configure the explicit trusted proxy hop count so the application can determine whether a request is secure, and restrict direct access to that proxy boundary.
 
 ## Logging/audit
 

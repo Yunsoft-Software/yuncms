@@ -238,6 +238,7 @@ Schema services expose veto-only filters: `schema.collection.create/update/delet
 ### Read query hooks
 
 `filter('items.query', handler)` transforms the normalized query for root collection list reads and single-item reads, including `ItemsService.readOne()` and `GET /items/:collection/:id`. Its context contains `operation: 'read'`; single-item reads also provide `single: true` and `key` with the requested primary key. The hook output is parsed again and remains subject to query-cost and native field/row permissions.
+External authentication JIT creation also uses the `users.create` gate with `externalRegistration: true`, `publicRegistration: true` and the provider id. This gate is veto-only: a returned payload cannot change the verified identity or configured JIT role. Rejection rolls back both user and identity creation; the safe user-create action runs only after commit. Linking an existing user does not create a user and does not run this gate.
 
 For a single-item read, hook `fields`, `filter` and `search` affect the selected record. The requested primary key is enforced separately and cannot be replaced by the hook. Pagination and sorting do not change this lookup; aggregate output is rejected with `INVALID_QUERY`. A record excluded by the hook returns `null` from the service or HTTP 404 from the item endpoint. The read performed to return a created or updated item uses the same hook.
 

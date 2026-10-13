@@ -9,7 +9,7 @@ import { ExtensionError } from '@yunsoft/yuncms-extensions-sdk';
 import {
   bootstrapDatabase, createAccountability, createDatabasePool, createStorageRegistry,
   createSystemAccountability, CollectionsService, FieldsService, FilesService,
-  HookEmitter, ItemsService, loadConfig, LocalStorageDriver, PermissionsService,
+  HookEmitter, ItemsService, loadConfig, LocalStorageDriver, PermissionsService, ExternalAuthService, createPublicAccountability,
   RelationsService, RolesService, SchemaCache, UsersService, withTransaction,
 } from '@yunsoft/yuncms-core';
 import { createApp } from '../../packages/api/src/app.js';
@@ -121,6 +121,15 @@ test('native file permissions, user/schema filters and identity relations enforc
     const [[count]] = await pool.query('SELECT COUNT(*) AS total FROM yuncms_users WHERE email = ?', [email]); assert.equal(Number(count.total), 0); assert.equal(actions.length, actionCount);
     const created = await new UsersService({ ...(await fresh()), emitter }).createOne({ email, password, role: staffRole.id }); users.push(created);
     assert.equal(actions.length, actionCount + 1); assert.equal(actions.at(-1), created.id);
+  });
+  await t.test('external authentication JIT cannot bypass the native user-create gate', async () => {
+    rejectCreate = true;
+    const email = `external-${run}@example.test`;
+    const external = new ExternalAuthService({ ...(await fresh(createPublicAccountability())), emitter });
+    await assert.rejects(external.completeLogin({ provider: `native-${run}`, subject: `subject-${run}`, email, emailVerified: true, policy: { jit: true, defaultRole: staffRole.id } }), { code: 'QUOTA_REACHED' });
+    const [[count]] = await pool.query('SELECT COUNT(*) AS total FROM yuncms_users WHERE email = ?', [email]); assert.equal(Number(count.total), 0);
+    const [[identities]] = await pool.query('SELECT COUNT(*) AS total FROM yuncms_auth_identities WHERE provider = ?', [`native-${run}`]); assert.equal(Number(identities.total), 0);
+    rejectCreate = false;
   });
   await t.test('native M2O/M2M create application FKs and preserve protected system schemas', async () => {
     await new CollectionsService(basic).createOne({ collection });

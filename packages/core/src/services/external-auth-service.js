@@ -6,7 +6,8 @@ import {
   encryptExternalAuthSecret,
   hashExternalAuthState,
 } from '../auth/external-state.js';
-import { withTransaction } from '../transaction.js';
+import { dispatchAfterCommit, withTransaction } from '../transaction.js';
+import { filterNativeMutation } from '../native-lifecycle.js';
 import { BaseService } from './base-service.js';
 import { SessionsService } from './sessions-service.js';
 
@@ -223,12 +224,18 @@ export class ExternalAuthService extends BaseService {
           if (policy.jit !== true) throw externalAuthError('EXTERNAL_IDENTITY_NOT_LINKED', 'External identity is not linked to a YunCMS user');
           const role = await this.resolveJitRole(policy.defaultRole, connection);
           localUserId = randomUUID();
+          await filterNativeMutation({ ...this, database: connection }, 'users.create', {
+            email: normalizedEmail, role: role.id, status: 'active',
+          }, { collection: 'yuncms_users', key: localUserId, operation: 'register', publicRegistration: true, externalRegistration: true, provider: providerId });
           await connection.query(
             `INSERT INTO yuncms_users
              (id, email, password_hash, role, status, email_verified_at)
              VALUES (?, ?, NULL, ?, 'active', UTC_TIMESTAMP(3))`,
             [localUserId, normalizedEmail, role.id],
           );
+          if (this.emitter) await dispatchAfterCommit(connection, (database, transaction) => this.emitter.action('users.create', {
+            key: localUserId, item: { id: localUserId, email: normalizedEmail, role: role.id, status: 'active' }, externalRegistration: true,
+          }, { accountability: this.accountability, collection: 'yuncms_users', requestId: this.requestId, database, transaction }));
         }
 
         await connection.query(
