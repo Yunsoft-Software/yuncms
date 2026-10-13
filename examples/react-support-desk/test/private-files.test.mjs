@@ -8,7 +8,7 @@ import { createServer } from "vite";
 test("development HTTP serves public UI but denies credentials, native state and upload bytes", async t => {
   const root = await mkdtemp(join(tmpdir(), "yuncms-example-private-"));
   const marker = "private-fixture-never-serve";
-  const paths = [".demo-accounts.json", ".demo-state.json", ".verification.json", ".env.local", "local.pem", ".git/config", ".yuncms/ai-settings.key", "uploads/private.txt"];
+  const paths = [".demo-accounts.json", ".demo-state.json", ".verification.json", ".env.local", "local.pem", "local.key", ".npmrc", ".yarnrc.yml", ".git/config", ".yuncms/ai-settings.key", "uploads/private.txt"];
   await writeFile(join(root, "index.html"), "<h1>Public example fixture</h1>");
   for (const path of paths) { await mkdir(join(root, path, ".."), { recursive: true }); await writeFile(join(root, path), marker); }
   const server = await createServer({ root, configFile: resolve(import.meta.dirname, "../vite.config.js"), logLevel: "silent", server: { host: "127.0.0.1", port: 0 } });
