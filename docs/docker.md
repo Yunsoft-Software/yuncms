@@ -6,7 +6,7 @@ Need help deploying, integrating or migrating? [Contact Yunsoft](https://yunsoft
 
 YunCMS publishes a Linux container image at [`yunsoftofficial/yuncms`](https://hub.docker.com/r/yunsoftofficial/yuncms). The image contains the YunCMS CLI, the built React Studio and official native MySQL 8.4 client binaries (`mysql` and `mysqldump` copied from `mysql:8.4` for the target architecture, rather than Debian's `default-mysql-client` / MariaDB package). This ensures verified generated columns, check constraints, and UTF-8 characters during `backup` and `restore`.
 
-The supported architectures are `linux/amd64` and `linux/arm64`. Use a version tag such as `0.1.29` for a controlled deployment. `latest` follows the newest published YunCMS release and is convenient for evaluation, but production deployments should not update implicitly.
+The supported architectures are `linux/amd64` and `linux/arm64`. Use a version tag such as `0.1.30` for a controlled deployment. `latest` follows the newest published YunCMS release and is convenient for evaluation, but production deployments should not update implicitly.
 
 ## Requirements
 
@@ -135,7 +135,7 @@ Container deployments update by replacing the image, not by running `yuncms upda
 ```bash
 docker compose stop yuncms
 docker compose run --rm yuncms backup
-# Edit YUNCMS_IMAGE in .env, for example yunsoftofficial/yuncms:0.1.29
+# Edit YUNCMS_IMAGE in .env, for example yunsoftofficial/yuncms:0.1.30
 docker compose pull yuncms
 docker compose run --rm yuncms bootstrap
 docker compose up -d yuncms
@@ -182,7 +182,7 @@ YunCMS includes an opt-in end-to-end backup and restore regression fixture again
 npm run docker:build
 
 # 2. Run the guarded Docker backup and restore test
-YUNCMS_TEST_DOCKER=1 YUNCMS_TEST_DOCKER_IMAGE=yunsoftofficial/yuncms:0.1.29 node --test test/integration/docker-backup-restore.test.js
+YUNCMS_TEST_DOCKER=1 YUNCMS_TEST_DOCKER_IMAGE=yunsoftofficial/yuncms:0.1.30 node --test test/integration/docker-backup-restore.test.js
 ```
 
 The fixture provisions an isolated Docker network, a disposable MySQL 8.4 instance, and dedicated volumes. It tests `bootstrap`, generated `STORED` and `VIRTUAL` columns, system roles, and uploaded files, executes `backup`, mutates state, executes `restore --yes`, and verifies that all schema constraints, computed columns, roles, and file payloads are preserved.
