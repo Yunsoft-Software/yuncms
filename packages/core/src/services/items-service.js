@@ -93,7 +93,15 @@ function createCandidateRecord(schema, id, entries, now = new Date()) {
 }
 
 function mergeSystemEntries(entries, schema, accountability, operation, now = new Date()) {
-  return [...entries, ...systemMutationEntries(schema, accountability, operation, now)];
+  const actors = [];
+  if (operation === 'create') {
+    for (const field of Object.values(schema.fields)) {
+      if (parseMetadata(field.schema_metadata).defaultPreset !== 'current_user') continue;
+      if (!accountability.user) throw serviceError('FORBIDDEN', 'Current-user fields require an authenticated user', field.field);
+      actors.push([field.field, accountability.user]);
+    }
+  }
+  return [...entries, ...actors, ...systemMutationEntries(schema, accountability, operation, now)];
 }
 
 function databaseMutationValue(field, value, schema) {
@@ -205,6 +213,9 @@ export class ItemsService extends BaseService {
     for (const [field] of entries) {
       const fieldSchema = schema.fields[field];
       if (!fieldSchema) throw serviceError('INVALID_PAYLOAD', `Unknown field: ${field}`, field);
+      if (parseMetadata(fieldSchema.schema_metadata).defaultPreset === 'current_user') {
+        throw serviceError('FIELD_READ_ONLY', `Current-user field is server-owned: ${field}`, field);
+      }
       if (fieldSchema.readonly) throw serviceError('FIELD_READ_ONLY', `Field is read-only: ${field}`, field);
       if (permission.fields && !permission.fields.includes(field)) {
         throw serviceError('FORBIDDEN_FIELD', `Field is not allowed for ${permission.action}: ${field}`, field);
@@ -456,9 +467,9 @@ export class ItemsService extends BaseService {
     const permission = await this.resolvePermission('create');
     const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create' });
     const callerEntries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
-    await validateNativeReferenceWrites(this, callerEntries);
     const now = new Date();
     const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create', now);
+    await validateNativeReferenceWrites(this, entries);
     const id = randomUUID();
     const candidate = createCandidateRecord(schema, id, entries, now);
     enforcePermissionValidation(candidate, permission.validation, schema, {
@@ -491,8 +502,8 @@ export class ItemsService extends BaseService {
     for (const payload of payloads) {
       const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create', bulk: true });
       const callerEntries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
-      await validateNativeReferenceWrites(this, callerEntries);
       const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create', now);
+      await validateNativeReferenceWrites(this, entries);
       const id = randomUUID();
       const candidate = createCandidateRecord(schema, id, entries, now);
       enforcePermissionValidation(candidate, permission.validation, schema, {

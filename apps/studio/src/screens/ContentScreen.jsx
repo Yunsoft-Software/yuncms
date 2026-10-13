@@ -11,7 +11,7 @@ import {
   useConfirmDialog,
 } from '../components/index.js';
 import { formatDateFieldValue } from '../date-format.js';
-import { contentTableFields, defaultContentColumnKeys, isFileField, isImageField } from '../field-ui.js';
+import { contentTableFields, defaultContentColumnKeys, isFileField, isImageField, isReadOnlyField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
 import { studioPath } from '../studio-route.js';
@@ -191,7 +191,7 @@ function RecordForm({
   compact = false,
 }) {
   const { t } = useI18n();
-  const editable = useMemo(() => fields.filter((field) => !field.readonly), [fields]);
+  const editable = useMemo(() => fields.filter((field) => !isReadOnlyField(field)), [fields]);
   const [values, setValues] = useState({});
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);

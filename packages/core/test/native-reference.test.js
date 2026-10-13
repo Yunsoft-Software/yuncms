@@ -60,7 +60,9 @@ test('native Files relation lookup compiles the row filter with caller identity'
   const query = o.calls.at(-1); assert.match(query.sql, /`uploaded_by` = \?/); assert.deepEqual(query.params, [id, id, 1]);
 });
 test('native reference writes deny missing grants, hidden targets and malformed UUIDs', async () => {
-  for (const setup of [{ grant: false }, { rows: [] }]) {
+  const denied = options({ grant: false });
+  await assert.rejects(validateNativeReferenceWrites({ ...denied, collection: 'tasks' }, [['owner', '22222222-2222-2222-2222-222222222222']]), { code: 'FORBIDDEN' });
+  for (const setup of [{ rows: [] }]) {
     const o = options(setup);
     await assert.rejects(validateNativeReferenceWrites({ ...o, collection: 'tasks' }, [['owner', id]]), { code: 'FORBIDDEN' });
   }

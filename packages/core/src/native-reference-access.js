@@ -19,7 +19,12 @@ export async function validateNativeReferenceWrites(service, entries) {
     if (metadata?.nativeReference !== true) continue;
     if (!NATIVE_REFERENCE_TARGETS.includes(relation.one_collection) || relation.one_field !== 'id') throw nativeReferenceError('UNSUPPORTED_RELATION_TARGET', 'Invalid native reference metadata');
     if (typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) throw nativeReferenceError('INVALID_PAYLOAD', `Native reference ${field} requires a UUID`);
-    const { data } = await nativeReferenceService(relation.one_collection, { ...service, schema: snapshot }).readManyForRelation({ fields: ['id'], lookupField: 'id', values: [value] });
+    const target = nativeReferenceService(relation.one_collection, { ...service, schema: snapshot });
+    // Self identity is already readable through UsersService.readOne; this write-only
+    // exception must not grant directory reads or relation expansion permissions.
+    const data = relation.one_collection === 'yuncms_users' && value === service.accountability.user
+      ? [await target.readOne(value)].filter(Boolean)
+      : (await target.readManyForRelation({ fields: ['id'], lookupField: 'id', values: [value] })).data;
     if (data.length !== 1) throw nativeReferenceError('FORBIDDEN', 'Native reference is unavailable to this caller');
   }
 }

@@ -79,8 +79,8 @@ function assertPhysicalPatch(patch) {
       throw invalidSchemaPayload(`${key} must be true when provided`);
     }
   }
-  if (Object.hasOwn(patch, 'defaultPreset') && patch.defaultPreset !== 'now') {
-    throw invalidSchemaPayload('defaultPreset currently supports only now');
+  if (Object.hasOwn(patch, 'defaultPreset') && !['now', 'current_user'].includes(patch.defaultPreset)) {
+    throw invalidSchemaPayload('defaultPreset supports now or current_user');
   }
   if (Object.hasOwn(patch, 'defaultValue') && Object.hasOwn(patch, 'defaultPreset')) {
     throw invalidSchemaPayload('defaultValue and defaultPreset cannot be used together');

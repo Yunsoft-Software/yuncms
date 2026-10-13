@@ -20,6 +20,14 @@ export async function dispatchAfterCommit(database, action) {
   await action(database, null);
 }
 
+// Storage is external to MySQL. Native file creation registers compensation on
+// the outer transaction so later failures also remove already uploaded blobs.
+export function dispatchAfterRollback(database, action) {
+  const transaction = transactions.get(database);
+  if (!transaction) throw new Error('Rollback cleanup requires a managed transaction');
+  transaction.rollbackActions.push(action);
+}
+
 function validateOperation(database, operation) {
   if (!database) throw new Error('Database connection is required');
   if (typeof operation !== 'function') throw new Error('Transaction operation is required');
@@ -44,7 +52,7 @@ async function setIsolationLevel(connection, isolationLevel) {
 async function executeTransaction(connection, operation, options) {
   await setIsolationLevel(connection, options.isolationLevel);
   await connection.beginTransaction();
-  const transaction = { actions: [], isolationLevel: options.isolationLevel ? String(options.isolationLevel).toUpperCase() : null };
+  const transaction = { actions: [], rollbackActions: [], isolationLevel: options.isolationLevel ? String(options.isolationLevel).toUpperCase() : null };
   transactions.set(connection, transaction);
 
   try {
@@ -56,6 +64,9 @@ async function executeTransaction(connection, operation, options) {
       await connection.rollback();
     } catch (rollbackError) {
       error.rollbackError = rollbackError;
+    }
+    for (const cleanup of transaction.rollbackActions.toReversed()) {
+      try { await cleanup(); } catch (cleanupError) { error.cleanupError ||= cleanupError; }
     }
     throw error;
   } finally {

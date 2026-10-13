@@ -232,6 +232,10 @@ YunCMS removes the metadata and then cleans up the storage object. If metadata d
 
 File lifecycle operations emit `files.create`, `files.update` and `files.delete` events for trusted extension/audit consumers.
 
+Trusted extensions can reject native uploads with a veto-only `files.create` filter, including uploads through REST, SDK and direct FilesService calls. It runs after native create authorization and byte/MIME validation, before any storage or metadata write. Its payload contains normalized `filenameDownload`, `title`, `mimetype`, `storage` and `metadata`; returned or mutated values cannot change the upload. Context includes the generated `key`, verified `accountability`, `requestId`, trusted byte count `filesize`, `uploadedBy`, active `database` connection and `transaction: { managed: true, state: 'active' }`. Throw a typed `ExtensionError` to preserve a public status/code, such as HTTP 413 for an application storage quota or 403 for read-only mode.
+
+File creation starts a managed transaction or joins an outer native `withTransaction` call. Reserve application quota atomically on `context.database` using row locking or a conditional update; a count-only check cannot prevent concurrent oversubscription. Let errors escape the outer transaction. Rejection or rollback removes file metadata and rolls back reservations; rollback also attempts to remove uploaded blobs, including after a later outer operation fails. Storage cleanup failures are attached as `cleanupError` for native callers and may leave an orphan that operators can reconcile. Storage and MySQL cannot commit atomically across a process crash; use file reconciliation for that case. Create success actions wait until the outer commit and are discarded on rollback; post-commit action failure does not undo a committed file.
+
 # Storage drivers
 
 ## Local storage

@@ -167,6 +167,15 @@ test('native file permissions, user/schema filters and identity relations enforc
   await t.test('native reference writes/expansions enforce target and junction permissions', async () => {
     permissionService = new PermissionsService(await fresh());
     for (const c of [collection, junction]) for (const action of ['create', 'read', 'update', 'delete']) await permissionService.createOne({ role: staffRole.id, collection: c, action });
+    assert.equal((await request(`/users/${b.id}`, bToken)).status, 200);
+    assert.equal((await request('/users', bToken)).status, 403);
+    const ownReference = await request(`/items/${collection}`, bToken, 'POST', { owner: b.id });
+    assert.equal(ownReference.status, 201);
+    assert.equal((await request(`/items/${collection}/${ownReference.body.data.id}?fields=owner.email`, bToken)).status, 403);
+    assert.equal((await request(`/items/${junction}`, bToken, 'POST', { [`${collection}_id`]: ownReference.body.data.id, user_id: b.id })).status, 201);
+    const [[beforeSelfBulk]] = await pool.query(`SELECT COUNT(*) AS total FROM \`${collection}\``);
+    await assert.rejects(new ItemsService(collection, await fresh(accountB)).createMany([{ owner: b.id }, { owner: a.id }]), { code: 'FORBIDDEN' });
+    const [[afterSelfBulk]] = await pool.query(`SELECT COUNT(*) AS total FROM \`${collection}\``); assert.equal(afterSelfBulk.total, beforeSelfBulk.total);
     assert.equal((await request(`/items/${collection}`, bToken, 'POST', { owner: a.id })).status, 403);
     await permissionService.createOne({ role: staffRole.id, collection: 'yuncms_users', action: 'read' });
     const created = await request(`/items/${collection}`, bToken, 'POST', { owner: a.id, asset: fileB.id }); assert.equal(created.status, 201); const item = created.body.data;
@@ -188,5 +197,51 @@ test('native file permissions, user/schema filters and identity relations enforc
     assert.equal(await driver.stat(fileB.filename_disk), null);
     const [[row]] = await pool.query(`SELECT asset FROM \`${collection}\` WHERE id = ?`, [item.id]); assert.equal(row.asset, null);
     assert.equal((await request(`/files/${fileA.id}`, bToken, 'DELETE')).status, 404);
+  });
+
+  await t.test('current_user preset survives physical updates, assigns actors and rejects forged identities', async () => {
+    const userGrant = (await permissionService.readMany()).find(p => p.role === staffRole.id && p.collection === 'yuncms_users' && p.action === 'read');
+    await permissionService.deleteOne(userGrant.id);
+    const path = `/schema/collections/${collection}/fields`;
+    assert.equal((await request(path, adminToken, 'POST', { field: 'actor', type: 'uuid', defaultPreset: 'current_user' })).status, 201);
+    assert.equal((await request(`${path}/actor/schema`, adminToken, 'PATCH', { removeDefaultPreset: true })).status, 200);
+    assert.equal((await request(`${path}/actor/schema`, adminToken, 'PATCH', { defaultPreset: 'current_user' })).status, 200);
+    assert.equal((await request('/schema/relations/native/m2o', adminToken, 'POST', { manyCollection: collection, manyField: 'actor', oneCollection: 'yuncms_users' })).status, 201);
+    permissionService = new PermissionsService(await fresh());
+    const createGrant = (await permissionService.readMany()).find(p => p.role === staffRole.id && p.collection === collection && p.action === 'create');
+    await permissionService.updateOne(createGrant.id, { fields: ['owner'], validation: { actor: { _eq: '$CURRENT_USER' } } });
+    const created = await request(`/items/${collection}`, bToken, 'POST', {}); assert.equal(created.status, 201); assert.equal(created.body.data.actor, b.id);
+    const [[row]] = await pool.query(`SELECT actor FROM \`${collection}\` WHERE id = ?`, [created.body.data.id]); assert.equal(row.actor, b.id);
+    assert.equal((await request(`/items/${collection}`, bToken, 'POST', { actor: a.id })).status, 400);
+    assert.equal((await request(`/items/${collection}/${created.body.data.id}`, bToken, 'PATCH', { actor: b.id })).status, 400);
+    assert.equal((await request(`/items/${collection}`, adminToken, 'POST', { actor: b.id })).status, 400);
+    const bulk = await new ItemsService(collection, await fresh(accountB)).createMany([{}, {}]); assert.equal(bulk.length, 2); assert.ok(bulk.every(item => item.actor === b.id));
+    assert.equal((await request(`/items/${collection}/${created.body.data.id}?fields=actor.email`, bToken)).status, 403);
+    assert.equal((await request('/users', bToken)).status, 403);
+    await assert.rejects(new ItemsService(collection, await fresh()).createOne({}), { code: 'FORBIDDEN' });
+  });
+
+  await t.test('file admission preserves typed HTTP denials and atomically rolls back quota, metadata and blobs', async () => {
+    const quota = `it_quota_${run}`;
+    await pool.query(`CREATE TABLE \`${quota}\` (id INT PRIMARY KEY, used_bytes INT NOT NULL, max_bytes INT NOT NULL) ENGINE=InnoDB`);
+    await pool.query(`INSERT INTO \`${quota}\` VALUES (1, 0, 7)`);
+    let readonly = false, reject = false;
+    const remove = emitter.registerFilter('files.create', async (_payload, ctx) => {
+      assert.equal(ctx.accountability.user, admin.id); assert.equal(ctx.filesize, 7); assert.equal(ctx.uploadedBy, admin.id);
+      assert.deepEqual(ctx.transaction, { managed: true, state: 'active' });
+      if (readonly) throw new ExtensionError('APP_READ_ONLY', 'Read-only', { status: 403 });
+      const [reserved] = await ctx.database.query(`UPDATE \`${quota}\` SET used_bytes = used_bytes + ? WHERE id = 1 AND used_bytes + ? <= max_bytes`, [ctx.filesize, ctx.filesize]);
+      if (!reserved.affectedRows || reject) throw new ExtensionError('QUOTA_REACHED', 'Quota reached', { status: 413 });
+    });
+    const upload = async () => { const response = await fetch(`${base}/files`, { method: 'POST', headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/octet-stream', 'x-filename': 'quota.txt' }, body: Buffer.from('content') }); return { status: response.status, body: await response.json() }; };
+    const snapshot = async () => { const [[row]] = await pool.query(`SELECT used_bytes FROM \`${quota}\``); const [[count]] = await pool.query('SELECT COUNT(*) AS total FROM yuncms_files'); return { bytes: row.used_bytes, count: count.total, objects: (await driver.list()).length }; };
+    try {
+      const before = await snapshot(); readonly = true; const ro = await upload(); assert.equal(ro.status, 403); assert.equal(ro.body.errors[0].code, 'APP_READ_ONLY'); assert.deepEqual(await snapshot(), before);
+      readonly = false; reject = true; const denied = await upload(); assert.equal(denied.status, 413); assert.equal(denied.body.errors[0].code, 'QUOTA_REACHED'); assert.deepEqual(await snapshot(), before); reject = false;
+      await assert.rejects(withTransaction(pool, async database => { await new FilesService({ ...(await fresh(createAccountability({ user: admin.id, role: adminRole.id, admin: true }))), database, emitter }).createOne({ contents: Buffer.from('content'), filenameDownload: 'rolled-back.txt' }); throw Error('outer failure'); }), /outer failure/);
+      assert.deepEqual(await snapshot(), before);
+      const results = await Promise.all([upload(), upload()]); assert.deepEqual(results.map(r => r.status).sort(), [201, 413]); files.push(results.find(r => r.status === 201).body.data);
+      const after = await snapshot(); assert.equal(after.bytes, 7); assert.equal(Number(after.count), Number(before.count) + 1); assert.equal(after.objects, before.objects + 1);
+    } finally { remove(); await pool.query(`DROP TABLE \`${quota}\``); }
   });
 });

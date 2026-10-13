@@ -45,6 +45,7 @@ test('FilesService removes stored object when metadata insert fails', async () =
     async getSignedUrl() {},
   };
   const database = {
+    async beginTransaction() {}, async commit() {}, async rollback() {},
     async query(sql) {
       if (sql.startsWith('INSERT INTO yuncms_files')) {
         const error = new Error('metadata insert failed');
@@ -86,6 +87,7 @@ test('FilesService physical key is generated independently from download filenam
     async getSignedUrl() {},
   };
   const database = {
+    async beginTransaction() {}, async commit() {}, async rollback() {},
     async query(sql, params = []) {
       if (sql.startsWith('INSERT INTO yuncms_files')) {
         insertedParams = params;

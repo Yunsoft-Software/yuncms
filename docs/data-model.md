@@ -106,6 +106,14 @@ Set `required: true` when a field must be non-null. Normal scalar fields can hav
 
 They can also use `autoUpdate: true` when the value should be refreshed by MySQL whenever the row changes.
 
+UUID fields can use `defaultPreset: "current_user"` for a server-owned creator identity. YunCMS assigns the verified accountability user on single and bulk item creation, even if the role's writable fields omit this field. The create permission and its validation still apply. Supplying or updating the field is rejected with `FIELD_READ_ONLY`, including for administrators; anonymous/system callers without a user identity are rejected with `FORBIDDEN`. Studio treats the field as read-only. The value is assigned by ItemsService, not a MySQL default; direct SQL writers must supply it themselves. It cannot be combined with a literal default. On an existing populated collection, backfill a nullable UUID field before making it required.
+
+```json
+{ "field": "customer_user_id", "type": "uuid", "required": true, "defaultPreset": "current_user" }
+```
+
+Combine this field with a native M2O relation to `yuncms_users.id` to enforce identity existence. Configure the preset through the field REST/service API.
+
 Literal defaults for `text` and `json` are not part of the current field contract.
 
 ### Writing JSON and time values
@@ -271,7 +279,7 @@ await relations.createNativeM2O({
 
 Reading expansions uses `UsersService`/`FilesService` with the caller's explicit target read grant, row filter and safe fields. User credentials and physical storage keys cannot be selected even by Administrator. Hidden file targets expand to `null` (or are omitted from M2M arrays); a missing target grant denies expansion. Source field restrictions and junction row permissions still apply. `fields=assignee.email` and existing M2M virtual aliases work through the normal Items API. Generic Items access to system tables remains forbidden.
 
-Writing a non-null native reference requires a UUID plus native target read access; a filtered-out or missing identity is rejected before writing. Item create/update, including bulk operations, use that check after their own field/row permissions and hook transformations. It does not grant user/file mutation authority. Native schema filters and the existing schema lock/DDL compensation also apply. Configure these relations through REST or the service API; Studio's ordinary relation builder uses the dynamic contract.
+Writing a non-null native reference requires a UUID plus native target read access; a filtered-out or missing identity is rejected before writing. A reference to the caller's own `yuncms_users.id` uses the existing bounded self-user read and does not require a global Users read grant. References to other users, directory listing and nested user expansion still require that grant. Item create/update, including bulk operations, use that check after their own field/row permissions and hook transformations. It does not grant user/file mutation authority. Native schema filters and the existing schema lock/DDL compensation also apply. Configure these relations through REST or the service API; Studio's ordinary relation builder uses the dynamic contract.
 
 For a custom user/role reference, store a UUID field and validate the reference through `UsersService` or `RolesService` in an extension using the caller's service options. These UUID fields have no dynamic foreign key or nested Items expansion. Files-backed controls can store native Files IDs; access to the file itself remains authorized through `FilesService` and the Files API. Generic Items CRUD cannot be used to access native system resources. See [Extensions](extensions.md) and [Files](files.md).
 

@@ -47,13 +47,18 @@ function assertTimePresets(type, input) {
     error.code = 'INVALID_FIELD_DEFAULT';
     throw error;
   }
-  if (input.defaultPreset != null && input.defaultPreset !== 'now') {
+  if (input.defaultPreset != null && !['now', 'current_user'].includes(input.defaultPreset)) {
     const error = new Error(`Unsupported default preset: ${String(input.defaultPreset)}`);
     error.code = 'UNSUPPORTED_FIELD_DEFAULT';
     throw error;
   }
   if (input.defaultPreset === 'now' && !CURRENT_TIME_TYPES.has(type)) {
     const error = new Error('Current-time defaults require datetime or timestamp storage');
+    error.code = 'UNSUPPORTED_FIELD_DEFAULT';
+    throw error;
+  }
+  if (input.defaultPreset === 'current_user' && type !== 'uuid') {
+    const error = new Error('Current-user defaults require uuid storage');
     error.code = 'UNSUPPORTED_FIELD_DEFAULT';
     throw error;
   }

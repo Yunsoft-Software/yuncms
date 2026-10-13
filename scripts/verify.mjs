@@ -33,6 +33,7 @@ const FAST_TESTS = [
   'packages/core/test/files-write-permissions.test.js',
   'packages/core/test/native-write-filters.test.js',
   'packages/core/test/native-reference.test.js',
+  'packages/core/test/native-admission.test.js',
   'packages/core/test/items-large-fields.test.js',
   'packages/core/test/maintenance-state.test.js',
   'packages/core/test/production-config.test.js',

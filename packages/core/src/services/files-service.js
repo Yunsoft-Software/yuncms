@@ -4,7 +4,7 @@ import { readNativeReferenceRows } from '../native-reference.js';
 
 import { compileFilter } from '../query.js';
 import { enforcePermissionValidation } from '../permission-validation.js';
-import { withTransaction } from '../transaction.js';
+import { dispatchAfterCommit, dispatchAfterRollback, transactionContext, withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { resolveSystemResourceAccess } from './system-resource-access.js';
 
@@ -111,11 +111,14 @@ export class FilesService extends BaseService {
 
   async action(event, payload) {
     if (!this.emitter) return;
-    await this.emitter.action(event, payload, {
+    const captured = structuredClone(payload);
+    await dispatchAfterCommit(this.database, (database, transaction) => this.emitter.action(event, captured, {
       accountability: this.accountability,
       requestId: this.requestId,
       collection: 'yuncms_files',
-    });
+      database,
+      transaction,
+    }));
   }
 
   async filter(event, payload, context = {}) {
@@ -126,6 +129,7 @@ export class FilesService extends BaseService {
       collection: 'yuncms_files',
       operation: event.split('.').at(-1),
       database: this.database,
+      transaction: transactionContext(this.database),
       ...context,
     });
   }
@@ -212,64 +216,43 @@ export class FilesService extends BaseService {
     return this.#readOneAuthorized(id, permission);
   }
 
-  async createOne({
-    contents,
-    filenameDownload,
-    title = null,
-    mimetype = 'application/octet-stream',
-    storage = 'local',
-    metadata = null,
-  } = {}) {
+  async createOne(input = {}) {
     await resolveSystemResourceAccess(this, 'create', 'yuncms_files');
-    if (!Buffer.isBuffer(contents) && !(contents instanceof Uint8Array)) {
+    if (!Buffer.isBuffer(input.contents) && !(input.contents instanceof Uint8Array)) {
       throw fileError('INVALID_FILE_CONTENT', 'File contents must be Buffer or Uint8Array');
     }
+    // Capture bytes and metadata before asynchronous admission; trusted size and
+    // actor identity are never taken from the client or a filter return value.
+    const contents = Buffer.from(input.contents);
     if (contents.byteLength === 0) throw fileError('INVALID_FILE_CONTENT', 'Empty file uploads are not allowed');
+    const filename = normalizeFilename(input.filenameDownload);
+    const mimetype = normalizeMimeType(input.mimetype);
+    assertMimeSignature(contents, mimetype);
+    if (!transactionContext(this.database)) {
+      return withTransaction(this.database, database => new FilesService({ ...this, database }).createOne(input));
+    }
 
-    const filename = normalizeFilename(filenameDownload);
-    const normalizedMime = normalizeMimeType(mimetype);
-    assertMimeSignature(contents, normalizedMime);
+    const storage = input.storage ?? 'local';
+    const title = input.title == null ? null : String(input.title).slice(0, 255);
+    const metadata = input.metadata == null ? null : JSON.stringify(input.metadata);
     const driver = this.storage.get(storage);
     const id = randomUUID();
-    const filenameDisk = id;
-    let stored = false;
-
-    try {
-      await driver.put(filenameDisk, contents);
-      stored = true;
-      await this.database.query(
-        `INSERT INTO yuncms_files
-         (id, storage, filename_disk, filename_download, title, mimetype, filesize, uploaded_by, metadata)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          storage,
-          filenameDisk,
-          filename,
-          title == null ? null : String(title).slice(0, 255),
-          normalizedMime,
-          contents.byteLength,
-          this.accountability.user ?? null,
-          metadata == null ? null : JSON.stringify(metadata),
-        ],
-      );
-      const file = await this.#readOneUnsafe(id);
-      await this.action('files.create', {
-        key: id,
-        item: file,
-      });
-      return file;
-    } catch (error) {
-      if (stored) {
-        try {
-          await driver.delete(filenameDisk);
-        } catch (cleanupError) {
-          error.cleanupError = cleanupError;
-          error.code ||= 'FILE_STORAGE_CLEANUP_FAILED';
-        }
-      }
-      throw error;
-    }
+    const uploadedBy = this.accountability.user ?? null;
+    await this.filter('files.create', {
+      filenameDownload: filename, title, mimetype, storage,
+      metadata: metadata == null ? null : JSON.parse(metadata),
+    }, { key: id, filesize: contents.byteLength, uploadedBy });
+    dispatchAfterRollback(this.database, () => driver.delete(id));
+    await driver.put(id, contents);
+    await this.database.query(
+      `INSERT INTO yuncms_files
+       (id, storage, filename_disk, filename_download, title, mimetype, filesize, uploaded_by, metadata)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, storage, id, filename, title, mimetype, contents.byteLength, uploadedBy, metadata],
+    );
+    const file = await this.#readOneUnsafe(id);
+    await this.action('files.create', { key: id, item: file });
+    return file;
   }
 
   async readContent(id) {

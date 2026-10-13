@@ -44,7 +44,8 @@ export function isFileField(field) {
 }
 
 export function isReadOnlyField(field) {
-  return field?.readonly === true || field?.readonly === 1;
+  return field?.readonly === true || field?.readonly === 1
+    || fieldSchemaMetadata(field).defaultPreset === 'current_user';
 }
 
 export function isImageField(field) {

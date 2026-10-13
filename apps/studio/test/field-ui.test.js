@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -13,6 +14,15 @@ import {
   isImageField,
   isReadOnlyField,
 } from '../src/field-ui.js';
+
+test('server-owned current_user fields are read-only in Studio for object and JSON metadata', () => {
+  for (const metadata of [{ defaultPreset: 'current_user' }, JSON.stringify({ defaultPreset: 'current_user' })]) {
+    const field = { field: 'owner', type: 'uuid', readonly: 0, schema_metadata: metadata };
+    assert.equal(isReadOnlyField(field), true);
+    assert.match(readFileSync(new URL('../src/screens/ContentScreen.jsx', import.meta.url), 'utf8'), /fields\.filter\(\(field\) => !isReadOnlyField\(field\)\)/);
+
+  }
+});
 
 test('numeric and boolean readonly flags render only the intended badge without a literal zero', () => {
   for (const readonly of [0, false, null, undefined]) {
