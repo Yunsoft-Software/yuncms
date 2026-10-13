@@ -6,14 +6,14 @@ import { FilesService } from '../src/services/files-service.js';
 const fields = Object.fromEntries(['id', 'title', 'uploaded_by', 'filename_download', 'metadata'].map(field => [field, { field, type: field === 'metadata' ? 'json' : 'string' }]));
 const schema = { collections: { yuncms_files: { collection: 'yuncms_files', system: true, metadata: { permissionManaged: true, permissionMode: 'filter-read', allowedActions: ['read', 'update', 'delete'] }, fields } } };
 
-function fixture({ owner = 'B', permission = {}, filterHook = null } = {}) {
+function fixture({ owner = 'B', permission = {}, filterHook = null, readGrant = true } = {}) {
   let row = { id: 'file', uploaded_by: owner, title: 'old', filename_download: 'a.txt', metadata: null, storage: 'local', filename_disk: 'disk' };
   const writes = [], removed = [], queries = [];
   const database = {
     async beginTransaction() {}, async commit() {}, async rollback() {},
     async query(sql, params = []) {
       queries.push(sql);
-      if (sql.includes('FROM yuncms_permissions')) return [[{ fields: null, filter: { uploaded_by: { _eq: '$CURRENT_USER' } }, validation: null, ...permission }]];
+      if (sql.includes('FROM yuncms_permissions')) return [params[2] === 'read' && !readGrant ? [] : [{ fields: null, filter: { uploaded_by: { _eq: '$CURRENT_USER' } }, validation: null, ...permission }]];
       const scoped = sql.includes('`uploaded_by`');
       if (sql.includes('SELECT') && sql.includes('FROM yuncms_files')) return [[...(row && (!scoped || row.uploaded_by === 'B') ? [{ ...row }] : [])]];
       if (sql.startsWith('UPDATE')) {
@@ -66,4 +66,9 @@ test('Files validates the prospective record before writing', async () => {
   await f.service.updateOne('file', { title: 'allowed' });
   assert.equal(f.row().title, 'allowed');
   assert.ok(f.queries.some(sql => sql.includes('FOR UPDATE')));
+});
+test('Files update-only grant cannot read unrelated metadata through the write response', async () => {
+  const f = fixture({ readGrant: false });
+  const result = await f.service.updateOne('file', { title: 'new' });
+  assert.deepEqual(result, { id: 'file' }); assert.equal(f.row().title, 'new');
 });

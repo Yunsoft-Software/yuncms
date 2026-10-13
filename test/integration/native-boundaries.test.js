@@ -94,6 +94,12 @@ test('native file permissions, user/schema filters and identity relations enforc
     assert.equal((await request(`/files/${fileB.id}`, bToken, 'PATCH', { filenameDownload: 'blocked.txt' })).status, 403);
     assert.equal((await request(`/files/${fileB.id}`, bToken, 'PATCH', { title: 'Denied validation' })).status, 400);
     assert.equal((await request(`/files/${fileB.id}`, bToken, 'PATCH', { title: 'Allowed own' })).status, 200);
+    const readGrant = (await permissionService.readMany()).find(p => p.role === staffRole.id && p.collection === 'yuncms_files' && p.action === 'read');
+    await permissionService.updateOne(readGrant.id, { filter: { title: { _eq: 'hidden-to-reader' } } });
+    const hidden = await request(`/files/${fileB.id}`, bToken, 'PATCH', { title: 'Allowed hidden' }); assert.equal(hidden.status, 200); assert.deepEqual(hidden.body.data, { id: fileB.id });
+    await permissionService.deleteOne(readGrant.id);
+    const writeOnly = await request(`/files/${fileB.id}`, bToken, 'PATCH', { title: 'Allowed own' }); assert.equal(writeOnly.status, 200); assert.deepEqual(writeOnly.body.data, { id: fileB.id });
+    await permissionService.createOne({ role: staffRole.id, collection: 'yuncms_files', action: 'read', filter: { uploaded_by: { _eq: '$CURRENT_USER' } } });
     assert.equal((await request(`/files/${fileA.id}/content`, bToken)).status, 404);
   });
   await t.test('typed user and schema filters deny HTTP writes without persistence', async () => {

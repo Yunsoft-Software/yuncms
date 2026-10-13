@@ -425,7 +425,12 @@ export class FilesService extends BaseService {
       item: file,
       changes: patch,
     });
-    return file;
+    try {
+      return await this.readOne(id) ?? { id };
+    } catch (error) {
+      if (error.code === 'FORBIDDEN') return { id };
+      throw error;
+    }
   }
 
   async deleteOne(id) {

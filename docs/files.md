@@ -218,6 +218,7 @@ curl 'http://localhost:3008/files/FILE_ID' \
 ```
 
 The current role must have Files update access to the target record.
+The successful update response uses the caller's separate Files read grant/filter. If the updated row cannot be read, the response contains only `{ "id": "..." }`; write access does not expose other metadata.
 
 ## Delete
 
