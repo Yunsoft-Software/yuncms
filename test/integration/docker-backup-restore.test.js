@@ -119,8 +119,8 @@ test('Docker container backup and restore round trip preserves generated columns
     ['util-linux', '2.41.5-0+deb13u1'],
   ]) {
     runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'sh', imageName,
-      '-c', 'installed=$(dpkg-query -W -f="${Version}" "$1"); dpkg --compare-versions "$installed" ge "$2"',
-      'security-floor', pkg, floor]);
+      '-c', 'installed=$(dpkg-query -W -f "$3" "$1"); dpkg --compare-versions "$installed" ge "$2"',
+      'security-floor', pkg, floor, '${Version}']);
   }
 
   // 3. Track and provision isolated Docker resources
