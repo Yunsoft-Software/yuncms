@@ -73,7 +73,7 @@ A hidden collection can still be accessed through the API if the caller's role h
 
 # Content
 
-Select a collection directly from **Content** to work with its records.
+Select a collection directly from **Content** to work with its records. When visible collections exist but none is selected, Studio asks you to select one from the sidebar. The no-collections message and Data Model creation action are reserved for an empty visible collection list.
 
 ![YunCMS Content workspace](assets/screenshots/studio-content.png)
 

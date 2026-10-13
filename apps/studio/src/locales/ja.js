@@ -505,6 +505,8 @@ export const JA = Object.freeze({
   'content.deleteError': 'レコードを削除できませんでした',
   'content.empty': '空',
   'content.notEmpty': '空ではない',
+  'content.selectCollection': 'コレクションを選択',
+  'content.selectCollectionDescription': 'コンテンツのサイドバーでコレクションを選択してレコードを表示します。',
   'content.noCollections': 'コレクションはまだありません',
   'content.noCollectionsDescription': 'データモデルで最初のコレクションを作成してください。コンテンツサイドバーに直接表示されます。',
   'content.matchingRecords': '一致するレコード {count} 件',

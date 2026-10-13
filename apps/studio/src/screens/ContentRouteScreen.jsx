@@ -10,6 +10,7 @@ export function ContentRouteScreen({
   collection,
   collectionLabel,
   collectionMeta,
+  visibleCollectionCount,
   route,
   onNavigate,
   onOpenDataModel,
@@ -55,6 +56,7 @@ export function ContentRouteScreen({
     <ContentScreen
       collection={collection}
       collectionLabel={collectionLabel}
+      visibleCollectionCount={visibleCollectionCount}
       route={route}
       onNavigate={onNavigate}
       onOpenDataModel={onOpenDataModel}

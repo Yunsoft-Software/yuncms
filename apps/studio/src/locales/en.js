@@ -505,6 +505,8 @@ export const EN = Object.freeze({
   'content.deleteError': 'Record could not be deleted',
   'content.empty': 'empty',
   'content.notEmpty': 'not empty',
+  'content.selectCollection': 'Select a collection',
+  'content.selectCollectionDescription': 'Choose a collection from the Content sidebar to view its records.',
   'content.noCollections': 'No collections yet',
   'content.noCollectionsDescription': 'Create your first collection in Data Model. It will appear directly in the Content sidebar.',
   'content.matchingRecords': '{count} matching records',

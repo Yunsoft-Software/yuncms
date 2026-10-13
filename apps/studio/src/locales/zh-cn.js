@@ -505,6 +505,8 @@ export const ZH_CN = Object.freeze({
   'content.deleteError': '无法删除记录',
   'content.empty': '空',
   'content.notEmpty': '非空',
+  'content.selectCollection': '选择集合',
+  'content.selectCollectionDescription': '从内容侧栏中选择一个集合以查看其记录。',
   'content.noCollections': '暂无集合',
   'content.noCollectionsDescription': '请在数据模型中创建第一个集合。它会直接显示在内容侧边栏中。',
   'content.matchingRecords': '{count} 条匹配记录',

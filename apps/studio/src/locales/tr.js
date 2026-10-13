@@ -505,6 +505,8 @@ export const TR = Object.freeze({
   'content.deleteError': 'Kayıt silinemedi',
   'content.empty': 'boş',
   'content.notEmpty': 'boş değil',
+  'content.selectCollection': 'Bir koleksiyon seçin',
+  'content.selectCollectionDescription': 'Kayıtlarını görmek için İçerik menüsünden bir koleksiyon seçin.',
   'content.noCollections': 'Henüz koleksiyon yok',
   'content.noCollectionsDescription': 'İlk koleksiyonunuzu Veri Modeli bölümünde oluşturun. Doğrudan İçerik menüsünde görünecektir.',
   'content.matchingRecords': '{count} eşleşen kayıt',

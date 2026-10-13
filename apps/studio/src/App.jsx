@@ -271,12 +271,13 @@ export function App() {
         collection={contentCollection}
         collectionLabel={contentTitle}
         collectionMeta={activeContentCollection}
+        visibleCollectionCount={contentCollections.filter((entry) => !entry.hidden).length}
         route={route}
         onNavigate={navigateStudio}
         onOpenDataModel={() => navigateStudio(studioPath.dataModel())}
       />
     );
-  }, [activeContentCollection, contentCollection, contentTitle, route, section, session?.user?.admin, session?.user?.id, t]);
+  }, [activeContentCollection, contentCollection, contentCollections, contentTitle, route, section, session?.user?.admin, session?.user?.id, t]);
 
   async function handleLogout() {
     setLoggingOut(true);

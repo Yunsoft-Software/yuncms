@@ -505,6 +505,8 @@ export const ES = Object.freeze({
   'content.deleteError': 'No se pudo eliminar el registro',
   'content.empty': 'vacío',
   'content.notEmpty': 'no vacío',
+  'content.selectCollection': 'Selecciona una colección',
+  'content.selectCollectionDescription': 'Elige una colección en la barra lateral de Contenido para ver sus registros.',
   'content.noCollections': 'Todavía no hay colecciones',
   'content.noCollectionsDescription': 'Crea tu primera colección en Modelo de datos. Aparecerá directamente en la barra lateral de Contenido.',
   'content.matchingRecords': '{count} registros coincidentes',

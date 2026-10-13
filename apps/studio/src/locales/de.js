@@ -505,6 +505,8 @@ export const DE = Object.freeze({
   'content.deleteError': 'Datensatz konnte nicht gelöscht werden',
   'content.empty': 'leer',
   'content.notEmpty': 'nicht leer',
+  'content.selectCollection': 'Sammlung auswählen',
+  'content.selectCollectionDescription': 'Wähle eine Sammlung in der Inhaltsnavigation, um ihre Datensätze anzuzeigen.',
   'content.noCollections': 'Noch keine Collections',
   'content.noCollectionsDescription': 'Erstelle deine erste Collection im Datenmodell. Sie erscheint direkt in der Inhaltsseitenleiste.',
   'content.matchingRecords': '{count} passende Datensätze',

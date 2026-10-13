@@ -11,6 +11,7 @@ import {
   useConfirmDialog,
 } from '../components/index.js';
 import { formatDateFieldValue } from '../date-format.js';
+import { contentEmptyState } from '../content-empty-state.js';
 import { contentTableFields, defaultContentColumnKeys, isFileField, isImageField, isReadOnlyField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
@@ -320,7 +321,7 @@ function RecordForm({
   );
 }
 
-export function ContentScreen({ collection, collectionLabel = '', onOpenDataModel, route = {}, onNavigate }) {
+export function ContentScreen({ collection, collectionLabel = '', visibleCollectionCount = 0, onOpenDataModel, route = {}, onNavigate }) {
   const { locale, t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const requestVersion = useRef(0);
@@ -730,14 +731,15 @@ export function ContentScreen({ collection, collectionLabel = '', onOpenDataMode
   }
 
   if (!collection) {
+    const emptyState = contentEmptyState(visibleCollectionCount);
     return (
       <section className="panel empty-state empty-state-action">
         <div>
           <p className="eyebrow">{t('nav.content')}</p>
-          <h2>{t('content.noCollections')}</h2>
-          <p>{t('content.noCollectionsDescription')}</p>
+          <h2>{t(emptyState.title)}</h2>
+          <p>{t(emptyState.description)}</p>
         </div>
-        {onOpenDataModel && (
+        {emptyState.canCreateCollection && onOpenDataModel && (
           <button className="primary-button" type="button" onClick={onOpenDataModel}>{t('content.openDataModel')}</button>
         )}
       </section>

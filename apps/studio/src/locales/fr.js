@@ -505,6 +505,8 @@ export const FR = Object.freeze({
   'content.deleteError': 'Impossible de supprimer l’enregistrement',
   'content.empty': 'vide',
   'content.notEmpty': 'non vide',
+  'content.selectCollection': 'Sélectionnez une collection',
+  'content.selectCollectionDescription': 'Choisissez une collection dans la navigation Contenu pour afficher ses enregistrements.',
   'content.noCollections': 'Aucune collection pour le moment',
   'content.noCollectionsDescription': 'Créez votre première collection dans Modèle de données. Elle apparaîtra directement dans la barre latérale Contenu.',
   'content.matchingRecords': '{count} enregistrements correspondants',

@@ -123,6 +123,7 @@ const FAST_TESTS = [
   'apps/studio/test/appearance-logo-picker.test.js',
   'apps/studio/test/localization.test.js',
   'apps/studio/test/field-ui.test.js',
+  'apps/studio/test/content-empty-state.test.js',
   'apps/studio/test/field-builder-ui.test.js',
   'apps/studio/test/data-model-v2.test.js',
   'apps/studio/test/content-display-names.test.js',
