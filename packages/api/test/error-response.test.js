@@ -34,6 +34,7 @@ test('known client errors map to stable http statuses', () => {
   assert.equal(statusForError({ code: 'INVALID_QUERY' }), 400);
   assert.equal(statusForError({ code: 'FILE_MIME_MISMATCH' }), 400);
   assert.equal(statusForError({ code: 'FORBIDDEN' }), 403);
+  assert.equal(statusForError({ code: 'SYSTEM_COLLECTION_USE_DEDICATED_SERVICE' }), 403);
   assert.equal(statusForError({ code: 'COLLECTION_NOT_FOUND' }), 404);
   assert.equal(statusForError({ code: 'DUPLICATE_KEY' }), 409);
 });

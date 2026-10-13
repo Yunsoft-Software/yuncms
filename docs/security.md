@@ -31,6 +31,8 @@ Direct M2O expansion does not bypass RBAC: the source relation field must be rea
 
 Dedicated native user/file references use the corresponding native services and explicit target read grants. Sensitive credential/storage fields remain unselectable. Non-null writes must reference a readable native target. Native FK DDL is limited to application tables, uses safe deletion rules and cannot modify protected system schemas.
 
+Requests to protected system collections through the generic `/items` API return HTTP 403 `SYSTEM_COLLECTION_USE_DEDICATED_SERVICE`; use the corresponding native API.
+
 Schema services and file/maintenance administration require admin/system accountability. User/role/permission management includes current-admin/protected-role guards.
 
 ## SQL safety

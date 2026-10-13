@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import express from 'express';
 import { ExtensionError } from '@yunsoft/yuncms-extensions-sdk';
 import {
   bootstrapDatabase, createAccountability, createDatabasePool, createStorageRegistry,
@@ -69,7 +70,9 @@ test('native file permissions, user/schema filters and identity relations enforc
   const fileA = await fileFor(a), fileB = await fileFor(b); files.push(fileA, fileB);
   let permissionService = new PermissionsService(await fresh());
   for (const action of ['read', 'update', 'delete']) await permissionService.createOne({ role: staffRole.id, collection: 'yuncms_files', action, filter: { uploaded_by: { _eq: '$CURRENT_USER' } }, ...(action === 'update' ? { fields: ['title'], validation: { title: { _starts_with: 'Allowed' } } } : {}) });
-  const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger: { info() {}, warn() {}, error() {} } });
+  const diagnostic = express.Router();
+  diagnostic.get('/', () => { throw Object.assign(new Error('Private diagnostic'), { path: root, code: 'INTERNAL_DIAGNOSTIC' }); });
+  const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger: { info() {}, warn() {}, error() {} }, endpointExtensions: [{ id: 'diagnostic', router: diagnostic }] });
   server = await new Promise(resolve => { const instance = app.listen(0, '127.0.0.1', () => resolve(instance)); });
   const base = `http://127.0.0.1:${server.address().port}`;
   const request = async (path, token, method = 'GET', body) => {
@@ -78,6 +81,11 @@ test('native file permissions, user/schema filters and identity relations enforc
   };
   const login = async user => { const r = await request('/auth/login', null, 'POST', { email: user.email, password }); assert.equal(r.status, 200); return r.body.data.access_token; };
   const adminToken = await login(admin), bToken = await login(b);
+  await t.test('public HTTP boundaries reject native management and sanitize internal diagnostics', async () => {
+    for (const path of ['/users', '/permissions', '/schema/collections']) assert.equal((await request(path, null, 'POST', {})).status, 403);
+    const internal = await request('/extensions/diagnostic');
+    assert.equal(internal.status, 500); assert.equal(Object.hasOwn(internal.body.errors[0], 'path'), false); assert.equal(internal.body.errors[0].message, 'Internal server error');
+  });
   await t.test('file owner scope denies foreign updates/deletes and preserves both storage and metadata', async () => {
     assert.equal((await request(`/files/${fileA.id}`, bToken, 'PATCH', { title: 'Allowed foreign' })).status, 404);
     assert.equal((await request(`/files/${fileA.id}`, bToken, 'DELETE')).status, 404);
@@ -150,6 +158,9 @@ test('native file permissions, user/schema filters and identity relations enforc
     assert.equal((await request(`/items/${collection}`, bToken, 'POST', { asset: fileA.id })).status, 403);
     assert.equal((await request(`/items/${collection}/${item.id}`, bToken, 'PATCH', { owner: 'invalid UUID' })).status, 400);
     const expanded = await request(`/items/${collection}/${item.id}?fields=id,owner.email,asset.title`, bToken); assert.equal(expanded.status, 200); assert.equal(expanded.body.data.owner.email, a.email); assert.equal(expanded.body.data.asset.title, 'Allowed own');
+    assert.equal((await request(`/items/${collection}?filter=${encodeURIComponent(JSON.stringify({ owner: { _sql: '1=1' } }))}`, bToken)).status, 400);
+    assert.equal((await request(`/items/${collection}?fields=${encodeURIComponent('id,(SELECT password_hash FROM yuncms_users)')}`, bToken)).status, 400);
+    assert.equal((await request(`/items/yuncms_users`, bToken)).status, 403);
     assert.equal((await request(`/items/${collection}/${item.id}?fields=owner.password_hash`, adminToken)).status, 400);
     assert.equal((await request(`/items/${collection}/${item.id}?fields=asset.filename_disk`, adminToken)).status, 400);
     const link = await request(`/items/${junction}`, bToken, 'POST', { [`${collection}_id`]: item.id, user_id: a.id }); assert.equal(link.status, 201);
