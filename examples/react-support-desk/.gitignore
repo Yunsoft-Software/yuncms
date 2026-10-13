@@ -1,0 +1,9 @@
+.env.local
+.demo-accounts.json
+.demo-state.json
+.verification*.json
+.yuncms/
+node_modules/
+dist/
+uploads/
+*.log
