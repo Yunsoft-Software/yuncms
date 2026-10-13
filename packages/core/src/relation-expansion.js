@@ -7,6 +7,8 @@ import {
 } from './query.js';
 import { SchemaCache } from './schema.js';
 import { ItemsService } from './services/items-service.js';
+import { nativeReferenceService } from './native-reference-access.js';
+import { NATIVE_REFERENCE_TARGETS } from './native-reference.js';
 
 export const MAX_EXPAND_FIELDS = QUERY_LIMITS.maxRelationExpansions;
 export const MAX_RELATION_DEPTH = QUERY_LIMITS.maxRelationDepth;
@@ -183,6 +185,12 @@ function relationDescriptor(snapshot, collection, field, path = `fields.${field}
     throw expansionError('INVALID_QUERY', `Field is not a relation and cannot be expanded: ${collection}.${field}`, path);
   }
   return descriptor;
+}
+
+function targetReadService(collection, options, ItemsServiceClass, snapshot) {
+  return NATIVE_REFERENCE_TARGETS.includes(collection)
+    ? nativeReferenceService(collection, { ...options, schema: snapshot })
+    : new ItemsServiceClass(collection, options);
 }
 
 function createPlanNode() {
@@ -456,7 +464,7 @@ async function expandToOne({ rows, field, childNode, descriptor, options, ItemsS
     .map((value) => String(value)))];
   if (values.length === 0) return rows.map((row) => ({ ...row, [field]: null }));
 
-  const targetService = new ItemsServiceClass(descriptor.targetCollection, options);
+  const targetService = targetReadService(descriptor.targetCollection, options, ItemsServiceClass, snapshot);
   const targetResult = await targetService.readManyForRelation({
     fields: [...new Set([...visibleSelectionForNode(childNode), ...childNode.internalFields])],
     lookupField: descriptor.targetKey,
@@ -495,7 +503,7 @@ async function expandReverse({ rows, field, childNode, descriptor, options, Item
     const empty = descriptor.kind === 'reverse_to_one' ? null : [];
     return rows.map((row) => ({ ...row, [field]: empty }));
   }
-  const targetService = new ItemsServiceClass(descriptor.targetCollection, options);
+  const targetService = targetReadService(descriptor.targetCollection, options, ItemsServiceClass, snapshot);
   const targetResult = await readRowsByLookup({
     service: targetService,
     fields: visibleSelectionForNode(childNode),
@@ -551,7 +559,7 @@ async function expandM2M({ rows, field, childNode, descriptor, options, ItemsSer
     .map((value) => String(value)))];
   if (targetValues.length === 0) return rows.map((row) => ({ ...row, [field]: [] }));
 
-  const targetService = new ItemsServiceClass(descriptor.targetCollection, options);
+  const targetService = targetReadService(descriptor.targetCollection, options, ItemsServiceClass, snapshot);
   const targetResult = await targetService.readManyForRelation({
     fields: [...new Set([...visibleSelectionForNode(childNode), ...childNode.internalFields])],
     lookupField: descriptor.targetKey,

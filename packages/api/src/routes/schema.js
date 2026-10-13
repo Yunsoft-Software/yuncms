@@ -254,6 +254,16 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
     res.status(201).json({ data });
   });
 
+  for (const [path, method] of [['m2o', 'createNativeM2O'], ['m2m', 'createNativeM2M']]) {
+    router.post(`/relations/native/${path}`, async (req, res) => {
+      const data = await service(req, 'RelationsService')[method](req.body ?? {});
+      clearSchemaCache();
+      const collection = data.many_collection ?? data.junctionCollection;
+      await auditSchema(req, { action: 'schema.relation.create', collection, itemKey: data.many_field ?? collection, payload: { after: data } });
+      res.status(201).json({ data });
+    });
+  }
+
   router.delete('/relations/m2o/:manyCollection/:manyField', async (req, res) => {
     const relations = service(req, 'RelationsService');
     const before = await relations.readOne(req.params.manyCollection, req.params.manyField);

@@ -213,6 +213,8 @@ GET /files/:id/content
 
 A file outside the permitted scope is not fetched from storage just because the caller guessed its id.
 
+Files update/delete grants may include row filters such as `uploaded_by: { _eq: '$CURRENT_USER' }`. Updates also support native column field allowlists and prospective-record validation; deletes may validate the existing record and have no field allowlist. Out-of-scope mutations return 404 and do not touch storage. Upload remains action-level. See the precise payload/column mapping in [Files](files.md).
+
 See [Files](files.md).
 
 ## Permission administration API

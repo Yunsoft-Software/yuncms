@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { assertNativeReferenceTarget, NATIVE_REFERENCE_TARGETS, nativeReferenceError } from '../native-reference.js';
 
 import { withAdvisoryLock } from '../advisory-lock.js';
 import { compileFieldColumn } from '../field-types.js';
@@ -95,6 +96,16 @@ export class RelationsService extends BaseService {
   }
 
   async createM2O(input = {}) {
+    return this.#createM2O(input, false);
+  }
+
+  async createNativeM2O(input = {}) {
+    assertSchemaManager(this.accountability);
+    assertNativeReferenceTarget(input.oneCollection, assertOnDelete(input.onDelete));
+    return this.#createM2O(input, true);
+  }
+
+  async #createM2O(input, nativeReference) {
     assertSchemaManager(this.accountability);
     const manyCollection = assertIdentifier(input.manyCollection, 'many collection');
     const manyField = assertIdentifier(input.manyField, 'many field');
@@ -114,7 +125,7 @@ export class RelationsService extends BaseService {
         error.code = 'COLLECTION_NOT_FOUND';
         throw error;
       }
-      if (manyCollectionMetadata.system || oneCollectionMetadata.system) {
+      if (manyCollectionMetadata.system || (oneCollectionMetadata.system && !nativeReference)) {
         const error = new Error('System collections cannot be changed through the dynamic relation API');
         error.code = 'SYSTEM_SCHEMA_READ_ONLY';
         throw error;
@@ -126,6 +137,9 @@ export class RelationsService extends BaseService {
         const error = new Error('V1 M2O relations must reference the target collection primary key');
         error.code = 'UNSUPPORTED_RELATION_TARGET';
         throw error;
+      }
+      if (nativeReference && (!oneCollectionMetadata.system || oneField !== 'id')) {
+        throw nativeReferenceError('UNSUPPORTED_RELATION_TARGET', 'Native references require a protected identity primary key');
       }
 
       const [manyFieldMetadata, oneFieldMetadata, existingRelation] = await Promise.all([
@@ -150,6 +164,9 @@ export class RelationsService extends BaseService {
         );
         error.code = 'RELATION_TYPE_MISMATCH';
         throw error;
+      }
+      if (nativeReference && (oneFieldMetadata.type !== 'uuid' || manyFieldMetadata.type !== 'uuid' || parseSchemaMetadata(manyFieldMetadata.schema_metadata).systemManaged === true)) {
+        throw nativeReferenceError('RELATION_TYPE_MISMATCH', 'Native references require an application UUID field and a native UUID primary key');
       }
       if (onDelete === 'SET NULL' && Boolean(manyFieldMetadata.required)) {
         const error = new Error('SET NULL cannot be used with a required relation field');
@@ -181,7 +198,7 @@ export class RelationsService extends BaseService {
             oneCollection,
             oneField,
             onDelete,
-            metadata: { constraintName: fkName, kind: 'm2o' },
+            metadata: { constraintName: fkName, kind: 'm2o', ...(nativeReference ? { nativeReference: true } : {}) },
           });
 
           const schemaVersion = await incrementSchemaVersion(connection);
@@ -216,6 +233,25 @@ export class RelationsService extends BaseService {
   }
 
   async createM2M(input = {}) {
+    return this.#createM2M(input, false);
+  }
+
+  async createNativeM2M(input = {}) {
+    assertSchemaManager(this.accountability);
+    const leftNative = NATIVE_REFERENCE_TARGETS.includes(input.leftCollection);
+    const rightNative = NATIVE_REFERENCE_TARGETS.includes(input.rightCollection);
+    if (leftNative === rightNative) throw nativeReferenceError('UNSUPPORTED_RELATION_TARGET', 'Native M2M requires one application collection and one approved native identity');
+    const nativeCollection = leftNative ? input.leftCollection : input.rightCollection;
+    const nativeDelete = assertOnDelete((leftNative ? input.leftOnDelete : input.rightOnDelete) ?? 'RESTRICT');
+    assertNativeReferenceTarget(nativeCollection, nativeDelete);
+    const field = nativeCollection === 'yuncms_users' ? 'user_id' : 'file_id';
+    return this.#createM2M({
+      ...input,
+      ...(leftNative ? { leftOnDelete: nativeDelete, leftField: input.leftField ?? field } : { rightOnDelete: nativeDelete, rightField: input.rightField ?? field }),
+    }, true);
+  }
+
+  async #createM2M(input, nativeReference) {
     assertSchemaManager(this.accountability);
     const junctionCollection = assertUserSchemaIdentifier(input.junctionCollection, 'junction collection');
     const leftCollection = assertIdentifier(input.leftCollection, 'left collection');
@@ -254,10 +290,16 @@ export class RelationsService extends BaseService {
         error.code = 'COLLECTION_NOT_FOUND';
         throw error;
       }
-      if (leftMetadata.system || rightMetadata.system) {
+      if ((leftMetadata.system || rightMetadata.system) && !nativeReference) {
         const error = new Error('System collections cannot participate in dynamic M2M creation');
         error.code = 'SYSTEM_SCHEMA_READ_ONLY';
         throw error;
+      }
+      if (nativeReference) {
+        for (const target of [leftMetadata, rightMetadata]) {
+          const approved = NATIVE_REFERENCE_TARGETS.includes(target.collection);
+          if (Boolean(target.system) !== approved || (approved && target.primary_key !== 'id')) throw nativeReferenceError('UNSUPPORTED_RELATION_TARGET', 'Native M2M requires protected identities and an application collection');
+        }
       }
 
       const leftPrimaryKey = leftMetadata.primary_key;
@@ -271,6 +313,7 @@ export class RelationsService extends BaseService {
         error.code = 'SCHEMA_METADATA_DRIFT';
         throw error;
       }
+      if (nativeReference && ((leftMetadata.system && leftPk.type !== 'uuid') || (rightMetadata.system && rightPk.type !== 'uuid'))) throw nativeReferenceError('RELATION_TYPE_MISMATCH', 'Native identities require UUID primary keys');
 
       const leftColumn = fieldDefinitionFromMetadata(leftPk, { required: true });
       const rightColumn = fieldDefinitionFromMetadata(rightPk, { required: true });
@@ -353,7 +396,7 @@ export class RelationsService extends BaseService {
             junctionCollection,
             junctionField: rightField,
             onDelete: leftOnDelete,
-            metadata: { constraintName: leftFk, kind: 'm2m', side: 'left' },
+            metadata: { constraintName: leftFk, kind: 'm2m', side: 'left', ...(nativeReference && leftMetadata.system ? { nativeReference: true } : {}) },
           });
           const rightRelation = await metadata.createRelation({
             manyCollection: junctionCollection,
@@ -363,7 +406,7 @@ export class RelationsService extends BaseService {
             junctionCollection,
             junctionField: leftField,
             onDelete: rightOnDelete,
-            metadata: { constraintName: rightFk, kind: 'm2m', side: 'right' },
+            metadata: { constraintName: rightFk, kind: 'm2m', side: 'right', ...(nativeReference && rightMetadata.system ? { nativeReference: true } : {}) },
           });
 
           const schemaVersion = await incrementSchemaVersion(connection);

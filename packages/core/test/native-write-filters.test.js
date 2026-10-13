@@ -8,6 +8,14 @@ import { FieldsService } from '../src/services/fields-service.js';
 import { RelationsService } from '../src/services/relations-service.js';
 import { createO2ORelation, deleteO2ORelation } from '../src/o2o-relation.js';
 import { deleteM2MJunction } from '../src/m2m-lifecycle.js';
+import { filterNativeMutation } from '../src/native-lifecycle.js';
+
+test('veto-only schema hooks cannot mutate the original schema payload', async () => {
+  const emitter = new HookEmitter(), payload = { metadata: { label: 'safe' } };
+  emitter.registerFilter('schema.collection.create', value => { value.metadata.label = 'changed'; return { collection: 'redirected' }; });
+  await filterNativeMutation({ emitter, database: {}, accountability: createSystemAccountability() }, 'schema.collection.create', payload);
+  assert.deepEqual(payload, { metadata: { label: 'safe' } });
+});
 
 function fixture(event) {
   const calls = [], emitter = new HookEmitter();

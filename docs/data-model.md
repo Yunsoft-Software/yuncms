@@ -249,7 +249,29 @@ The junction remains part of authorization: a caller must be allowed to read the
 
 ## Native system resource references
 
-The dynamic relation API supports relations between project collections. M2O, O2O and M2M declarations involving a native system collection such as `yuncms_users`, `yuncms_roles` or `yuncms_files` are rejected with HTTP 403 `SYSTEM_SCHEMA_READ_ONLY`, including for Administrators. YunCMS-generated `created_by` and `updated_by` references are managed by the platform and are not custom dynamic relations.
+The ordinary dynamic relation API supports relations between project collections. Its M2O, O2O and M2M declarations involving system collections remain rejected with HTTP 403 `SYSTEM_SCHEMA_READ_ONLY`, including for Administrators. YunCMS-generated `created_by` and `updated_by` fields remain platform-managed.
+
+For application assignees/owners and file references, administrators/system callers may use the dedicated native contract:
+
+```text
+POST /schema/relations/native/m2o
+POST /schema/relations/native/m2m
+```
+
+`RelationsService.createNativeM2O(input)` accepts the same keys as `createM2O`: an application `manyCollection`/UUID `manyField`, `oneCollection` restricted to `yuncms_users` or `yuncms_files`, and the native `id` primary key only. `onDelete` defaults to `RESTRICT`; `SET NULL` requires a nullable application field. `CASCADE`, protected source collections and platform-managed source fields are rejected. Only the application table receives DDL; native tables, primary keys and permissions are unchanged.
+
+```js
+await relations.createNativeM2O({
+  manyCollection: 'tasks', manyField: 'assignee',
+  oneCollection: 'yuncms_users', onDelete: 'RESTRICT',
+});
+```
+
+`RelationsService.createNativeM2M(input)` uses the usual junction/left/right keys and requires exactly one application endpoint and one approved native identity. The generated junction is an application collection. The native side defaults to `RESTRICT` and disallows `CASCADE`/`SET NULL`; the application side defaults to `CASCADE`. Native junction field names default to `user_id` or `file_id`, and may be overridden with ordinary application field names. Remove native M2O edges with the ordinary M2O delete API; remove native M2M junctions with the existing explicit destructive M2M delete operation.
+
+Reading expansions uses `UsersService`/`FilesService` with the caller's explicit target read grant, row filter and safe fields. User credentials and physical storage keys cannot be selected even by Administrator. Hidden file targets expand to `null` (or are omitted from M2M arrays); a missing target grant denies expansion. Source field restrictions and junction row permissions still apply. `fields=assignee.email` and existing M2M virtual aliases work through the normal Items API. Generic Items access to system tables remains forbidden.
+
+Writing a non-null native reference requires a UUID plus native target read access; a filtered-out or missing identity is rejected before writing. Item create/update, including bulk operations, use that check after their own field/row permissions and hook transformations. It does not grant user/file mutation authority. Native schema filters and the existing schema lock/DDL compensation also apply. Configure these relations through REST or the service API; Studio's ordinary relation builder uses the dynamic contract.
 
 For a custom user/role reference, store a UUID field and validate the reference through `UsersService` or `RolesService` in an extension using the caller's service options. These UUID fields have no dynamic foreign key or nested Items expansion. Files-backed controls can store native Files IDs; access to the file itself remains authorized through `FilesService` and the Files API. Generic Items CRUD cannot be used to access native system resources. See [Extensions](extensions.md) and [Files](files.md).
 

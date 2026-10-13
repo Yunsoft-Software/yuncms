@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
+import { readNativeReferenceRows } from '../native-reference.js';
 
 import { compileFilter } from '../query.js';
 import { enforcePermissionValidation } from '../permission-validation.js';
@@ -97,6 +98,11 @@ function resolveContentEtag(file, size, modifiedAt, providerEtag) {
 }
 
 export class FilesService extends BaseService {
+  async readManyForRelation(query) {
+    const permission = await resolveSystemResourceAccess(this, 'read', 'yuncms_files');
+    return readNativeReferenceRows(this, 'yuncms_files', permission, query);
+  }
+
   constructor(options = {}) {
     super(options);
     if (!options.storage) throw new Error('FilesService requires a storage registry');

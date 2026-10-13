@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readNativeReferenceRows } from '../native-reference.js';
 
 import { hashPassword } from '../auth/password.js';
 import {
@@ -103,6 +104,11 @@ async function assertTargetManageable(database, id, accountability) {
 }
 
 export class UsersService extends BaseService {
+  async readManyForRelation(query) {
+    const permission = await resolveSystemResourceAccess(this, 'read', 'yuncms_users');
+    return readNativeReferenceRows(this, 'yuncms_users', permission, query);
+  }
+
   async action(event, payload) {
     if (!this.emitter) return;
     await dispatchAfterCommit(this.database, (database, transaction) => this.emitter.action(event, payload, {
@@ -114,12 +120,12 @@ export class UsersService extends BaseService {
     }));
   }
 
-  async #readOneUnsafe(id) {
+  async #readOneUnsafe(id, lock = false) {
     const [rows] = await this.database.query(
       `SELECT id, email, role, status, email_verified_at, last_access, created_at, updated_at
        FROM yuncms_users
        WHERE id = ?
-       LIMIT 1`,
+       LIMIT 1${lock ? ' FOR UPDATE' : ''}`,
       [id],
     );
     return rows[0] ?? null;
@@ -244,7 +250,7 @@ export class UsersService extends BaseService {
     await resolveSystemResourceAccess(this, 'update', 'yuncms_users');
     await assertTargetManageable(this.database, id, this.accountability);
     if (this.emitter) {
-      const before = await this.#readOneUnsafe(id);
+      const before = await this.#readOneUnsafe(id, true);
       if (!before) throw Object.assign(new Error(`Unknown user: ${id}`), { code: 'USER_NOT_FOUND' });
       patch = await this.filter('users.update', patch, { collection: 'yuncms_users', key: id, before });
     }
@@ -326,7 +332,7 @@ export class UsersService extends BaseService {
       error.code = 'SELF_ADMIN_MUTATION_FORBIDDEN';
       throw error;
     }
-    const before = this.emitter ? await this.#readOneUnsafe(id) : null;
+    const before = this.emitter ? await this.#readOneUnsafe(id, true) : null;
     await this.filter('users.delete', { key: id }, { collection: 'yuncms_users', key: id, before });
     const [result] = await this.database.query('DELETE FROM yuncms_users WHERE id = ?', [id]);
     if (result.affectedRows !== 1) {

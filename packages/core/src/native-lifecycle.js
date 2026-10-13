@@ -2,7 +2,8 @@ import { transactionContext } from './transaction.js';
 
 export async function filterNativeMutation(options, event, payload, context = {}) {
   if (!options.emitter) return payload;
-  return options.emitter.filter(event, payload, {
+  const filterPayload = event.startsWith('schema.') ? structuredClone(payload) : payload;
+  return options.emitter.filter(event, filterPayload, {
     accountability: options.accountability,
     requestId: options.requestId ?? null,
     database: options.database,

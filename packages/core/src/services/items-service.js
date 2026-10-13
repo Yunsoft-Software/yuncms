@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { validateNativeReferenceWrites } from '../native-reference-access.js';
 
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { enforcePermissionValidation } from '../permission-validation.js';
@@ -455,6 +456,7 @@ export class ItemsService extends BaseService {
     const permission = await this.resolvePermission('create');
     const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create' });
     const callerEntries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
+    await validateNativeReferenceWrites(this, callerEntries);
     const now = new Date();
     const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create', now);
     const id = randomUUID();
@@ -489,6 +491,7 @@ export class ItemsService extends BaseService {
     for (const payload of payloads) {
       const filteredPayload = await this.filterMutation('items.create', payload, { operation: 'create', bulk: true });
       const callerEntries = this.validatePayload(filteredPayload, schema, permission, { creating: true });
+      await validateNativeReferenceWrites(this, callerEntries);
       const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'create', now);
       const id = randomUUID();
       const candidate = createCandidateRecord(schema, id, entries, now);
@@ -526,6 +529,7 @@ export class ItemsService extends BaseService {
     const permission = await this.resolvePermission('update');
     const filteredPayload = await this.filterMutation('items.update', payload, { operation: 'update', key: id });
     const callerEntries = this.validatePayload(filteredPayload, schema, permission);
+    await validateNativeReferenceWrites(this, callerEntries);
     if (callerEntries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
     const now = new Date();
     const dynamicVariables = this.dynamicVariables(now);
@@ -565,6 +569,7 @@ export class ItemsService extends BaseService {
     const accessSchema = schemaForFields(schema, permission.fields);
     const filteredPayload = await this.filterMutation('items.update', payload, { operation: 'update', bulk: true, filter: filterInput });
     const callerEntries = this.validatePayload(filteredPayload, schema, permission);
+    await validateNativeReferenceWrites(this, callerEntries);
     if (callerEntries.length === 0) throw serviceError('INVALID_PAYLOAD', 'Update payload cannot be empty');
     const now = new Date();
     const dynamicVariables = this.dynamicVariables(now);
