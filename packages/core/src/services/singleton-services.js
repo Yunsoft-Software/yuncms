@@ -35,7 +35,7 @@ export class SingletonItemsService extends ItemsService {
       singletonLockName(this.collection),
       async (connection) => {
         await assertSingletonVacant(connection, this.collection, schema);
-        return super.createOne(payload);
+        return new ItemsService(this.collection, { ...this, database: connection }).createOne(payload);
       },
       { timeoutSeconds: 10 },
     );
@@ -53,7 +53,7 @@ export class SingletonItemsService extends ItemsService {
       singletonLockName(this.collection),
       async (connection) => {
         await assertSingletonVacant(connection, this.collection, schema);
-        return super.createMany(payloads);
+        return new ItemsService(this.collection, { ...this, database: connection }).createMany(payloads);
       },
       { timeoutSeconds: 10 },
     );

@@ -28,6 +28,13 @@ export function dispatchAfterRollback(database, action) {
   transaction.rollbackActions.push(action);
 }
 
+export function registerTransactionCleanup(database, cleanup) {
+  const transaction = transactions.get(database);
+  if (!transaction) return false;
+  transaction.cleanups.push(cleanup);
+  return true;
+}
+
 function validateOperation(database, operation) {
   if (!database) throw new Error('Database connection is required');
   if (typeof operation !== 'function') throw new Error('Transaction operation is required');
@@ -52,7 +59,7 @@ async function setIsolationLevel(connection, isolationLevel) {
 async function executeTransaction(connection, operation, options) {
   await setIsolationLevel(connection, options.isolationLevel);
   await connection.beginTransaction();
-  const transaction = { actions: [], rollbackActions: [], isolationLevel: options.isolationLevel ? String(options.isolationLevel).toUpperCase() : null };
+  const transaction = { actions: [], rollbackActions: [], cleanups: [], isolationLevel: options.isolationLevel ? String(options.isolationLevel).toUpperCase() : null };
   transactions.set(connection, transaction);
 
   try {
@@ -70,7 +77,9 @@ async function executeTransaction(connection, operation, options) {
     }
     throw error;
   } finally {
-    transactions.delete(connection);
+    try {
+      for (const cleanup of transaction.cleanups.toReversed()) await cleanup();
+    } finally { transactions.delete(connection); }
   }
 }
 

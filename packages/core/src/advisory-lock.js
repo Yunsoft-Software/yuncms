@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { registerTransactionCleanup } from './transaction.js';
 
 export function databaseAdvisoryLockName(databaseName, lockName) {
   if (typeof databaseName !== 'string' || !databaseName || typeof lockName !== 'string' || !lockName) throw new TypeError('Database and advisory lock names are required');
@@ -10,7 +11,8 @@ export async function withAdvisoryLock(pool, lockName, operation, { timeoutSecon
   if (!lockName || typeof lockName !== 'string') throw new Error('Advisory lock name is required');
   if (typeof operation !== 'function') throw new Error('Advisory lock operation is required');
 
-  const connection = await pool.getConnection();
+  const borrowed = typeof pool.getConnection === 'function';
+  const connection = borrowed ? await pool.getConnection() : pool;
   // mysql2 promise pools/connections retain their selected database config.
   // Legacy query adapters have no native database identity and retain explicit names.
   const databaseName = connection.connection?.config?.database || pool.pool?.config?.connectionConfig?.database;
@@ -29,13 +31,17 @@ export async function withAdvisoryLock(pool, lockName, operation, { timeoutSecon
 
     return await operation(connection);
   } finally {
-    if (acquired) {
-      try {
-        await connection.query('SELECT RELEASE_LOCK(?) AS released', [lockName]);
-      } catch {
-        // Releasing the connection also drops connection-scoped MySQL locks.
+    const releaseLock = async () => {
+      if (acquired) {
+        try { await connection.query('SELECT RELEASE_LOCK(?) AS released', [lockName]); }
+        catch { connection.destroy?.(); } // Destroy, rather than return a connection still holding a lock.
       }
+    };
+    // An outer mutation must retain singleton serialization until commit/rollback.
+    // Transaction cleanup runs before borrowed connections return to their pool.
+    if (!acquired || !registerTransactionCleanup(connection, releaseLock)) await releaseLock();
+    if (borrowed) {
+      connection.release();
     }
-    connection.release();
   }
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { databaseAdvisoryLockName, withAdvisoryLock } from '../src/advisory-lock.js';
+import { withTransaction } from '../src/transaction.js';
 
 test('database lock names isolate databases and purposes while staying within MySQL limits', () => {
   const name = databaseAdvisoryLockName('project_test', 'yuncms:schema');
@@ -9,6 +10,20 @@ test('database lock names isolate databases and purposes while staying within My
   assert.notEqual(name, databaseAdvisoryLockName('project_test', 'yuncms:bootstrap'));
   assert.ok(Buffer.byteLength(databaseAdvisoryLockName('測'.repeat(64), 'x'.repeat(200))) <= 64);
   for (const value of [null, '', 123]) assert.throws(() => databaseAdvisoryLockName(value, 'schema'), TypeError);
+});
+
+test('connection-owned advisory locks last until outer commit or rollback without releasing ownership', async () => {
+  for (const rollback of [false, true]) {
+    const calls = [], connection = {
+      connection: { config: { database: 'project_test' } },
+      async beginTransaction() { calls.push('begin'); }, async commit() { calls.push('commit'); }, async rollback() { calls.push('rollback'); },
+      release() { assert.fail('caller owns connection'); },
+      async query(sql) { calls.push(sql.includes('GET_LOCK') ? 'lock' : 'unlock'); return [[{ acquired: 1 }]]; },
+    };
+    const operation = withTransaction(connection, async db => { await withAdvisoryLock(db, 'schema', async () => {}); assert.deepEqual(calls, ['begin', 'lock']); if (rollback) throw Error('rollback'); });
+    if (rollback) await assert.rejects(operation, /rollback/); else await operation;
+    assert.deepEqual(calls, ['begin', 'lock', rollback ? 'rollback' : 'commit', 'unlock']);
+  }
 });
 
 test('native pool lock acquisition and release use the same configured database scope', async () => {

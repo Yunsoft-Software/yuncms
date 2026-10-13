@@ -39,6 +39,21 @@ test('non-singleton collections skip the singleton cardinality query', async () 
   await assertSingletonVacant(database, 'articles', { singleton: false });
 });
 
+test('singleton mutations reuse their advisory-lock connection with a one-connection pool', async () => {
+  for (const bulk of [false, true]) {
+    const database = createMockPool({ occupied: false });
+    const borrow = database.getConnection; let borrowed = 0;
+    database.getConnection = async () => { assert.equal(++borrowed, 1, 'must not borrow again while holding the singleton lock'); return borrow(); };
+    database.query = async () => assert.fail('must use the lock connection');
+    const service = new SingletonItemsService('site_settings', { database, schema: singletonSchema, accountability: { role: 'admin', user: 'admin-user', admin: true } });
+    if (bulk) assert.equal((await service.createMany([{ title: 'Settings' }])).length, 1);
+    else assert.ok(await service.createOne({ title: 'Settings' }));
+    assert.equal(borrowed, 1);
+    const commit = database.calls.indexOf('commit'), releaseLock = database.calls.findIndex(c => c.sql?.includes('RELEASE_LOCK'));
+    assert.ok(commit >= 0 && releaseLock > commit, 'commit before releasing singleton serialization');
+  }
+});
+
 const singletonSchema = {
   version: 1,
   collections: {
