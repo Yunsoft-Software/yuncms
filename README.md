@@ -58,6 +58,7 @@ These screenshots were captured from the current published package. New users sh
 | Understand Content, Files, Data Model and users | [Using YunCMS Studio](docs/studio.md) |
 | Choose the Studio and AI language | [Localization](docs/studio-customization.md#localization) |
 | Design fields and relations | [Data Model Guide](docs/data-model.md) |
+| Build a React support desk with roles, relations and AI | [React Support Desk example](examples/react-support-desk/README.md) |
 | Configure roles and safe public access | [Roles and Permissions](docs/permissions.md) |
 | Connect a frontend or integration | [REST API](docs/rest-api.md) and [Items Query Language](docs/api-query-language.md) |
 | Automate summaries, classification or translation with AI | [AI Automations](docs/ai-automations.md) |
