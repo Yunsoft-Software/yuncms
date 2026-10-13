@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 import {
   contentTableFields,
@@ -9,7 +11,20 @@ import {
   fileAcceptForField,
   isFileField,
   isImageField,
+  isReadOnlyField,
 } from '../src/field-ui.js';
+
+test('numeric and boolean readonly flags render only the intended badge without a literal zero', () => {
+  for (const readonly of [0, false, null, undefined]) {
+    assert.equal(isReadOnlyField({ readonly }), false);
+    const html = renderToStaticMarkup(createElement('div', null, isReadOnlyField({ readonly }) && createElement('span', null, 'Read only')));
+    assert.equal(html, '<div></div>');
+  }
+  for (const readonly of [1, true]) {
+    assert.equal(isReadOnlyField({ readonly }), true);
+    assert.equal(renderToStaticMarkup(createElement('div', null, isReadOnlyField({ readonly }) && createElement('span', null, 'Read only'))), '<div><span>Read only</span></div>');
+  }
+});
 
 test('file fields keep human labels while using UUID storage with a file interface', () => {
   const payload = fieldCreationPayload({ name: 'Ek Dosya', field: 'ek_dosya', type: 'file', required: false });

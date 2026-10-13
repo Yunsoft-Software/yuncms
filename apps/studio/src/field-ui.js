@@ -43,6 +43,10 @@ export function isFileField(field) {
   return field?.interface === 'file' || field?.interface === 'image';
 }
 
+export function isReadOnlyField(field) {
+  return field?.readonly === true || field?.readonly === 1;
+}
+
 export function isImageField(field) {
   return field?.interface === 'image';
 }

@@ -180,6 +180,7 @@ Display names are for humans; collection API keys are the stable identifiers use
 ## Fields
 
 The **Fields** tab lets you inspect/add/remove fields and adjust supported schema properties such as required/nullability. Field rows use type-specific icons so text, numeric, boolean, date/time, UUID, relation and Files-backed fields are easier to distinguish while scanning a schema.
+The **Read only** badge appears only for read-only fields. Editable fields show their required/optional state without a read-only badge or numeric placeholder.
 
 Current storage types include:
 

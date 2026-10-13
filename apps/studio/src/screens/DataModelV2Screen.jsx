@@ -16,6 +16,7 @@ import {
   fieldCreationPayload,
   fieldDisplayType,
   isFileField,
+  isReadOnlyField,
 } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName, schemaKeyFromName } from '../schema-name.js';
@@ -702,7 +703,7 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
                             {isManagedField(field) && <span className="status-pill system-field-pill">{t('collectionBuilder.systemManaged')}</span>}
                             {isSystemExtension(field) && <span className="status-pill">{t('dataModel.customSystemField')}</span>}
                             <span className="status-pill">{field.required ? t('common.required') : t('common.optional')}</span>
-                            {field.readonly && <span className="status-pill">{t('common.readonly')}</span>}
+                            {isReadOnlyField(field) && <span className="status-pill">{t('common.readonly')}</span>}
                           </div>
                           <div className="field-workspace-actions"><button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.field(selected, field.field))}>{t('dataModel.openField')}</button></div>
                         </div>

@@ -72,6 +72,11 @@ test('field list shows human labels alongside technical keys', () => {
   assert.match(screenSource, /\[field\.name, field\.field, fieldDisplayType\(field\)\]/);
 });
 
+test('field list uses a boolean readonly predicate so editable numeric flags cannot render zero', () => {
+  assert.match(screenSource, /\{isReadOnlyField\(field\) && <span className="status-pill">/);
+  assert.doesNotMatch(screenSource, /\{field\.readonly &&/);
+});
+
 test('relation workspace preserves delete actions while simplifying layout', () => {
   assert.match(screenSource, /deleteDirectRelation/);
   assert.match(screenSource, /deleteM2M/);
