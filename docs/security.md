@@ -84,6 +84,7 @@ Do not place tokens/passwords in logs. Structured logging and audit redaction re
 - reconciliation defaults to dry-run;
 - destructive orphan cleanup requires explicit intent plus an object-age guard;
 - missing storage objects never cause automatic DB metadata deletion.
+- native file update/delete enforce row filters in SQL; update field masks and prospective-record validation are checked before writing, and delete cannot touch storage outside its grant.
 
 Reconciliation is an operational safety tool, not a replacement for storage backups/monitoring.
 

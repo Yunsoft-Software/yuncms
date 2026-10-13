@@ -30,6 +30,10 @@ Administrative/system accountability can perform maintenance operations such as 
 
 See [Roles and permissions](permissions.md).
 
+File update/delete permissions enforce their row `filter` in the SQL mutation, including `$CURRENT_USER` ownership rules. An out-of-scope file returns 404 without changing metadata or storage. Update permissions may specify native column `fields` (`filename_download`, `title`, `metadata`) and prospective-record `validation`; the HTTP/service payload still uses `filenameDownload`. Delete permissions support a row filter and validation of the existing record, but no field allowlist. Validation locks the current row inside a transaction. Read permissions support a row filter; upload remains an action-level grant.
+
+Trusted extensions may register cancellable `files.update` and `files.delete` filters. Context contains verified accountability, `operation`, target `key` and the authorized `before` record. An update filter returns a metadata patch that is validated again; a delete filter may throw to cancel but cannot redirect the target. Success actions retain the same event names and run after the mutation.
+
 ## Studio Files library
 
 Open **Files** in Studio to browse uploaded assets. The Files workbench is designed as an asset browser: gallery view prioritizes previews while list view gives more room to filenames and storage metadata.

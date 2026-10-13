@@ -75,6 +75,10 @@ export function assertSystemPermissionPayload(
   }
 
   if (config.mode === 'filter-read') {
+    if (collectionSchema.collection === 'yuncms_files' && ['update', 'delete'].includes(action)) {
+      if (action === 'delete' && fields != null) advancedUnsupported(collectionSchema, 'File delete permissions do not support a field allowlist');
+      return;
+    }
     if (fields != null || validation != null) {
       advancedUnsupported(
         collectionSchema,

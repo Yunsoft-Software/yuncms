@@ -28,7 +28,7 @@ const schema = {
   collections: { yuncms_files: filesSchema },
 };
 
-test('Files system permissions allow only read filters as an advanced rule', () => {
+test('Files system permissions allow read filters and scoped mutation rules', () => {
   assert.doesNotThrow(() => assertSystemPermissionPayload(
     filesSchema,
     'read',
@@ -38,10 +38,9 @@ test('Files system permissions allow only read filters as an advanced rule', () 
     () => assertSystemPermissionPayload(filesSchema, 'read', { fields: ['title'] }),
     (error) => error.code === 'SYSTEM_PERMISSION_ADVANCED_UNSUPPORTED',
   );
-  assert.throws(
-    () => assertSystemPermissionPayload(filesSchema, 'update', { filter: { title: { _eq: 'public' } } }),
-    (error) => error.code === 'SYSTEM_PERMISSION_ADVANCED_UNSUPPORTED',
-  );
+  assert.doesNotThrow(() => assertSystemPermissionPayload(filesSchema, 'update', { fields: ['title'], filter: { uploaded_by: { _eq: '$CURRENT_USER' } }, validation: { title: { _nnull: true } } }));
+  assert.doesNotThrow(() => assertSystemPermissionPayload(filesSchema, 'delete', { filter: { uploaded_by: { _eq: '$CURRENT_USER' } } }));
+  assert.throws(() => assertSystemPermissionPayload(filesSchema, 'delete', { fields: ['title'] }), { code: 'SYSTEM_PERMISSION_ADVANCED_UNSUPPORTED' });
 });
 
 test('administrator can create a filtered Public Files read grant', async () => {

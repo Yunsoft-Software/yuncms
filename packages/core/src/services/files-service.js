@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 
 import { compileFilter } from '../query.js';
+import { enforcePermissionValidation } from '../permission-validation.js';
+import { withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { resolveSystemResourceAccess } from './system-resource-access.js';
 
@@ -110,6 +112,27 @@ export class FilesService extends BaseService {
     });
   }
 
+  async filter(event, payload, context = {}) {
+    if (!this.emitter) return payload;
+    return this.emitter.filter(event, payload, {
+      accountability: this.accountability,
+      requestId: this.requestId,
+      collection: 'yuncms_files',
+      operation: event.split('.').at(-1),
+      database: this.database,
+      ...context,
+    });
+  }
+
+  #validateRecord(record, permission) {
+    if (!permission.validation) return;
+    const schema = this.schema?.collections?.yuncms_files;
+    if (!schema) throw fileError('SYSTEM_SCHEMA_REQUIRED', 'System schema is required for file validation');
+    enforcePermissionValidation(record, permission.validation, schema, {
+      dynamicVariables: { user: this.accountability.user, role: this.accountability.role, now: new Date() },
+    });
+  }
+
   #compileReadScope(permission, id = null) {
     let sql = '';
     let params = [];
@@ -153,13 +176,13 @@ export class FilesService extends BaseService {
     return normalizeRow(rows[0]);
   }
 
-  async #readOneAuthorized(id, permission) {
+  async #readOneAuthorized(id, permission, database = this.database, lock = false) {
     const scope = this.#compileReadScope(permission, id);
-    const [rows] = await this.database.query(
+    const [rows] = await database.query(
       `SELECT id, storage, filename_disk, filename_download, title, mimetype, filesize,
               uploaded_by, uploaded_at, metadata
        FROM yuncms_files${scope.sql}
-       LIMIT 1`,
+       LIMIT 1${lock ? ' FOR UPDATE' : ''}`,
       scope.params,
     );
     return normalizeRow(rows[0]);
@@ -338,7 +361,10 @@ export class FilesService extends BaseService {
   }
 
   async updateOne(id, patch = {}) {
-    await resolveSystemResourceAccess(this, 'update', 'yuncms_files');
+    const permission = await resolveSystemResourceAccess(this, 'update', 'yuncms_files');
+    const before = await this.#readOneAuthorized(id, permission);
+    if (!before) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+    patch = await this.filter('files.update', patch, { key: id, before });
     if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
       throw fileError('INVALID_PAYLOAD', 'File metadata patch must be an object');
     }
@@ -347,30 +373,45 @@ export class FilesService extends BaseService {
       throw fileError('INVALID_PAYLOAD', 'File update supports filenameDownload, title and metadata only');
     }
 
-    const before = await this.#readOneUnsafe(id);
-    if (!before) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+    for (const key of keys) {
+      const field = key === 'filenameDownload' ? 'filename_download' : key;
+      if (permission.fields && !permission.fields.includes(field)) {
+        throw fileError('FORBIDDEN_FIELD', `Field is not allowed for update: ${field}`);
+      }
+    }
 
     const assignments = [];
     const params = [];
+    const changes = {};
     if (Object.hasOwn(patch, 'filenameDownload')) {
       assignments.push('filename_download = ?');
-      params.push(normalizeFilename(patch.filenameDownload));
+      changes.filename_download = normalizeFilename(patch.filenameDownload);
+      params.push(changes.filename_download);
     }
     if (Object.hasOwn(patch, 'title')) {
       assignments.push('title = ?');
-      params.push(patch.title == null ? null : String(patch.title).slice(0, 255));
+      changes.title = patch.title == null ? null : String(patch.title).slice(0, 255);
+      params.push(changes.title);
     }
     if (Object.hasOwn(patch, 'metadata')) {
       assignments.push('metadata = ?');
       params.push(patch.metadata == null ? null : JSON.stringify(patch.metadata));
+      changes.metadata = patch.metadata ?? null;
     }
 
-    params.push(id);
-    const [result] = await this.database.query(
-      `UPDATE yuncms_files SET ${assignments.join(', ')} WHERE id = ?`,
-      params,
-    );
-    if (result.affectedRows !== 1) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+    const mutate = async (database) => {
+      const current = permission.validation ? await this.#readOneAuthorized(id, permission, database, true) : before;
+      if (!current) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+      this.#validateRecord({ ...current, ...changes }, permission);
+      const scope = this.#compileReadScope(permission, id);
+      const [result] = await database.query(
+        `UPDATE yuncms_files SET ${assignments.join(', ')}${scope.sql}`,
+        [...params, ...scope.params],
+      );
+      if (result.affectedRows !== 1) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+    };
+    if (permission.validation) await withTransaction(this.database, mutate);
+    else await mutate(this.database);
     const file = await this.#readOneUnsafe(id);
     await this.action('files.update', {
       key: id,
@@ -382,12 +423,20 @@ export class FilesService extends BaseService {
   }
 
   async deleteOne(id) {
-    await resolveSystemResourceAccess(this, 'delete', 'yuncms_files');
-    const file = await this.#readOneUnsafe(id);
+    const permission = await resolveSystemResourceAccess(this, 'delete', 'yuncms_files');
+    const file = await this.#readOneAuthorized(id, permission);
     if (!file) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
-
-    const [result] = await this.database.query('DELETE FROM yuncms_files WHERE id = ?', [id]);
-    if (result.affectedRows !== 1) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+    await this.filter('files.delete', { key: id }, { key: id, before: file });
+    const mutate = async (database) => {
+      const current = permission.validation ? await this.#readOneAuthorized(id, permission, database, true) : file;
+      if (!current) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+      this.#validateRecord(current, permission);
+      const scope = this.#compileReadScope(permission, id);
+      const [result] = await database.query(`DELETE FROM yuncms_files${scope.sql}`, scope.params);
+      if (result.affectedRows !== 1) throw fileError('FILE_NOT_FOUND', `Unknown file: ${id}`);
+    };
+    if (permission.validation) await withTransaction(this.database, mutate);
+    else await mutate(this.database);
 
     const driver = this.storage.get(file.storage);
     try {
