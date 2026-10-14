@@ -126,7 +126,22 @@ test('M2M rejects SET NULL because junction FK fields are required', async () =>
 });
 
 
-test('standalone unique options are explicitly rejected before schema I/O instead of silently ignored', async () => {
+test('unique and indexed options require real booleans and indexable storage before schema I/O', async () => {
   const service = new FieldsService(adminOptions());
-  for (const unique of [true, false, 'true']) await assert.rejects(service.createOne('records', { field: 'business_key', type: 'string', unique }), { code: 'INVALID_SCHEMA_PAYLOAD' });
+  for (const unique of ['true', 1, null]) {
+    await assert.rejects(service.createOne('records', { field: 'business_key', type: 'string', unique }), { code: 'INVALID_SCHEMA_PAYLOAD' });
+    await assert.rejects(service.updateSchema('records', 'business_key', { unique }), { code: 'INVALID_SCHEMA_PAYLOAD' });
+  }
+  for (const options of [{ type: 'json', unique: true }, { type: 'text', unique: true }, { type: 'string', length: 769, unique: true }, { type: 'uuid', indexed: 'false' }]) {
+    await assert.rejects(service.createOne('records', { field: 'business_key', ...options }), { code: 'INVALID_SCHEMA_PAYLOAD' });
+  }
+  await assert.rejects(new FieldsService(publicOptions()).createOne('records', { field: 'key', type: 'string', unique: true }), { code: 'FORBIDDEN' });
+  await assert.rejects(new FieldsService(publicOptions()).updateSchema('records', 'key', { unique: true }), { code: 'FORBIDDEN' });
+});
+
+test('system field upgrades enforce schema-management authority and validated field names before I/O', async () => {
+  await assert.rejects(new CollectionsService(publicOptions()).updateOne('records', { systemFields: ['created_at'] }), { code: 'FORBIDDEN' });
+  for (const systemFields of ['created_at', ['unexpected'], ['created_at` DROP TABLE users']]) {
+    await assert.rejects(new CollectionsService(adminOptions()).updateOne('records', { systemFields }), { code: 'INVALID_SCHEMA_PAYLOAD' });
+  }
 });

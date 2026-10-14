@@ -314,6 +314,8 @@ curl 'http://localhost:3008/schema/collections' \
 
 Changing only `name`, `note`, visibility or UI metadata does not rename the physical collection key.
 
+`PATCH /schema/collections/:collection` also accepts `systemFields` to add native managed fields to an existing collection. The migration is additive and idempotent; ordinary name collisions return 409 `FIELD_EXISTS`. Legacy timestamps use the migration time and legacy actors stay `null`. See [system fields](data-model.md#system-fields) for backfill, authorization and recovery behavior.
+
 ## Fields
 
 ```text
@@ -324,6 +326,8 @@ PATCH  /schema/collections/:collection/fields/:field
 PATCH  /schema/collections/:collection/fields/:field/schema
 DELETE /schema/collections/:collection/fields/:field?destructive=true
 ```
+
+Creation and physical schema updates accept boolean `unique` and `indexed` options. Unique constraints are enforced by MySQL and conflicting writes or existing data return 409 `DUPLICATE_KEY`. See [data-model field constraints](data-model.md) for supported storage, NULL/collation behavior and safe migrations.
 
 Example string field:
 

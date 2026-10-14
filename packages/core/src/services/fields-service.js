@@ -1,11 +1,13 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { withAdvisoryLock } from '../advisory-lock.js';
 import { compileFieldColumn } from '../field-types.js';
+import { assertFieldIndexOptions, assertNoDuplicateFieldValues, fieldIndexClause, fieldIndexName, safeFieldIndexError } from '../field-index.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { normalizeDisplayName, resolveSchemaName } from '../schema-key.js';
 import { incrementSchemaVersion } from '../schema-version.js';
+import { assertSchemaDDLAllowed } from '../schema-ddl.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { assertSchemaManager } from './schema-access.js';
@@ -19,6 +21,7 @@ const FIELD_PHYSICAL_KEYS = new Set([
   'removeDefaultPreset',
   'autoUpdate',
   'indexed',
+  'unique',
 ]);
 
 function assertFieldName(field) {
@@ -68,9 +71,7 @@ function assertPhysicalPatch(patch) {
   if (Object.hasOwn(patch, 'required') && typeof patch.required !== 'boolean') {
     throw invalidSchemaPayload('required must be boolean');
   }
-  if (Object.hasOwn(patch, 'indexed') && typeof patch.indexed !== 'boolean') {
-    throw invalidSchemaPayload('indexed must be boolean');
-  }
+  assertFieldIndexOptions(patch);
   if (Object.hasOwn(patch, 'autoUpdate') && typeof patch.autoUpdate !== 'boolean') {
     throw invalidSchemaPayload('autoUpdate must be boolean');
   }
@@ -126,11 +127,6 @@ function fieldInputFromMetadata(field, schemaMetadata) {
   return input;
 }
 
-function indexName(collection, field) {
-  const digest = createHash('sha256').update(`${collection}:${field}:index`).digest('hex').slice(0, 24);
-  return `yidx_${digest}`;
-}
-
 function temporaryDropName() {
   return `_yuncms_drop_${randomUUID().replaceAll('-', '').slice(0, 24)}`;
 }
@@ -152,9 +148,7 @@ export class FieldsService extends BaseService {
   async createOne(collection, input = {}) {
     assertSchemaManager(this.accountability);
     assertIdentifier(collection, 'collection name');
-    if (Object.hasOwn(input, 'unique')) {
-      throw invalidSchemaPayload('Standalone unique field configuration is not supported');
-    }
+    assertFieldIndexOptions(input);
     const resolvedName = resolveSchemaName({
       displayName: input.name ?? input.field,
       key: input.field,
@@ -172,6 +166,7 @@ export class FieldsService extends BaseService {
     const compiled = compileFieldColumn(input);
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      assertSchemaDDLAllowed(connection);
       await this.filter('schema.field.create', input, { collection, key: field, database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const collectionMetadata = await metadata.readCollection(collection);
@@ -198,8 +193,9 @@ export class FieldsService extends BaseService {
       let physicalFieldCreated = false;
 
       try {
+        const index = fieldIndexClause(collection, field, input);
         await connection.query(
-          `ALTER TABLE ${tableName} ADD COLUMN ${fieldName} ${compiled.sql}`,
+          `ALTER TABLE ${tableName} ADD COLUMN ${fieldName} ${compiled.sql}${index ? `, ${index}` : ''}`,
           compiled.params,
         );
         physicalFieldCreated = true;
@@ -216,7 +212,7 @@ export class FieldsService extends BaseService {
             sort: input.sort ?? null,
             interface: input.interface ?? null,
             options: input.options ?? null,
-            schemaMetadata: compiled.schemaMetadata,
+            schemaMetadata: { ...compiled.schemaMetadata, indexed: input.indexed === true, unique: input.unique === true },
           });
 
           const schemaVersion = await incrementSchemaVersion(connection);
@@ -241,9 +237,9 @@ export class FieldsService extends BaseService {
 
         if (cleanupErrors.length > 0) {
           error.cleanupErrors = cleanupErrors;
-          error.code ||= 'SCHEMA_PARTIAL_FAILURE';
+          error.code = 'SCHEMA_PARTIAL_FAILURE';
         }
-        throw error;
+        throw safeFieldIndexError(error);
       }
     });
   }
@@ -305,6 +301,7 @@ export class FieldsService extends BaseService {
     }
 
     return withAdvisoryLock(this.database, 'yuncms:schema', async (connection) => {
+      assertSchemaDDLAllowed(connection);
       await this.filter('schema.field.update', patch, { collection, key: field, physical: true, database: connection });
       const metadata = new SchemaMetadataRepository(connection);
       const [collectionMetadata, existing, relations] = await Promise.all([
@@ -357,47 +354,46 @@ export class FieldsService extends BaseService {
       const currentCompiled = compileFieldColumn(currentInput);
       const nextCompiled = compileFieldColumn(nextInput);
       const currentIndexed = currentMetadata.indexed === true;
-      const nextIndexed = Object.hasOwn(patch, 'indexed') ? patch.indexed : currentIndexed;
+      let nextIndexed = Object.hasOwn(patch, 'indexed') ? patch.indexed : currentIndexed;
+      const currentUnique = currentMetadata.unique === true;
+      const nextUnique = Object.hasOwn(patch, 'unique') ? patch.unique : currentUnique;
+      assertFieldIndexOptions({ ...nextInput, indexed: nextIndexed, unique: nextUnique });
       const tableName = quoteIdentifier(collection, 'collection name');
       const fieldName = quoteIdentifier(field, 'field name');
-      const physicalIndexName = indexName(collection, field);
+      const physicalIndexName = fieldIndexName(collection, field);
       const indexSql = quoteIdentifier(physicalIndexName, 'index name');
-
-      const restorePhysical = async () => {
-        const restoreErrors = [];
-        try {
-          await connection.query(
-            `ALTER TABLE ${tableName} MODIFY COLUMN ${fieldName} ${currentCompiled.sql}`,
-            currentCompiled.params,
-          );
-        } catch (error) {
-          restoreErrors.push(error);
+      if (relation && (currentUnique || currentIndexed) && !nextUnique && !nextIndexed) {
+        const [indexes] = await connection.query(`SHOW INDEX FROM ${tableName}`);
+        const anotherSupportingIndex = indexes.some(index => index.Key_name !== physicalIndexName
+          && index.Column_name === field && Number(index.Seq_in_index) === 1 && index.Sub_part == null);
+        if (!anotherSupportingIndex) {
+          if (patch.indexed === false) throw invalidSchemaPayload('A relation field must retain an index for its foreign key');
+          nextIndexed = true;
         }
-        if (currentIndexed !== nextIndexed) {
-          try {
-            if (currentIndexed) {
-              await connection.query(`ALTER TABLE ${tableName} ADD INDEX ${indexSql} (${fieldName})`);
-            } else {
-              await connection.query(`ALTER TABLE ${tableName} DROP INDEX ${indexSql}`);
-            }
-          } catch (error) {
-            restoreErrors.push(error);
-          }
-        }
-        return restoreErrors;
-      };
+      }
+      const currentIndex = fieldIndexClause(collection, field, { indexed: currentIndexed, unique: currentUnique });
+      const nextIndex = fieldIndexClause(collection, field, { indexed: nextIndexed, unique: nextUnique });
+      const indexChanged = currentIndex !== nextIndex;
+      if (nextUnique && !currentUnique) await assertNoDuplicateFieldValues(connection, collection, field);
+      const columnChanged = currentCompiled.sql !== nextCompiled.sql || JSON.stringify(currentCompiled.params) !== JSON.stringify(nextCompiled.params);
+      const changes = [], restores = [];
+      if (columnChanged) {
+        changes.push(`MODIFY COLUMN ${fieldName} ${nextCompiled.sql}`);
+        restores.push(`MODIFY COLUMN ${fieldName} ${currentCompiled.sql}`);
+      }
+      if (indexChanged) {
+        if (currentIndex) changes.push(`DROP INDEX ${indexSql}`);
+        if (nextIndex) changes.push(nextIndex);
+        if (nextIndex) restores.push(`DROP INDEX ${indexSql}`);
+        if (currentIndex) restores.push(currentIndex);
+      }
+      let physicalChanged = false;
 
       try {
-        await connection.query(
-          `ALTER TABLE ${tableName} MODIFY COLUMN ${fieldName} ${nextCompiled.sql}`,
-          nextCompiled.params,
-        );
-        if (currentIndexed !== nextIndexed) {
-          if (nextIndexed) {
-            await connection.query(`ALTER TABLE ${tableName} ADD INDEX ${indexSql} (${fieldName})`);
-          } else {
-            await connection.query(`ALTER TABLE ${tableName} DROP INDEX ${indexSql}`);
-          }
+        // InnoDB validates the whole ALTER atomically, including a concurrent duplicate after preflight.
+        if (changes.length) {
+          await connection.query(`ALTER TABLE ${tableName} ${changes.join(', ')}`, columnChanged ? nextCompiled.params : []);
+          physicalChanged = true;
         }
 
         return await withConnectionTransaction(connection, async () => {
@@ -406,18 +402,22 @@ export class FieldsService extends BaseService {
             schemaMetadata: {
               ...nextCompiled.schemaMetadata,
               indexed: nextIndexed,
+              unique: nextUnique,
             },
           });
           const schemaVersion = await incrementSchemaVersion(connection);
           return { ...updated, schemaVersion };
         });
       } catch (error) {
-        const restoreErrors = await restorePhysical();
-        if (restoreErrors.length > 0) {
-          error.restoreErrors = restoreErrors;
-          error.code ||= 'SCHEMA_PARTIAL_FAILURE';
+        if (physicalChanged) {
+          try {
+            await connection.query(`ALTER TABLE ${tableName} ${restores.join(', ')}`, columnChanged ? currentCompiled.params : []);
+          } catch (restoreError) {
+            error.restoreErrors = [restoreError];
+            error.code = 'SCHEMA_PARTIAL_FAILURE';
+          }
         }
-        throw error;
+        throw safeFieldIndexError(error);
       }
     });
   }

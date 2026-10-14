@@ -1,5 +1,6 @@
 import { withAdvisoryLock } from '../advisory-lock.js';
 import { compileFieldColumn } from '../field-types.js';
+import { assertFieldIndexOptions } from '../field-index.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { resolveSchemaName } from '../schema-key.js';
@@ -33,6 +34,12 @@ function assertExtensibleSystemCollection(collection) {
 }
 
 function assertSystemExtensionInput(input = {}) {
+  assertFieldIndexOptions(input);
+  if (input.unique === true || input.indexed === true) {
+    throw Object.assign(new Error('Field indexes are supported on project collections; protected system extensions cannot add indexes'), {
+      code: 'UNSUPPORTED_SCHEMA_UPDATE',
+    });
+  }
   if (input.required === true) {
     const error = new Error('Custom system collection fields must be optional in V1');
     error.code = 'SYSTEM_EXTENSION_REQUIRED_UNSUPPORTED';

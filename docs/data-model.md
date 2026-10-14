@@ -116,7 +116,15 @@ Combine this field with a native M2O relation to `yuncms_users.id` to enforce id
 
 Literal defaults for `text` and `json` are not part of the current field contract.
 
-Standalone `unique` field configuration is not supported in V1. Field creation rejects a supplied `unique` option with HTTP 400 / `INVALID_SCHEMA_PAYLOAD` before changing the schema, so the API never implies an unenforced business-key constraint. Physical field updates also reject unsupported properties. One-to-one relations have their own documented uniqueness contract. Upgrading does not add constraints or alter existing duplicate records; a previously supplied, ignored option did not create a unique index.
+Scalar fields on project collections support native `unique: true` and `indexed: true` options on creation and `FieldsService.updateSchema()` / `PATCH /schema/collections/:collection/fields/:field/schema`. Both options require actual booleans. Protected system-extension fields reject enabled index options rather than silently ignoring them. `unique` creates a full-value MySQL unique index; it does not use a prefix or an application-only precheck. Supported storage is `uuid`, `string` (at most 768 characters), numeric, boolean and date/time types. `text` and `json` cannot be indexed this way. Configure these options through the REST/service API.
+
+```json
+{ "field": "business_key", "type": "string", "length": 180, "unique": true }
+```
+
+To upgrade an existing field, call `fields.updateSchema("orders", "business_key", { unique: true })`. YunCMS checks existing non-null duplicates using the column's MySQL collation and returns HTTP 409 / `DUPLICATE_KEY` without changing records, metadata, defaults or schema version if a conflict exists. The final InnoDB ALTER also rejects a concurrent duplicate atomically. A case-insensitive collation treats differently cased values as equal. Nullable unique fields allow multiple `NULL` values. Duplicate item creates/updates return HTTP 409 / `DUPLICATE_KEY`; bulk writes roll back the entire batch and transactional hook effects.
+
+`unique: false` removes only the field-owned unique index. If `indexed: true` is retained, it becomes an ordinary index; otherwise it is removed. If a many-to-one foreign key relies on this index, YunCMS retains an ordinary index automatically; explicitly requesting `indexed: false` without another supporting index is rejected with `INVALID_SCHEMA_PAYLOAD`. One-to-one relation constraints are separately owned and remain enforced. Existing data is never deduplicated, deleted or rewritten by enabling/disabling uniqueness. Metadata transaction failures trigger compensating DDL; failed compensation is reported as `SCHEMA_PARTIAL_FAILURE`. Before a production migration, back up the database, resolve conflicts explicitly and pause writers to avoid writes during compensation. DDL can lock a large table; field creation, physical field updates and managed-field additions reject execution inside a managed application transaction with `INVALID_SCHEMA_PAYLOAD` to avoid MySQL implicitly committing pending writes. Installing a new YunCMS version does not automatically constrain fields whose old `unique` option was ignored; request the migration explicitly.
 
 ### Writing JSON and time values
 
@@ -158,7 +166,7 @@ Image control:
 
 ## System fields
 
-A project collection may opt into any of these fields at creation time:
+A project collection may opt into any of these fields at creation time or add them to an existing collection through the native schema API:
 
 | Field | Behavior |
 | --- | --- |
@@ -168,6 +176,10 @@ A project collection may opt into any of these fields at creation time:
 | `updated_by` | current authenticated user on create/update |
 
 These fields are read-only and maintained by YunCMS. User fields must not try to overwrite them. User-reference fields use foreign keys to the users resource and become `null` if the referenced user is removed.
+
+For an existing collection, use `CollectionsService.updateOne("conversations", { systemFields: ["created_at", "updated_at", "created_by", "updated_by"] })` or `PATCH /schema/collections/conversations` with the same JSON body. This is additive and idempotent: omitted fields and an empty list never remove existing managed fields. Schema-management authority and the `schema.collection.update` veto hook apply. An ordinary field with a requested managed name returns `FIELD_EXISTS` before any changes; YunCMS never adopts or overwrites it.
+
+Existing rows retain their IDs, business data and relations. Newly added timestamps receive the migration time (not an invented historical creation time); newly added actor fields are `NULL` because the historical actor is unknown. Future native item mutations stamp verified users/times, reject client forgeries and enforce the same user foreign keys as fresh collection creation. Physical additions are a single InnoDB ALTER; metadata and schema-version changes use a transaction with compensating removal of only the new fields on failure. Back up production data and pause writers for schema migrations; Run physical additions outside managed application transactions; they are rejected with `INVALID_SCHEMA_PAYLOAD` inside one to preserve pending writes.
 
 ## Schema graph
 

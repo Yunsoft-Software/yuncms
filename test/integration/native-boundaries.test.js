@@ -221,9 +221,9 @@ test('native file permissions, user/schema filters and identity relations enforc
     await assert.rejects(new ItemsService(collection, await fresh()).createOne({}), { code: 'FORBIDDEN' });
   });
 
-  await t.test('unsupported unique field configuration returns a typed error without physical or metadata changes', async () => {
+  await t.test('invalid unique field configuration returns a typed error without physical or metadata changes', async () => {
     const [[before]] = await pool.query('SELECT version FROM yuncms_schema_state WHERE id = 1');
-    const body = { field: 'business_key', type: 'string', required: true, unique: true };
+    const body = { field: 'business_key', type: 'string', required: true, unique: 'true' };
     const path = `/schema/collections/${collection}/fields`;
     const denied = await request(path, adminToken, 'POST', body);
     assert.equal(denied.status, 400); assert.equal(denied.body.errors[0].code, 'INVALID_SCHEMA_PAYLOAD');

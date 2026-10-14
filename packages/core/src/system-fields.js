@@ -71,7 +71,7 @@ export function systemFieldDefinition(field) {
   return SYSTEM_FIELD_DEFINITIONS[field] ?? null;
 }
 
-function foreignKeyName(collection, field) {
+export function systemFieldForeignKeyName(collection, field) {
   const digest = createHash('sha256')
     .update(`${collection}:${field}:system-user`)
     .digest('hex')
@@ -106,7 +106,7 @@ export function compileCollectionSystemFields(collection, requestedFields) {
 
     if (field === 'created_by' || field === 'updated_by') {
       constraints.push(
-        `CONSTRAINT ${quoteIdentifier(foreignKeyName(collection, field), 'system field constraint')} `
+        `CONSTRAINT ${quoteIdentifier(systemFieldForeignKeyName(collection, field), 'system field constraint')} `
         + `FOREIGN KEY (${quoteIdentifier(field, 'system field')}) REFERENCES yuncms_users (id) ON DELETE SET NULL`,
       );
     }

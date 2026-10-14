@@ -35,6 +35,14 @@ test('custom system extension fields are optional-only so existing system rows r
   );
 });
 
+test('protected system extensions reject index options instead of silently ignoring constraints', () => {
+  assert.doesNotThrow(() => assertSystemExtensionInput({ unique: false, indexed: false }));
+  for (const options of [{ unique: true }, { indexed: true }]) {
+    assert.throws(() => assertSystemExtensionInput(options), { code: 'UNSUPPORTED_SCHEMA_UPDATE' });
+  }
+  assert.throws(() => assertSystemExtensionInput({ unique: 'true' }), { code: 'INVALID_SCHEMA_PAYLOAD' });
+});
+
 test('system extension creation is schema-locked, normalized and tagged in metadata', () => {
   assert.match(serviceSource, /resolveSchemaName/);
   assert.match(serviceSource, /displayName:\s*input\.name \?\? input\.field/);

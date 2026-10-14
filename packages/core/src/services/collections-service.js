@@ -4,13 +4,14 @@ import { withAdvisoryLock } from '../advisory-lock.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { normalizeDisplayName, resolveSchemaName } from '../schema-key.js';
-import { incrementSchemaVersion } from '../schema-version.js';
-import { compileCollectionSystemFields, normalizeCollectionSystemFields } from '../system-fields.js';
+import { incrementSchemaVersion, readSchemaVersion } from '../schema-version.js';
+import { assertSchemaDDLAllowed } from '../schema-ddl.js';
+import { COLLECTION_SYSTEM_FIELDS, compileCollectionSystemFields, normalizeCollectionSystemFields, systemFieldForeignKeyName } from '../system-fields.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { assertSchemaManager } from './schema-access.js';
 
-const COLLECTION_METADATA_KEYS = new Set(['name', 'note', 'singleton', 'hidden', 'metadata']);
+const COLLECTION_METADATA_KEYS = new Set(['name', 'note', 'singleton', 'hidden', 'metadata', 'systemFields']);
 
 function assertUserCollectionName(collection) {
   assertIdentifier(collection, 'collection name');
@@ -43,6 +44,7 @@ function assertCollectionMetadataPatch(patch) {
   if (Object.keys(patch).length === 0) {
     throw invalidSchemaPayload('Collection metadata patch cannot be empty');
   }
+  if (Object.hasOwn(patch, 'systemFields')) normalizeCollectionSystemFields(patch.systemFields);
   for (const key of ['singleton', 'hidden']) {
     if (Object.hasOwn(patch, key) && typeof patch[key] !== 'boolean') {
       throw invalidSchemaPayload(`Collection ${key} must be a boolean`);
@@ -217,12 +219,73 @@ export class CollectionsService extends BaseService {
         error.code = 'SYSTEM_SCHEMA_READ_ONLY';
         throw error;
       }
+      if (!Object.hasOwn(patch, 'systemFields')) {
+        return withConnectionTransaction(connection, async () => {
+          const updated = await metadata.updateCollectionMetadata(collection, patch);
+          const schemaVersion = await incrementSchemaVersion(connection);
+          return { ...updated, schemaVersion };
+        });
+      }
 
-      return withConnectionTransaction(connection, async () => {
-        const updated = await metadata.updateCollectionMetadata(collection, patch);
-        const schemaVersion = await incrementSchemaVersion(connection);
-        return { ...updated, schemaVersion };
-      });
+      // Additive migration only: never adopt, overwrite or remove an existing business field.
+      const requested = compileCollectionSystemFields(collection, patch.systemFields);
+      const fields = await metadata.listFields(collection);
+      for (const definition of requested.metadata) {
+        const current = fields.find(candidate => candidate.field === definition.field);
+        if (!current) continue;
+        const details = typeof current.schema_metadata === 'string' ? JSON.parse(current.schema_metadata) : current.schema_metadata;
+        if (details?.systemManaged !== true || details.special !== definition.schemaMetadata.special || current.type !== definition.type) {
+          throw Object.assign(new Error(`Existing field cannot be adopted as a managed system field: ${collection}.${definition.field}`), {
+            code: 'FIELD_EXISTS',
+          });
+        }
+      }
+      const missing = requested.fields.filter(field => !fields.some(candidate => candidate.field === field));
+      if (!missing.length && Object.keys(patch).length === 1) {
+        return { ...existing, schemaVersion: await readSchemaVersion(connection) };
+      }
+      const additions = compileCollectionSystemFields(collection, missing);
+      if (missing.length) assertSchemaDDLAllowed(connection);
+      const table = quoteIdentifier(collection, 'collection name');
+      const changes = [...additions.columns.map(column => `ADD COLUMN ${column}`), ...additions.constraints.map(constraint => `ADD ${constraint}`)];
+      const previousMetadata = typeof existing.metadata === 'string' ? JSON.parse(existing.metadata) : existing.metadata;
+      const managed = normalizeCollectionSystemFields([
+        ...fields.filter(field => {
+          const details = typeof field.schema_metadata === 'string' ? JSON.parse(field.schema_metadata) : field.schema_metadata;
+          return COLLECTION_SYSTEM_FIELDS.includes(field.field) && details?.systemManaged === true;
+        }).map(field => field.field), ...missing,
+      ]);
+      let physicalChanged = false;
+      try {
+        if (changes.length) {
+          // Legacy timestamps receive the migration time; legacy actors remain NULL.
+          await connection.query(`ALTER TABLE ${table} ${changes.join(', ')}`);
+          physicalChanged = true;
+        }
+        return await withConnectionTransaction(connection, async () => {
+          for (const field of additions.metadata) await metadata.createField(field);
+          const { systemFields: _requested, ...metadataPatch } = patch;
+          const updated = await metadata.updateCollectionMetadata(collection, {
+            ...metadataPatch,
+            metadata: { ...(previousMetadata ?? {}), ...(patch.metadata ?? {}), systemFields: managed },
+          });
+          const schemaVersion = await incrementSchemaVersion(connection);
+          return { ...updated, schemaVersion };
+        });
+      } catch (error) {
+        if (physicalChanged) {
+          try {
+            const drops = missing.filter(field => ['created_by', 'updated_by'].includes(field))
+              .map(field => `DROP FOREIGN KEY ${quoteIdentifier(systemFieldForeignKeyName(collection, field), 'system field constraint')}`);
+            drops.push(...missing.map(field => `DROP COLUMN ${quoteIdentifier(field, 'system field')}`));
+            await connection.query(`ALTER TABLE ${table} ${drops.join(', ')}`);
+          } catch (restoreError) {
+            error.restoreError = restoreError;
+            error.code = 'SCHEMA_PARTIAL_FAILURE';
+          }
+        }
+        throw error;
+      }
     });
   }
 
