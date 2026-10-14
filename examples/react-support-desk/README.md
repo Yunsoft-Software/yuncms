@@ -1,6 +1,6 @@
 # React Support Desk with YunCMS
 
-A small JavaScript/React app backed by **published YunCMS 0.1.34** and MySQL. It demonstrates native authentication, scalar data types, M2O/O2M relations, server-side row/field permissions and native AI automations. No custom CRUD/auth backend or ORM is added.
+A small JavaScript/React app backed by **published YunCMS 0.1.35** and MySQL. It demonstrates native authentication, scalar data types, M2O/O2M relations, server-side row/field permissions and native AI automations. No custom CRUD/auth backend or ORM is added.
 
 ![Working React support desk with a real model-generated summary](screenshots/01-react-agent.jpg)
 
