@@ -1,0 +1,42 @@
+export const flowsMigration = Object.freeze({
+  id: '0023-flows',
+  statements: [
+    `CREATE TABLE yuncms_flows (
+      id CHAR(36) NOT NULL PRIMARY KEY,
+      name VARCHAR(120) NOT NULL,
+      status VARCHAR(16) NOT NULL DEFAULT 'inactive',
+      trigger_type VARCHAR(16) NOT NULL,
+      definition JSON NOT NULL,
+      revision INT UNSIGNED NOT NULL DEFAULT 1,
+      user_created CHAR(36) NULL,
+      created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+      INDEX idx_flows_trigger (trigger_type, status),
+      CHECK (status IN ('active', 'inactive')),
+      CHECK (trigger_type IN ('manual', 'event', 'webhook', 'schedule', 'operation'))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE yuncms_flow_runs (
+      id CHAR(36) NOT NULL PRIMARY KEY,
+      flow_id CHAR(36) NOT NULL,
+      revision INT UNSIGNED NOT NULL,
+      status VARCHAR(16) NOT NULL DEFAULT 'pending',
+      trigger_data JSON NOT NULL,
+      actor JSON NOT NULL,
+      lineage JSON NULL,
+      request_id VARCHAR(100) NULL,
+      trace JSON NULL,
+      output JSON NULL,
+      error_code VARCHAR(100) NULL,
+      schedule_key VARCHAR(40) NULL,
+      created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      started_at DATETIME(3) NULL,
+      finished_at DATETIME(3) NULL,
+      lease_until DATETIME(3) NULL,
+      INDEX idx_flow_queue (status, created_at),
+      INDEX idx_flow_history (flow_id, created_at),
+      UNIQUE KEY uq_flow_schedule (flow_id, schedule_key),
+      CONSTRAINT fk_flow_run FOREIGN KEY (flow_id) REFERENCES yuncms_flows (id) ON DELETE CASCADE,
+      CHECK (status IN ('pending', 'running', 'succeeded', 'failed', 'skipped'))
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  ],
+});

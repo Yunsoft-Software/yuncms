@@ -60,6 +60,10 @@ export function loadConfig(env = process.env) {
   }
 
   return {
+    flows: {
+      requestHosts: readString(env.FLOWS_REQUEST_ALLOWED_HOSTS, '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean),
+      envAllowList: readString(env.FLOWS_ENV_ALLOW_LIST, '').split(',').map(value => value.trim()).filter(Boolean),
+    },
     server: {
       host: readString(env.HOST, '127.0.0.1'),
       port: serverPort,

@@ -43,6 +43,17 @@ YunCMS connects to MySQL with `timezone: 'Z'` and `dateStrings: ['DATE']`. In ad
 - `DATE` values are handled as exact calendar strings (`YYYY-MM-DD`). They never drift based on the Node server's host timezone or `TZ` environment variable.
 - `DATETIME(3)` and `TIMESTAMP(3)` values represent UTC instants. When API consumers submit timestamp strings bearing timezone offsets (e.g. `2026-10-10T15:30:00+03:00`), YunCMS normalizes them to UTC (`2026-10-10T12:30:00.000Z`) before persisting. Returned values are standard ISO strings in UTC.
 
+## Flows
+
+```env
+FLOWS_REQUEST_ALLOWED_HOSTS=
+FLOWS_ENV_ALLOW_LIST=
+```
+
+Both lists are empty by default. `FLOWS_REQUEST_ALLOWED_HOSTS` is a comma-separated list of exact hostnames allowed by the Flow Request operation (case-insensitive; no wildcard, URL or port). HTTP(S) requests do not follow redirects. Allow only destinations operators intend flows to reach, including any explicitly permitted private-network hosts.
+
+`FLOWS_ENV_ALLOW_LIST` lists exact environment-variable names exposed through the Flow `$env` data chain. Variables absent from the server environment are omitted. Allowlisted values can be used in responses and external operations; keep secrets out unless that disclosure is intentional. Changes require restarting the API. See [Flows](flows.md) for execution scopes, SMTP operations, UTC scheduling, history and bounds.
+
 ## Redis shared state
 
 A single-process installation can use in-memory cache and rate-limit state. Multi-process/multi-replica deployments can move those stores to Redis.

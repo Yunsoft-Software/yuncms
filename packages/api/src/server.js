@@ -33,6 +33,7 @@ import { createAiRouter } from './routes/ai.js';
 import { createAutomationsRouter } from './routes/automations.js';
 import { AiAutomationsService } from './automations/service.js';
 import { AiAutomationWorker } from './automations/worker.js';
+import { FlowRuntime } from './flows/runtime.js';
 
 loadEnvFileIfPresent();
 await assertMaintenanceStartupAllowed({ cwd: process.cwd(), env: process.env });
@@ -86,6 +87,7 @@ const mailer = config.mail.host ? new SmtpMailer({
 let server = null;
 let extensionRuntime = null;
 let automationWorker = null;
+let flowRuntime = null;
 let shuttingDown = false;
 
 async function start() {
@@ -128,6 +130,11 @@ async function start() {
   }
   automationWorker = new AiAutomationWorker(automations);
   const automationsRouter = createAutomationsRouter(automationOptions);
+  const flowsOptions = {
+    schemaCache, mailer, requestHosts: config.flows.requestHosts,
+    flowEnv: Object.fromEntries(config.flows.envAllowList.filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]])),
+  };
+  flowRuntime = new FlowRuntime({ database: pool, services, emitter, storage, logger, mailer, ...flowsOptions }).registerHooks();
   const mcpRouter = createMcpRouter({ settingsStore: mcpSettingsStore, logger, automationOptions });
 
   extensionRuntime = await loadExtensionRuntime({
@@ -156,6 +163,7 @@ async function start() {
     endpointExtensions: extensionRuntime.endpointExtensions,
     aiRouter,
     automationsRouter,
+    flowsOptions,
     mcpRouter,
   });
 
@@ -174,6 +182,7 @@ async function start() {
   await extensionRuntime.init('app.afterStart');
   extensionRuntime.startSchedules();
   automationWorker.start();
+  flowRuntime.start();
 }
 
 async function shutdown(signal) {
@@ -186,6 +195,7 @@ async function shutdown(signal) {
   }, 10_000);
   forceExit.unref();
   await automationWorker?.stop();
+  await flowRuntime?.stop();
 
   const schedulesStopped = await extensionRuntime?.stopSchedules({ timeoutMs: 5_000 }).catch(() => false);
   if (schedulesStopped === false) {

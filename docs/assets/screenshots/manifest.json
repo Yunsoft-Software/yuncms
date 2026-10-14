@@ -9,7 +9,17 @@
     "studio-permissions.png",
     "studio-mobile-content.png",
     "studio-mobile-menu.png",
-    "studio-automations.jpg"
+    "studio-automations.jpg",
+    "studio-flows.png",
+    "studio-mobile-flows-dark.png"
   ],
-  "verifiedAt": "2026-10-10"
+  "verifiedAt": "2026-10-10",
+  "flowCaptures": {
+    "capturedAt": "2026-10-15",
+    "source": "Playwright Chromium against a built Studio and native MySQL/API with synthetic users and records; test/browser/flows.spec.js.",
+    "files": [
+      "studio-flows.png",
+      "studio-mobile-flows-dark.png"
+    ]
+  }
 }

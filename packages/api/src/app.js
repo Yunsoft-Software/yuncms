@@ -20,6 +20,7 @@ import { createStudioNavigationRouter } from './routes/studio-navigation.js';
 import { createStudioSettingsRouter } from './routes/studio-settings.js';
 import { createSystemSchemaRouter } from './routes/system-schema.js';
 import { createUsersRouter } from './routes/users.js';
+import { createFlowsRouter } from './routes/flows.js';
 import { createStudioMiddleware } from './studio.js';
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
@@ -131,6 +132,7 @@ export function createApp({
   endpointExtensions = [],
   aiRouter = null,
   automationsRouter = null,
+  flowsOptions = {},
   mcpRouter = null,
   studioRoot = undefined,
 }) {
@@ -209,6 +211,7 @@ export function createApp({
 
   if (aiRouter) app.use('/ai', aiRouter);
   if (automationsRouter) app.use('/automations', automationsRouter);
+  app.use('/flows', createFlowsRouter({ schemaCache: schemaCache ?? undefined, mailer, ...flowsOptions }));
   if (mcpRouter) app.use('/mcp', mcpRouter);
   app.use('/studio-navigation', createStudioNavigationRouter());
   app.use('/studio-settings', createStudioSettingsRouter());

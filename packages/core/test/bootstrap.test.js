@@ -317,7 +317,7 @@ test('AI automation migration is required and preserves queue, identity and disa
   const migration = CORE_MIGRATIONS.find(({ id }) => id === '0021-ai-automations');
   assert.ok(migration);
   assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes(migration.id));
-  assert.equal(CORE_MIGRATIONS.at(-2).id, migration.id);
+  assert.equal(CORE_MIGRATIONS.findIndex(entry => entry.id === '0022-utc-auth-deadlines'), CORE_MIGRATIONS.indexOf(migration) + 1);
   assert.equal(migration.statements.length, 2);
   const sql = migration.statements.join('\n');
   assert.match(sql, /enabled TINYINT\(1\) NOT NULL DEFAULT 0/);
@@ -330,7 +330,7 @@ test('UTC auth deadlines migration is required and cleans up active sessions, pe
   const migration = CORE_MIGRATIONS.find(({ id }) => id === '0022-utc-auth-deadlines');
   assert.ok(migration);
   assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes(migration.id));
-  assert.equal(CORE_MIGRATIONS.at(-1).id, migration.id);
+  assert.equal(CORE_MIGRATIONS.findIndex(entry => entry.id === '0023-flows'), CORE_MIGRATIONS.indexOf(migration) + 1);
   assert.equal(migration.statements.length, 4);
   assert.deepEqual(migration.statements, [
     'DELETE FROM yuncms_sessions',

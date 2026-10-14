@@ -16,6 +16,10 @@ function requireStudioUser(req) {
 
 export function createStudioNavigationRouter() {
   const router = express.Router();
+  const schemaService = req => new req.context.services.StudioSchemaService(serviceOptionsFromRequest(req));
+  router.get('/collections', async (req, res) => { requireStudioUser(req); res.json({ data: await schemaService(req).readCollections() }); });
+  router.get('/collections/:collection/fields', async (req, res) => { requireStudioUser(req); res.json({ data: await schemaService(req).readFields(req.params.collection) }); });
+  router.get('/relations', async (req, res) => { requireStudioUser(req); res.json({ data: await schemaService(req).readRelations() }); });
 
   router.get('/groups', async (req, res, next) => {
     try {

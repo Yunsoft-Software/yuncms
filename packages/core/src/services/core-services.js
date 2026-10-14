@@ -6,12 +6,14 @@ import { ExternalAuthService } from './external-auth-service.js';
 import { FieldsService } from './fields-service.js';
 import { FileReconciliationService } from './file-reconciliation-service.js';
 import { FilesService } from './files-service.js';
+import { FlowsService } from './flows-service.js';
 import { NavigationGroupsService } from './navigation-groups-service.js';
 import { PermissionsService } from './permissions-service.js';
 import { RelationsService } from './relations-service.js';
 import { RolesService } from './roles-service.js';
 import { SingletonCollectionsService, SingletonItemsService } from './singleton-services.js';
 import { StudioSettingsService } from './studio-settings-service.js';
+import { StudioSchemaService } from './studio-schema-service.js';
 import { SystemCollectionFieldsService } from './system-collection-fields-service.js';
 import { UsersService } from './users-service.js';
 import { createServiceRegistry } from './service-registry.js';
@@ -32,8 +34,10 @@ export function createCoreServiceRegistry() {
     RolesService,
     PermissionsService,
     FilesService,
+    FlowsService,
     FileReconciliationService,
     StudioSettingsService,
+    StudioSchemaService,
     NavigationGroupsService,
   });
 }
