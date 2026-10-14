@@ -219,7 +219,7 @@ await writeFile(
   JSON.stringify(
     {
       checked_at: new Date().toISOString(),
-      yunCMS: "0.1.36",
+      yunCMS: "0.1.37",
       ai_mode: state.ai_mode || "not-configured",
       checks: results,
     },
