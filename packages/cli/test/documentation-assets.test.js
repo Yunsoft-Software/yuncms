@@ -30,6 +30,8 @@ test('public documentation screenshots track the current release', () => {
 
   assert.match(readme, /docs\/assets\/screenshots\/studio-content\.png/);
   assert.match(readme, /docs\/assets\/screenshots\/studio-data-model\.png/);
+  assert.match(readme, /\[screenshot manifest\]\(docs\/assets\/screenshots\/manifest\.json\)/);
+  assert.doesNotMatch(readme, /screenshots were captured from the current published package/);
 });
 
 test('AI documentation is consistently English and documents every Studio language', () => {

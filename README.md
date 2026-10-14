@@ -46,7 +46,7 @@ Website: [https://yunsoft.com](https://yunsoft.com)
   </tr>
 </table>
 
-These screenshots were captured from the current published package. New users should follow the **[15-minute Getting Started guide](docs/getting-started.md)**; administrators can jump directly to **[Using Studio](docs/studio.md)**.
+These screenshots illustrate the documented Studio workflows. Original capture and validation dates are recorded in the [screenshot manifest](docs/assets/screenshots/manifest.json). New users should follow the **[15-minute Getting Started guide](docs/getting-started.md)**; administrators can jump directly to **[Using Studio](docs/studio.md)**.
 
 ## Choose your path
 
