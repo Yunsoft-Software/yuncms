@@ -14,6 +14,7 @@
     "test": "node --test --test-reporter=dot"
   },
   "dependencies": {
+    "@xyflow/react": "12.12.0",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },

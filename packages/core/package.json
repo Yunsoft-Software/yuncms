@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1100.0",
+    "@yunsoft/yuncms-extensions-sdk": "0.1.37",
     "mysql2": "3.23.2",
     "nodemailer": "10.0.13"
   },
