@@ -60,6 +60,8 @@ export function readStudioRoute(hash = window.location.hash) {
     return { section, view: first === 'new' ? 'new' : first ? 'detail' : 'list', userId: first && first !== 'new' ? first : '' };
   }
 
+  if (section === 'flows') return { section, view: first === 'new' ? 'new' : first ? 'detail' : 'list', flowId: first && first !== 'new' ? first : '' };
+
   if (TOP_LEVEL_SECTIONS.has(section)) return { section, view: 'list' };
   return { section: 'content', collection: '', view: 'list', recordId: '' };
 }
@@ -89,6 +91,9 @@ export const studioPath = Object.freeze({
   user: (userId) => `#/users/${encode(userId)}`,
   ai: () => '#/ai',
   automations: () => '#/automations',
+  flows: () => '#/flows',
+  newFlow: () => '#/flows/new',
+  flow: id => `#/flows/${encode(id)}`,
   mcp: () => '#/mcp',
   appearance: () => '#/appearance',
 });

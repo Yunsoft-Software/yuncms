@@ -58,6 +58,19 @@ node scripts/verify.mjs strict
   4. Real MySQL/API integration suite when `YUNCMS_TEST_MYSQL=1`.
 - **Routine mode behavior:** If `YUNCMS_TEST_MYSQL=1` is not set, real database integration is reported as skipped while build and package checks proceed.
 
+### Browser acceptance (`npm run test:browser`)
+
+Feature changes require unit, backend and Playwright browser coverage, updated with the behavior they test. The source suites do not imply browser or physical database acceptance. The browser command runs Chromium against a built Studio and a native API/MySQL fixture, covering Flow graph interactions, execution, role boundaries and responsive themes.
+
+```bash
+npm run build:studio
+npx playwright install chromium
+# Set DB_HOST, DB_PORT, DB_USER, DB_PASSWORD and a disposable DB_DATABASE first.
+YUNCMS_TEST_MYSQL=1 YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1 npm run test:browser
+```
+
+The database name must contain `test`, `ci` or `dev`. Never point the fixture at an existing installation: it bootstraps native tables and creates/removes synthetic users, roles, flows and a collection. Use a dedicated database and do not run other integration fixtures against it concurrently. `YUNCMS_BROWSER_PORT` defaults to `34074`; the local port must be free. Failure traces, screenshots and JSON results stay under ignored `.yuncms/flows-tests/`. Browser tests are an explicit additional command, not an automatic part of the four source/release profiles above.
+
 ### 4. Strict Release Gate (`YUNCMS_TEST_STRICT=1`)
 
 - **Scope:** Comprehensive, zero-skip release gate for production sign-off.

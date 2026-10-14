@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { apiRequest } from '../api.js';
+import { apiRequest, readSession } from '../api.js';
 import {
   DataViewOptions,
   FileFieldControl,
   FileValuePreview,
   Inspector,
+  ManualFlowActions,
   Pagination,
   RelationPicker,
   useConfirmDialog,
@@ -364,7 +365,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
       const targetCollection = relation.one_collection;
       const keyField = relation.one_field || 'id';
       const [fieldResponse, itemResponse] = await Promise.all([
-        apiRequest(`/schema/collections/${encodeURIComponent(targetCollection)}/fields`),
+        apiRequest(`${readSession()?.user?.admin ? '/schema' : '/studio-navigation'}/collections/${encodeURIComponent(targetCollection)}/fields`),
         apiRequest(`/items/${encodeURIComponent(targetCollection)}?limit=200`),
       ]);
       const targetFields = fieldResponse?.data ?? [];
@@ -397,8 +398,8 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     setError('');
     try {
       const [fieldResponse, relationResponse] = await Promise.all([
-        apiRequest(`/schema/collections/${encodeURIComponent(target)}/fields`),
-        apiRequest('/schema/relations'),
+        apiRequest(`${readSession()?.user?.admin ? '/schema' : '/studio-navigation'}/collections/${encodeURIComponent(target)}/fields`),
+        readSession()?.user?.admin ? apiRequest('/schema/relations') : apiRequest('/studio-navigation/relations'),
       ]);
       const loadedFields = fieldResponse?.data ?? [];
       const loadedRelations = relationResponse?.data ?? [];
@@ -726,6 +727,10 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
             onNavigate?.(studioPath.content(collection));
           }}
         />
+        {editing && <ManualFlowActions collection={collection} keys={[editing.id]} onComplete={async () => {
+          try { setEditingRecord((await apiRequest(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(editing.id)}`)).data); await loadItems(); }
+          catch (failure) { if (failure.status === 404) onNavigate?.(studioPath.content(collection)); else throw failure; }
+        }} />}
       </div>
     );
   }
@@ -768,6 +773,8 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
           </button>
         </div>
       </section>
+
+      <ManualFlowActions collection={collection} keys={Array.from(selectedRecordIds)} onComplete={loadItems} />
 
       {!schemaLoading && (
         <section className="panel data-controls-panel" aria-label={t('content.dataControls', { collection: visibleCollectionName })}>

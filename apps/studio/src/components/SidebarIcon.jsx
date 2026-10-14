@@ -1,4 +1,5 @@
 const PATHS = {
+  flows: <><rect x="2" y="8" width="6" height="7" rx="1"/><rect x="16" y="2" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M8 11.5h4V5h4M12 11.5V19h4"/></>,
   content: <><path d="M4 5.5h16v13H4z"/><path d="M8 9h8M8 13h8"/></>,
   files: <><path d="M3.5 7h6l2-2h9v14h-17z"/><path d="M7 12h10"/></>,
   visibility: <><path d="M2.8 12s3.2-5 9.2-5 9.2 5 9.2 5-3.2 5-9.2 5-9.2-5-9.2-5z"/><circle cx="12" cy="12" r="2.5"/></>,

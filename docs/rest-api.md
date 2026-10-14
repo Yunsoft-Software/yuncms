@@ -571,6 +571,9 @@ See [`files.md`](files.md).
 
 ```text
 GET /studio-navigation
+GET /studio-navigation/collections
+GET /studio-navigation/collections/:collection/fields
+GET /studio-navigation/relations
 GET /studio-settings
 GET /studio-settings/logo
 GET /studio-settings/favicon
@@ -580,6 +583,8 @@ PATCH /studio-settings
 Safe display settings are readable before authentication so the login/reset/verification screens can render configured branding. Updating Studio settings requires administrative/system access.
 
 Logo and favicon settings point to Files records rather than arbitrary external asset URLs.
+
+The three Studio metadata discovery paths require authentication. They return only project collections with native read permission, fields in the caller's read allowlist (plus the primary key), and relations between visible collections/fields. Collection metadata is limited to navigation display properties. These read-only endpoints support ordinary Content users; `/schema` administration remains privileged. Field/row restrictions on the actual `/items` operations remain authoritative.
 
 See [`studio.md`](studio.md) and [`studio-customization.md`](studio-customization.md).
 
@@ -611,6 +616,12 @@ See [`ai-assistant.md`](ai-assistant.md) for configuration, privacy, write modes
 Authenticated Administrators manage rules through `GET /automations`, `GET /automations/configuration`, `POST /automations`, `PUT /automations/:id`, `DELETE /automations/:id`, `POST /automations/preview`, `GET /automations/:id/runs` and `POST /automations/runs/:id/retry`.
 
 Background execution uses the configured normal Run as user's permissions. See [AI Automations](ai-automations.md) for full request/response definitions, field restrictions, queue behavior, failure codes and privacy.
+
+# Flows
+
+Administrators manage graphs through `GET /flows`, `GET /flows/configuration`, `POST /flows`, `GET /flows/:id`, `PUT /flows/:id`, `DELETE /flows/:id?revision=1` and `GET /flows/:id/runs`. Updates/deletes require the current revision.
+
+Authenticated callers discover granted manual actions through `GET /flows/available?collection=articles` and execute them with `POST /flows/:id/run`. Webhooks use `GET` or `POST /flows/trigger/:id` with explicitly configured method/access. Flow execution uses an explicitly selected accountability and native services. See [Flows](flows.md) for definitions, templates, operation options, queue behavior and authorization boundaries.
 
 # MCP
 

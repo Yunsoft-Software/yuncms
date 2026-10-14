@@ -25,6 +25,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 | Connect an application | [REST API](rest-api.md) | Authentication, CRUD, schema, Files and system endpoints. |
 | Query content safely | [Items Query Language](api-query-language.md) | Fields, relations, filters, search, sorting, pagination and aggregation. |
 | Automate repeated content tasks with AI | [AI Automations](ai-automations.md) | Input/output fields, preview, restricted execution users, persistent runs and MCP setup. |
+| Build a visual automation graph | [Flows](flows.md) | Triggers, connected operations, branches, Content actions, native permissions and run history. |
 | Put YunCMS in production | [Production Readiness](production-readiness.md) | Verification commands, test gates, dedicated test databases and environment readiness. |
 
 ## Start here
@@ -49,6 +50,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 - [MCP](mcp.md) — connect agents through the same query and RBAC model as REST.
 - [AI assistant](ai-assistant.md) — configure the Studio assistant, provider privacy, read/write modes and permission boundaries.
 - [AI automations](ai-automations.md) — repeat summaries, classification, translation and extraction when selected content changes.
+- [Flows](flows.md) — connect manual actions, events, webhooks, schedules and child flows with native data operations.
 
 ## Studio administration
 

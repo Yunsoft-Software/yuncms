@@ -1,0 +1,75 @@
+/* Shared Flow workbench components. All visual decisions use Studio tokens. */
+.flows-workspace { min-width: 0; display: grid; gap: 20px; }
+.flow-heading, .flow-toolbar-actions, .flow-workbench-actions, .flow-palette { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.flow-heading { justify-content: space-between; }
+.flow-heading h1, .flow-heading p { margin: 0; }
+.flow-heading p, .flow-canvas-hint, .flow-draft-status, .flow-list small, .flow-inspector small { color: var(--studio-text-muted); font-size: 12px; }
+.flow-heading p { margin-top: 6px; }
+.flow-layout { display: grid; grid-template-columns: minmax(170px, 210px) minmax(300px, 1fr) minmax(240px, 300px); gap: 14px; align-items: start; }
+.flow-list, .flow-inspector, .flow-history { border: 1px solid var(--studio-border); background: var(--studio-surface); border-radius: var(--studio-radius-lg, 14px); padding: 14px; min-width: 0; }
+.flow-list { display: grid; gap: 8px; max-height: 760px; overflow: auto; }
+.flow-list input { min-width: 0; width: 100%; }
+.flow-list button { display: grid; gap: 5px; text-align: left; border: 1px solid transparent; border-radius: var(--studio-radius-md, 10px); padding: 11px; background: transparent; color: var(--studio-text); overflow-wrap: anywhere; cursor: pointer; }
+.flow-list button.active, .flow-list button:hover { border-color: var(--studio-border); background: var(--studio-surface-muted); }
+.flow-workbench { min-width: 0; display: grid; gap: 10px; }
+.flow-palette { justify-content: flex-start; }
+.flow-palette .field-label { margin: 0; min-width: 180px; }
+.flow-canvas-hint { margin: 0; }
+.flow-canvas { height: 540px; min-height: 380px; width: 100%; border: 1px solid var(--studio-border); border-radius: var(--studio-radius-lg, 14px); overflow: hidden; background: var(--studio-surface-muted); }
+.flow-canvas .react-flow { --xy-background-color: var(--studio-surface-muted); --xy-node-color: var(--studio-text); --xy-edge-stroke: var(--studio-text-muted); --xy-minimap-background-color: var(--studio-surface); --xy-controls-button-background-color: var(--studio-surface); --xy-controls-button-color: var(--studio-text); --xy-controls-button-border-color: var(--studio-border); }
+.flow-canvas .react-flow { --xy-minimap-node-background-color: var(--studio-text-muted); --xy-minimap-mask-background-color: color-mix(in srgb, var(--studio-surface) 70%, transparent); --xy-background-pattern-color: var(--studio-border); --xy-selection-background-color: color-mix(in srgb, var(--studio-primary) 12%, transparent); --xy-controls-button-background-color-hover: var(--studio-surface-muted); --xy-controls-button-color-hover: var(--studio-text); --xy-attribution-background-color: var(--studio-surface); }
+.flow-graph-node { width: 230px; min-height: 126px; padding: 16px 20px; display: grid; gap: 6px; border: 1px solid var(--studio-border); border-radius: var(--studio-radius-lg, 14px); background: var(--studio-surface); color: var(--studio-text); box-shadow: 0 4px 16px color-mix(in srgb, var(--studio-text) 6%, transparent); }
+.flow-graph-node strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flow-node-kind, .flow-graph-node code { font-size: 11px; color: var(--studio-text-muted); }
+.flow-graph-trigger { border-top: 3px solid var(--studio-accent, var(--studio-primary)); }
+.react-flow__node.selected .flow-graph-node { outline: 2px solid var(--studio-accent, var(--studio-primary)); outline-offset: 3px; }
+.flow-node-ports { display: flex; justify-content: space-between; font-size: 10px; color: var(--studio-text-muted); }
+.flow-canvas .react-flow__handle { width: 16px; height: 16px; border: 3px solid var(--studio-surface); background: var(--studio-text-muted); }
+.flow-canvas .flow-port-resolve { top: 36%; background: var(--studio-success-text); }
+.flow-canvas .flow-port-reject { top: 76%; background: var(--studio-danger); }
+.flow-canvas .flow-edge-resolve path { stroke: var(--studio-success-text); stroke-width: 2; }
+.flow-canvas .flow-edge-reject path { stroke: var(--studio-danger); stroke-width: 2; }
+.flow-canvas .react-flow__edge-text { fill: var(--studio-text); font-size: 10px; }
+.flow-canvas .react-flow__edge-textbg { fill: var(--studio-surface); }
+.flow-node-succeeded { border-color: var(--studio-success-text); }
+.flow-node-failed { border-color: var(--studio-danger); }
+.flow-inspector fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 14px; }
+.flow-inspector h2, .flow-history h2 { font-size: 15px; margin: 0 0 6px; }
+.flow-inspector .field-label { min-width: 0; margin: 0; }
+.flow-inspector input:not([type="checkbox"]), .flow-inspector select, .flow-inspector textarea { width: 100%; min-width: 0; }
+.flow-inspector .checkbox-label { display: flex; gap: 8px; align-items: start; font-size: 12px; }
+.flow-advanced { min-width: 0; }
+.flow-advanced summary { cursor: pointer; font-size: 12px; color: var(--studio-text-muted); margin-bottom: 10px; }
+.json-field { min-width: 0; }
+.json-field-input { width: 100%; min-width: 0; font-family: var(--studio-font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.6; tab-size: 2; resize: vertical; }
+.json-field .field-error { color: var(--studio-danger); }
+.flow-history-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.flow-history-entry { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--studio-border); border-radius: var(--studio-radius-md, 10px); color: var(--studio-text); background: var(--studio-surface); cursor: pointer; text-align: left; }
+.flow-history-entry.active { background: var(--studio-surface-muted); }
+.flow-history-entry time, .flow-history-entry code { font-size: 11px; color: var(--studio-text-muted); }
+.flow-status { font-size: 11px; font-weight: 700; }
+.flow-status-succeeded { color: var(--studio-success-text); }
+.flow-status-failed { color: var(--studio-danger); }
+.flow-run-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 16px; }
+.flow-run-steps { display: grid; gap: 8px; }
+.flow-run-step { display: grid; gap: 7px; padding: 12px; border: 1px solid var(--studio-border); border-left: 3px solid var(--studio-success-text); border-radius: var(--studio-radius-md, 10px); font-size: 12px; min-width: 0; }
+.flow-step-failed { border-left-color: var(--studio-danger); }
+.flow-run-step span { color: var(--studio-text-muted); font-size: 11px; }
+.flow-run-detail pre { margin: 0; padding: 12px; border-radius: var(--studio-radius-md, 10px); background: var(--studio-surface-muted); color: var(--studio-text); font-size: 11px; overflow: auto; max-height: 260px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 1200px) {
+  .flow-layout { grid-template-columns: minmax(0, 1fr) 280px; }
+  .flow-list { grid-column: 1 / -1; display: flex; max-height: 140px; overflow: auto; }
+  .flow-list input { flex: 0 0 180px; }
+  .flow-list button { flex: 0 0 180px; }
+}
+@media (max-width: 760px) {
+  .flow-layout, .flow-run-detail { grid-template-columns: minmax(0, 1fr); }
+  .flow-heading, .flow-heading > div, .flow-toolbar-actions { width: 100%; }
+  .flow-toolbar-actions { justify-content: flex-start; }
+  .flow-list { grid-column: 1; }
+  .flow-canvas { height: 420px; }
+  .flow-canvas .react-flow__minimap { display: none; }
+  .flow-inspector { max-height: none; }
+}
+
+.manual-flow-actions { display: grid; gap: 10px; }

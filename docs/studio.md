@@ -343,6 +343,12 @@ See [AI assistant](ai-assistant.md) before enabling data-changing tools.
 
 Administrators can open **Settings → AI Automations** (`#/automations`) to define a repeated content transformation, choose a normal Run as user, select input/output fields and test a sample record before enabling it. The same screen shows pending/running/succeeded/failed/skipped runs and eligible retry actions. Ordinary users do not see this administration destination. See [AI Automations](ai-automations.md) for the permission, trigger and concurrency contract.
 
+## Flows
+
+Administrators open **Settings → Flows** (`#/flows`) to build a graph from one trigger and connected operations. Drag nodes and connect Resolve/Reject outputs; branches can merge into a common operation. The inspector edits trigger permissions and JSON operation options, while run history highlights execution on the canvas. Save before running a manual flow. Imports and duplicates start inactive.
+
+Ordinary authenticated Content users see only manual flows explicitly granted to their role and collection. Selection-required actions are disabled until records are selected; confirmation uses Studio's shared dialog. The Content screen discovers only readable collection/field metadata and continues to enforce native item permissions. See [Flows](flows.md) for a walkthrough, all five triggers, twelve operations, templates and execution scopes.
+
 The Administrator sidebar includes links to Yunsoft project help, the GitHub repository and GitHub Sponsors. The AI and automation screens also show a small help card; dismissing it is remembered in that browser's local storage.
 
 # Accessibility and motion

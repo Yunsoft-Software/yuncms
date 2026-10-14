@@ -62,6 +62,7 @@ These screenshots illustrate the documented Studio workflows. Original capture a
 | Configure roles and safe public access | [Roles and Permissions](docs/permissions.md) |
 | Connect a frontend or integration | [REST API](docs/rest-api.md) and [Items Query Language](docs/api-query-language.md) |
 | Automate summaries, classification or translation with AI | [AI Automations](docs/ai-automations.md) |
+| Connect events, webhooks and scheduled work visually | [Flows](docs/flows.md) |
 | Deploy, back up and update a server | [Deployment](docs/deployment.md), [Production Readiness](docs/production-readiness.md) and [Upgrades](docs/upgrades.md) |
 
 ## What YunCMS provides
@@ -500,6 +501,7 @@ The complete user/operator/integrator index is **[docs/README.md](docs/README.md
 - **[MCP](docs/mcp.md)**
 - **[AI Assistant](docs/ai-assistant.md)**
 - **[AI Automations](docs/ai-automations.md)**
+- **[Flows](docs/flows.md)** — visual triggers, operations, branches, manual Content actions and execution history.
 
 ## Production and operations
 

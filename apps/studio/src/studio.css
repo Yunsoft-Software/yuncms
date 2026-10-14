@@ -2,6 +2,8 @@
  * Keep import order stable while legacy surfaces move into the semantic Studio system.
  */
 
+@import '@xyflow/react/dist/style.css';
+
 @import './styles.css';
 @import './ui-improvements.css';
 @import './usability-pass.css';
@@ -52,3 +54,4 @@
 /* Explicit fallbacks for shell state in browsers without :has(). */
 @import './studio-compat.css';
 @import './automations.css';
+@import './flows.css';

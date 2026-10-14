@@ -22,6 +22,7 @@ import {
 } from './studio-route.js';
 import { AiScreen } from './screens/AiScreen.jsx';
 import { AutomationsScreen } from './screens/AutomationsScreen.jsx';
+import { FlowsScreen } from './screens/FlowsScreen.jsx';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
 import { ContentRouteScreen } from './screens/ContentRouteScreen.jsx';
@@ -38,6 +39,7 @@ const settingsSections = [
   { id: 'roles', labelKey: 'nav.roles', icon: 'roles' },
   { id: 'mcp', labelKey: 'nav.mcp', icon: 'mcp', adminOnly: true },
   { id: 'automations', labelKey: 'automation.title', icon: 'ai', adminOnly: true },
+  { id: 'flows', labelKey: 'flow.title', icon: 'flows', adminOnly: true },
   { id: 'appearance', labelKey: 'nav.appearance', icon: 'appearance' },
 ];
 
@@ -196,10 +198,14 @@ export function App() {
       .catch(() => setHealthState('offline'));
   }, []);
 
+  function readNavigationCollections() {
+    return session?.user?.admin ? apiRequest('/schema/collections') : apiRequest('/studio-navigation/collections');
+  }
+
   async function loadNavigationCollections() {
     try {
       const [response, groupRows] = await Promise.all([
-        apiRequest('/schema/collections'),
+        readNavigationCollections(),
         navigationGroups(),
       ]);
       const visible = sortContentCollections(response?.data ?? []);
@@ -217,7 +223,7 @@ export function App() {
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    Promise.all([apiRequest('/schema/collections'), navigationGroups()])
+    Promise.all([readNavigationCollections(), navigationGroups()])
       .then(([response, groupRows]) => {
         if (cancelled) return;
         const visible = sortContentCollections(response?.data ?? []);
@@ -262,6 +268,8 @@ export function App() {
     if (section === 'ai') return <AiScreen />;
     if (section === 'automations') return session?.user?.admin
       ? <AutomationsScreen /> : <div className="error-banner" role="alert">{t('automation.adminOnly')}</div>;
+    if (section === 'flows') return session?.user?.admin
+      ? <FlowsScreen route={route} /> : <div className="error-banner" role="alert">{t('flow.adminOnly')}</div>;
     if (section === 'mcp') return session?.user?.admin
       ? <McpScreen />
       : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;
@@ -306,6 +314,7 @@ export function App() {
       ai: studioPath.ai(),
       mcp: studioPath.mcp(),
       automations: studioPath.automations(),
+      flows: studioPath.flows(),
       appearance: studioPath.appearance(),
       content: studioPath.content(contentCollection || contentCollections[0]?.collection || ''),
     };
