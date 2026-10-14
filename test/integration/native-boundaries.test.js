@@ -221,6 +221,19 @@ test('native file permissions, user/schema filters and identity relations enforc
     await assert.rejects(new ItemsService(collection, await fresh()).createOne({}), { code: 'FORBIDDEN' });
   });
 
+  await t.test('unsupported unique field configuration returns a typed error without physical or metadata changes', async () => {
+    const [[before]] = await pool.query('SELECT version FROM yuncms_schema_state WHERE id = 1');
+    const body = { field: 'business_key', type: 'string', required: true, unique: true };
+    const path = `/schema/collections/${collection}/fields`;
+    const denied = await request(path, adminToken, 'POST', body);
+    assert.equal(denied.status, 400); assert.equal(denied.body.errors[0].code, 'INVALID_SCHEMA_PAYLOAD');
+    assert.equal((await request(path, bToken, 'POST', body)).status, 403);
+    await assert.rejects(new FieldsService(await fresh()).createOne(collection, body), { code: 'INVALID_SCHEMA_PAYLOAD' });
+    const [physical] = await pool.query('SELECT column_name FROM information_schema.columns WHERE table_schema = ? AND table_name = ? AND column_name = ?', [config.database.database, collection, 'business_key']); assert.equal(physical.length, 0);
+    const [metadata] = await pool.query('SELECT field FROM yuncms_fields WHERE collection = ? AND field = ?', [collection, 'business_key']); assert.equal(metadata.length, 0);
+    const [[after]] = await pool.query('SELECT version FROM yuncms_schema_state WHERE id = 1'); assert.equal(after.version, before.version);
+  });
+
   await t.test('file admission preserves typed HTTP denials and atomically rolls back quota, metadata and blobs', async () => {
     const quota = `it_quota_${run}`;
     await pool.query(`CREATE TABLE \`${quota}\` (id INT PRIMARY KEY, used_bytes INT NOT NULL, max_bytes INT NOT NULL) ENGINE=InnoDB`);

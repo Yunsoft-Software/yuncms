@@ -152,6 +152,9 @@ export class FieldsService extends BaseService {
   async createOne(collection, input = {}) {
     assertSchemaManager(this.accountability);
     assertIdentifier(collection, 'collection name');
+    if (Object.hasOwn(input, 'unique')) {
+      throw invalidSchemaPayload('Standalone unique field configuration is not supported');
+    }
     const resolvedName = resolveSchemaName({
       displayName: input.name ?? input.field,
       key: input.field,

@@ -116,6 +116,8 @@ Combine this field with a native M2O relation to `yuncms_users.id` to enforce id
 
 Literal defaults for `text` and `json` are not part of the current field contract.
 
+Standalone `unique` field configuration is not supported in V1. Field creation rejects a supplied `unique` option with HTTP 400 / `INVALID_SCHEMA_PAYLOAD` before changing the schema, so the API never implies an unenforced business-key constraint. Physical field updates also reject unsupported properties. One-to-one relations have their own documented uniqueness contract. Upgrading does not add constraints or alter existing duplicate records; a previously supplied, ignored option did not create a unique index.
+
 ### Writing JSON and time values
 
 REST item mutations and `ItemsService` accept objects or arrays for `json` fields. Valid pre-serialized JSON text is also accepted and is not encoded a second time.

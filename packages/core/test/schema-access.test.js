@@ -124,3 +124,9 @@ test('M2M rejects SET NULL because junction FK fields are required', async () =>
     (error) => error.code === 'INVALID_ON_DELETE',
   );
 });
+
+
+test('standalone unique options are explicitly rejected before schema I/O instead of silently ignored', async () => {
+  const service = new FieldsService(adminOptions());
+  for (const unique of [true, false, 'true']) await assert.rejects(service.createOne('records', { field: 'business_key', type: 'string', unique }), { code: 'INVALID_SCHEMA_PAYLOAD' });
+});
