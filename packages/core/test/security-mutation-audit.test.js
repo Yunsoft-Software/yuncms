@@ -2,18 +2,18 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createSystemAccountability } from '../src/accountability.js';
+import { HookEmitter } from '../src/hooks.js';
 import { PermissionsService } from '../src/services/permissions-service.js';
 import { RolesService } from '../src/services/roles-service.js';
 import { UsersService } from '../src/services/users-service.js';
 
 function recordingEmitter() {
   const events = [];
-  return {
-    events,
-    async action(event, payload, context) {
-      events.push({ event, payload, context });
-    },
-  };
+  const emitter = new HookEmitter();
+  for (const event of ['users.password.update', 'roles.create', 'permissions.delete']) {
+    emitter.registerAction(event, (payload, context) => events.push({ event, payload, context }));
+  }
+  return Object.assign(emitter, { events });
 }
 
 test('password changes emit an audit-safe event without password material', async () => {
@@ -25,6 +25,7 @@ test('password changes emit an audit-safe event without password material', asyn
     release() {},
     async query(sql) {
       const normalized = sql.replace(/\s+/g, ' ').trim();
+      if (normalized.startsWith('SELECT id, email, role, status')) return [[{ id: 'user-1', email: 'user@example.test', status: 'active' }], []];
       if (normalized.startsWith('UPDATE yuncms_users SET password_hash')) return [{ affectedRows: 1 }, []];
       if (normalized.startsWith('DELETE FROM yuncms_sessions')) return [{ affectedRows: 2 }, []];
       throw new Error(`Unexpected query: ${normalized}`);

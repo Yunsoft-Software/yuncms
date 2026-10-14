@@ -69,6 +69,12 @@ POST /auth/logout-all
 
 Changing or resetting a password also revokes existing sessions.
 
+### User password changes
+
+`PATCH /users/:id/password` accepts `{ "password": "new-password" }` and returns `204` on success. Authenticated users can change their own password; changing another user's password requires Administrator or explicit system accountability. Delegated user-management permissions do not grant access to another user's credentials.
+
+Extensions can reject these changes through the veto-only [`users.password.update` filter](extensions.md#filters), including changes requested by Administrators, the user themselves or system services. The filter receives safe identity and transaction context, without the password or hash. Rejection leaves both the credential and existing sessions unchanged. Successful writes revoke sessions and emit the password action only after the outer native transaction commits. Direct `UsersService.updatePassword()` calls use the same boundary.
+
 ## API tokens
 
 API tokens are long-lived bearer credentials for integrations and agents:

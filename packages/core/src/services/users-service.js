@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readNativeReferenceRows } from '../native-reference.js';
 
-import { hashPassword } from '../auth/password.js';
+import { assertPasswordInput, hashPassword } from '../auth/password.js';
 import {
   buildSystemListQuery,
   USER_SAFE_SELECT_COLUMNS,
@@ -347,12 +347,18 @@ export class UsersService extends BaseService {
   async updatePassword(id, password) {
     const self = this.accountability.user === id;
     if (!self) assertCredentialManager(this.accountability);
+    assertPasswordInput(password);
 
-    const passwordHash = await hashPassword(password);
-    const connection = await this.database.getConnection();
-
-    try {
-      await connection.beginTransaction();
+    return withTransaction(this.database, async (connection) => {
+      const service = new UsersService({ ...this, database: connection });
+      if (this.emitter) {
+        const before = await service.#readOneUnsafe(id, true);
+        if (!before) throw Object.assign(new Error(`Unknown user: ${id}`), { code: 'USER_NOT_FOUND' });
+        // Admission is veto-only: extensions cannot redirect a credential write
+        // or observe/replace the requested password.
+        await service.filter('users.password.update', { key: id }, { collection: 'yuncms_users', key: id, before });
+      }
+      const passwordHash = await hashPassword(password);
       const [result] = await connection.query(
         'UPDATE yuncms_users SET password_hash = ? WHERE id = ?',
         [passwordHash, id],
@@ -363,20 +369,9 @@ export class UsersService extends BaseService {
         throw error;
       }
       await connection.query('DELETE FROM yuncms_sessions WHERE user = ?', [id]);
-      await connection.commit();
-    } catch (error) {
-      try {
-        await connection.rollback();
-      } catch (rollbackError) {
-        error.rollbackError = rollbackError;
-      }
-      throw error;
-    } finally {
-      connection.release();
-    }
-
-    await this.action('users.password.update', { key: id });
-    return true;
+      await service.action('users.password.update', { key: id });
+      return true;
+    });
   }
 }
 
