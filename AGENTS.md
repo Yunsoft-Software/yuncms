@@ -13,6 +13,7 @@ Public documentation on `main` is for installers, administrators, API consumers 
 - Database access is `mysql2/promise` directly. Do not add Knex, Prisma, Sequelize, an ORM, or a second database driver.
 - REST only. Do not add GraphQL.
 - Studio is React 19.2 + Vite 8.
+- All Studio design must come from the central design system: shared design tokens, centrally loaded styles and reusable components. Do not add page-local design rules, inline visual styling or duplicate styling remnants inside screens. Keep graph coordinates and other runtime layout data separate from visual design rules.
 - Use npm workspaces; do not add a monorepo build orchestrator without a demonstrated need.
 - Do not use GitHub Actions.
 - Keep commits small and focused. Do not mix unrelated refactors/features.
@@ -50,6 +51,8 @@ Do not add compatibility behavior merely to imitate another product. New behavio
 - Internal plans and blocked-environment notes must not be added to `main` as `plan.md`, `todo.md`, roadmap documents, or release scratchpads.
 
 ## Testing
+- Every feature must include browser acceptance tests written with Playwright, unit tests and backend/API tests in the same development pass. Keep all three layers aligned with the actual supported behavior; a feature is incomplete until its applicable tests are written and executed.
+- When a feature changes, update its Playwright, unit and backend/API tests in the same pass. When a feature is removed, remove the tests that exclusively cover the removed behavior and update any shared tests; preserve coverage for behavior that remains supported. Never delete or weaken a test to conceal a regression.
 - Prefer Node's built-in test runner for backend/core unit tests unless a real need forces another framework.
 - Every implementation change must have a directly relevant regression test where technically possible.
 - Bug fixes must include a test that would have failed before the fix whenever practical.
