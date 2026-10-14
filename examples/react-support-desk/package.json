@@ -18,8 +18,8 @@
     "verify:mcp": "node --env-file=.env.local scripts/verify-mcp.mjs"
   },
   "dependencies": {
-    "@yunsoft/yuncms": "0.1.35",
-    "@yunsoft/yuncms-core": "0.1.35",
+    "@yunsoft/yuncms": "0.1.36",
+    "@yunsoft/yuncms-core": "0.1.36",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
