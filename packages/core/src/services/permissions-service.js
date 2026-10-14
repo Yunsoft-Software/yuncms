@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { assertPermissionValidationRule } from '../permission-validation.js';
 import { compileFilter } from '../query.js';
 import { SchemaCache } from '../schema.js';
+import { dispatchAfterCommit } from '../transaction.js';
 import {
   assertSystemPermissionPayload,
   assertSystemResourceAction,
@@ -88,11 +89,17 @@ export class PermissionsService extends BaseService {
 
   async action(event, payload) {
     if (!this.emitter) return;
-    await this.emitter.action(event, payload, {
+    const captured = structuredClone(payload);
+    const context = {
       accountability: this.accountability,
       requestId: this.requestId,
       collection: 'yuncms_permissions',
-    });
+    };
+    await dispatchAfterCommit(this.database, (database, transaction) => this.emitter.action(event, captured, {
+      ...context,
+      database,
+      transaction,
+    }));
   }
 
   async #collectionSchema(collection) {

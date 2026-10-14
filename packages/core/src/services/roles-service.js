@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { dispatchAfterCommit } from '../transaction.js';
 
 import {
   buildSystemListQuery,
@@ -35,11 +36,17 @@ function assertSpecialRoleCreation(accountability, { admin = false, public: publ
 export class RolesService extends BaseService {
   async action(event, payload) {
     if (!this.emitter) return;
-    await this.emitter.action(event, payload, {
+    const captured = structuredClone(payload);
+    const context = {
       accountability: this.accountability,
       requestId: this.requestId,
       collection: 'yuncms_roles',
-    });
+    };
+    await dispatchAfterCommit(this.database, (database, transaction) => this.emitter.action(event, captured, {
+      ...context,
+      database,
+      transaction,
+    }));
   }
 
   async #readOneUnsafe(id) {
