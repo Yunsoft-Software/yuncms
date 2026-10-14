@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { addFlowOperation, connectFlowOperation, disconnectFlowOperation, exportFlowDefinition, FLOW_OPERATION_DEFAULTS, flowGraphEdges, importFlowDefinition, newFlowDraft, removeFlowOperation, triggerDefaults } from '../src/flow-graph.js';
 import { hasTranslation, SUPPORTED_LOCALES, translate } from '../src/localization.js';
@@ -69,5 +70,31 @@ test('Flow guide and tracked screenshots preserve their own capture provenance',
     assert.ok(manifest.files.includes(file));
     const bytes = readFileSync(new URL(`../../../docs/assets/screenshots/${file}`, import.meta.url));
     assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+    const capture = manifest.flowCaptures.captures[file];
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), capture.sha256, file);
+    assert.equal(bytes.readUInt32BE(16), capture.width); assert.equal(bytes.readUInt32BE(20), capture.height);
   }
+});
+
+test('illustrated Flow guides link to existing images, importable examples and valid local section anchors', () => {
+  const base = new URL('../../../docs/', import.meta.url);
+  const slug = text => text.toLowerCase().replace(/[`*]/g, '').replace(/[^\p{L}\p{N}_\- ]/gu, '').trim().replace(/ /g, '-');
+  const manifest = JSON.parse(source('../../../docs/assets/screenshots/manifest.json'));
+  const images = new Set();
+  for (const path of ['flows.md', 'flows-recipes.md']) {
+    const text = readFileSync(new URL(path, base), 'utf8');
+    const links = [...text.matchAll(/!?\[[^\]]+\]\(([^)]+)\)/g)].map(match => match[1]);
+    links.push(...[...text.matchAll(/<img\s+src="([^"]+)"/g)].map(match => match[1]));
+    for (const link of links) {
+      if (/^https?:/.test(link)) continue;
+      const [file, anchor] = link.split('#'), target = new URL(file || path, base);
+      const bytes = readFileSync(target);
+      if (target.pathname.endsWith('.md') && anchor) {
+        const headings = [...bytes.toString('utf8').matchAll(/^#{1,6}\s+(.+)$/gm)].map(match => slug(match[1]));
+        assert.ok(headings.includes(anchor), `Missing section: ${path} -> ${link}`);
+      }
+      if (target.pathname.endsWith('.png')) images.add(target.pathname.split('/').at(-1));
+    }
+  }
+  for (const filename of manifest.flowCaptures.files) assert.ok(images.has(filename), `Unillustrated capture: ${filename}`);
 });

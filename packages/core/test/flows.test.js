@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createAccountability, createPublicAccountability, createSystemAccountability } from '../src/accountability.js';
 import { CORE_MIGRATIONS, REQUIRED_CORE_MIGRATION_IDS } from '../src/bootstrap.js';
 import { loadConfig } from '../src/config.js';
@@ -12,6 +13,20 @@ import { FlowsService } from '../src/services/flows-service.js';
 const node = (id, type, options = {}, extra = {}) => ({ id, key: id, name: id, type, options, position: { x: 100, y: 100 }, resolve: null, reject: null, ...extra });
 const flow = operations => ({ id: 'test-flow', name: 'Example', status: 'active', trigger: 'manual', options: {}, entry: operations[0]?.id ?? null, operations });
 const context = (extra = {}) => ({ accountability: createAccountability({ user: 'actor', role: 'staff' }), trigger: { amount: 4 }, schema: { collections: {} }, ...extra });
+
+test('every downloadable documentation example validates inactive, and the documented pure examples execute unchanged', async () => {
+  const root = new URL('../../../docs/examples/flows/', import.meta.url);
+  const examples = new Map(readdirSync(root).filter(name => name.endsWith('.json')).map(name => [name, JSON.parse(readFileSync(new URL(name, root), 'utf8'))]));
+  assert.equal(examples.size, 8);
+  for (const [name, value] of examples) { const normalized = normalizeFlow(value); assert.equal(normalized.status, 'inactive', name); assert.ok(normalized.entry, name); }
+  const greeting = await executeFlowGraph({ ...examples.get('manual-greeting.json'), id: 'docs-greeting' }, context({ trigger: { body: { name: 'YunCMS' } } }));
+  assert.deepEqual(greeting.output, { message: 'Hello YunCMS' });
+  for (const approved of [false, true]) {
+    const result = await executeFlowGraph({ ...examples.get('approval-branches.json'), id: 'docs-approval' }, context({ trigger: { body: { approved } } }));
+    assert.deepEqual(result.output, { decision: approved ? 'approved' : 'needs_review', accepted: approved });
+    assert.deepEqual(result.trace.map(step => step.key), ['approval', approved ? 'accepted' : 'rejected', 'result']);
+  }
+});
 
 test('flow defaults are inactive, explicitly inherit the trigger and reject unsafe graphs', () => {
   const draft = normalizeFlow({ name: 'Draft', operations: [] });

@@ -349,6 +349,8 @@ Administrators open **Settings → Flows** (`#/flows`) to build a graph from one
 
 Ordinary authenticated Content users see only manual flows explicitly granted to their role and collection. Selection-required actions are disabled until records are selected; confirmation uses Studio's shared dialog. The Content screen discovers only readable collection/field metadata and continues to enforce native item permissions. See [Flows](flows.md) for a walkthrough, all five triggers, twelve operations, templates and execution scopes.
 
+The [illustrated editor walkthrough](flows.md#your-first-flow) shows JSON editing, confirmation, branching, run traces, Content actions and trigger setup. [Flow recipes](flows-recipes.md) supplies eight inactive JSON definitions you can import and adapt to your collections, roles and users.
+
 The Administrator sidebar includes links to Yunsoft project help, the GitHub repository and GitHub Sponsors. The AI and automation screens also show a small help card; dismissing it is remembered in that browser's local storage.
 
 # Accessibility and motion

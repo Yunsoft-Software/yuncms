@@ -1,0 +1,43 @@
+{
+  "name": "Daily review queue",
+  "description": "",
+  "status": "inactive",
+  "trigger": "schedule",
+  "accountability": "user",
+  "run_as": "33333333-3333-4333-8333-333333333333",
+  "options": {
+    "cron": "0 0 8 * * *",
+    "response": "$last"
+  },
+  "entry": "review_records",
+  "operations": [
+    {
+      "id": "review_records",
+      "key": "review_records",
+      "name": "Read review queue",
+      "type": "read",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "collection": "articles",
+        "query": {
+          "fields": [
+            "id",
+            "title",
+            "status"
+          ],
+          "filter": {
+            "status": {
+              "_eq": "review"
+            }
+          },
+          "limit": 25
+        }
+      },
+      "resolve": null,
+      "reject": null
+    }
+  ]
+}

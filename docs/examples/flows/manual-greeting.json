@@ -1,0 +1,32 @@
+{
+  "name": "Greeting",
+  "description": "",
+  "status": "inactive",
+  "trigger": "manual",
+  "accountability": "trigger",
+  "run_as": null,
+  "options": {
+    "response": "$last",
+    "require_confirmation": true
+  },
+  "entry": "greeting",
+  "operations": [
+    {
+      "id": "greeting",
+      "key": "greeting",
+      "name": "Build greeting",
+      "type": "transform",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "value": {
+          "message": "Hello {{ $trigger.body.name }}"
+        }
+      },
+      "resolve": null,
+      "reject": null
+    }
+  ]
+}

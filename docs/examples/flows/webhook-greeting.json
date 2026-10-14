@@ -1,0 +1,33 @@
+{
+  "name": "Webhook greeting",
+  "description": "",
+  "status": "inactive",
+  "trigger": "webhook",
+  "accountability": "trigger",
+  "run_as": null,
+  "options": {
+    "method": "POST",
+    "public": false,
+    "response": "$last"
+  },
+  "entry": "greeting",
+  "operations": [
+    {
+      "id": "greeting",
+      "key": "greeting",
+      "name": "Build greeting",
+      "type": "transform",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "value": {
+          "message": "Hello {{ $trigger.body.name }}"
+        }
+      },
+      "resolve": null,
+      "reject": null
+    }
+  ]
+}

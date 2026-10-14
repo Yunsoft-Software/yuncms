@@ -10,7 +10,7 @@ import { createApp } from '../../../packages/api/src/app.js';
 import { FlowRuntime } from '../../../packages/api/src/flows/runtime.js';
 
 if (process.env.YUNCMS_TEST_MYSQL !== '1' || process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE !== '1') throw Error('Browser acceptance requires an explicitly authorized disposable MySQL database');
-const config = loadConfig({ ...process.env, API_RATE_LIMIT_ENABLED: '0', AUTH_RATE_LIMIT_ENABLED: '0', PRESSURE_LIMIT_ENABLED: '0' });
+const config = loadConfig({ ...process.env, API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '100', PRESSURE_LIMIT_ENABLED: '0' });
 if (!/(test|ci|dev)/i.test(config.database.database)) throw Error('Browser fixture requires a disposable test/ci/dev database');
 const pool = createDatabasePool({ ...config.database, connectionLimit: 5 }), accountability = createSystemAccountability();
 const root = await mkdtemp(join(tmpdir(), 'yuncms-flows-browser-'));
@@ -34,14 +34,15 @@ try {
   await bootstrapDatabase(pool);
   await new CollectionsService(basic).createOne({ collection });
   await new FieldsService(basic).createOne(collection, { field: 'title', type: 'string' });
+  await new FieldsService(basic).createOne(collection, { field: 'status', type: 'string' });
   const adminRole = await new RolesService(basic).createOne({ name: 'Browser flow administrator', admin: true }); roleIds.push(adminRole.id);
   const staffRole = await new RolesService(basic).createOne({ name: 'Browser flow staff' }); roleIds.push(staffRole.id);
   for (const [email, role] of [['flows-admin@example.test', adminRole.id], ['flows-staff@example.test', staffRole.id]]) {
     userIds.push((await new UsersService(basic).createOne({ email, role, password: 'Browser-flow-fixture-123!' })).id);
   }
   const schema = await cache.get(pool);
-  for (const action of ['read', 'update']) await new PermissionsService({ ...basic, schema }).createOne({ role: staffRole.id, collection, action, fields: ['id', 'title'] });
-  await new ItemsService(collection, { ...basic, schema }).createOne({ title: 'Browser fixture record' });
+  for (const action of ['read', 'update']) await new PermissionsService({ ...basic, schema }).createOne({ role: staffRole.id, collection, action, fields: ['id', 'title', 'status'] });
+  await new ItemsService(collection, { ...basic, schema }).createOne({ title: 'Documentation article', status: 'draft' });
   runtime = new FlowRuntime({ database: pool, schemaCache: cache, services, emitter, storage, logger }).registerHooks();
   const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger });
   server = await new Promise(resolve => { const instance = app.listen(Number(process.env.YUNCMS_BROWSER_PORT ?? 34074), '127.0.0.1', () => resolve(instance)); });

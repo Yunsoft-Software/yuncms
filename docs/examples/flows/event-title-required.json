@@ -1,0 +1,57 @@
+{
+  "name": "Require an article title",
+  "description": "",
+  "status": "inactive",
+  "trigger": "event",
+  "accountability": "trigger",
+  "run_as": null,
+  "options": {
+    "mode": "filter",
+    "events": [
+      "items.create"
+    ],
+    "collections": [
+      "articles"
+    ]
+  },
+  "entry": "title_check",
+  "operations": [
+    {
+      "id": "title_check",
+      "key": "title_check",
+      "name": "Title is present",
+      "type": "condition",
+      "position": {
+        "x": 380,
+        "y": 160
+      },
+      "options": {
+        "rules": {
+          "$trigger.payload.title": {
+            "_nnull": true,
+            "_neq": ""
+          }
+        }
+      },
+      "resolve": null,
+      "reject": "reject_title"
+    },
+    {
+      "id": "reject_title",
+      "key": "reject_title",
+      "name": "Reject missing title",
+      "type": "error",
+      "position": {
+        "x": 740,
+        "y": 260
+      },
+      "options": {
+        "code": "ARTICLE_TITLE_REQUIRED",
+        "status": 422,
+        "message": "Provide an article title."
+      },
+      "resolve": null,
+      "reject": null
+    }
+  ]
+}

@@ -51,6 +51,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 - [AI assistant](ai-assistant.md) — configure the Studio assistant, provider privacy, read/write modes and permission boundaries.
 - [AI automations](ai-automations.md) — repeat summaries, classification, translation and extraction when selected content changes.
 - [Flows](flows.md) — connect manual actions, events, webhooks, schedules and child flows with native data operations.
+- [Flow recipes](flows-recipes.md) — illustrated setup, eight importable JSON definitions, API requests and expected results.
 
 ## Studio administration
 

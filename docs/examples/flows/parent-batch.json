@@ -1,0 +1,31 @@
+{
+  "name": "Normalize a name list",
+  "description": "",
+  "status": "inactive",
+  "trigger": "manual",
+  "accountability": "trigger",
+  "run_as": null,
+  "options": {
+    "response": "$last",
+    "require_confirmation": true
+  },
+  "entry": "normalize_names",
+  "operations": [
+    {
+      "id": "normalize_names",
+      "key": "normalize_names",
+      "name": "Process each name",
+      "type": "trigger",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "flow": "22222222-2222-4222-8222-222222222222",
+        "payload": "{{ $trigger.body.rows }}"
+      },
+      "resolve": null,
+      "reject": null
+    }
+  ]
+}

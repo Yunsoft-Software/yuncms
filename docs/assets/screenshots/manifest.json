@@ -11,15 +11,113 @@
     "studio-mobile-menu.png",
     "studio-automations.jpg",
     "studio-flows.png",
-    "studio-mobile-flows-dark.png"
+    "studio-mobile-flows-dark.png",
+    "studio-flows-operation.png",
+    "studio-flows-run-dialog.png",
+    "studio-flows-branches.png",
+    "studio-flows-history.png",
+    "studio-flows-webhook.png",
+    "studio-flows-schedule.png",
+    "studio-flows-content-action.png",
+    "studio-flows-content-confirmation.png",
+    "studio-flows-event-filter.png"
   ],
   "verifiedAt": "2026-10-10",
   "flowCaptures": {
     "capturedAt": "2026-10-15",
-    "source": "Playwright Chromium against a built Studio and native MySQL/API with synthetic users and records; test/browser/flows.spec.js.",
+    "source": "Playwright Chromium against a built Studio and native MySQL/API with synthetic users and records; scenario paths are recorded per image.",
     "files": [
       "studio-flows.png",
-      "studio-mobile-flows-dark.png"
-    ]
+      "studio-mobile-flows-dark.png",
+      "studio-flows-operation.png",
+      "studio-flows-run-dialog.png",
+      "studio-flows-branches.png",
+      "studio-flows-history.png",
+      "studio-flows-webhook.png",
+      "studio-flows-schedule.png",
+      "studio-flows-content-action.png",
+      "studio-flows-content-confirmation.png",
+      "studio-flows-event-filter.png"
+    ],
+    "runtimeRevision": "315a582e0bf9464fdcfbb5fbc71c14a8db6ad5de",
+    "captures": {
+      "studio-flows.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flows.spec.js",
+        "sha256": "f5353a267e42727fedd6d9d8a56caa67e9e27960079fb1e816c5b7671570e5ad",
+        "width": 1536,
+        "height": 1273
+      },
+      "studio-mobile-flows-dark.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flows.spec.js",
+        "sha256": "d66eff6176b5faf41e34810dfd378331fa6d64b7ac8d6f090958160d2939169a",
+        "width": 390,
+        "height": 2012
+      },
+      "studio-flows-operation.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "sha256": "73aaa201515725472b1a729ad54e4683b982e506750e8a3847a2198b2f2a3d76",
+        "width": 300,
+        "height": 600
+      },
+      "studio-flows-run-dialog.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "sha256": "28604175fe55ebc0bc5f7a59d878857211bfa4b5559747d20801723d338c4f10",
+        "width": 480,
+        "height": 430
+      },
+      "studio-flows-branches.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "sha256": "527fa322c49789df989718268502fe2eb4552606e032fb56ca39ce86d2e67876",
+        "width": 1058,
+        "height": 680
+      },
+      "studio-flows-history.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "sha256": "2d21f8a170fc05d35105d94775ec2529f5e30ebe3755b0b03a9272368ecb2043",
+        "width": 1596,
+        "height": 578
+      },
+      "studio-flows-webhook.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "sha256": "b53c8e35e449fa62a6fe9ff980ba48cf07d798ff6e1d8a2a3226de3f4d8ad07d",
+        "width": 300,
+        "height": 759
+      },
+      "studio-flows-schedule.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "sha256": "25df592194b4f1438c77a18ed18dee53f207fae0e97ed513c11665faba6b1ed1",
+        "width": 300,
+        "height": 767
+      },
+      "studio-flows-content-action.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "sha256": "8c654b4f1c1704022bb5ec4cc99ebb064c80db0253abc02063119175af8b660c",
+        "width": 1440,
+        "height": 1000
+      },
+      "studio-flows-content-confirmation.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "sha256": "bfe218ffe9a55337dc877b41cc0f5c407904b110df3bf111a0df35361e04dbbb",
+        "width": 1440,
+        "height": 1000
+      },
+      "studio-flows-event-filter.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "sha256": "1245f1ab00fcecc39c1bcc38d3691da2ff2ca0954b53543e2f1e8011cf7bc39e",
+        "width": 300,
+        "height": 801
+      }
+    }
   }
 }

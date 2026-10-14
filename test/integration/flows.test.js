@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { readFileSync, readdirSync } from 'node:fs';
 import {
   bootstrapDatabase, CollectionsService, createAccountability, createCoreServiceRegistry, createDatabasePool,
   createStorageRegistry, createSystemAccountability, FieldsService, FlowsService, HookEmitter, ItemsService,
@@ -50,12 +51,13 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
   for (const collection of [articles, notes]) {
     await new CollectionsService(basic).createOne({ collection, systemFields: ['created_by'] });
     await new FieldsService(basic).createOne(collection, { field: 'title', type: 'string' });
+    await new FieldsService(basic).createOne(collection, { field: 'status', type: 'string' });
     await new FieldsService(basic).createOne(collection, { field: 'private_note', type: 'string' });
   }
   const schema = await cache.get(pool);
   const permissions = new PermissionsService({ ...basic, schema });
   for (const action of ['read', 'create', 'update']) await permissions.createOne({ role: staffRole.id, collection: articles, action,
-    fields: action === 'read' ? ['id', 'title', 'created_by'] : ['title'], ...(action === 'read' ? { filter: { created_by: { _eq: '$CURRENT_USER' } } } : {}) });
+    fields: action === 'read' ? ['id', 'title', 'status', 'created_by'] : ['title', 'status'], ...(action === 'read' ? { filter: { created_by: { _eq: '$CURRENT_USER' } } } : {}) });
   const adminActor = createAccountability({ user: admin.id, role: adminRole.id, admin: true });
   const messages = [];
   const mailer = new SmtpMailer({ from: 'flows@example.test', emitter, transport: { async sendMail(message) { messages.push(message); return { messageId: 'local-fixture' }; } } });
@@ -96,7 +98,7 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     const visible = await request('/studio-navigation/collections', staffToken);
     assert.equal(visible.status, 200); assert.deepEqual(visible.body.data.map(entry => entry.collection), [articles]);
     const fields = await request(`/studio-navigation/collections/${articles}/fields`, staffToken);
-    assert.equal(fields.status, 200); assert.deepEqual(fields.body.data.map(entry => entry.field).sort(), ['created_by', 'id', 'title']);
+    assert.equal(fields.status, 200); assert.deepEqual(fields.body.data.map(entry => entry.field).sort(), ['created_by', 'id', 'status', 'title']);
     assert.equal((await request(`/studio-navigation/collections/${notes}/fields`, staffToken)).status, 403);
     assert.equal((await request('/studio-navigation/collections', null)).status, 401);
     assert.equal((await request('/studio-navigation/collections/yuncms_users/fields', staffToken)).status, 404);
@@ -131,6 +133,46 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     const reject = emitter.registerFilter('mail.send', () => { throw Object.assign(new Error('Native mail guard'), { code: 'FORBIDDEN' }); });
     try { assert.equal((await request(`/flows/${rule.id}/run`, adminToken, 'POST', {})).status, 403); assert.equal(messages.length, 1); }
     finally { reject(); }
+  });
+  await t.test('downloadable documentation recipes import through HTTP and execute their advertised native behavior', async () => {
+    const root = new URL('../../docs/examples/flows/', import.meta.url), examples = new Map();
+    for (const name of readdirSync(root).filter(name => name.endsWith('.json'))) {
+      const input = JSON.parse(readFileSync(new URL(name, root), 'utf8').replaceAll('"articles"', JSON.stringify(articles))
+        .replaceAll('11111111-1111-4111-8111-111111111111', staffRole.id).replaceAll('33333333-3333-4333-8333-333333333333', staff.id));
+      const response = await request('/flows', adminToken, 'POST', input);
+      assert.equal(response.status, 201, name); assert.equal(response.body.data.status, 'inactive', name);
+      examples.set(name, response.body.data); flowIds.push(response.body.data.id);
+    }
+    assert.equal(examples.size, 8);
+    const activate = async name => {
+      const response = await request(`/flows/${examples.get(name).id}`, adminToken, 'PUT', { ...examples.get(name), status: 'active' });
+      assert.equal(response.status, 200); examples.set(name, response.body.data); return response.body.data;
+    };
+    const greeting = await activate('manual-greeting.json');
+    assert.deepEqual((await request(`/flows/${greeting.id}/run`, adminToken, 'POST', { body: { name: 'YunCMS' } })).body.data.output, { message: 'Hello YunCMS' });
+    const branching = await activate('approval-branches.json');
+    for (const approved of [false, true]) assert.deepEqual((await request(`/flows/${branching.id}/run`, adminToken, 'POST', { body: { approved } })).body.data.output, { decision: approved ? 'approved' : 'needs_review', accepted: approved });
+    const review = await activate('manual-content-review.json');
+    const record = await request(`/items/${articles}`, staffToken, 'POST', { title: 'Documented article', status: 'draft' }); assert.equal(record.status, 201);
+    const result = await request(`/flows/${review.id}/run`, staffToken, 'POST', { collection: articles, keys: [record.body.data.id], body: {} });
+    assert.equal(result.status, 200); assert.equal(result.body.data.output[0].status, 'review');
+    assert.equal((await request(`/flows/${review.id}/run`, staffToken, 'POST', { collection: articles, keys: [] })).status, 400);
+    assert.equal((await request(`/flows/${review.id}/run`, null, 'POST', { collection: articles, keys: [record.body.data.id] })).status, 403);
+    await activate('event-title-required.json');
+    const before = await count(articles);
+    const rejected = await request(`/items/${articles}`, staffToken, 'POST', { title: '' });
+    assert.equal(rejected.status, 422); assert.equal(rejected.body.errors[0].code, 'ARTICLE_TITLE_REQUIRED'); assert.equal(await count(articles), before);
+    const webhook = await activate('webhook-greeting.json');
+    assert.equal((await request(`/flows/trigger/${webhook.id}`, null, 'POST', { name: 'YunCMS' })).status, 403);
+    assert.deepEqual((await request(`/flows/trigger/${webhook.id}`, adminToken, 'POST', { name: 'YunCMS' })).body.data.output, { message: 'Hello YunCMS' });
+    const child = await activate('child-normalize.json'), parent = examples.get('parent-batch.json');
+    parent.operations[0].options.flow = child.id;
+    const batch = await activate('parent-batch.json');
+    assert.deepEqual((await request(`/flows/${batch.id}/run`, adminToken, 'POST', { body: { rows: [{ name: 'Ada' }, { name: 'Lin' }] } })).body.data.output, [{ name: 'Ada' }, { name: 'Lin' }]);
+    const schedule = await activate('schedule-read.json');
+    await runtime.tick(new Date('2026-10-15T08:00:00Z'));
+    const runs = await manager.readRuns(schedule.id); assert.equal(runs.length, 1); assert.equal(runs[0].status, 'succeeded');
+    assert.ok(runs[0].output.some(item => item.id === record.body.data.id && item.status === 'review'));
   });
   await t.test('run-as preserves native field, row and hook boundaries for allowed manual roles', async () => {
     const rule = await create(definition([node('create', 'create', { collection: articles, payload: { title: 'Scoped record' } })], { accountability: 'user', run_as: staff.id, options: { response: '$last', allowed_roles: [staffRole.id], collections: [articles] } }));

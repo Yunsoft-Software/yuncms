@@ -1,0 +1,88 @@
+{
+  "name": "Approval decision",
+  "description": "",
+  "status": "inactive",
+  "trigger": "manual",
+  "accountability": "trigger",
+  "run_as": null,
+  "options": {
+    "response": "$last",
+    "require_confirmation": true
+  },
+  "entry": "approval",
+  "operations": [
+    {
+      "id": "approval",
+      "key": "approval",
+      "name": "Approval check",
+      "type": "condition",
+      "position": {
+        "x": 380,
+        "y": 220
+      },
+      "options": {
+        "rules": {
+          "$trigger.body.approved": {
+            "_eq": true
+          }
+        }
+      },
+      "resolve": "accepted",
+      "reject": "rejected"
+    },
+    {
+      "id": "accepted",
+      "key": "accepted",
+      "name": "Approved path",
+      "type": "transform",
+      "position": {
+        "x": 740,
+        "y": 60
+      },
+      "options": {
+        "value": {
+          "decision": "approved",
+          "accepted": true
+        }
+      },
+      "resolve": "result",
+      "reject": null
+    },
+    {
+      "id": "rejected",
+      "key": "rejected",
+      "name": "Review path",
+      "type": "transform",
+      "position": {
+        "x": 740,
+        "y": 380
+      },
+      "options": {
+        "value": {
+          "decision": "needs_review",
+          "accepted": false
+        }
+      },
+      "resolve": "result",
+      "reject": null
+    },
+    {
+      "id": "result",
+      "key": "result",
+      "name": "Shared result",
+      "type": "transform",
+      "position": {
+        "x": 1100,
+        "y": 220
+      },
+      "options": {
+        "value": {
+          "decision": "{{ $last.decision }}",
+          "accepted": "{{ $last.accepted }}"
+        }
+      },
+      "resolve": null,
+      "reject": null
+    }
+  ]
+}

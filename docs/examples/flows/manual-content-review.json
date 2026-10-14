@@ -1,0 +1,43 @@
+{
+  "name": "Mark for review",
+  "description": "",
+  "status": "inactive",
+  "trigger": "manual",
+  "accountability": "trigger",
+  "run_as": null,
+  "options": {
+    "response": "$last",
+    "collections": [
+      "articles"
+    ],
+    "allowed_roles": [
+      "11111111-1111-4111-8111-111111111111"
+    ],
+    "require_selection": true,
+    "require_confirmation": true,
+    "confirmation": "Set the selected records to review status?"
+  },
+  "entry": "mark_review",
+  "operations": [
+    {
+      "id": "mark_review",
+      "key": "mark_review",
+      "name": "Set review status",
+      "type": "update",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "collection": "articles",
+        "ids": "{{ $trigger.keys }}",
+        "payload": {
+          "status": "review"
+        },
+        "emit_events": false
+      },
+      "resolve": null,
+      "reject": null
+    }
+  ]
+}
