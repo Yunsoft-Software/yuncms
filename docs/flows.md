@@ -108,6 +108,8 @@ After a run, use the **Run history** dialog and click a history entry. History p
 
 ![Successful overall run with a handled condition failure, the review path and the shared result](assets/screenshots/studio-flows-history.png)
 
+Closing run history with **Close** or **Escape** restores keyboard focus to **Run history**, including on mobile.
+
 In the false-input example, `approval` is **Failed** with `FLOW_CONDITION_REJECTED`, but its Failure connector handles the rejection. The overall run therefore succeeds after `rejected` and `result`. Without that connector, the rejection ends the run and the API returns an error. A failure does not automatically follow a Success connector.
 
 ### Give a Content role a manual action

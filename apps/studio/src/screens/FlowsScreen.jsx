@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../api.js';
 import { addFlowOperation, exportFlowDefinition, importFlowDefinition, newFlowDraft, removeFlowOperation } from '../flow-graph.js';
 import { useI18n } from '../i18n.js';
@@ -20,6 +20,7 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
   const [configuration, setConfiguration] = useState(null), [ready, setReady] = useState(false), [access, setAccess] = useState({ manage: false, run: false });
   const [draft, setDraft] = useState(() => initialDraft ?? newFlowDraft()), [selected, setSelected] = useState('trigger');
   const [run, setRun] = useState(null), [historyOpen, setHistoryOpen] = useState(false), [historyRefresh, setHistoryRefresh] = useState(0);
+  const historyTriggerRef = useRef(null);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [invalid, setInvalid] = useState(false);
   const [saved, setSaved] = useState(false), [baseline, setBaseline] = useState('');
@@ -91,7 +92,7 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
     <header className="flow-heading"><div><button type="button" className="text-button flow-back" disabled={busy} onClick={() => navigate(studioPath.flows())}>← {t('flow.back')}</button><h1>{draft.name || t('flow.new')}</h1><p>{t('flow.subtitle')}</p></div>
       <div className="flow-toolbar-actions">{access.manage && <><button className="secondary-button" type="button" disabled={busy} onClick={() => navigate(studioPath.newFlow())}>{t('flow.new')}</button>
         <button className="secondary-button" type="button" disabled={busy} onClick={() => { setImportText(''); setImportError(''); setImportReading(false); setImportOpen(true); }}>{t('flow.import')}</button></>}
-        <button className="secondary-button" type="button" disabled={busy || !draft.id} onClick={() => setHistoryOpen(true)}>{t('flow.runs')}</button>
+        <button ref={historyTriggerRef} className="secondary-button" type="button" disabled={busy || !draft.id} onClick={() => setHistoryOpen(true)}>{t('flow.runs')}</button>
         {access.manage && <button className="primary-button" type="button" disabled={busy || invalid || !draft.name.trim()} onClick={save}>{busy ? t('common.saving') : t('common.save')}</button>}</div>
     </header>
     {!access.manage && <p className="notice-banner">{t('flow.readOnly')}</p>}
@@ -112,7 +113,7 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
       </div>
       {inspectorOpen && <FlowInspector key={selected} flow={draft} selected={selected} configuration={configuration} onChange={change} disabled={busy || !access.manage} onValidityChange={valid => setInvalid(!valid)} onRemove={id => { change(removeFlowOperation(draft, id)); setSelected('trigger'); setInvalid(false); }} />}
     </div>
-    {draft.id && <FlowRunHistory flowId={draft.id} open={historyOpen} onClose={() => setHistoryOpen(false)} onSelect={setRun} refreshKey={historyRefresh} />}
+    {draft.id && <FlowRunHistory flowId={draft.id} open={historyOpen} onClose={() => setHistoryOpen(false)} onSelect={setRun} refreshKey={historyRefresh} returnFocusRef={historyTriggerRef} />}
     <Modal open={importOpen && access.manage} title={t('flow.import')} description={t('flow.importHint')} onClose={() => setImportOpen(false)} actions={<><button type="button" className="text-button" onClick={() => setImportOpen(false)}>{t('common.cancel')}</button><button type="button" className="primary-button" disabled={importReading || Boolean(importError)} onClick={async () => {
       setImportReading(true);
       try { const parsed = importFlowDefinition(parseJsonImportText(importText)); const result = await apiRequest('/flows/import?preview=1', { method: 'POST', body: parsed }); adoptDraft(result.data); setImportOpen(false); }

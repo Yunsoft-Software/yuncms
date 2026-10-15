@@ -71,6 +71,8 @@ test('Flow screens use shared components and centralized design without page-loc
   assert.match(page, /<FlowCanvas/); assert.match(page, /<FlowInspector/); assert.match(page, /<Modal/);
   assert.match(page, /<FlowList/); assert.doesNotMatch(page, /className="flow-list"/);
   assert.match(list, /<Pagination/); assert.match(history, /<Modal/); assert.match(history, /<Pagination/);
+  assert.match(page, /ref=\{historyTriggerRef\}/); assert.match(page, /returnFocusRef=\{historyTriggerRef\}/);
+  assert.match(history, /returnFocusRef=\{returnFocusRef\}/); assert.match(source('../src/components/Modal.jsx'), /if \(returnFocusRef\?\.current\) returnFocusRef\.current\.focus\(\)/);
   assert.match(canvas, /hideAttribution: true/); assert.doesNotMatch(canvas, /MiniMap/);
   assert.match(page, /<JsonImportField/); assert.match(jsonImport, /className="json-field-input"/);
   assert.match(canvas, /<Handle type="source"[^\n]*id="resolve"/); assert.match(canvas, /<Handle type="source"[^\n]*id="reject"/);

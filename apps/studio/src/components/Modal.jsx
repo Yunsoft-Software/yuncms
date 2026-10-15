@@ -21,6 +21,7 @@ export function Modal({
   actions,
   onClose,
   initialFocusRef,
+  returnFocusRef,
   className = '',
 }) {
   const { t } = useI18n();
@@ -46,9 +47,10 @@ export function Modal({
 
     return () => {
       document.body.style.overflow = previousOverflow;
-      previousFocusRef.current?.focus?.();
+      if (returnFocusRef?.current) returnFocusRef.current.focus();
+      else previousFocusRef.current?.focus?.();
     };
-  }, [initialFocusRef, open]);
+  }, [initialFocusRef, returnFocusRef, open]);
 
   if (!open) return null;
 

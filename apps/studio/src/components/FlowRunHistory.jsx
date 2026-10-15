@@ -4,7 +4,7 @@ import { useI18n } from '../i18n.js';
 import { Modal } from './Modal.jsx';
 import { Pagination } from './Pagination.jsx';
 
-export function FlowRunHistory({ flowId, open, onClose, onSelect, refreshKey }) {
+export function FlowRunHistory({ flowId, open, onClose, onSelect, refreshKey, returnFocusRef }) {
   const { t, locale } = useI18n();
   const [rows, setRows] = useState([]), [total, setTotal] = useState(0), [page, setPage] = useState(1), [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(false), [detailLoading, setDetailLoading] = useState(false), [error, setError] = useState('');
@@ -32,7 +32,7 @@ export function FlowRunHistory({ flowId, open, onClose, onSelect, refreshKey }) 
     return () => { active = false; };
   }, [open, flowId, selectedId, refresh, refreshKey, onSelect]);
   function changePage(next) { setRows([]); setLoading(true); setSelectedId(''); setSelected(null); setPage(next); }
-  return <Modal open={open} title={t('flow.runs')} eyebrow="" className="flow-history-modal" onClose={onClose}
+  return <Modal open={open} title={t('flow.runs')} eyebrow="" className="flow-history-modal" onClose={onClose} returnFocusRef={returnFocusRef}
     actions={<><button type="button" className="secondary-button" disabled={loading || detailLoading} onClick={() => { setLoading(true); setRefresh(value => value + 1); }}>{t('flow.refresh')}</button><button type="button" className="primary-button" onClick={onClose}>{t('common.close')}</button></>}>
     <section className="flow-history" aria-label={t('flow.runs')} aria-busy={loading}>
       {error && <div className="error-banner" role="alert">{error}</div>}
