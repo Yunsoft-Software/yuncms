@@ -129,10 +129,19 @@ test('0022 UTC migration revokes legacy sessions/action-tokens/transactions/fini
     assert.equal(await countById(pool, 'yuncms_auth_transactions', transactionId), 1);
     assert.equal(await countById(pool, 'yuncms_api_tokens', finiteApiTokenId), 1);
 
-    // 3. Apply migration 0022 via bootstrapDatabase
+    // 3. Bootstrap applies the exact pending suffix, including newer migrations.
     const upgraded = await bootstrapDatabase(pool);
-    assert.deepEqual(upgraded.newlyApplied, ['0022-utc-auth-deadlines']);
+    assert.deepEqual(upgraded.newlyApplied, CORE_MIGRATIONS.slice(migration0022Index).map(({ id }) => id));
     await assertDatabaseCompatible(pool);
+    for (const table of ['yuncms_flows', 'yuncms_flow_runs']) {
+      const [columns] = await pool.query(`SHOW COLUMNS FROM ${quoteIdentifier(table, 'Flow table')}`);
+      assert.ok(columns.some(column => column.Field === 'id'), `${table} must be physically created`);
+    }
+    const [[flowResource]] = await pool.query("SELECT metadata FROM yuncms_collections WHERE collection = 'yuncms_flows'");
+    const metadata = typeof flowResource.metadata === 'string' ? JSON.parse(flowResource.metadata) : flowResource.metadata;
+    assert.equal(metadata.permissionManaged, true);
+    assert.equal(metadata.permissionMode, 'filter-read');
+    assert.deepEqual(metadata.allowedActions, ['read']);
 
     // Verify revocations
     assert.equal(await countById(pool, 'yuncms_sessions', legacySession.session), 0, 'Legacy session must be revoked');
