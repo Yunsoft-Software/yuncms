@@ -5,7 +5,8 @@ const profiles = { chromium: devices['Desktop Chrome'], firefox: devices['Deskto
 if (new Set(engines).size !== engines.length || engines.some(engine => !Object.hasOwn(profiles, engine))) throw Error('YUNCMS_BROWSER_ENGINES must list chromium, firefox or webkit without duplicates');
 export default defineConfig({
   testDir: './test/browser', testMatch: '**/*.spec.js', fullyParallel: false, workers: 1, retries: 0,
-  timeout: 30000, expect: { timeout: 8000 }, outputDir: '.yuncms/flows-tests/browser-results',
+  // Browser/context startup is included in this budget; UI assertions remain bounded separately.
+  timeout: 120000, expect: { timeout: 8000 }, outputDir: '.yuncms/flows-tests/browser-results',
   reporter: [['list'], ['json', { outputFile: '.yuncms/flows-tests/browser-results.json' }]],
   use: { baseURL: `http://127.0.0.1:${port}`, headless: true, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
   projects: engines.map(name => ({ name, use: { ...profiles[name], viewport: { width: 1536, height: 1000 } } })),

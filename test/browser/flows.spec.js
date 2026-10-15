@@ -30,7 +30,8 @@ async function connect(page, source, target, branch = 'resolve') {
 
 test('native browser login exposes Flow navigation only to administrators', async ({ page }) => {
   await page.goto('/'); await page.getByLabel('Email', { exact: true }).fill('flows-admin@example.test'); await page.getByLabel('Password', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  const signedIn = page.waitForResponse(response => response.url().endsWith('/auth/login') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click(); expect((await signedIn).status()).toBe(200);
   await page.goto('/#/flows/new'); await expect(page.getByTestId('flow-canvas')).toBeVisible();
   await expect(page.locator('.flow-inspector').getByLabel('Execution permissions')).toHaveValue('trigger');
 });
@@ -79,7 +80,7 @@ test('condition success/failure connections merge into a shared node and survive
 });
 
 test('a saved graph retains visible nodes and connections across repeated real page reloads', async ({ page, request }, info) => {
-  test.setTimeout(60000);
+  test.setTimeout(Math.max(info.timeout, 60000));
   const consoleMessages = []; page.on('console', message => { if (['warning', 'error'].includes(message.type())) consoleMessages.push(message.text()); });
   const session = await authenticate(page, request), flow = await createFlow(request, session, 'Canvas reload regression');
   try {

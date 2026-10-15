@@ -10,3 +10,11 @@ test('the actual Flow acceptance command fails closed before starting tests with
     assert.equal(result.status, 1); assert.match(result.stderr, /No tests were started/); assert.doesNotMatch(result.stdout, /Flow acceptance: unit/);
   }
 });
+
+
+test('real browser acceptance keeps bounded startup, strict UI assertions, serial execution and no retries', async () => {
+  const { default: config } = await import('../../../playwright.config.js');
+  assert.equal(config.timeout, 120000); assert.equal(config.expect.timeout, 8000);
+  assert.equal(config.workers, 1); assert.equal(config.retries, 0);
+  assert.equal(config.webServer.reuseExistingServer, false);
+});
