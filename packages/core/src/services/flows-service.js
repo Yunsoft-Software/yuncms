@@ -195,7 +195,10 @@ export class FlowsService extends BaseService {
   }
   async runNext() {
     this.requireSystem();
-    await this.database.query("UPDATE yuncms_flow_runs SET status = 'failed', error_code = 'FLOW_RUN_INTERRUPTED', finished_at = CURRENT_TIMESTAMP(3), lease_until = NULL WHERE status = 'running' AND lease_until < CURRENT_TIMESTAMP(3)");
+    // A bulk status-index UPDATE locks even unexpired rows and reverses the
+    // primary/status-index lock order used when an executing job completes.
+    const [expired] = await this.database.query("SELECT id FROM yuncms_flow_runs WHERE status = 'running' AND lease_until < CURRENT_TIMESTAMP(3) ORDER BY id LIMIT 100");
+    for (const { id } of expired) await this.database.query("UPDATE yuncms_flow_runs SET status = 'failed', error_code = 'FLOW_RUN_INTERRUPTED', finished_at = CURRENT_TIMESTAMP(3), lease_until = NULL WHERE id = ? AND status = 'running' AND lease_until < CURRENT_TIMESTAMP(3)", [id]);
     const job = await withTransaction(this.database, async connection => {
       const [rows] = await connection.query("SELECT *, CAST(trigger_data AS CHAR) AS trigger_data, CAST(actor AS CHAR) AS actor, CAST(lineage AS CHAR) AS lineage FROM yuncms_flow_runs WHERE status = 'pending' ORDER BY created_at, id LIMIT 1 FOR UPDATE SKIP LOCKED");
       if (!rows[0]) return null;

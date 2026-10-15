@@ -219,6 +219,33 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     const result = await request(`/flows/${recovered.id}/run`, adminToken, 'POST', {});
     assert.equal(result.status, 200); assert.deepEqual(result.body.data.output, { recovered: true, code: 'FLOW_SCRIPT_ERROR' });
   });
+  await t.test('polling never locks an unexpired running job held by an independent MySQL transaction', async () => {
+    const flow = await create(definition([node('wait', 'sleep', { milliseconds: 5000 })]));
+    const id = await internal.enqueue(flow, {}, adminActor);
+    const child = fork(new URL('../helpers/flow-drain.mjs', import.meta.url), [], { execArgv: [], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+    const exited = new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', resolve); });
+    t.after(() => { if (child.exitCode === null) child.kill('SIGKILL'); });
+    const holder = await pool.getConnection(), probe = await pool.getConnection();
+    const [[settings]] = await probe.query('SELECT @@SESSION.innodb_lock_wait_timeout AS timeout');
+    try {
+      let running = false;
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const [[row]] = await pool.query('SELECT status FROM yuncms_flow_runs WHERE id = ?', [id]);
+        if (row.status === 'running') { running = true; break; } await delay(25);
+      }
+      assert.equal(running, true);
+      await holder.beginTransaction();
+      await holder.query('SELECT id FROM yuncms_flow_runs WHERE id = ? FOR UPDATE', [id]);
+      await probe.query('SET SESSION innodb_lock_wait_timeout = 1');
+      const dispatcher = new FlowsService({ ...shared, database: probe, accountability: system });
+      assert.equal(await dispatcher.runNext(), false, 'An unexpired locked job must not block lease cleanup');
+    } finally {
+      await holder.rollback(); holder.release();
+      try { await probe.query('SET SESSION innodb_lock_wait_timeout = ?', [Number(settings.timeout)]); }
+      finally { probe.release(); assert.equal(await exited, 0); }
+    }
+    const runs = await manager.readRuns(flow.id); assert.equal(runs[0].status, 'succeeded');
+  });
   await t.test('two actual Node workers claim durable jobs once each using physical MySQL locks', async () => {
     for (let round = 0; round < 3; round++) {
       const flow = await create(definition([node('wait', 'sleep', { milliseconds: 100 }, { resolve: 'create' }), node('create', 'create', { collection: notes, payload: { title: 'Concurrent {{ $trigger.index }}' } })]));
@@ -233,7 +260,7 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
       const completed = await Promise.allSettled([drain(), drain()]);
       for (const result of completed) if (result.status === 'rejected') throw result.reason;
       const counts = completed.map(result => result.value); assert.equal(counts[0] + counts[1], 20); assert.ok(counts.every(count => count > 0));
-      const runs = await manager.readRuns(flow.id); assert.equal(runs.length, 20); assert.ok(runs.every(run => run.status === 'succeeded'));
+      const runs = await manager.readRuns(flow.id); assert.equal(runs.length, 20); assert.deepEqual(runs.filter(run => run.status !== 'succeeded').map(({ status, error_code, trace }) => ({ status, error_code, trace })), [], 'Every claimed job must complete successfully');
       assert.equal(new Set(runs.map(run => run.output[0].id)).size, 20); assert.equal(await count(notes), before + 20);
     }
   });
@@ -379,8 +406,8 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     assert.equal((await request(`/flows/${rule.id}/runs`, null)).status, 403);
   });
   await t.test('replicas deduplicate UTC schedules with physical unique constraints', async () => {
-    const rule = await create(definition([node('value', 'transform', { value: '{{ $trigger.scheduled_at }}' })], { trigger: 'schedule', accountability: 'public', options: { cron: '30 15 12 * * *', response: '$last' } }));
-    const other = new FlowRuntime(shared), now = new Date('2026-10-15T12:15:30Z');
+    const rule = await create(definition([node('value', 'transform', { value: '{{ $trigger.scheduled_at }}' })], { trigger: 'schedule', accountability: 'public', options: { cron: '* * * * * *', response: '$last' } }));
+    const other = new FlowRuntime(shared), now = new Date();
     await Promise.all([runtime.tick(now), other.tick(now)]);
     const history = await manager.readRuns(rule.id); assert.equal(history.length, 1); assert.equal(history[0].status, 'succeeded'); assert.equal(history[0].output, now.toISOString());
   });
