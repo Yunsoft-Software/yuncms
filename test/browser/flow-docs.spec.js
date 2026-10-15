@@ -21,8 +21,10 @@ async function create(request, session, name, patch = {}) {
   expect(response.status()).toBe(201); return (await response.json()).data;
 }
 async function run(page, payload) {
+  const oldHistory = page.getByRole('dialog', { name: 'Run history', exact: true });
+  if (await oldHistory.isVisible()) await oldHistory.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Run saved flow', exact: true }).click();
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('dialog', { name: 'Run saved flow', exact: true });
   await dialog.getByLabel('Trigger payload (JSON)', { exact: true }).fill(JSON.stringify(payload));
   await dialog.getByRole('button', { name: 'Run saved flow', exact: true }).click();
   await expect(dialog).not.toBeVisible();
@@ -55,8 +57,11 @@ test('documented approval graph runs both paths and renders the shared result an
   await run(page, { body: { approved: true } }); await expect(page.getByTestId('flow-run-output')).toContainText('approved');
   await run(page, { body: { approved: false } }); await expect(page.getByTestId('flow-run-output')).toContainText('needs_review');
   await expect(page.locator('.flow-node-failed')).toHaveCount(1);
+  await page.getByRole('dialog', { name: 'Run history', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
   await page.locator('.flow-workbench').screenshot({ path: `${output}/${test.info().project.name}/docs-flow-branches.png` });
-  await page.locator('.flow-history').screenshot({ path: `${output}/${test.info().project.name}/docs-flow-history.png` });
+  await page.getByRole('button', { name: 'Run history', exact: true }).click();
+  await expect(page.getByTestId('flow-run-output')).toContainText('needs_review');
+  await page.getByRole('dialog', { name: 'Run history', exact: true }).screenshot({ path: `${output}/${test.info().project.name}/docs-flow-history.png` });
 });
 
 test('documented webhook access and schedule configuration match the native API and inspector', async ({ page, request }) => {

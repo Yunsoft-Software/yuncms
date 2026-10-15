@@ -39,7 +39,7 @@ const settingsSections = [
   { id: 'roles', labelKey: 'nav.roles', icon: 'roles' },
   { id: 'mcp', labelKey: 'nav.mcp', icon: 'mcp', adminOnly: true },
   { id: 'automations', labelKey: 'automation.title', icon: 'ai', adminOnly: true },
-  { id: 'flows', labelKey: 'flow.title', icon: 'flows', adminOnly: true },
+  { id: 'flows', labelKey: 'flow.title', icon: 'flows', capability: 'flows' },
   { id: 'appearance', labelKey: 'nav.appearance', icon: 'appearance' },
 ];
 
@@ -141,6 +141,7 @@ function ContentNavigationGroup({ group, open, activeCollection, onToggle }) {
 export function App() {
   const { t } = useI18n();
   const [session, setSession] = useState(() => readSession());
+  const [flowAccess, setFlowAccess] = useState(() => ({ read: session?.user?.admin === true }));
   const [authAction, setAuthAction] = useState(() => readAuthAction());
   const [route, setRoute] = useState(() => readStudioRoute());
   const [contentCollections, setContentCollections] = useState([]);
@@ -155,6 +156,15 @@ export function App() {
   const [contentNavFocused, setContentNavFocused] = useState(() => readStudioRoute().section === 'content');
 
   useEffect(() => subscribeSession(() => setSession(readSession())), []);
+  useEffect(() => {
+    let active = true;
+    if (!session?.user) { setFlowAccess({ read: false }); return; }
+    if (session.user.admin) { setFlowAccess({ read: true }); return; }
+    setFlowAccess({ read: false });
+    apiRequest('/flows/access').then(result => { if (active) setFlowAccess(result.data); }).catch(() => { if (active) setFlowAccess({ read: false }); });
+    return () => { active = false; };
+  }, [session?.user?.id, session?.user?.role, session?.user?.admin]);
+
 
   useEffect(() => {
     const updateRoute = () => {
@@ -268,8 +278,8 @@ export function App() {
     if (section === 'ai') return <AiScreen />;
     if (section === 'automations') return session?.user?.admin
       ? <AutomationsScreen /> : <div className="error-banner" role="alert">{t('automation.adminOnly')}</div>;
-    if (section === 'flows') return session?.user?.admin
-      ? <FlowsScreen route={route} /> : <div className="error-banner" role="alert">{t('flow.adminOnly')}</div>;
+    if (section === 'flows') return flowAccess.read
+      ? <FlowsScreen key={`${session?.user?.id}:${session?.user?.role}:${session?.user?.admin}`} route={route} /> : <div className="error-banner" role="alert">{t('flow.accessDenied')}</div>;
     if (section === 'mcp') return session?.user?.admin
       ? <McpScreen />
       : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;
@@ -285,7 +295,7 @@ export function App() {
         onOpenDataModel={() => navigateStudio(studioPath.dataModel())}
       />
     );
-  }, [activeContentCollection, contentCollection, contentCollections, contentTitle, route, section, session?.user?.admin, session?.user?.id, t]);
+  }, [flowAccess.read, activeContentCollection, contentCollection, contentCollections, contentTitle, route, section, session?.user?.admin, session?.user?.id, t]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -444,7 +454,7 @@ export function App() {
                 collapsed={navigationCollapsed}
                 onToggle={() => toggleGroup('settings')}
               >
-                {settingsSections.filter((item) => !item.adminOnly || session.user?.admin).map((item) => (
+                {settingsSections.filter((item) => item.capability === 'flows' ? flowAccess.read : !item.adminOnly || session.user?.admin).map((item) => (
                   <button
                     key={item.id}
                     className={`nav-item nav-item-child ${section === item.id ? 'active' : ''}`}

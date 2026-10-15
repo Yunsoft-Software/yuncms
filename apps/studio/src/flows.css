@@ -3,21 +3,32 @@
 .flow-heading, .flow-toolbar-actions, .flow-workbench-actions, .flow-palette { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .flow-heading { justify-content: space-between; }
 .flow-heading h1, .flow-heading p { margin: 0; }
-.flow-heading p, .flow-canvas-hint, .flow-draft-status, .flow-list small, .flow-inspector small { color: var(--studio-text-muted); font-size: 12px; }
+.flow-heading p, .flow-canvas-hint, .flow-draft-status, .flow-inspector small { color: var(--studio-text-muted); font-size: 12px; }
 .flow-heading p { margin-top: 6px; }
-.flow-layout { display: grid; grid-template-columns: minmax(170px, 210px) minmax(300px, 1fr) minmax(240px, 300px); gap: 14px; align-items: start; }
-.flow-list, .flow-inspector, .flow-history { border: 1px solid var(--studio-border); background: var(--studio-surface); border-radius: var(--studio-radius-lg, 14px); padding: 14px; min-width: 0; }
-.flow-list { display: grid; gap: 8px; max-height: 760px; overflow: auto; }
-.flow-list input { min-width: 0; width: 100%; }
-.flow-list button { display: grid; gap: 5px; text-align: left; border: 1px solid transparent; border-radius: var(--studio-radius-md, 10px); padding: 11px; background: transparent; color: var(--studio-text); overflow-wrap: anywhere; cursor: pointer; }
-.flow-list button.active, .flow-list button:hover { border-color: var(--studio-border); background: var(--studio-surface-muted); }
+.flow-heading > div:first-child { min-width: 0; flex: 1 1 320px; }
+.flow-heading h1 { font-size: clamp(20px, 2vw, 28px); line-height: 1.25; overflow-wrap: anywhere; }
+.flow-back { margin-bottom: 10px; }
+.flow-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 350px); gap: 18px; align-items: start; }
+.flow-layout-expanded { grid-template-columns: minmax(0, 1fr); }
+.flow-catalogue, .flow-inspector { border: 1px solid var(--studio-border); background: var(--studio-surface); border-radius: var(--studio-radius-lg, 14px); padding: 18px; min-width: 0; }
+.flow-catalogue { display: grid; gap: 20px; }
+.flow-catalogue-filters { display: grid; grid-template-columns: minmax(200px, 1fr) repeat(2, minmax(160px, 220px)); gap: 14px; }
+.flow-catalogue-filters .field-label { min-width: 0; margin: 0; }
+.flow-catalogue-filters input, .flow-catalogue-filters select { width: 100%; min-width: 0; }
+.flow-catalogue .table-scroll { overflow: auto; }
+.flow-catalogue table { width: 100%; border-collapse: collapse; text-align: left; }
+.flow-catalogue th, .flow-catalogue td { border-bottom: 1px solid var(--studio-border); padding: 16px 12px; }
+.flow-catalogue th { color: var(--studio-text-muted); font-size: 12px; font-weight: 600; }
+.flow-catalogue td { font-size: 13px; }
+.flow-name-link { color: var(--studio-text); font-weight: 600; overflow-wrap: anywhere; }
+.flow-inspector { max-height: max(520px, calc(100dvh - 190px)); overflow: auto; }
 .flow-workbench { min-width: 0; display: grid; gap: 10px; }
 .flow-palette { justify-content: flex-start; }
 .flow-palette .field-label { margin: 0; min-width: 180px; }
 .flow-canvas-hint { margin: 0; }
-.flow-canvas { height: 540px; min-height: 380px; width: 100%; border: 1px solid var(--studio-border); border-radius: var(--studio-radius-lg, 14px); overflow: hidden; background: var(--studio-surface-muted); }
-.flow-canvas .react-flow { --xy-background-color: var(--studio-surface-muted); --xy-node-color: var(--studio-text); --xy-edge-stroke: var(--studio-text-muted); --xy-minimap-background-color: var(--studio-surface); --xy-controls-button-background-color: var(--studio-surface); --xy-controls-button-color: var(--studio-text); --xy-controls-button-border-color: var(--studio-border); }
-.flow-canvas .react-flow { --xy-minimap-node-background-color: var(--studio-text-muted); --xy-minimap-mask-background-color: color-mix(in srgb, var(--studio-surface) 70%, transparent); --xy-background-pattern-color: var(--studio-border); --xy-selection-background-color: color-mix(in srgb, var(--studio-primary) 12%, transparent); --xy-controls-button-background-color-hover: var(--studio-surface-muted); --xy-controls-button-color-hover: var(--studio-text); --xy-attribution-background-color: var(--studio-surface); }
+.flow-canvas { height: max(500px, calc(100dvh - 310px)); min-height: 380px; width: 100%; border: 1px solid var(--studio-border); border-radius: var(--studio-radius-lg, 14px); overflow: hidden; background: var(--studio-surface-muted); }
+.flow-canvas .react-flow { --xy-background-color: var(--studio-surface-muted); --xy-node-color: var(--studio-text); --xy-edge-stroke: var(--studio-text-muted); --xy-controls-button-background-color: var(--studio-surface); --xy-controls-button-color: var(--studio-text); --xy-controls-button-border-color: var(--studio-border); }
+.flow-canvas .react-flow { --xy-background-pattern-color: var(--studio-border); --xy-selection-background-color: color-mix(in srgb, var(--studio-primary) 12%, transparent); --xy-controls-button-background-color-hover: var(--studio-surface-muted); --xy-controls-button-color-hover: var(--studio-text); }
 .flow-graph-node { width: 230px; min-height: 126px; padding: 16px 20px; display: grid; gap: 6px; border: 1px solid var(--studio-border); border-radius: var(--studio-radius-lg, 14px); background: var(--studio-surface); color: var(--studio-text); box-shadow: 0 4px 16px color-mix(in srgb, var(--studio-text) 6%, transparent); }
 .flow-graph-node strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flow-node-kind, .flow-graph-node code { font-size: 11px; color: var(--studio-text-muted); }
@@ -43,33 +54,40 @@
 .json-field { min-width: 0; }
 .json-field-input { width: 100%; min-width: 0; font-family: var(--studio-font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.6; tab-size: 2; resize: vertical; }
 .json-field .field-error { color: var(--studio-danger); }
-.flow-history-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.flow-history-modal { width: min(1240px, 100%); }
+.flow-history { display: grid; gap: 18px; min-width: 0; }
+.flow-history-layout { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.flow-history-list { display: grid; gap: 8px; max-height: 58dvh; overflow: auto; }
+.flow-history-list button { width: 100%; }
+.flow-status-active { color: var(--studio-success-text); }
+.flow-status-inactive { color: var(--studio-text-muted); }
 .flow-history-entry { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--studio-border); border-radius: var(--studio-radius-md, 10px); color: var(--studio-text); background: var(--studio-surface); cursor: pointer; text-align: left; }
 .flow-history-entry.active { background: var(--studio-surface-muted); }
 .flow-history-entry time, .flow-history-entry code { font-size: 11px; color: var(--studio-text-muted); }
 .flow-status { font-size: 11px; font-weight: 700; }
 .flow-status-succeeded { color: var(--studio-success-text); }
 .flow-status-failed { color: var(--studio-danger); }
-.flow-run-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 16px; }
+.flow-run-detail { display: grid; gap: 18px; min-width: 0; max-height: 58dvh; overflow: auto; }
+.flow-run-detail h3 { margin: 0 0 10px; font-size: 14px; }
 .flow-run-steps { display: grid; gap: 8px; }
 .flow-run-step { display: grid; gap: 7px; padding: 12px; border: 1px solid var(--studio-border); border-left: 3px solid var(--studio-success-text); border-radius: var(--studio-radius-md, 10px); font-size: 12px; min-width: 0; }
 .flow-step-failed { border-left-color: var(--studio-danger); }
 .flow-run-step span { color: var(--studio-text-muted); font-size: 11px; }
 .flow-run-detail pre { margin: 0; padding: 12px; border-radius: var(--studio-radius-md, 10px); background: var(--studio-surface-muted); color: var(--studio-text); font-size: 11px; overflow: auto; max-height: 260px; white-space: pre-wrap; overflow-wrap: anywhere; }
-@media (max-width: 1200px) {
+@media (max-width: 1100px) {
   .flow-layout { grid-template-columns: minmax(0, 1fr) 280px; }
-  .flow-list { grid-column: 1 / -1; display: flex; max-height: 140px; overflow: auto; }
-  .flow-list input { flex: 0 0 180px; }
-  .flow-list button { flex: 0 0 180px; }
+  .flow-layout-expanded { grid-template-columns: minmax(0, 1fr); }
+  .flow-catalogue-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .flow-catalogue-filters > :first-child { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
-  .flow-layout, .flow-run-detail { grid-template-columns: minmax(0, 1fr); }
+  .flow-layout, .flow-history-layout, .flow-catalogue-filters { grid-template-columns: minmax(0, 1fr); }
   .flow-heading, .flow-heading > div, .flow-toolbar-actions { width: 100%; }
+  .flow-heading > div:first-child { flex-basis: auto; }
   .flow-toolbar-actions { justify-content: flex-start; }
-  .flow-list { grid-column: 1; }
-  .flow-canvas { height: 420px; }
-  .flow-canvas .react-flow__minimap { display: none; }
+  .flow-canvas { height: 440px; }
   .flow-inspector { max-height: none; }
+  .flow-history-list, .flow-run-detail { max-height: 40dvh; }
 }
 
 .manual-flow-actions { display: grid; gap: 10px; }

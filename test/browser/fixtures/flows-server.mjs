@@ -46,10 +46,12 @@ try {
   const readerRole = await new RolesService(basic).createOne({ name: 'Browser content reader' }); roleIds.push(readerRole.id);
   const writerRole = await new RolesService(basic).createOne({ name: 'Browser content writer' }); roleIds.push(writerRole.id);
   const filteredRole = await new RolesService(basic).createOne({ name: 'Browser filtered writer' }); roleIds.push(filteredRole.id);
-  for (const [email, role] of [['flows-admin@example.test', adminRole.id], ['flows-staff@example.test', staffRole.id], ['content-reader@example.test', readerRole.id], ['content-writer@example.test', writerRole.id], ['content-filtered@example.test', filteredRole.id]]) {
+  const flowViewerRole = await new RolesService(basic).createOne({ name: 'Browser flow viewer' }); roleIds.push(flowViewerRole.id);
+  for (const [email, role] of [['flows-admin@example.test', adminRole.id], ['flows-staff@example.test', staffRole.id], ['content-reader@example.test', readerRole.id], ['content-writer@example.test', writerRole.id], ['content-filtered@example.test', filteredRole.id], ['flows-viewer@example.test', flowViewerRole.id]]) {
     userIds.push((await new UsersService(basic).createOne({ email, role, password: 'Browser-flow-fixture-123!' })).id);
   }
   const schema = await cache.get(pool);
+  await new PermissionsService({ ...basic, schema }).createOne({ role: flowViewerRole.id, collection: 'yuncms_flows', action: 'read', filter: { name: { _starts_with: 'Delegated browser ' } } });
   for (const action of ['read', 'update']) await new PermissionsService({ ...basic, schema }).createOne({ role: staffRole.id, collection, action, fields: ['id', 'title', 'status'] });
   for (const [role, actions] of [[readerRole.id, ['read']], [writerRole.id, ['read', 'create', 'update', 'delete']], [filteredRole.id, ['read', 'update', 'delete']]]) {
     for (const action of actions) await new PermissionsService({ ...basic, schema }).createOne({ role, collection, action, fields: role === filteredRole.id && action === 'update' ? ['status'] : ['id', 'title', 'status'], ...(role === filteredRole.id && ['update', 'delete'].includes(action) ? { filter: { status: { _neq: 'locked' } } } : {}) });

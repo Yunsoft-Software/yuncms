@@ -23,6 +23,7 @@ import { studioLocalesMigration } from './migrations/0020-studio-locales.js';
 import { aiAutomationsMigration } from './migrations/0021-ai-automations.js';
 import { utcAuthDeadlinesMigration } from './migrations/0022-utc-auth-deadlines.js';
 import { flowsMigration } from './migrations/0023-flows.js';
+import { flowReadPermissionsMigration } from './migrations/0024-flow-read-permissions.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -50,6 +51,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   aiAutomationsMigration,
   utcAuthDeadlinesMigration,
   flowsMigration,
+  flowReadPermissionsMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(

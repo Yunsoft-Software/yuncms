@@ -190,6 +190,7 @@ Selected system resources use dedicated services but can be explicitly delegated
 | `yuncms_users` | read, create, update, delete | action-level delegation; protected Administrator/user-assignment invariants remain enforced |
 | `yuncms_files` | read, create, update, delete | read can use a server-side row filter |
 | `yuncms_roles` | read, create, update, delete | action-level delegation; protected role invariants remain enforced |
+| `yuncms_flows` | read | optional native row filter; authenticated roles can view/export matching definitions and histories; mutations remain Administrator-only |
 
 This does not enable generic `/items/yuncms_*` CRUD. Dedicated user/file/role services remain authoritative.
 
@@ -297,3 +298,5 @@ This distinction allows practical back-office roles without turning every manage
 - [Data model](data-model.md)
 - [Security](security.md)
 - [Configuration](configuration.md)
+
+Flow viewing and execution are separate grants. A native `yuncms_flows:read` permission controls catalogue counts, definition/export access and run history. `options.allowed_roles` on an active manual flow controls execution independently. See [Flow access and REST contracts](flows.md#rest-reference-and-minimal-definition).

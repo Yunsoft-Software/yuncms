@@ -22,7 +22,7 @@ const node = (id, type, options = {}, extra = {}) => ({ id, key: id, name: id, t
 const definition = (operations, extra = {}) => ({ name: 'Integration flow', status: 'active', trigger: 'manual', accountability: 'trigger', options: { response: '$last' }, entry: operations[0]?.id ?? null, operations, ...extra });
 
 test('native Flows API, graph execution, event transactions and durable jobs enforce real MySQL boundaries', {
-  skip: process.env.YUNCMS_TEST_MYSQL !== '1', timeout: 120000,
+  skip: process.env.YUNCMS_TEST_MYSQL !== '1', timeout: 180000,
 }, async t => {
   const config = loadConfig(process.env);
   assert.equal(process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE, '1'); assert.match(config.database.database, /(test|ci|dev)/i);
@@ -149,6 +149,86 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
         assert.equal(result.status, 200); assert.deepEqual(result.body.data.output, { value: 42, driver: 'function', literal: '{{ untouched }}' });
       }
     }
+  });
+  await t.test('server pagination reaches more than a thousand flows and sixty-one native runs with literal search and isolated run details', async () => {
+    const prefix = `Page-${run}-`;
+    const ids = new Set();
+    for (let index = 0; index < 1001; index++) {
+      const saved = await manager.save({ name: prefix + String(index).padStart(4, '0'), status: 'inactive', operations: [] });
+      flowIds.push(saved.id); ids.add(saved.id);
+    }
+    const literal = await manager.save({ name: prefix + 'literal %_', status: 'inactive', operations: [] }); flowIds.push(literal.id); ids.add(literal.id);
+    const seen = new Set();
+    for (let offset = 0; offset < 1002; offset += 100) {
+      const result = await request(`/flows?search=${prefix}&limit=100&offset=${offset}&summary=1&meta=filter_count`, adminToken);
+      assert.equal(result.status, 200); assert.equal(result.body.meta.filter_count, 1002); assert.equal(result.body.data.length, Math.min(100, 1002 - offset));
+      for (const row of result.body.data) { assert.ok(ids.has(row.id)); assert.equal(seen.has(row.id), false); seen.add(row.id); assert.equal(row.operations, undefined); assert.equal(row.definition, undefined); }
+    }
+    assert.equal(seen.size, 1002);
+    assert.equal((await request(`/flows/${[...ids][0]}`, adminToken)).status, 200);
+    const literalSearch = await request(`/flows?search=${encodeURIComponent('%_')}&meta=filter_count`, adminToken);
+    assert.equal(literalSearch.body.meta.filter_count, 1); assert.equal(literalSearch.body.data[0].id, literal.id);
+    for (const query of [`search=${prefix}&status=active`, `search=${prefix}&trigger=schedule`, 'search=' + encodeURIComponent("' OR 1=1 --")]) {
+      const empty = await request(`/flows?${query}&meta=filter_count`, adminToken);
+      assert.equal(empty.status, 200); assert.equal(empty.body.meta.filter_count, 0);
+    }
+    const beyond = await request(`/flows?search=${prefix}&offset=1002&limit=25&meta=filter_count`, adminToken); assert.deepEqual(beyond.body.data, []); assert.equal(beyond.body.meta.filter_count, 1002);
+    for (const query of ['limit=0', 'limit=101', 'offset=-1', 'limit=1e2', 'offset=2147483648', 'search[]=text', 'status=unknown', 'trigger=unknown', 'summary=sql', 'meta=all']) {
+      assert.equal((await request('/flows?' + query, adminToken)).status, 400, query);
+      assert.equal((await request('/flows?' + query, staffToken)).status, 403, query);
+    }
+    const history = await create(definition([node('output', 'transform', { value: { index: '{{ $trigger.index }}', access_token: 'private-value' } })]));
+    const runIds = new Set();
+    for (let index = 0; index < 61; index++) runIds.add((await manager.runManual(history.id, { index })).id);
+    const seenRuns = new Set();
+    for (let offset = 0; offset < 61; offset += 10) {
+      const result = await request(`/flows/${history.id}/runs?summary=1&limit=10&offset=${offset}&meta=filter_count`, adminToken);
+      assert.equal(result.status, 200); assert.equal(result.body.meta.filter_count, 61); assert.equal(result.body.data.length, Math.min(10, 61 - offset));
+      for (const row of result.body.data) { assert.ok(runIds.has(row.id)); assert.equal(seenRuns.has(row.id), false); seenRuns.add(row.id); assert.equal(row.trace, undefined); assert.equal(row.output, undefined); }
+    }
+    assert.equal(seenRuns.size, 61);
+    const firstRun = [...runIds][0], detailPath = `/flows/${history.id}/runs/${firstRun}`;
+    const detail = await request(detailPath, adminToken); assert.equal(detail.status, 200); assert.equal(detail.body.data.output.index, 0); assert.equal(detail.body.data.output.access_token, '[REDACTED]'); assert.equal(detail.body.data.trace.length, 1);
+    for (const token of [staffToken, null]) {
+      assert.equal((await request(detailPath, token)).status, 403);
+      assert.equal((await request(`/flows/${history.id}/runs?meta=filter_count`, token)).status, 403);
+    }
+    assert.equal((await request(`/flows/${literal.id}/runs/${firstRun}`, adminToken)).status, 404);
+    assert.equal((await request(`/flows/${history.id}/runs/missing`, adminToken)).status, 404);
+    assert.equal((await request(`/flows/${history.id}/runs?limit=101`, adminToken)).status, 400);
+    assert.equal((await request('/flows/missing/runs?meta=filter_count', adminToken)).status, 404);
+  });
+  await t.test('portable API imports are independent inactive definitions and role-scoped reads, exports and histories enforce native permissions', async () => {
+    const role = await roles.createOne({ name: `Flow reader ${run}` }); roleIds.push(role.id);
+    const viewer = await users.createOne({ email: `viewer-${run}@example.test`, password, role: role.id }); userIds.push(viewer.id);
+    const viewerToken = (await request('/auth/login', null, 'POST', { email: viewer.email, password })).body.data.access_token;
+    const source = await create(definition([node('output', 'transform', { value: { actor: '{{ $accountability.user }}', literal: '{{ $trigger.value }}' } })], { name: `Role scope ${run}`, options: { response: '$last', allowed_roles: [] } }));
+    const hidden = await create(definition([node('hidden', 'transform', { value: true })]));
+    const exported = await request(`/flows/${source.id}/export`, adminToken); assert.equal(exported.status, 200); assert.equal(exported.body.id, undefined); assert.equal(exported.body.revision, undefined); assert.deepEqual(exported.body.operations, source.operations);
+    const preview = await request('/flows/import?preview=1', adminToken, 'POST', exported.body); assert.equal(preview.status, 200); assert.equal(preview.body.data.id, undefined); assert.equal(preview.body.data.status, 'inactive');
+    const imported = await request('/flows/import', adminToken, 'POST', { ...exported.body, id: source.id, revision: source.revision, status: 'active' }); assert.equal(imported.status, 201); flowIds.push(imported.body.data.id);
+    assert.notEqual(imported.body.data.id, source.id); assert.equal(imported.body.data.status, 'inactive'); assert.deepEqual(imported.body.data.operations, source.operations); assert.equal((await manager.readOne(source.id)).status, 'active');
+    assert.equal((await request(`/flows/${imported.body.data.id}/run`, adminToken, 'POST', {})).status, 409);
+    const before = await manager.count(); await request('/flows/import?preview=1', adminToken, 'POST', exported.body); assert.equal(await manager.count(), before);
+    const grant = await permissions.createOne({ role: role.id, collection: 'yuncms_flows', action: 'read', filter: { id: { _eq: source.id } } });
+    await assert.rejects(permissions.createOne({ role: role.id, collection: 'yuncms_flows', action: 'update' }), { code: 'SYSTEM_PERMISSION_ACTION_PROTECTED' });
+    const access = await request('/flows/access', viewerToken); assert.deepEqual(access.body.data, { read: true, manage: false, import: false, export: true });
+    const catalogue = await request('/flows?meta=filter_count&summary=1', viewerToken); assert.equal(catalogue.status, 200); assert.equal(catalogue.body.meta.filter_count, 1); assert.deepEqual(catalogue.body.data.map(flow => flow.id), [source.id]);
+    const details = await request(`/flows/${source.id}`, viewerToken); assert.equal(details.status, 200); assert.deepEqual(details.body.meta.access, { manage: false, run: false });
+    assert.equal((await request(`/flows/${hidden.id}`, viewerToken)).status, 404); assert.equal((await request(`/flows/${hidden.id}/export`, viewerToken)).status, 404); assert.equal((await request(`/flows/${hidden.id}/runs`, viewerToken)).status, 404);
+    assert.equal((await request(`/flows/${source.id}/export`, viewerToken)).status, 200);
+    for (const path of ['/flows/import', '/flows/import?preview=1', '/flows']) assert.equal((await request(path, viewerToken, 'POST', exported.body)).status, 403);
+    assert.equal((await request(`/flows/${source.id}`, viewerToken, 'PUT', source)).status, 403); assert.equal((await request(`/flows/${source.id}?revision=${source.revision}`, viewerToken, 'DELETE')).status, 403);
+    assert.equal((await request(`/flows/${source.id}/run`, viewerToken, 'POST', { value: 'no grant' })).status, 403);
+    const allowed = await manager.save({ ...source, options: { ...source.options, allowed_roles: [role.id] } }, source.id);
+    const executed = await request(`/flows/${source.id}/run`, viewerToken, 'POST', { value: 'native', accountability: { admin: true } }); assert.equal(executed.status, 200); assert.equal(executed.body.data.output.actor, viewer.id);
+    const history = await request(`/flows/${source.id}/runs?meta=filter_count&summary=1`, viewerToken); assert.equal(history.body.meta.filter_count, 1);
+    assert.equal((await request(`/flows/${source.id}/runs/${executed.body.data.id}`, viewerToken)).status, 200);
+    assert.equal((await request(`/flows/${hidden.id}/runs/${executed.body.data.id}`, viewerToken)).status, 404);
+    const configuration = await request('/flows/configuration', viewerToken); assert.deepEqual(configuration.body.data.users, []); assert.deepEqual(configuration.body.data.roles, []); assert.deepEqual(configuration.body.data.collections, []);
+    await permissions.deleteOne(grant.id); assert.equal((await request(`/flows/${source.id}`, viewerToken)).status, 403); assert.equal((await request(`/flows/${source.id}/export`, viewerToken)).status, 403); assert.equal((await request('/flows/access', viewerToken)).body.data.read, false);
+    assert.equal((await request(`/flows/${source.id}/run`, viewerToken, 'POST', { value: 'separate execution grant' })).status, 200);
+    assert.equal((await manager.readOne(source.id)).revision, allowed.revision);
   });
   await t.test('issue 76 capabilities enforce native action/field/read-row masks and reject invalid identifiers or unauthenticated discovery', async () => {
     const owned = (await request(`/items/${articles}`, staffToken, 'POST', { title: 'Owned capability record', status: 'draft' })).body.data;
@@ -292,7 +372,7 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
       const completed = await completion;
       for (const result of completed) if (result.status === 'rejected') throw result.reason;
       const counts = completed.map(result => result.value); assert.equal(counts[0] + counts[1], 20); assert.ok(counts.every(count => count > 0));
-      const runs = await manager.readRuns(flow.id); assert.equal(runs.length, 20); assert.deepEqual(runs.filter(run => run.status !== 'succeeded').map(({ status, error_code, trace }) => ({ status, error_code, trace })), [], 'Every claimed job must complete successfully');
+      const runs = await manager.readRuns(flow.id, { limit: 100 }); assert.equal(runs.length, 20); assert.deepEqual(runs.filter(run => run.status !== 'succeeded').map(({ status, error_code, trace }) => ({ status, error_code, trace })), [], 'Every claimed job must complete successfully');
       assert.equal(new Set(runs.map(run => run.output[0].id)).size, 20); assert.equal(await count(notes), before + 20);
     }
   });

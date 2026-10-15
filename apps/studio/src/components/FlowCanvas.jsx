@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo } from 'react';
-import { ReactFlow, Background, Controls, MiniMap, Handle, Position, MarkerType, useNodesState } from '@xyflow/react';
+import { ReactFlow, Background, Controls, Handle, Position, MarkerType, useNodesState } from '@xyflow/react';
 import { connectFlowOperation, disconnectFlowOperation, flowGraphEdges, reconcileFlowCanvasNodes } from '../flow-graph.js';
 import { useI18n } from '../i18n.js';
 
@@ -32,8 +32,12 @@ export function FlowCanvas({ flow, selected, onSelect, onChange, onError, trace 
     markerEnd: { type: MarkerType.ArrowClosed }, label: t(`flow.${edge.data.branch}`), type: 'smoothstep' })), [flow, t]);
   function connect(connection) { try { onChange(connectFlowOperation(flow, connection)); } catch (error) { onError(error); } }
   return <div className="flow-canvas" data-testid="flow-canvas" aria-label={t('flow.canvas')}>
-    <ReactFlow key={`${flow.id ?? 'new'}:${flow.operations.length}`} nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} fitView minZoom={0.2} maxZoom={1.6} deleteKeyCode={null}
+    <ReactFlow key={`${flow.id ?? 'new'}:${flow.operations.length}`} nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} fitView proOptions={{ hideAttribution: true }} minZoom={0.2} maxZoom={1.6} deleteKeyCode={null}
       nodesDraggable={!disabled} nodesConnectable={!disabled} edgesReconnectable={false}
+      ariaLabelConfig={{ 'controls.ariaLabel': t('flow.controls'), 'controls.zoomIn.ariaLabel': t('flow.zoomIn'), 'controls.zoomOut.ariaLabel': t('flow.zoomOut'),
+        'controls.fitView.ariaLabel': t('flow.fitView'), 'controls.interactive.ariaLabel': t('flow.toggleInteraction'),
+        'node.a11yDescription.default': t('flow.keyboardHint'), 'node.a11yDescription.keyboardDisabled': t('flow.keyboardHint'), 'edge.a11yDescription.default': t('flow.edgeHint'), 'handle.ariaLabel': t('flow.input'),
+        'node.a11yDescription.ariaLiveMessage': ({ x, y }) => t('flow.nodeMoved', { x, y }) }}
       onNodeClick={(_event, node) => onSelect(node.id)}
       onNodesChange={changes => {
         applyCanvasChanges(changes);
@@ -43,6 +47,6 @@ export function FlowCanvas({ flow, selected, onSelect, onChange, onError, trace 
       }}
       onConnect={connect} isValidConnection={connection => { try { connectFlowOperation(flow, connection); return !disabled; } catch { return false; } }}
       onEdgeDoubleClick={(_event, edge) => { if (!disabled) onChange(disconnectFlowOperation(flow, edge.source, edge.data.branch)); }}
-    ><Background /><Controls /><MiniMap pannable zoomable /></ReactFlow>
+    ><Background /><Controls /></ReactFlow>
   </div>;
 }

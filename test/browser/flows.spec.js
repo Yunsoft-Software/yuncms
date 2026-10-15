@@ -1,3 +1,5 @@
+import { FLOW_LOCALES } from '../../apps/studio/src/locales/flows.js';
+import { translate } from '../../apps/studio/src/localization.js';
 import { test, expect } from '@playwright/test';
 import { open as openFile, readFile } from 'node:fs/promises';
 import { isolateCreatedFlows } from './fixtures/flow-isolation.js';
@@ -8,9 +10,9 @@ const password = 'Browser-flow-fixture-123!';
 async function apiLogin(request, email = 'flows-admin@example.test') {
   const response = await request.post('/auth/login', { data: { email, password } }); expect(response.status()).toBe(200); return (await response.json()).data;
 }
-async function authenticate(page, request, email) {
+async function authenticate(page, request, email, locale = 'en') {
   const session = await apiLogin(request, email);
-  await page.addInitScript(value => { sessionStorage.setItem('yuncms.studio.session', JSON.stringify(value)); localStorage.setItem('yuncms.studio.locale', 'en'); }, session);
+  await page.addInitScript(({ session, locale }) => { sessionStorage.setItem('yuncms.studio.session', JSON.stringify(session)); localStorage.setItem('yuncms.studio.locale', locale); }, { session, locale });
   return session;
 }
 async function createFlow(request, session, name, extra = {}) {
@@ -29,7 +31,7 @@ async function connect(page, source, target, branch = 'resolve') {
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 16 }); await page.mouse.up();
 }
 
-test('native browser login exposes Flow navigation only to administrators', async ({ page }) => {
+test('native browser login opens a dedicated Flow editor for administrators', async ({ page }) => {
   await page.goto('/'); await page.getByLabel('Email', { exact: true }).fill('flows-admin@example.test'); await page.getByLabel('Password', { exact: true }).fill(password);
   const signedIn = page.waitForResponse(response => response.url().endsWith('/auth/login') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click(); expect((await signedIn).status()).toBe(200);
@@ -54,6 +56,7 @@ test('create, drag, connect, save, reload and run a manual Flow against the nati
   await page.getByRole('button', { name: 'Run saved flow', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Run saved flow', exact: true }).click();
   await expect(page.getByTestId('flow-run-output')).toContainText('Hello YunCMS');
+  await page.getByRole('dialog', { name: 'Run history', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
   await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-editor-desktop.png`, fullPage: true });
 });
 
@@ -143,7 +146,7 @@ test('downloaded JSON files import as independent inactive flows and preserve ex
   expect(download.suggestedFilename()).toBe('Portable-npm-script.json'); expect(portable.id).toBeUndefined(); expect(portable.revision).toBeUndefined(); expect(portable.operations[0].options.code).toBe(code);
   await page.getByRole('button', { name: 'Import', exact: true }).click();
   const dialog = page.getByRole('dialog'); await dialog.getByLabel('Choose a JSON file', { exact: true }).setInputFiles(path);
-  await expect(dialog.getByLabel('Flow definition (JSON)', { exact: true })).toHaveValue(JSON.stringify(portable, null, 2));
+  await expect(dialog.getByRole('textbox', { name: 'Flow definition (JSON)', exact: true })).toHaveValue(JSON.stringify(portable, null, 2));
   await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-json-import.png`, fullPage: true });
   await dialog.getByRole('button', { name: 'Import', exact: true }).click();
   await expect(page.locator('.flow-inspector').getByLabel('Status', { exact: true })).toHaveValue('inactive');
@@ -180,7 +183,7 @@ test('staff cannot open the Flow manager and can run only explicitly granted col
   const admin = await apiLogin(request), rolesResponse = await request.get('/roles', { headers: { authorization: `Bearer ${admin.access_token}` } });
   const role = (await rolesResponse.json()).data.find(role => role.name === 'Browser flow staff');
   const flow = await createFlow(request, admin, 'Allowed content action', { options: { response: '$last', collections: ['browser_flow_records'], allowed_roles: [role.id], require_confirmation: true, require_selection: true }, operations: [{ id: 'output', key: 'output', name: 'Output', type: 'transform', position: { x: 380, y: 100 }, options: { value: 'Done' }, resolve: null, reject: null }] });
-  await authenticate(page, request, 'flows-staff@example.test'); await page.goto('/#/flows'); await expect(page.getByRole('alert')).toContainText('requires an administrator'); await expect(page.getByTestId('flow-canvas')).toHaveCount(0);
+  await authenticate(page, request, 'flows-staff@example.test'); await page.goto('/#/flows'); await expect(page.getByRole('alert')).toContainText('cannot view flows'); await expect(page.getByTestId('flow-canvas')).toHaveCount(0);
   await page.goto('/#/content/browser_flow_records'); const action = page.getByRole('button', { name: 'Allowed content action', exact: true }); await expect(action).toBeDisabled();
   await page.locator('tbody input[type="checkbox"]').first().check(); await expect(action).toBeEnabled(); await action.click();
   await page.getByRole('dialog').getByRole('button', { name: 'Run saved flow', exact: true }).click(); await expect(page.getByText('Flow finished.', { exact: true })).toBeVisible();
@@ -202,7 +205,7 @@ test('flow deletion uses the shared confirmation dialog and removes the saved gr
   await page.goto(`/#/flows/${flow.id}`); await page.getByRole('button', { name: 'Delete', exact: true }).click();
   const dialog = page.getByRole('dialog'); await expect(dialog).toContainText('run history');
   await dialog.getByRole('button', { name: 'Confirm', exact: true }).click();
-  await expect(page).toHaveURL(/#\/flows\/new$/);
+  await expect(page).toHaveURL(/#\/flows$/);
   const response = await request.get(`/flows/${flow.id}`, { headers: { authorization: `Bearer ${session.access_token}` } }); expect(response.status()).toBe(404);
 });
 
@@ -218,4 +221,80 @@ test('manual run modal preserves immediately typed payload and keyboard focus th
   await page.getByRole('dialog').getByRole('button', { name: 'Run saved flow', exact: true }).click();
   const result = await running; expect(result.status()).toBe(200); expect(result.request().postDataJSON()).toEqual({ body: { value } });
   expect((await result.json()).data.output).toBe(value); await expect(page.getByTestId('flow-run-output')).toContainText(value);
+});
+
+test('server-paginated flow catalogue opens a separate wide editor and preserves the list page on return', async ({ page, request }) => {
+  const session = await authenticate(page, request), prefix = `Catalogue ${crypto.randomUUID()} `;
+  for (let index = 0; index < 31; index++) await createFlow(request, session, prefix + String(index).padStart(2, '0'), { status: 'inactive' });
+  await page.goto('/#/flows'); await page.getByLabel('Search flows', { exact: true }).fill(prefix);
+  await expect(page.locator('.flow-catalogue tbody tr')).toHaveCount(10); await expect(page.getByTestId('flow-canvas')).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Per page', exact: true }).selectOption('20'); await expect(page.locator('tbody tr')).toHaveCount(20);
+  await page.getByRole('button', { name: 'Next page', exact: true }).click(); await expect(page.locator('.pagination-summary')).toContainText('21–31'); await expect(page.locator('.flow-catalogue')).toHaveAttribute('aria-busy', 'false');
+  const link = page.locator('.flow-name-link').first(), href = await link.getAttribute('href'); await link.click(); await expect(page).toHaveURL(new RegExp(href + '$'));
+  await expect(page.getByTestId('flow-canvas')).toBeVisible(); await expect(page.locator('.flow-catalogue')).toHaveCount(0); await expect(page.locator('.flow-history')).toHaveCount(0);
+  await expect(page.locator('.react-flow__minimap, .react-flow__attribution')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Hide settings', exact: true }).click(); await expect(page.locator('.flow-inspector')).toHaveCount(0);
+  const canvas = await page.getByTestId('flow-canvas').boundingBox(), workspace = await page.locator('.flows-workspace').boundingBox(); expect(canvas.width).toBeGreaterThan(workspace.width * .95);
+  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-editor-expanded.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Back to flows', exact: false }).click(); await expect(page.locator('.pagination-summary')).toContainText('21–31'); await expect(page.getByRole('combobox', { name: 'Per page', exact: true })).toHaveValue('20');
+  await expect(page.getByLabel('Search flows', { exact: true })).toHaveValue(prefix);
+  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-catalogue.png`, fullPage: true });
+  await page.getByRole('button', { name: 'New flow', exact: true }).click(); await expect(page).toHaveURL(/#\/flows\/new$/); await expect(page.locator('.flow-catalogue')).toHaveCount(0);
+  await page.locator('.flow-inspector').getByLabel('Name', { exact: true }).fill('Keep this new draft'); await page.getByRole('button', { name: 'Back to flows', exact: false }).click();
+  const confirmation = page.getByRole('dialog'); await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click(); await expect(page.locator('.flow-inspector').getByLabel('Name', { exact: true })).toHaveValue('Keep this new draft');
+  await page.getByRole('button', { name: 'Back to flows', exact: false }).click(); await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click(); await expect(page).toHaveURL(/#\/flows$/);
+});
+
+test('native run history loads bounded summaries and separate details inside a paginated modal', async ({ page, request }) => {
+  const session = await authenticate(page, request), flow = await createFlow(request, session, 'Paginated run history', { operations: [{ id: 'output', key: 'output', name: 'Output', type: 'transform', position: { x: 380, y: 100 }, options: { value: '{{ $trigger.index }}' }, resolve: null, reject: null }] });
+  const headers = { authorization: `Bearer ${session.access_token}` };
+  for (let index = 0; index < 23; index++) expect((await request.post(`/flows/${flow.id}/run`, { headers, data: { index } })).status()).toBe(200);
+  await page.goto(`/#/flows/${flow.id}`); await expect(page.locator('.flow-history')).toHaveCount(0);
+  const summaries = page.waitForResponse(response => response.url().includes(`/flows/${flow.id}/runs?`) && response.request().method() === 'GET');
+  await page.getByRole('button', { name: 'Run history', exact: true }).click(); const data = await (await summaries).json(); expect(data.meta.filter_count).toBe(23); expect(data.data).toHaveLength(10); expect(data.data[0].trace).toBeUndefined();
+  const dialog = page.getByRole('dialog', { name: 'Run history', exact: true }); await expect(dialog.locator('.flow-history-entry')).toHaveCount(10);
+  await expect(dialog.getByTestId('flow-run-output')).toBeVisible(); const firstId = await dialog.locator('.flow-history-entry').first().getAttribute('data-run-id');
+  await dialog.getByRole('button', { name: 'Next page', exact: true }).click(); await expect(dialog.locator('.pagination-summary')).toContainText('11–20');
+  await expect(dialog.locator('.flow-history-entry').first()).not.toHaveAttribute('data-run-id', firstId);
+  await dialog.getByRole('button', { name: 'Next page', exact: true }).click(); await expect(dialog.locator('.flow-history-entry')).toHaveCount(3); await expect(dialog.locator('.pagination-summary')).toContainText('21–23');
+  const selectedId = await dialog.locator('.flow-history-entry').last().getAttribute('data-run-id'); await dialog.locator('.flow-history-entry').last().click();
+  const detail = await (await request.get(`/flows/${flow.id}/runs/${selectedId}`, { headers })).json(); await expect(dialog.getByTestId('flow-run-output')).toHaveText(JSON.stringify(detail.data.output, null, 2));
+  await dialog.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-history-pagination.png` });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(page.getByRole('button', { name: 'Run history', exact: true })).toBeFocused();
+});
+
+for (const locale of ['en', 'tr', 'es', 'de', 'fr', 'pt-BR', 'ja', 'zh-CN']) {
+  test(`Flow catalogue, script editor, import and history controls are localized in ${locale}`, async ({ page, request }) => {
+    await authenticate(page, request, undefined, locale); const labels = FLOW_LOCALES[locale], t = key => labels['flow.' + key];
+    await page.goto('/#/flows'); await expect(page.getByRole('heading', { name: t('title'), exact: true })).toBeVisible(); await expect(page.getByLabel(t('status'), { exact: true })).toContainText(t('allStatuses'));
+    await page.getByRole('button', { name: t('new'), exact: true }).click(); await expect(page.getByRole('button', { name: t('zoomIn'), exact: true })).toBeVisible();
+    await page.getByLabel(t('operations'), { exact: true }).selectOption('script'); await page.getByRole('button', { name: t('addOperation'), exact: true }).click();
+    await expect(page.getByLabel(t('scriptCode'), { exact: true })).toBeVisible(); await expect(page.getByLabel(t('scriptFormat'), { exact: true })).toContainText(t('scriptModule'));
+    await expect(page.getByText(t('scriptHint'), { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: t('import'), exact: true }).click(); const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel(t('importFile'), { exact: true })).toBeVisible(); await expect(dialog).toContainText(t('importHint'));
+    await dialog.getByLabel(t('importFile'), { exact: true }).setInputFiles({ name: 'broken.json', mimeType: 'application/json', buffer: Buffer.from('{bad') }); await expect(dialog.getByRole('alert')).toHaveText(t('importInvalidJson'));
+    await dialog.getByRole('button', { name: translate(locale, 'common.cancel'), exact: true }).click();
+  });
+}
+
+test('delegated native readers see only permitted flows and no management controls, with execution granted separately', async ({ page, request }) => {
+  const admin = await apiLogin(request), headers = { authorization: `Bearer ${admin.access_token}` };
+  const configuration = (await (await request.get('/flows/configuration', { headers })).json()).data;
+  const role = configuration.roles.find(role => role.name === 'Browser flow viewer');
+  const allowed = await createFlow(request, admin, 'Delegated browser visible', { options: { response: '$last', allowed_roles: [] } });
+  const hidden = await createFlow(request, admin, 'Hidden delegated definition');
+  await authenticate(page, request, 'flows-viewer@example.test'); await page.goto('/#/flows');
+  await expect(page.getByRole('link', { name: allowed.name, exact: true })).toBeVisible(); await expect(page.getByRole('link', { name: hidden.name, exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New flow', exact: true })).toHaveCount(0); await expect(page.getByRole('button', { name: 'Import', exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: allowed.name, exact: true }).click(); await expect(page.getByTestId('flow-canvas')).toBeVisible();
+  for (const label of ['Save', 'Add operation', 'Delete', 'Duplicate', 'Import']) await expect(page.getByRole('button', { name: label, exact: true })).toHaveCount(0);
+  await expect(page.locator('.flow-inspector').getByLabel('Name', { exact: true })).toBeDisabled(); await expect(page.getByRole('button', { name: 'Run saved flow', exact: true })).toBeDisabled();
+  const exporting = page.waitForEvent('download'); await page.getByRole('button', { name: 'Export', exact: true }).click(); const file = await exporting; expect(file.suggestedFilename()).toBe('Delegated-browser-visible.json');
+  expect((await request.put(`/flows/${allowed.id}`, { headers, data: { ...allowed, options: { ...allowed.options, allowed_roles: [role.id] } } })).status()).toBe(200);
+  await page.reload(); await page.getByRole('button', { name: 'Run saved flow', exact: true }).click(); await page.getByRole('dialog').getByRole('button', { name: 'Run saved flow', exact: true }).click(); await expect(page.getByTestId('flow-run-output')).toContainText('Hello YunCMS');
+  await page.goto(`/#/flows/${hidden.id}`); await expect(page.getByRole('alert')).toContainText('Flow not found'); await expect(page.getByTestId('flow-canvas')).toHaveCount(0);
 });

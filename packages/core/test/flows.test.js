@@ -1,3 +1,4 @@
+import { flowListPredicate, normalizeFlowPageQuery } from '../src/flows/query.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -85,7 +86,7 @@ test('logs redact sensitive keys, sleep observes cancellation and recursion is b
 });
 
 test('flow migration, cron contracts and safe configuration defaults remain explicit', () => {
-  const migration = CORE_MIGRATIONS.at(-1);
+  const migration = CORE_MIGRATIONS.find(entry => entry.id === '0023-flows');
   assert.equal(migration.id, '0023-flows'); assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes(migration.id)); assert.equal(migration.statements.length, 2);
   const sql = migration.statements.join('\n');
   assert.match(sql, /DEFAULT 'inactive'/); assert.match(sql, /UNIQUE KEY uq_flow_schedule/); assert.match(sql, /REFERENCES yuncms_flows \(id\) ON DELETE CASCADE/);
@@ -101,4 +102,29 @@ test('flow migration, cron contracts and safe configuration defaults remain expl
     for (const value of invalid) assert.throws(() => loadConfig({ [key]: value }), new RegExp(key));
   }
   assert.throws(() => loadConfig({ FLOWS_SCRIPTS_ENABLED: 'perhaps' }), /Expected boolean/);
+});
+
+test('flow catalogue and history pagination use bounded defaults and numeric SQL values', () => {
+  assert.deepEqual(normalizeFlowPageQuery(), { limit: 10, offset: 0, summary: false, search: '', status: null, trigger: null });
+  assert.deepEqual(normalizeFlowPageQuery({}, { runs: true }), { limit: 10, offset: 0, summary: false });
+  assert.deepEqual(normalizeFlowPageQuery({ limit: '100', offset: '1000', summary: '1', meta: 'filter_count', search: '  Türkçe  ', status: 'active', trigger: 'webhook' }), { limit: 100, offset: 1000, summary: true, search: 'Türkçe', status: 'active', trigger: 'webhook' });
+});
+
+test('flow pagination rejects overflow, SQL fragments, arrays and unbounded queries', () => {
+  for (const input of [null, [], { limit: 0 }, { limit: 101 }, { limit: -1 }, { limit: '1e2' }, { limit: ['25'] }, { offset: 2147483648 }, { offset: '0; DROP TABLE yuncms_flows' }, { offset: {} }, { limit: Infinity }, { summary: 'yes' }, { status: 'unknown' }, { trigger: 'sql' }, { search: ['text'] }, { search: 'x'.repeat(201) }, { meta: 'unknown' }, { 'search[]': 'text' }]) {
+    assert.throws(() => normalizeFlowPageQuery(input), { code: 'INVALID_FLOW_QUERY' });
+  }
+});
+
+test('flow search and filters remain literal parameter values in a trusted SQL predicate', () => {
+  const value = "%_' OR 1=1 --", where = flowListPredicate(normalizeFlowPageQuery({ search: value, status: 'inactive', trigger: 'manual' }));
+  assert.equal(where.sql, ' WHERE LOCATE(?, name) > 0 AND status = ? AND trigger_type = ?');
+  assert.deepEqual(where.values, [value, 'inactive', 'manual']); assert.equal(where.sql.includes(value), false);
+});
+
+test('native Flow read delegation is registered as a filtered read-only system resource', () => {
+  const migration = readFileSync(new URL('../src/migrations/0024-flow-read-permissions.js', import.meta.url), 'utf8');
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes('0024-flow-read-permissions'));
+  assert.match(migration, /filter-read/); assert.match(migration, /JSON_ARRAY\('read'\)/);
+  for (const field of ['id', 'status', 'trigger_type', 'user_created']) assert.ok(migration.includes(`'${field}'`));
 });

@@ -1,4 +1,26 @@
+import { FLOW_ES } from './flows-es.js';
+import { FLOW_DE } from './flows-de.js';
+import { FLOW_FR } from './flows-fr.js';
+import { FLOW_PT_BR } from './flows-pt-br.js';
+import { FLOW_JA } from './flows-ja.js';
+import { FLOW_ZH_CN } from './flows-zh-cn.js';
 const EN = {
+  "flow.accessDenied": "Your role cannot view flows.",
+  "flow.readOnly": "Read-only access. Flow editing requires an administrator.",
+  "flow.runDenied": "Your role is not allowed to run this flow.",
+
+  "flow.nodeMoved": "Node moved. Position x: {x}, y: {y}.",
+  "flow.controls": "Canvas controls",
+  "flow.zoomIn": "Zoom in",
+  "flow.zoomOut": "Zoom out",
+  "flow.fitView": "Fit view",
+  "flow.toggleInteraction": "Toggle interaction",
+  "flow.keyboardHint": "Select a node with Enter or Space. Move with arrow keys; Escape cancels.",
+  "flow.edgeHint": "Double-click a connection to remove it.",
+
+  'flow.back': 'Back to flows', 'flow.listHint': 'Browse, search and manage your automations.', 'flow.allStatuses': 'All statuses', 'flow.allTriggers': 'All triggers',
+  'flow.noMatches': 'No flows match these filters.', 'flow.updatedAt': 'Last updated', 'flow.items': 'flows', 'flow.runItems': 'runs', 'flow.refresh': 'Refresh',
+  'flow.hideSettings': 'Hide settings', 'flow.showSettings': 'Show settings', 'flow.scriptModule': 'JavaScript module (ESM)', 'flow.scriptCommonjs': 'CommonJS',
   'flow.operation.script': 'Run script', 'flow.scriptCode': 'JavaScript code', 'flow.scriptFormat': 'Script format',
   'flow.scriptHint': 'Full server privileges. Trusted code only. Import installed project packages; use context.items(collection) for native data access. Return JSON.',
   'flow.scriptDisabled': 'A server administrator must enable trusted scripts with FLOWS_SCRIPTS_ENABLED before activation.',
@@ -35,6 +57,22 @@ const EN = {
   'flow.copySuffix': 'copy', 'flow.step': 'Step', 'flow.duration': 'Duration', 'flow.noSelection': 'Select the trigger or an operation to configure it.',
 };
 const TR = {
+  "flow.accessDenied": "Rolünüzün akışları görüntüleme yetkisi yok.",
+  "flow.readOnly": "Salt okunur erişim. Akışı düzenlemek için yönetici yetkisi gerekir.",
+  "flow.runDenied": "Rolünüzün bu akışı çalıştırma izni yok.",
+
+  "flow.nodeMoved": "Düğüm taşındı. Konum x: {x}, y: {y}.",
+  "flow.controls": "Tuval kontrolleri",
+  "flow.zoomIn": "Yakınlaştır",
+  "flow.zoomOut": "Uzaklaştır",
+  "flow.fitView": "Tuvale sığdır",
+  "flow.toggleInteraction": "Etkileşimi aç/kapat",
+  "flow.keyboardHint": "Enter veya Boşluk ile düğüm seçin. Ok tuşlarıyla taşıyın; Escape iptal eder.",
+  "flow.edgeHint": "Bağlantıyı kaldırmak için çift tıklayın.",
+
+  'flow.back': 'Akışlara dön', 'flow.listHint': 'Otomasyonlarınızı listeleyin, arayın ve yönetin.', 'flow.allStatuses': 'Tüm durumlar', 'flow.allTriggers': 'Tüm tetikleyiciler',
+  'flow.noMatches': 'Bu filtrelere uyan akış bulunamadı.', 'flow.updatedAt': 'Son güncelleme', 'flow.items': 'akış', 'flow.runItems': 'çalıştırma', 'flow.refresh': 'Yenile',
+  'flow.hideSettings': 'Ayarları gizle', 'flow.showSettings': 'Ayarları göster', 'flow.scriptModule': 'JavaScript modülü (ESM)', 'flow.scriptCommonjs': 'CommonJS',
   'flow.operation.script': 'Script çalıştır', 'flow.scriptCode': 'JavaScript kodu', 'flow.scriptFormat': 'Script biçimi',
   'flow.scriptHint': 'Tam sunucu yetkisi taşır. Yalnızca güvenilir kod kullanın. Projede kurulu paketleri import edin; native veri erişimi için context.items(koleksiyon) kullanın. JSON döndürün.',
   'flow.scriptDisabled': 'Etkinleştirmeden önce sunucu yöneticisi FLOWS_SCRIPTS_ENABLED ile güvenilir scriptleri açmalıdır.',
@@ -70,4 +108,4 @@ const TR = {
   'flow.saveFirst': 'Çalıştırmak için manuel akışı kaydedip etkinleştirin.', 'flow.search': 'Akışlarda ara',
   'flow.copySuffix': 'kopya', 'flow.step': 'Adım', 'flow.duration': 'Süre', 'flow.noSelection': 'Yapılandırmak için tetikleyiciyi veya bir işlemi seçin.',
 };
-export const FLOW_LOCALES = Object.freeze(Object.fromEntries(['en', 'tr', 'es', 'de', 'fr', 'pt-BR', 'ja', 'zh-CN'].map(locale => [locale, { ...EN, ...(locale === 'tr' ? TR : {}) }])));
+export const FLOW_LOCALES = Object.freeze({ en: EN, tr: TR, es: FLOW_ES, de: FLOW_DE, fr: FLOW_FR, 'pt-BR': FLOW_PT_BR, ja: FLOW_JA, 'zh-CN': FLOW_ZH_CN });

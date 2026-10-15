@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { addFlowOperation, reconcileFlowCanvasNodes, connectFlowOperation, disconnectFlowOperation, exportFlowDefinition, FLOW_OPERATION_DEFAULTS, flowGraphEdges, importFlowDefinition, newFlowDraft, removeFlowOperation, triggerDefaults } from '../src/flow-graph.js';
 import { hasTranslation, SUPPORTED_LOCALES, translate } from '../src/localization.js';
+import { FLOW_LOCALES } from '../src/locales/flows.js';
 import { readStudioRoute, studioPath } from '../src/studio-route.js';
 import { FLOW_OPERATION_TYPES } from '../../../packages/core/src/flows/definition.js';
 const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -22,7 +23,7 @@ test('canvas reconciliation retains untouched node references and measured state
   const added = reconcileFlowCanvasNodes(previous, [...model, { id: 'new', type: 'flow', position: { x: 700, y: 100 }, data: { label: 'New' } }]);
   assert.equal(added[0], previous[0]); assert.equal(added[1], previous[1]); assert.equal(added.length, 3);
   const canvas = source('../src/components/FlowCanvas.jsx'); assert.match(canvas, /useNodesState\(modelNodes\)/); assert.match(canvas, /applyCanvasChanges\(changes\)/);
-  assert.match(source('../src/screens/FlowsScreen.jsx'), /if \(!configuration \|\| !routeReady\)/);
+  assert.match(source('../src/screens/FlowsScreen.jsx'), /if \(!configuration \|\| !ready\)/);
   assert.doesNotMatch(JSON.stringify(exportFlowDefinition(addFlowOperation(newFlowDraft(), 'transform', 'operation'))), /measured/);
 });
 
@@ -63,20 +64,31 @@ test('palette, trigger defaults and deep links match the backend graph contract'
 
 test('Flow screens use shared components and centralized design without page-local visual styling', () => {
   const page = source('../src/screens/FlowsScreen.jsx'), canvas = source('../src/components/FlowCanvas.jsx'), inspector = source('../src/components/FlowInspector.jsx');
-  const jsonImport = source('../src/components/JsonImportField.jsx');
+  const jsonImport = source('../src/components/JsonImportField.jsx'), list = source('../src/components/FlowList.jsx'), history = source('../src/components/FlowRunHistory.jsx');
   const css = source('../src/studio.css');
   assert.match(css, /@import '@xyflow\/react\/dist\/style\.css'/); assert.match(css, /@import '\.\/flows\.css'/);
-  for (const text of [page, canvas, inspector, jsonImport]) { assert.doesNotMatch(text, /<style\b|\bstyle=\{|import ['"].*\.css['"]|\b(?:window\.)?(?:alert|prompt|confirm)\s*\(/); }
+  for (const text of [page, canvas, inspector, jsonImport, list, history]) { assert.doesNotMatch(text, /<style\b|\bstyle=\{|import ['"].*\.css['"]|\b(?:window\.)?(?:alert|prompt|confirm)\s*\(/); }
   assert.match(page, /<FlowCanvas/); assert.match(page, /<FlowInspector/); assert.match(page, /<Modal/);
+  assert.match(page, /<FlowList/); assert.doesNotMatch(page, /className="flow-list"/);
+  assert.match(list, /<Pagination/); assert.match(history, /<Modal/); assert.match(history, /<Pagination/);
+  assert.match(canvas, /hideAttribution: true/); assert.doesNotMatch(canvas, /MiniMap/);
   assert.match(page, /<JsonImportField/); assert.match(jsonImport, /className="json-field-input"/);
   assert.match(canvas, /<Handle type="source"[^\n]*id="resolve"/); assert.match(canvas, /<Handle type="source"[^\n]*id="reject"/);
   assert.match(canvas, /flowGraphEdges\(flow\)/); assert.match(canvas, /onConnect/); assert.match(canvas, /onEdgeDoubleClick/);
-  const app = source('../src/App.jsx'); assert.match(app, /id: 'flows'.*adminOnly: true/); assert.match(app, /section === 'flows'\) return session\?\.user\?\.admin/);
+  const app = source('../src/App.jsx'); assert.match(app, /id: 'flows'.*capability: 'flows'/); assert.match(app, /section === 'flows'\) return flowAccess\.read/); assert.match(app, /apiRequest\('\/flows\/access'\)/);
   assert.match(source('../src/screens/ContentScreen.jsx'), /<ManualFlowActions collection=\{collection\} keys=\{Array\.from\(selectedRecordIds\)\}/);
 });
 
 test('Flow labels exist in every enabled locale and Turkish copy is localized', () => {
-  for (const locale of SUPPORTED_LOCALES) for (const key of ['flow.title', 'flow.trigger.manual', 'flow.accountability.trigger', 'flow.run', 'flow.options', 'flow.resolve', 'flow.reject']) assert.equal(hasTranslation(locale, key), true, `${locale}:${key}`);
+  const keys = Object.keys(FLOW_LOCALES.en).sort();
+  for (const locale of SUPPORTED_LOCALES) {
+    assert.deepEqual(Object.keys(FLOW_LOCALES[locale]).sort(), keys, locale);
+    for (const key of keys) assert.equal(hasTranslation(locale, key), true, `${locale}:${key}`);
+    for (const key of ['flow.back', 'flow.listHint', 'flow.importFile', 'flow.runs', 'flow.scriptHint', 'flow.zoomIn']) {
+      assert.ok(FLOW_LOCALES[locale][key].length > 0);
+      if (locale !== 'en') assert.notEqual(FLOW_LOCALES[locale][key], FLOW_LOCALES.en[key], `${locale}:${key} must have an explicit translation`);
+    }
+  }
   assert.equal(translate('tr', 'flow.title'), 'Akışlar'); assert.equal(translate('en', 'flow.title'), 'Flows');
 });
 

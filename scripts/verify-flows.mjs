@@ -34,7 +34,7 @@ try {
     'packages/api/test/flows.test.js', 'apps/studio/test/flows.test.js', 'apps/studio/test/json-import.test.js', 'apps/studio/test/content-access.test.js', 'apps/studio/test/content-inspector-next.test.js', 'apps/studio/test/field-ui.test.js'], true);
   await run('build', npm, ['run', 'build:studio']);
   // Keep native and browser fixtures sequential: they must never consume each other's queue jobs.
-  await run('mysql', process.execPath, ['--test', '--test-reporter=tap', 'test/integration/flows.test.js'], true);
+  await run('mysql', process.execPath, ['--test', '--test-concurrency=1', '--test-reporter=tap', 'test/integration/flows.test.js', 'test/integration/users-password-admission.test.js'], true);
   await run('browser', npm, ['run', 'test:browser']);
   const browser = JSON.parse(await readFile(resolve(root, '.yuncms/flows-tests/browser-results.json'), 'utf8')).stats;
   report.browser = browser;

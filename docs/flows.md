@@ -24,24 +24,26 @@ Start with [your first flow](#your-first-flow), then follow the [branching examp
 4. Connect the green **Resolve** output for success or the red **Reject** output for failure to another operation's input. Multiple branches can connect to the same operation. Only the branch selected during this run executes; a merged node does not wait for other branches.
 5. Select a node to edit its name, unique data-chain key and options. Most operation options use JSON; invalid JSON blocks saving. Run script uses a JavaScript editor and module-format selector. The collection selector fills the collection option for data operations.
 6. Activate and save. **Run saved flow** executes a saved manual flow with the JSON input supplied in the shared confirmation dialog. Unsaved changes must be saved first.
-7. Open a run in **Run history** to inspect its output and step trace. The canvas highlights successful and failed steps. A handled rejection can appear as a failed step inside a successful run.
+7. Open **Run history** to inspect runs in a separate paginated dialog. Select a run to load its output and step trace; use **Refresh** to retrieve new runs. A manual execution opens this dialog automatically. The canvas highlights successful and failed steps. A handled rejection can appear as a failed step inside a successful run.
+
+The **Flows** catalogue is a separate page with server-side search, status/trigger filters and pagination (10 flows per page by default; choose 10 or 20). Open a flow name or click **New flow** to enter its dedicated editor page. **Back to flows** restores the catalogue filters and page; unsaved edits require confirmation before leaving through this button. The editor keeps the list and run history out of the canvas area. **Hide settings** expands the canvas to the available width; selecting a node reopens its inspector. The mini map and React Flow attribution link are hidden. All Flow controls, including import errors, script settings and canvas controls, are translated in all eight Studio languages.
 
 To move a flow between projects, click **Export** to download its definition as a `.json` file. In **Import**, choose that file or paste its JSON, review the inactive draft, then click **Save** to create an independent flow. Files with a UTF-8 BOM are accepted. Invalid JSON and files larger than 20 MiB show an error inside the import dialog without replacing the current draft. This input limit allows formatted files; the native API still enforces its 256 KiB definition limit. Exports preserve triggers, node coordinates, connections, options and literal custom script source; server ids, revisions and run history are excluded. Dependencies referenced by scripts must be installed in the destination project, and selected users, roles and child-flow ids must be reviewed for that project.
 
 Double-click a connection to remove it. Removing an operation clears its incoming connections and trigger entry. Circular connections are rejected. Use **Duplicate**, **Export** and **Import** to reuse definitions; imports and duplicates start inactive and get a new id when saved. Export contains the definition, not run history. Saving or deleting a stale revision returns `FLOW_REVISION_CONFLICT` (409); reload before continuing.
 
-The editor uses Studio's shared components, typography, spacing, theme tokens and responsive layout. Settings access and flow definitions/history are restricted to Administrators. Ordinary authenticated users see only explicitly granted manual actions in the relevant Content collection list or record editor. Actions requiring selection stay disabled until records are selected. Confirmation is a Studio interaction; direct API callers must provide the same required collection/selection data but do not receive a browser dialog.
+The editor uses Studio's shared components, typography, spacing, theme tokens and responsive layout. Administrators manage definitions. Other authenticated roles can receive a native filtered `read` permission on `yuncms_flows` to view/export matching definitions and inspect their histories in read-only Studio pages. A read grant does not grant execution; manual execution separately requires `options.allowed_roles`. Creating, importing, editing, deleting and activating flows remain Administrator operations because definitions can contain privileged server code or choose system accountability. Ordinary authenticated users see only explicitly granted manual actions in the relevant Content collection list or record editor. Actions requiring selection stay disabled until records are selected. Confirmation is a Studio interaction; direct API callers must provide the same required collection/selection data but do not receive a browser dialog.
 
 ### Understand the editor
 
 | Area | What to do |
 | --- | --- |
-| Flow list | Search saved flows or open a definition. **New flow** starts an empty draft. |
+| Flow catalogue | Use the separate paginated list to search/filter saved flows and open their editor page. **New flow** opens an empty editor. |
 | Operations toolbar | Choose an operation type, then click **Add operation**. The new node becomes selected. |
 | Canvas | Pan, zoom, drag operation nodes and draw connections between their ports. The trigger stays anchored. Layout coordinates are saved with the definition. |
 | Inspector | Select the trigger to edit its name, activation, trigger type and execution permissions; select an operation to edit its key, type and JSON options or script source. |
 | Graph actions | Run a saved active manual flow, export the current definition, duplicate it or delete the saved flow and its history. |
-| Run history | Select a run to display its result and per-step status, output and duration. |
+| Run history | Open a separate modal, page through runs and select one to load its result, per-step output and duration. |
 
 Studio's English UI labels the connectors **Success** and **Failure**. These correspond to the definition's `resolve` and `reject` fields. In Turkish they are **Başarılı** and **Başarısız**. Connector colors help orientation, while labels identify the branches.
 
@@ -98,7 +100,7 @@ Only one of the two middle nodes runs. Both can feed `result`, which receives th
 
 ### Read the result and trace
 
-After a run, click its history entry. Each executed node shows its key, duration, status and safe result. The canvas highlights executed nodes. Unvisited nodes have no run status.
+After a run, use the **Run history** dialog and click a history entry. History pages contain 10 runs by default (10 or 20 per page). The server returns bounded summaries; only the selected run loads its full trace. Each executed node shows its key, duration, status and safe result. The canvas highlights executed nodes. Unvisited nodes have no run status.
 
 ![Successful overall run with a handled condition failure, the review path and the shared result](assets/screenshots/studio-flows-history.png)
 
@@ -254,16 +256,29 @@ Use [order calculation](flows-recipes.md#8-calculate-an-order-in-a-trusted-scrip
 
 | Method/path | Access and result |
 | --- | --- |
-| `GET /flows` | Administrator; newest definitions first, up to 500. |
-| `GET /flows/configuration` | Administrator; project collections, roles, eligible users, operation/event catalogue and bounds. |
+| `GET /flows` | Administrator or native role-scoped reader; paginated definitions, newest first. Default limit 10, maximum 100. |
+| `GET /flows/configuration` | Administrator or delegated reader; readers receive no user/role/collection catalogue; project collections, roles, eligible users, operation/event catalogue and bounds. |
+| `GET /flows/access` | Access flags for Studio/API discovery; no graph data. |
+| `GET /flows/:id/export` | Authorized reader; downloads a portable JSON definition with no server id/revision/history. |
+| `POST /flows/import` | Administrator; imports a portable JSON object as an independent inactive flow, returns 201. |
+| `POST /flows/import?preview=1` | Administrator; structurally validates and normalizes an inactive draft without writing it, returns 200. Destination users/roles must still be reviewed before saving. |
 | `POST /flows` | Administrator; create definition, returns 201 with id/revision. |
-| `GET /flows/:id` | Administrator; complete definition. |
+| `GET /flows/:id` | Administrator or native role-scoped reader; complete definition. |
 | `PUT /flows/:id` | Administrator; replace definition, include current `revision`. |
 | `DELETE /flows/:id?revision=1` | Administrator; delete graph and its history, returns 204. |
-| `GET /flows/:id/runs` | Administrator; newest 50 runs with safe input, actor, trace and output. |
+| `GET /flows/:id/runs` | Administrator or native role-scoped reader; paginated runs, newest first. Default limit 10, maximum 100. |
+| `GET /flows/:id/runs/:runId` | Administrator or native role-scoped reader; one run with safe input, actor, trace and output. A run belonging to another flow returns 404. |
 | `GET /flows/available?collection=articles` | Authenticated; allowed active manual actions with display/confirmation/selection metadata, without graph definitions. |
 | `POST /flows/:id/run` | Allowed manual caller; arbitrary JSON object, commonly `{collection, keys, body}`. Returns `{id,status,output,trace}` inside `data`. |
 | `GET`/`POST /flows/trigger/:id` | Matching webhook method/access; returns the same execution envelope. |
+
+Both list endpoints accept `limit` (1–100), `offset` (0–2147483647), `summary=1` and `meta=filter_count`. Counts appear as `meta.filter_count` beside the `data` array. Flow summaries omit graph definitions; run summaries omit input, actor, trace and output. Omit `summary` to retrieve complete page entries. `GET /flows` also accepts `search` (a literal name substring, at most 200 characters), `status=active|inactive` and `trigger=manual|event|webhook|schedule|operation`. Filters apply before pagination and counting. Invalid query values return `INVALID_FLOW_QUERY` (400). All list/count/export/history/detail requests enforce the same native read scope. Mutation and import requests require an Administrator; public webhooks and role-granted manual execution retain their independent trigger rules.
+
+For example, `GET /flows?limit=25&offset=25&summary=1&meta=filter_count&status=active` retrieves the second page of active flows. `GET /flows/FLOW_UUID/runs?limit=10&offset=10&summary=1&meta=filter_count` retrieves the second history page; request a selected run with `GET /flows/FLOW_UUID/runs/RUN_UUID`.
+
+For API-driven setup, create definitions with `POST /flows`, export with `GET /flows/:id/export`, and submit the downloaded JSON object directly to `POST /flows/import`. Imports always receive a new id and start inactive, even when the file says `active` or includes an old id/revision. `GET /flows/:id` also returns `meta.access.manage` and `meta.access.run` for the current caller. Preview import leaves no database record or run history. Studio uses the preview endpoint before displaying an imported draft, and uses the export endpoint for saved, unchanged flows; exporting an unsaved draft preserves that local draft.
+
+Grant read access through **Roles & Permissions → System resources → yuncms_flows → Read**, optionally with a filter such as `{"id":{"_in":["FLOW_UUID"]}}` or `{"user_created":{"_eq":"$CURRENT_USER"}}`. Native role metadata remains the single permission source. Read permission covers the full definition, including script source, and its history; field masks and delegated writes are unsupported. Unauthorized ids and histories outside the read filter return 404. An ordinary reader sees no creation/edit/import/delete controls, and can run only explicitly granted manual flows. Revoking read removes viewing/export/history access while a separate manual execution grant can still serve Content actions.
 
 Example `POST /flows` body:
 
@@ -327,6 +342,6 @@ The trigger/data-chain/resolve-reject behavior was studied in the [Directus Flow
 
 ## Validate a deployment before enabling flows
 
-Use a separate disposable MySQL database whose name contains `test`, `ci` or `dev`. Never point acceptance fixtures at production. Set the normal `DB_*` connection variables, `YUNCMS_TEST_MYSQL=1`, and `YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1`, then run `npm run test:flows` from the source checkout. This command builds Studio and sequentially runs pure unit/source checks, actual Node script processes, real MySQL/API integration and Chromium Playwright. It fails on skipped, cancelled or failing tests; reports and logs are local under `.yuncms/flows-tests/acceptance/`. Chromium must already be installed (`npx playwright install chromium`). To run the same scenarios in all three engines, install them with `npx playwright install chromium firefox webkit` and set `YUNCMS_BROWSER_ENGINES=chromium,firefox,webkit`; the default is `chromium`. Node.js 24 and `openssl` are required for the real TLS fixtures. Browser cases allow 120 seconds including browser/context startup; UI assertions remain bounded to 8 seconds. Cases that intentionally wait for a native deadline or worker lease declare a larger total budget. Tests run serially with zero retries.
+Use a separate disposable MySQL database whose name contains `test`, `ci` or `dev`. Never point acceptance fixtures at production. Set the normal `DB_*` connection variables, `YUNCMS_TEST_MYSQL=1`, and `YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1`, then run `npm run test:flows` from the source checkout. This command builds Studio and sequentially runs pure unit/source checks, actual Node script processes, real MySQL/API integration (including password-admission regression) and Chromium Playwright. It fails on skipped, cancelled or failing tests; reports and logs are local under `.yuncms/flows-tests/acceptance/`. Chromium must already be installed (`npx playwright install chromium`). To run the same scenarios in all three engines, install them with `npx playwright install chromium firefox webkit` and set `YUNCMS_BROWSER_ENGINES=chromium,firefox,webkit`; the default is `chromium`. Node.js 24 and `openssl` are required for the real TLS fixtures. Browser cases allow 120 seconds including browser/context startup; UI assertions remain bounded to 8 seconds. Cases that intentionally wait for a native deadline or worker lease declare a larger total budget. Tests run serially with zero retries.
 
 The suite creates synthetic users/collections/flows, runs real HTTPS with trusted and untrusted certificates, sends SMTP to a local TCP server, polls actual UTC time, executes imports, checks native authorization/transaction rollback, competes with two real workers, holds an unexpired job row in a real transaction while another dispatcher polls, kills a worker and waits for its real one-minute lease, and checks script crashes/timeouts/heap limits. Network fixtures bind only to localhost. No database, HTTP/HTTPS, SMTP, script process, scheduler clock or browser request is mocked. Existing unrelated legacy repository suites retain their own coverage. These checks do not validate your production credentials, external provider availability, replica sizing or business-specific scripts; repeat the relevant scenarios with controlled integrations before activation.

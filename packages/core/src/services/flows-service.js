@@ -3,11 +3,14 @@ import { createAccountability, createPublicAccountability, createSystemAccountab
 import { SchemaCache } from '../schema.js';
 import { withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
+import { resolveSystemResourceAccess } from './system-resource-access.js';
+import { compileFilter } from '../query.js';
 import { FLOW_LIMITS, FLOW_OPERATION_TYPES, assertFlowJson, flowError, normalizeFlow } from '../flows/definition.js';
 import { executeFlowGraph, safeFlowValue } from '../flows/engine.js';
 import { parseFlowCronExpression } from '../flows/cron.js';
 import { flowExecutionStorage } from '../flows/context.js';
 import { SCRIPT_DEFAULTS, validateScriptOptions } from '../flows/script.js';
+import { flowListPredicate, normalizeFlowPageQuery } from '../flows/query.js';
 
 export const FLOW_FILTER_EVENTS = Object.freeze(['items.create', 'items.update', 'items.delete', 'users.update', 'users.delete', 'users.password.update']);
 export const FLOW_ACTION_EVENTS = Object.freeze([...FLOW_FILTER_EVENTS, 'users.create', 'files.create', 'files.update', 'files.delete']);
@@ -16,6 +19,9 @@ function fromRow(row) {
   return row ? { ...decode(row.definition), id: row.id, revision: row.revision, user_created: row.user_created,
     created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at } : null;
+}
+function decodeRun(row) {
+  return { ...row, ...Object.fromEntries(['trigger_data', 'actor', 'trace', 'output'].map(key => [key, safeFlowValue(decode(row[key]))])) };
 }
 function json(value) {
   const parsed = JSON.parse(JSON.stringify(value ?? null, (_key, entry) => typeof entry === 'bigint' ? String(entry) : entry));
@@ -48,18 +54,63 @@ export class FlowsService extends BaseService {
     if (!rows[0]) throw flowError('FLOW_NOT_FOUND', 'Flow not found', 404);
     return fromRow(rows[0]);
   }
-  async readOne(id) { this.requireManager(); return this.#load(id); }
-  async readMany() {
+  async #readScope() {
+    if (!this.accountability.user && !this.accountability.admin && !this.accountability.system) throw flowError('FORBIDDEN', 'Flow access requires an authenticated role', 403);
+    const permission = await resolveSystemResourceAccess(this, 'read', 'yuncms_flows');
+    if (!permission.filter) return { sql: '', params: [] };
+    const schema = this.schema ?? await this.schemaCache.get(this.database);
+    return compileFilter(permission.filter, schema.collections.yuncms_flows, { dynamicVariables: { user: this.accountability.user, role: this.accountability.role, now: new Date() } });
+  }
+  async access() {
+    const manage = this.accountability.admin === true || this.accountability.system === true;
+    let read = false;
+    try { await this.#readScope(); read = true; } catch (error) { if (error.code !== 'FORBIDDEN') throw error; }
+    return { read, manage, import: manage, export: read };
+  }
+  accessFor(flow) { return { manage: this.accountability.admin === true || this.accountability.system === true, run: flow.trigger === 'manual' && this.#manualAllowed(flow) }; }
+  async readOne(id) {
+    const scope = await this.#readScope();
+    if (typeof id !== 'string' || id.length > 64) throw flowError('FLOW_NOT_FOUND', 'Flow not found', 404);
+    const [rows] = await this.database.query(`SELECT * FROM yuncms_flows${scope.sql ? scope.sql + ' AND id = ?' : ' WHERE id = ?'}`, [...scope.params, id]);
+    if (!rows[0]) throw flowError('FLOW_NOT_FOUND', 'Flow not found', 404);
+    return fromRow(rows[0]);
+  }
+  async exportOne(id) {
+    const flow = await this.readOne(id);
+    return Object.fromEntries(['name', 'description', 'status', 'trigger', 'accountability', 'run_as', 'options', 'entry', 'operations'].map(key => [key, structuredClone(flow[key])]));
+  }
+  async importDefinition(input, { preview = false } = {}) {
     this.requireManager();
-    const [rows] = await this.database.query('SELECT * FROM yuncms_flows ORDER BY created_at DESC, id DESC LIMIT 500');
-    return rows.map(fromRow);
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw flowError('INVALID_FLOW', 'Provide a JSON flow definition');
+    const draft = normalizeFlow({ ...input, status: 'inactive' }, { operationTypes: [...FLOW_OPERATION_TYPES, ...this.operations.keys()] });
+    for (const operation of draft.operations) if (operation.type === 'script') validateScriptOptions(operation.options);
+    return preview ? draft : this.save(draft);
+  }
+  async readMany(input = {}) {
+    const scope = await this.#readScope();
+    const query = normalizeFlowPageQuery(input), where = flowListPredicate(query);
+    where.sql = scope.sql ? scope.sql + (where.sql ? ' AND ' + where.sql.slice(7) : '') : where.sql;
+    where.values = [...scope.params, ...where.values];
+    const columns = query.summary ? 'id, name, status, trigger_type AS `trigger`, revision, created_at, updated_at' : '*';
+    const [rows] = await this.database.query(`SELECT ${columns} FROM yuncms_flows${where.sql} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, [...where.values, query.limit, query.offset]);
+    return query.summary ? rows : rows.map(fromRow);
+  }
+  async count(input = {}) {
+    const scope = await this.#readScope();
+    const where = flowListPredicate(normalizeFlowPageQuery(input));
+    where.sql = scope.sql ? scope.sql + (where.sql ? ' AND ' + where.sql.slice(7) : '') : where.sql;
+    where.values = [...scope.params, ...where.values];
+    const [[row]] = await this.database.query(`SELECT COUNT(*) AS total FROM yuncms_flows${where.sql}`, where.values);
+    return Number(row.total);
   }
   async configuration() {
-    this.requireManager();
+    const access = await this.access();
+    if (!access.read) throw flowError('FORBIDDEN', 'Your role cannot view flows', 403);
+    if (!access.manage) return { access, roles: [], users: [], collections: [], operations: [...new Set([...FLOW_OPERATION_TYPES, ...this.operations.keys()])], filter_events: FLOW_FILTER_EVENTS, action_events: FLOW_ACTION_EVENTS, limits: FLOW_LIMITS, scripts: { enabled: this.scripts.enabled } };
     const schema = this.schema ?? await this.schemaCache.get(this.database);
     const [roles] = await this.database.query('SELECT id, name, admin, public FROM yuncms_roles ORDER BY name LIMIT 500');
     const [users] = await this.database.query("SELECT u.id, u.email FROM yuncms_users u INNER JOIN yuncms_roles r ON r.id = u.role WHERE u.status = 'active' AND r.admin = 0 AND r.public = 0 ORDER BY u.email LIMIT 500");
-    return { roles, users, collections: Object.values(schema.collections).filter(c => !c.system).map(c => ({ collection: c.collection, name: c.name ?? c.collection })),
+    return { access, roles, users, collections: Object.values(schema.collections).filter(c => !c.system).map(c => ({ collection: c.collection, name: c.name ?? c.collection })),
       operations: [...new Set([...FLOW_OPERATION_TYPES, ...this.operations.keys()])], filter_events: FLOW_FILTER_EVENTS, action_events: FLOW_ACTION_EVENTS, limits: FLOW_LIMITS,
       scripts: { enabled: this.scripts.enabled, timeoutMs: this.scripts.timeoutMs, memoryMb: this.scripts.memoryMb, concurrency: this.scripts.concurrency } };
   }
@@ -95,10 +146,25 @@ export class FlowsService extends BaseService {
     if (!result.affectedRows) { await this.#load(id); throw flowError('FLOW_REVISION_CONFLICT', 'Flow changed elsewhere; reload before deleting', 409); }
     return true;
   }
-  async readRuns(id) {
-    this.requireManager(); await this.#load(id);
-    const [rows] = await this.database.query('SELECT id, flow_id, revision, status, CAST(trigger_data AS CHAR) AS trigger_data, CAST(actor AS CHAR) AS actor, request_id, CAST(trace AS CHAR) AS trace, CAST(output AS CHAR) AS output, error_code, created_at, started_at, finished_at FROM yuncms_flow_runs WHERE flow_id = ? ORDER BY created_at DESC, id DESC LIMIT 50', [id]);
-    return rows.map(row => ({ ...row, ...Object.fromEntries(['trigger_data', 'actor', 'trace', 'output'].map(key => [key, safeFlowValue(decode(row[key]))])) }));
+  async readRuns(id, input = {}) {
+    await this.readOne(id);
+    const query = normalizeFlowPageQuery(input, { runs: true });
+    const columns = query.summary ? 'id, flow_id, revision, status, error_code, created_at, started_at, finished_at'
+      : 'id, flow_id, revision, status, CAST(trigger_data AS CHAR) AS trigger_data, CAST(actor AS CHAR) AS actor, request_id, CAST(trace AS CHAR) AS trace, CAST(output AS CHAR) AS output, error_code, created_at, started_at, finished_at';
+    const [rows] = await this.database.query(`SELECT ${columns} FROM yuncms_flow_runs WHERE flow_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, [id, query.limit, query.offset]);
+    return query.summary ? rows : rows.map(decodeRun);
+  }
+  async countRuns(id, input = {}) {
+    await this.readOne(id); normalizeFlowPageQuery(input, { runs: true });
+    const [[row]] = await this.database.query('SELECT COUNT(*) AS total FROM yuncms_flow_runs WHERE flow_id = ?', [id]);
+    return Number(row.total);
+  }
+  async readRun(id, runId) {
+    await this.readOne(id);
+    if (typeof runId !== 'string' || runId.length > 64) throw flowError('FLOW_RUN_NOT_FOUND', 'Flow run not found', 404);
+    const [rows] = await this.database.query('SELECT id, flow_id, revision, status, CAST(trigger_data AS CHAR) AS trigger_data, CAST(actor AS CHAR) AS actor, request_id, CAST(trace AS CHAR) AS trace, CAST(output AS CHAR) AS output, error_code, created_at, started_at, finished_at FROM yuncms_flow_runs WHERE flow_id = ? AND id = ?', [id, runId]);
+    if (!rows[0]) throw flowError('FLOW_RUN_NOT_FOUND', 'Flow run not found', 404);
+    return decodeRun(rows[0]);
   }
   async #userAccountability(id, database, { normalOnly = false } = {}) {
     const [rows] = await database.query('SELECT u.id, u.role, u.status, r.admin, r.public FROM yuncms_users u INNER JOIN yuncms_roles r ON r.id = u.role WHERE u.id = ?', [id]);
