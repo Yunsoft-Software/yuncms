@@ -28,7 +28,11 @@ Start with [your first flow](#your-first-flow), then follow the [branching examp
 
 The **Flows** catalogue is a separate page with server-side search, status/trigger filters and pagination (10 flows per page by default; choose 10 or 20). Open a flow name or click **New flow** to enter its dedicated editor page. **Back to flows** restores the catalogue filters and page; unsaved edits require confirmation before leaving through this button. The editor keeps the list and run history out of the canvas area. **Hide settings** expands the canvas to the available width; selecting a node reopens its inspector. The mini map and React Flow attribution link are hidden. All Flow controls, including import errors, script settings and canvas controls, are translated in all eight Studio languages.
 
+![Separate Flow catalogue with server-side filters and 20-record pagination](assets/screenshots/studio-flows-list.png)
+
 To move a flow between projects, click **Export** to download its definition as a `.json` file. In **Import**, choose that file or paste its JSON, review the inactive draft, then click **Save** to create an independent flow. Files with a UTF-8 BOM are accepted. Invalid JSON and files larger than 20 MiB show an error inside the import dialog without replacing the current draft. This input limit allows formatted files; the native API still enforces its 256 KiB definition limit. Exports preserve triggers, node coordinates, connections, options and literal custom script source; server ids, revisions and run history are excluded. Dependencies referenced by scripts must be installed in the destination project, and selected users, roles and child-flow ids must be reviewed for that project.
+
+![JSON import dialog with a file chooser and editable portable definition](assets/screenshots/studio-flows-import.png)
 
 Double-click a connection to remove it. Removing an operation clears its incoming connections and trigger entry. Circular connections are rejected. Use **Duplicate**, **Export** and **Import** to reuse definitions; imports and duplicates start inactive and get a new id when saved. Export contains the definition, not run history. Saving or deleting a stale revision returns `FLOW_REVISION_CONFLICT` (409); reload before continuing.
 
@@ -274,11 +278,24 @@ Use [order calculation](flows-recipes.md#8-calculate-an-order-in-a-trusted-scrip
 
 Both list endpoints accept `limit` (1–100), `offset` (0–2147483647), `summary=1` and `meta=filter_count`. Counts appear as `meta.filter_count` beside the `data` array. Flow summaries omit graph definitions; run summaries omit input, actor, trace and output. Omit `summary` to retrieve complete page entries. `GET /flows` also accepts `search` (a literal name substring, at most 200 characters), `status=active|inactive` and `trigger=manual|event|webhook|schedule|operation`. Filters apply before pagination and counting. Invalid query values return `INVALID_FLOW_QUERY` (400). All list/count/export/history/detail requests enforce the same native read scope. Mutation and import requests require an Administrator; public webhooks and role-granted manual execution retain their independent trigger rules.
 
-For example, `GET /flows?limit=25&offset=25&summary=1&meta=filter_count&status=active` retrieves the second page of active flows. `GET /flows/FLOW_UUID/runs?limit=10&offset=10&summary=1&meta=filter_count` retrieves the second history page; request a selected run with `GET /flows/FLOW_UUID/runs/RUN_UUID`.
+For example, `GET /flows?limit=20&offset=20&summary=1&meta=filter_count&status=active` retrieves the second page of active flows. `GET /flows/FLOW_UUID/runs?limit=10&offset=10&summary=1&meta=filter_count` retrieves the second history page; request a selected run with `GET /flows/FLOW_UUID/runs/RUN_UUID`.
 
 For API-driven setup, create definitions with `POST /flows`, export with `GET /flows/:id/export`, and submit the downloaded JSON object directly to `POST /flows/import`. Imports always receive a new id and start inactive, even when the file says `active` or includes an old id/revision. `GET /flows/:id` also returns `meta.access.manage` and `meta.access.run` for the current caller. Preview import leaves no database record or run history. Studio uses the preview endpoint before displaying an imported draft, and uses the export endpoint for saved, unchanged flows; exporting an unsaved draft preserves that local draft.
 
 Grant read access through **Roles & Permissions → System resources → yuncms_flows → Read**, optionally with a filter such as `{"id":{"_in":["FLOW_UUID"]}}` or `{"user_created":{"_eq":"$CURRENT_USER"}}`. Native role metadata remains the single permission source. Read permission covers the full definition, including script source, and its history; field masks and delegated writes are unsupported. Unauthorized ids and histories outside the read filter return 404. An ordinary reader sees no creation/edit/import/delete controls, and can run only explicitly granted manual flows. Revoking read removes viewing/export/history access while a separate manual execution grant can still serve Content actions.
+
+The same setup works without Studio. With an Administrator bearer token, use the existing [Permissions API](rest-api.md) to `POST /permissions` with this body (replace both UUID placeholders):
+
+```json
+{
+  "role": "ROLE_UUID",
+  "collection": "yuncms_flows",
+  "action": "read",
+  "filter": { "id": { "_in": ["FLOW_UUID"] } }
+}
+```
+
+Use `PATCH /permissions/:id` or `DELETE /permissions/:id` to change or revoke that grant. To grant manual execution, update the flow through `PUT /flows/:id`, retaining its complete definition and current revision, with the role UUID in `options.allowed_roles`. Each endpoint applies the same authorization used by Studio; reading a definition does not permit importing or executing it.
 
 Example `POST /flows` body:
 

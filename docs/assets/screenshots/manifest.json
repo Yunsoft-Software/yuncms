@@ -21,7 +21,9 @@
     "studio-flows-content-action.png",
     "studio-flows-content-confirmation.png",
     "studio-flows-event-filter.png",
-    "studio-flows-script.png"
+    "studio-flows-script.png",
+    "studio-flows-list.png",
+    "studio-flows-import.png"
   ],
   "verifiedAt": "2026-10-10",
   "flowCaptures": {
@@ -39,23 +41,29 @@
       "studio-flows-content-action.png",
       "studio-flows-content-confirmation.png",
       "studio-flows-event-filter.png",
-      "studio-flows-script.png"
+      "studio-flows-script.png",
+      "studio-flows-list.png",
+      "studio-flows-import.png"
     ],
     "runtimeRevision": "315a582e0bf9464fdcfbb5fbc71c14a8db6ad5de",
     "captures": {
       "studio-flows.png": {
         "capturedAt": "2026-10-15",
         "scenario": "test/browser/flows.spec.js",
-        "sha256": "f5353a267e42727fedd6d9d8a56caa67e9e27960079fb1e816c5b7671570e5ad",
+        "engine": "Chromium",
+        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
+        "sha256": "c437948d80b385b822eca69ff596502ce5b24fc42f76f3824713518768362e35",
         "width": 1536,
-        "height": 1273
+        "height": 1000
       },
       "studio-mobile-flows-dark.png": {
         "capturedAt": "2026-10-15",
         "scenario": "test/browser/flows.spec.js",
-        "sha256": "d66eff6176b5faf41e34810dfd378331fa6d64b7ac8d6f090958160d2939169a",
+        "engine": "Chromium",
+        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
+        "sha256": "3c277a7ebd556c26a602ff728792fcc1c22b598b3f69ea0dd9b7f98f6ab36543",
         "width": 390,
-        "height": 2012
+        "height": 1823
       },
       "studio-flows-operation.png": {
         "capturedAt": "2026-10-15",
@@ -74,16 +82,20 @@
       "studio-flows-branches.png": {
         "capturedAt": "2026-10-15",
         "scenario": "test/browser/flow-docs.spec.js",
-        "sha256": "527fa322c49789df989718268502fe2eb4552606e032fb56ca39ce86d2e67876",
-        "width": 1058,
-        "height": 680
+        "engine": "Chromium",
+        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
+        "sha256": "7651e8baf3bc74dbbd3092eda19178394bcd63afde3c636308c479512ad97e77",
+        "width": 1228,
+        "height": 1030
       },
       "studio-flows-history.png": {
         "capturedAt": "2026-10-15",
         "scenario": "test/browser/flow-docs.spec.js",
-        "sha256": "2d21f8a170fc05d35105d94775ec2529f5e30ebe3755b0b03a9272368ecb2043",
-        "width": 1596,
-        "height": 578
+        "engine": "Chromium",
+        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
+        "sha256": "374afe7028e919397b191918ff0abdf6ab6c27b31b749b9fb694e16bbdcc831d",
+        "width": 1240,
+        "height": 814
       },
       "studio-flows-webhook.png": {
         "capturedAt": "2026-10-15",
@@ -128,10 +140,28 @@
         "capturedAt": "2026-10-15",
         "scenario": "test/browser/flow-runtime.spec.js",
         "engine": "Chromium",
-        "runtimeRevision": "4ea601e67e258711f011aa30d9ef080b0ca4c877",
-        "sha256": "74595b70cfa2dbc3a733d275d5ebfee7decd2e45c62677f2f365694636832a10",
+        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
+        "sha256": "33aa991f85ccfdda2870fcee5e8dc1a0e69b9de1fa3ad62b26d7b68d3d4347c8",
         "width": 1536,
-        "height": 1315
+        "height": 1000
+      },
+      "studio-flows-list.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flows.spec.js",
+        "engine": "Chromium",
+        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
+        "sha256": "e2f7263676f2c28890801fe99807de984706ce986e7e148a3ce1c5fa2f425245",
+        "width": 1536,
+        "height": 1000
+      },
+      "studio-flows-import.png": {
+        "capturedAt": "2026-10-15",
+        "scenario": "test/browser/flows.spec.js",
+        "engine": "Chromium",
+        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
+        "sha256": "9641d11840270f2a41b6ab813524818e3b8a4537e2e1a0889144ef06c6995cf2",
+        "width": 1536,
+        "height": 1000
       }
     }
   }
