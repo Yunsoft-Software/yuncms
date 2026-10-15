@@ -103,7 +103,7 @@
         "capturedAt": "2026-10-15",
         "scenario": "test/browser/flow-docs.spec.js",
         "engine": "Chromium",
-        "runtimeRevision": null,
+        "runtimeRevision": "4ea601e67e258711f011aa30d9ef080b0ca4c877",
         "sha256": "04135c35d3da36f586846d664b9de142d45011d3bc5056d7fa46935b95d7441d",
         "width": 1440,
         "height": 1000
@@ -112,7 +112,7 @@
         "capturedAt": "2026-10-15",
         "scenario": "test/browser/flow-docs.spec.js",
         "engine": "Chromium",
-        "runtimeRevision": null,
+        "runtimeRevision": "4ea601e67e258711f011aa30d9ef080b0ca4c877",
         "sha256": "9ec9d9a431347ec32317a4d499a393c1ad8383ccd0ca8ee150e99dcdfb718750",
         "width": 1440,
         "height": 1000
@@ -128,7 +128,7 @@
         "capturedAt": "2026-10-15",
         "scenario": "test/browser/flow-runtime.spec.js",
         "engine": "Chromium",
-        "runtimeRevision": null,
+        "runtimeRevision": "4ea601e67e258711f011aa30d9ef080b0ca4c877",
         "sha256": "74595b70cfa2dbc3a733d275d5ebfee7decd2e45c62677f2f365694636832a10",
         "width": 1536,
         "height": 1315
