@@ -22,7 +22,7 @@ Start with [your first flow](#your-first-flow), then follow the [branching examp
 2. Create a flow, name it and choose its trigger and execution permissions. New flows start **Inactive**.
 3. Add operations. Drag nodes to arrange them and drag a connector from the trigger to the first operation.
 4. Connect the green **Resolve** output for success or the red **Reject** output for failure to another operation's input. Multiple branches can connect to the same operation. Only the branch selected during this run executes; a merged node does not wait for other branches.
-5. Select a node to edit its name, unique data-chain key and options. Operation options use JSON; invalid JSON blocks saving. The collection selector fills the collection option for data operations.
+5. Select a node to edit its name, unique data-chain key and options. Most operation options use JSON; invalid JSON blocks saving. Run script uses a JavaScript editor and module-format selector. The collection selector fills the collection option for data operations.
 6. Activate and save. **Run saved flow** executes a saved manual flow with the JSON input supplied in the shared confirmation dialog. Unsaved changes must be saved first.
 7. Open a run in **Run history** to inspect its output and step trace. The canvas highlights successful and failed steps. A handled rejection can appear as a failed step inside a successful run.
 
@@ -37,7 +37,7 @@ The editor uses Studio's shared components, typography, spacing, theme tokens an
 | Flow list | Search saved flows or open a definition. **New flow** starts an empty draft. |
 | Operations toolbar | Choose an operation type, then click **Add operation**. The new node becomes selected. |
 | Canvas | Pan, zoom, drag operation nodes and draw connections between their ports. The trigger stays anchored. Layout coordinates are saved with the definition. |
-| Inspector | Select the trigger to edit its name, activation, trigger type and execution permissions; select an operation to edit its key, type and JSON options. |
+| Inspector | Select the trigger to edit its name, activation, trigger type and execution permissions; select an operation to edit its key, type and JSON options or script source. |
 | Graph actions | Run a saved active manual flow, export the current definition, duplicate it or delete the saved flow and its history. |
 | Run history | Select a run to display its result and per-step status, output and duration. |
 
@@ -197,7 +197,7 @@ Options accept templates except script source, which is executed literally. The 
 | `delete` | `{"collection":"articles","ids":"{{ $trigger.keys }}"}` | Native delete results, in id order. Requires 1–100 ids. |
 | `log` | `{"message":"{{ $last }}"}` | Redacted structured application log; result `null`. |
 | `sleep` | `{"milliseconds":1000}` | Delay 0–5000 ms; result `null`. |
-| `request` | `{"method":"POST","url":"https://api.example.test/task","headers":{},"body":{"id":"{{ $trigger.keys[0] }}"}}` | `{status, body}`. HTTP(S) only, explicit server hostname allowlist, no URL credentials or redirects. GET/POST/PUT/PATCH/DELETE/HEAD; non-2xx fails. JSON response content types are decoded; otherwise body is text. Maximum response 256 KiB. |
+| `request` | `{"method":"POST","url":"https://api.example.test/task","headers":{},"body":{"id":"{{ $trigger.keys[0] }}"}}` | `{status, body}`. HTTP(S) only, explicit server hostname allowlist, no URL credentials or redirects. GET/POST/PUT/PATCH/DELETE/HEAD; non-2xx fails. JSON response content types are decoded; otherwise body is text. Maximum response 256 KiB; HEAD/empty responses return an empty string. |
 | `mail` | `{"to":"reader@example.test","subject":"Updated","text":"Record changed"}` | Native SMTP delivery; `to` may contain up to 20 recipients. Requires [SMTP configuration](configuration.md#smtp-and-account-actions). Result `null`. |
 | `trigger` | `{"flow":"CHILD_FLOW_UUID","payload":"{{ $last }}"}` | Child flow output, or outputs for an array of up to 100 inputs. The child must use the `operation` trigger. |
 | `error` | `{"code":"REVIEW_REQUIRED","status":422,"message":"Review this record first"}` | Throws a configured 4xx error. Code uses uppercase letters, numbers and underscores. A reject connection may handle it. |
@@ -229,6 +229,8 @@ export default async function (data, context) {
 ```
 
 For CommonJS choose `format: "commonjs"` and use `module.exports = async function (data, context) { ... }`. `require('node:crypto')` and installed npm packages work in that format. ESM supports static and dynamic `import`. Install dependencies in the **running project's** `node_modules` with npm, include them in the deployment/image, and restart/redeploy when required. YunCMS does not install packages from script source or infer dependencies from flow imports. Packages must support Node.js 24 and the selected module format. Relative imports resolve from the temporary script directory; use installed packages for reusable code. Exporting a non-function fails with `FLOW_SCRIPT_EXPORT_INVALID`.
+
+In the official Docker image, the running project directory is `/data`. Manage its package manifest/lockfile and install project dependencies under `/data/node_modules`. The runtime user needs write access to the private `/data/.yuncms/flow-scripts` directory. Deploy the same dependency versions to every API replica.
 
 | Context member | Contract |
 | --- | --- |

@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { isolateCreatedFlows } from './fixtures/flow-isolation.js';
+
+isolateCreatedFlows(test);
 
 const password = 'Browser-flow-fixture-123!';
 async function apiLogin(request, email = 'flows-admin@example.test') {

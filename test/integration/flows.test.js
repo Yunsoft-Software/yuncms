@@ -154,6 +154,12 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     const rule = await create(definition([node('request', 'request', { url: network.httpsUrl + '/echo', method: 'POST', headers: { 'x-flow-proof': 'real-tls' }, body: { value: '{{ $trigger.body.value }}' } })]));
     const result = await request(`/flows/${rule.id}/run`, adminToken, 'POST', { body: { value: [false, 7] }, accountability: { admin: true } });
     assert.equal(result.status, 200); assert.deepEqual(result.body.data.output.body, { method: 'POST', body: { value: [false, 7] }, proof: 'real-tls' });
+    for (const method of ['GET', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
+      const flow = await create(definition([node('request', 'request', { url: network.httpsUrl + '/echo', method, body: { value: 'actual-wire-body' } })]));
+      const response = await request(`/flows/${flow.id}/run`, adminToken, 'POST', {}); assert.equal(response.status, 200);
+      if (method === 'HEAD') assert.equal(response.body.data.output.body, ''); // HEAD has no entity body; the Request contract returns empty text.
+      else assert.deepEqual(response.body.data.output.body, { method, body: method === 'GET' ? null : { value: 'actual-wire-body' }, proof: null });
+    }
     const cases = [
       [network.httpsUrl.replace('localhost', '127.0.0.1') + '/echo', 403, 'FLOW_REQUEST_FORBIDDEN'],
       [network.untrustedUrl, 502, 'FLOW_REQUEST_FAILED'],
@@ -259,6 +265,10 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     const reject = emitter.registerFilter('mail.send', () => { throw Object.assign(new Error('Native mail guard'), { code: 'FORBIDDEN' }); });
     try { assert.equal((await request(`/flows/${rule.id}/run`, adminToken, 'POST', {})).status, 403); assert.equal(messages.length, 1); }
     finally { reject(); }
+    const refused = await create(definition([node('mail', 'mail', { to: 'blocked@example.test', subject: 'Native SMTP rejection', text: 'The real SMTP fixture rejects this recipient with 550.' })]));
+    const failed = await request(`/flows/${refused.id}/run`, adminToken, 'POST', {});
+    assert.equal(failed.status, 500); assert.equal(failed.body.errors[0].code, 'EENVELOPE');
+    assert.equal((await manager.readRuns(refused.id))[0].error_code, 'EENVELOPE'); assert.equal(messages.length, 1);
   });
   await t.test('downloadable documentation recipes import through HTTP and execute their advertised native behavior', async () => {
     const root = new URL('../../docs/examples/flows/', import.meta.url), examples = new Map();

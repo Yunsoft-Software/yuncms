@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
+import { isolateCreatedFlows } from './fixtures/flow-isolation.js';
+
+isolateCreatedFlows(test);
 
 const output = '.yuncms/flows-tests';
 const example = name => JSON.parse(readFileSync(new URL(`../../docs/examples/flows/${name}.json`, import.meta.url), 'utf8'));

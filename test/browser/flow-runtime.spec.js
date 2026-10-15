@@ -96,6 +96,7 @@ test('script native proxies execute every supported CRUD method, redact real log
   for (const [code, expected] of [
     [`export default async (_data, context) => { for (let i = 0; i < 101; i++) await context.items('${collection}').readMany({ limit: 1 }); }`, 'FLOW_SCRIPT_CALL_LIMIT'],
     [`export default async (_data, context) => context.items('${collection}').createMany(Array.from({ length: 101 }, () => ({ title: 'Too many' })))`, 'INVALID_FLOW_OPERATION'],
+    [`export default async (_data, context) => Promise.all(Array.from({ length: 17 }, () => context.items('${collection}').readMany({ limit: 1 })))`, 'FLOW_SCRIPT_CALL_LIMIT'],
   ]) {
     const bounded = await create(request, [node('script', 'script', { code })]);
     const failed = await request.post(`/flows/${bounded.id}/run`, { headers, data: {} }); expect(failed.status()).toBe(400); expect((await failed.json()).errors[0].code).toBe(expected);
