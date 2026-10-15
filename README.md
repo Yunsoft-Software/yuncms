@@ -180,6 +180,8 @@ npm start
 
 Source installs are intended for development. Production operators should prefer a pinned Docker image or a versioned npm dependency. See **[Installation Options](docs/installation.md)** for the comparison, state layout and update path for each method.
 
+For a consuming project that needs an unreleased fixed commit, see [development package candidates](docs/development-candidates.md).
+
 Useful commands:
 
 ```bash
