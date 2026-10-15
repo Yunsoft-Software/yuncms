@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createAccountability, createPublicAccountability, createSystemAccountability } from '../accountability.js';
 import { SchemaCache } from '../schema.js';
-import { withTransaction } from '../transaction.js';
+import { transactionContext, withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { resolveSystemResourceAccess } from './system-resource-access.js';
 import { compileFilter } from '../query.js';
@@ -14,6 +14,7 @@ import { flowListPredicate, normalizeFlowPageQuery } from '../flows/query.js';
 
 export const FLOW_FILTER_EVENTS = Object.freeze(['items.create', 'items.update', 'items.delete', 'users.update', 'users.delete', 'users.password.update']);
 export const FLOW_ACTION_EVENTS = Object.freeze([...FLOW_FILTER_EVENTS, 'users.create', 'files.create', 'files.update', 'files.delete']);
+export const FLOW_ADMISSION_VERSION = 1;
 function decode(value) { return typeof value === 'string' ? JSON.parse(value) : value; }
 function fromRow(row) {
   return row ? { ...decode(row.definition), id: row.id, revision: row.revision, user_created: row.user_created,
@@ -40,6 +41,7 @@ export class FlowsService extends BaseService {
     this.requestHosts = options.requestHosts ?? [];
     this.flowEnv = options.flowEnv ?? {};
     this.scripts = { ...SCRIPT_DEFAULTS, ...options.scripts };
+    this.admissionRequired = options.admissionRequired === true;
   }
 
   requireManager() {
@@ -47,6 +49,19 @@ export class FlowsService extends BaseService {
   }
   requireSystem() {
     if (this.accountability.system !== true) throw flowError('FORBIDDEN', 'Internal flow dispatch requires explicit system accountability', 403);
+  }
+  // Admission is veto-only: extensions cannot replace normalized definitions,
+  // caller authority or trigger input by returning an altered filter payload.
+  async admission(event, flow, { database = this.database, previous = null, actor = this.accountability } = {}) {
+    if (this.admissionRequired && ['flows.create','flows.update','flows.delete','flows.enqueue','flows.execute'].some(name => !this.emitter?.filters?.get(name)?.length)) {
+      throw flowError('FLOW_ADMISSION_UNAVAILABLE', 'Required Flow admission extension is not installed', 503);
+    }
+    await new BaseService({ ...this, database }).filter(event,
+      { key: flow.id ?? null, definition: structuredClone(flow) }, {
+        collection: 'yuncms_flows', key: flow.id ?? null,
+        flow: structuredClone(flow), previous: previous ? structuredClone(previous) : null,
+        triggerAccountability: actor,
+      });
   }
   async #load(id, database = this.database, { lock = false } = {}) {
     if (typeof id !== 'string' || id.length > 64) throw flowError('FLOW_NOT_FOUND', 'Flow not found', 404);
@@ -116,6 +131,8 @@ export class FlowsService extends BaseService {
   }
   async save(input, id = null) {
     this.requireManager();
+    if (!transactionContext(this.database)) return withTransaction(this.database,
+      database => new FlowsService({ ...this, database }).save(input, id));
     const flow = normalizeFlow(input, { operationTypes: [...FLOW_OPERATION_TYPES, ...this.operations.keys()] });
     for (const operation of flow.operations) if (operation.type === 'script') {
       validateScriptOptions(operation.options);
@@ -126,14 +143,18 @@ export class FlowsService extends BaseService {
     }
     if (flow.trigger === 'event' && flow.options.events.some(event => !(flow.options.mode === 'filter' ? FLOW_FILTER_EVENTS : FLOW_ACTION_EVENTS).includes(event))) throw flowError('INVALID_FLOW', 'Unsupported native flow event');
     if (flow.run_as) await this.#userAccountability(flow.run_as, this.database, { normalOnly: true });
+    const previous = id ? await this.#load(id, this.database, { lock: true }) : null;
+    if (previous && previous.revision !== input.revision) throw flowError('FLOW_REVISION_CONFLICT', 'Flow changed elsewhere; reload before saving', 409);
+    id ||= randomUUID();
+    await this.admission(previous ? 'flows.update' : 'flows.create',
+      { ...flow, id, revision: previous ? previous.revision + 1 : 1 }, { previous });
     const definition = JSON.stringify(flow);
-    if (id) {
+    if (previous) {
       if (!Number.isInteger(input.revision) || input.revision < 1) throw flowError('INVALID_FLOW', 'Provide the current revision when updating a flow');
       const [result] = await this.database.query('UPDATE yuncms_flows SET name = ?, status = ?, trigger_type = ?, definition = ?, revision = revision + 1 WHERE id = ? AND revision = ?',
         [flow.name, flow.status, flow.trigger, definition, id, input.revision]);
       if (!result.affectedRows) { await this.#load(id); throw flowError('FLOW_REVISION_CONFLICT', 'Flow changed elsewhere; reload before saving', 409); }
     } else {
-      id = randomUUID();
       await this.database.query('INSERT INTO yuncms_flows (id, name, status, trigger_type, definition, user_created) VALUES (?, ?, ?, ?, ?, ?)',
         [id, flow.name, flow.status, flow.trigger, definition, this.accountability.user]);
     }
@@ -141,7 +162,12 @@ export class FlowsService extends BaseService {
   }
   async deleteOne(id, revision) {
     this.requireManager();
+    if (!transactionContext(this.database)) return withTransaction(this.database,
+      database => new FlowsService({ ...this, database }).deleteOne(id, revision));
     if (!Number.isInteger(revision) || revision < 1) throw flowError('INVALID_FLOW', 'Provide the current revision when deleting a flow');
+    const flow = await this.#load(id, this.database, { lock: true });
+    if (flow.revision !== revision) throw flowError('FLOW_REVISION_CONFLICT', 'Flow changed elsewhere; reload before deleting', 409);
+    await this.admission('flows.delete', flow);
     const [result] = await this.database.query('DELETE FROM yuncms_flows WHERE id = ? AND revision = ?', [id, revision]);
     if (!result.affectedRows) { await this.#load(id); throw flowError('FLOW_REVISION_CONFLICT', 'Flow changed elsewhere; reload before deleting', 409); }
     return true;
@@ -213,6 +239,7 @@ export class FlowsService extends BaseService {
   }
   async #execute(flow, trigger, actor, { database = this.database, runId = null, signal = null, budget = null } = {}) {
     if (flow.status !== 'active') throw flowError('FLOW_INACTIVE', 'Activate the flow before executing it', 409);
+    await this.admission('flows.execute', flow, { database, actor });
     const id = runId ?? randomUUID();
     if (!runId) await database.query("INSERT INTO yuncms_flow_runs (id, flow_id, revision, status, trigger_data, actor, request_id, started_at, lease_until) VALUES (?, ?, ?, 'running', ?, ?, ?, CURRENT_TIMESTAMP(3), DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL 1 MINUTE))",
       [id, flow.id, flow.revision, JSON.stringify(safeFlowValue(trigger)), JSON.stringify(safeFlowValue(actor)), this.requestId]);
@@ -249,6 +276,7 @@ export class FlowsService extends BaseService {
     return withTransaction(database, async connection => {
       const current = await this.#load(flow.id, connection, { lock: true });
       if (current.status !== 'active' || current.revision !== flow.revision) return null;
+      await this.admission('flows.enqueue', current, { database: connection, actor });
       const [[count]] = await connection.query("SELECT COUNT(*) AS total FROM yuncms_flow_runs WHERE flow_id = ? AND status IN ('pending', 'running')", [flow.id]);
       if (Number(count.total) >= 1000) throw flowError('FLOW_QUEUE_FULL', 'Flow queue is full', 429);
       const id = randomUUID();

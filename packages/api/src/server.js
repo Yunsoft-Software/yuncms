@@ -131,6 +131,7 @@ async function start() {
   automationWorker = new AiAutomationWorker(automations);
   const automationsRouter = createAutomationsRouter(automationOptions);
   const flowsOptions = {
+    admissionRequired: config.flows.admissionRequired,
     schemaCache, mailer, requestHosts: config.flows.requestHosts, scripts: config.flows.scripts,
     flowEnv: Object.fromEntries(config.flows.envAllowList.filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]])),
   };

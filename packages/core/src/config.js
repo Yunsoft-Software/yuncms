@@ -61,6 +61,7 @@ export function loadConfig(env = process.env) {
 
   return {
     flows: {
+      admissionRequired: readBoolean(env.FLOWS_ADMISSION_REQUIRED, false),
       requestHosts: readString(env.FLOWS_REQUEST_ALLOWED_HOSTS, '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean),
       envAllowList: readString(env.FLOWS_ENV_ALLOW_LIST, '').split(',').map(value => value.trim()).filter(Boolean),
       scripts: {

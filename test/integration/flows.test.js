@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { ExtensionError } from '@yunsoft/yuncms-extensions-sdk';
 import { readFileSync, readdirSync } from 'node:fs';
 import { createWriteStream } from 'node:fs';
 import {
@@ -518,6 +519,43 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     assert.equal(result.status, 200); assert.equal(result.body.data.output.message, 'Public');
     const history = await manager.readRuns(rule.id); assert.equal(history[0].output.access_token, '[REDACTED]'); assert.equal(history[0].trigger_data.body.access_token, '[REDACTED]');
     assert.equal((await request(`/flows/${rule.id}/runs`, null)).status, 403);
+  });
+  await t.test('extension admission can veto native create, update, delete, enqueue and every execution before effects', async () => {
+    const guarded = new FlowsService({ ...shared, accountability: adminActor, admissionRequired: true });
+    await assert.rejects(guarded.save(definition([node('guard_missing', 'transform')])), { code: 'FLOW_ADMISSION_UNAVAILABLE' });
+    const created = await create(definition([node('guarded', 'transform', { value: 'allowed' })]));
+    const counts = (await pool.query('SELECT COUNT(*) AS n FROM yuncms_flows'))[0][0].n;
+    const offCreate = emitter.registerFilter('flows.create', (_payload, hook) => {
+      assert.equal(hook.transaction.state, 'active');
+      assert.equal(hook.collection, 'yuncms_flows');
+      throw new ExtensionError('FLOW_APPROVAL_REQUIRED','approval required',{status:403});
+    });
+    try {
+      const denied = await request('/flows/import', adminToken, 'POST', definition([node('new', 'transform')]));
+      assert.equal(denied.status, 403);
+      assert.equal((await pool.query('SELECT COUNT(*) AS n FROM yuncms_flows'))[0][0].n, counts);
+    } finally { offCreate(); }
+    for (const event of ['flows.update', 'flows.delete', 'flows.execute', 'flows.enqueue']) {
+      const off = emitter.registerFilter(event, (_payload, hook) => {
+        assert.equal(hook.key, created.id);
+        assert.equal(hook.flow.id, created.id);
+        throw new ExtensionError('FLOW_APPROVAL_REQUIRED','approval required',{status:403});
+      });
+      try {
+        if (event === 'flows.update') await assert.rejects(manager.save({ ...created, name: 'Forbidden edit' }, created.id), { code: 'FLOW_APPROVAL_REQUIRED' });
+        if (event === 'flows.delete') await assert.rejects(manager.deleteOne(created.id, created.revision), { code: 'FLOW_APPROVAL_REQUIRED' });
+        if (event === 'flows.execute') {
+          const denied = await request('/flows/' + created.id + '/run', adminToken, 'POST', {});
+          assert.equal(denied.status, 403);
+          assert.equal((await manager.readRuns(created.id)).length, 0);
+          await assert.rejects(internal.runTriggered(created.id, {}, adminActor), { code: 'FLOW_APPROVAL_REQUIRED' });
+        }
+        if (event === 'flows.enqueue') await assert.rejects(internal.enqueue(created, {}, adminActor), { code: 'FLOW_APPROVAL_REQUIRED' });
+        assert.equal((await manager.readOne(created.id)).name, created.name);
+        assert.equal((await manager.readOne(created.id)).revision, created.revision);
+      } finally { off(); }
+    }
+    assert.equal((await manager.runManual(created.id, {})).output, 'allowed');
   });
   await t.test('replicas deduplicate UTC schedules with physical unique constraints', async () => {
     const rule = await create(definition([node('value', 'transform', { value: '{{ $trigger.scheduled_at }}' })], { trigger: 'schedule', accountability: 'public', options: { cron: '* * * * * *', response: '$last' } }));

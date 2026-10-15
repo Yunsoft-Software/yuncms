@@ -260,6 +260,30 @@ Use [order calculation](flows-recipes.md#8-calculate-an-order-in-a-trusted-scrip
 
 ## REST reference and minimal definition
 
+### Extension admission
+
+Native services emit veto-only filters `flows.create`, `flows.update`,
+`flows.delete`, `flows.enqueue` and `flows.execute`. They run before the
+corresponding mutation, queue insertion or graph execution. Returning a changed
+payload does not replace the normalized definition. Throw an SDK
+`ExtensionError` to reject the operation. Create/update/delete run in a native
+transaction and preserve optimistic revision checks; a caller-owned transaction
+is reused. Import uses the same create admission. All execution paths, including
+manual, webhook, event, queued and child flows, pass through execute admission.
+
+Filter context contains `collection: 'yuncms_flows'`, `key`, normalized `flow`,
+`previous` for updates, the verified service `accountability`, separate
+`triggerAccountability`, database and native transaction metadata. Read/export
+permissions are unchanged. The core exports `FLOW_ADMISSION_VERSION = 1` so
+consumers requiring these guards can reject unsupported runtimes at startup.
+This contract does not sandbox trusted script code.
+
+Deployments that require a policy extension can set
+`FLOWS_ADMISSION_REQUIRED=true`. Missing admission filters then reject Flow
+mutations/queue admission/execution with `FLOW_ADMISSION_UNAVAILABLE` instead of
+silently continuing after an extension load failure. Direct service consumers
+use `admissionRequired: true`. The standalone default remains false.
+
 | Method/path | Access and result |
 | --- | --- |
 | `GET /flows` | Administrator or native role-scoped reader; paginated definitions, newest first. Default limit 10, maximum 100. |

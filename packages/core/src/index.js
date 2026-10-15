@@ -75,7 +75,7 @@ export { FieldsService } from './services/fields-service.js';
 export { SystemCollectionFieldsService } from './services/system-collection-fields-service.js';
 export { RelationsService } from './services/relations-service.js';
 export { UsersService } from './services/users-service.js';
-export { FlowsService, FLOW_FILTER_EVENTS, FLOW_ACTION_EVENTS } from './services/flows-service.js';
+export { FlowsService, FLOW_FILTER_EVENTS, FLOW_ACTION_EVENTS, FLOW_ADMISSION_VERSION } from './services/flows-service.js';
 export { normalizeFlow, FLOW_LIMITS, FLOW_TRIGGERS, FLOW_OPERATION_TYPES } from './flows/definition.js';
 export { parseCronExpression, cronMatches, parseFlowCronExpression, flowCronMatchesUtc } from './flows/cron.js';
 export { flowExecutionStorage } from './flows/context.js';
