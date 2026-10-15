@@ -242,6 +242,12 @@ For CommonJS choose `format: "commonjs"` and use `module.exports = async functio
 
 In the official Docker image, the running project directory is `/data`. Manage its package manifest/lockfile and install project dependencies under `/data/node_modules`. The runtime user needs write access to the private `/data/.yuncms/flow-scripts` directory. Deploy the same dependency versions to every API replica.
 
+If the API's working directory stages extensions separately from the project,
+set `FLOWS_SCRIPT_PROJECT_PATH` to the application's absolute project directory.
+Trusted scripts and their temporary `.yuncms/flow-scripts` files then resolve
+packages from that project. The runtime user needs write access there. This
+server setting does not enable scripts or grant users execution permission.
+
 | Context member | Contract |
 | --- | --- |
 | `accountability` | Verified execution actor selected by the flow; input cannot replace it. |

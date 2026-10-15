@@ -3,6 +3,12 @@ import test from 'node:test';
 
 import { loadConfig } from '../src/config.js';
 
+test('trusted Flow script project directory is an explicit server configuration', () => {
+  assert.equal(loadConfig({}).flows.scripts.projectPath, undefined);
+  assert.equal(loadConfig({ FLOWS_SCRIPT_PROJECT_PATH: '/app/apps/yuncms' }).flows.scripts.projectPath, '/app/apps/yuncms');
+  assert.equal(loadConfig({ FLOWS_SCRIPT_PROJECT_PATH: '/app/apps/yuncms' }).flows.scripts.enabled, false);
+});
+
 test('trusted proxy hops are disabled by default and explicitly bounded', () => {
   assert.equal(loadConfig({}).server.trustProxyHops, 0);
   assert.equal(loadConfig({ TRUST_PROXY_HOPS: '1' }).server.trustProxyHops, 1);

@@ -65,6 +65,7 @@ export function loadConfig(env = process.env) {
       requestHosts: readString(env.FLOWS_REQUEST_ALLOWED_HOSTS, '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean),
       envAllowList: readString(env.FLOWS_ENV_ALLOW_LIST, '').split(',').map(value => value.trim()).filter(Boolean),
       scripts: {
+        ...(env.FLOWS_SCRIPT_PROJECT_PATH ? { projectPath: readString(env.FLOWS_SCRIPT_PROJECT_PATH, '') } : {}),
         enabled: readBoolean(env.FLOWS_SCRIPTS_ENABLED, false),
         timeoutMs: readInteger(env.FLOWS_SCRIPT_TIMEOUT_MS, 5000, 'FLOWS_SCRIPT_TIMEOUT_MS', { min: 100, max: 30000 }),
         memoryMb: readInteger(env.FLOWS_SCRIPT_MEMORY_MB, 128, 'FLOWS_SCRIPT_MEMORY_MB', { min: 32, max: 512 }),
