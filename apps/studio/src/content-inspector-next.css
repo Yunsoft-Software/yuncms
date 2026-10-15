@@ -21,6 +21,7 @@
   inset: 0 0 0 auto;
   width: min(390px, 92vw);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   border-left: 1px solid var(--ui-border);
   background: var(--ui-surface);
@@ -50,6 +51,11 @@
   letter-spacing: -.02em;
 }
 
+.studio-inspector-header > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .studio-inspector-header p {
   margin: 3px 0 0;
   color: var(--ui-text-tertiary);
@@ -57,6 +63,7 @@
 }
 
 .studio-inspector-close {
+  flex: 0 0 32px;
   width: 32px;
   height: 32px;
   padding: 0;

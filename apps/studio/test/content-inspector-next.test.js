@@ -9,6 +9,12 @@ const inspectorSource = readFileSync(resolve(SRC, 'components/Inspector.jsx'), '
 const relationPickerSource = readFileSync(resolve(SRC, 'components/RelationPicker.jsx'), 'utf8');
 const workbenchCss = readFileSync(resolve(SRC, 'content-inspector-next.css'), 'utf8');
 
+test('shared inspector constrains long titles and preserves a reachable close control', () => {
+  assert.match(workbenchCss, /\.studio-inspector\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(workbenchCss, /\.studio-inspector-header > div\s*\{[^}]*min-width: 0;[^}]*overflow-wrap: anywhere;/);
+  assert.match(workbenchCss, /\.studio-inspector-close\s*\{[^}]*flex: 0 0 32px;/);
+});
+
 test('Content quick edit reuses the existing RecordForm inside the shared inspector', () => {
   assert.match(contentSource, /import \{[\s\S]*Inspector,[\s\S]*RelationPicker,[\s\S]*\} from '\.\.\/components\/index\.js';/);
   assert.match(contentSource, /<Inspector/);

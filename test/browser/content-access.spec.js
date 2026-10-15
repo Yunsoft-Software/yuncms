@@ -97,7 +97,8 @@ test('closing an inspector during a real blocking Flow update keeps it closed wh
     await page.getByRole('dialog').getByLabel('status', { exact: true }).fill('review');
     const saving = page.waitForResponse(result => result.url().endsWith(`/items/${collection}/${record.id}`) && result.request().method() === 'PATCH');
     await page.getByRole('dialog').getByRole('button', { name: 'Save record', exact: true }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Close inspector', exact: true }).click(); await expect(page.getByRole('dialog')).toHaveCount(0);
+    const close = page.getByRole('dialog').getByRole('button', { name: 'Close inspector', exact: true });
+    await expect(close).toBeInViewport({ ratio: 1 }); await close.click(); await expect(page.getByRole('dialog')).toHaveCount(0);
     expect((await saving).status()).toBe(200); await expect(row).toContainText('review'); await expect(page.getByRole('dialog')).toHaveCount(0);
   } finally { await request.delete(`/flows/${flow.id}?revision=${flow.revision}`, { headers: adminHeaders }); await request.delete(`/items/${collection}/${record.id}`, { headers: adminHeaders }); }
 });

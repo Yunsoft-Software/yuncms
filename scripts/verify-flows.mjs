@@ -31,7 +31,7 @@ async function run(name, command, args, tests = false) {
 try {
   await run('unit', process.execPath, ['--test', '--test-reporter=tap',
     'packages/core/test/flows.test.js', 'packages/core/test/flow-script.test.js', 'packages/core/test/flow-verification.test.js', 'packages/core/test/studio-schema-service.test.js',
-    'packages/api/test/flows.test.js', 'apps/studio/test/flows.test.js', 'apps/studio/test/content-access.test.js', 'apps/studio/test/field-ui.test.js'], true);
+    'packages/api/test/flows.test.js', 'apps/studio/test/flows.test.js', 'apps/studio/test/content-access.test.js', 'apps/studio/test/content-inspector-next.test.js', 'apps/studio/test/field-ui.test.js'], true);
   await run('build', npm, ['run', 'build:studio']);
   // Keep native and browser fixtures sequential: they must never consume each other's queue jobs.
   await run('mysql', process.execPath, ['--test', '--test-reporter=tap', 'test/integration/flows.test.js'], true);
