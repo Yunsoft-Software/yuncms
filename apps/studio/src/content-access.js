@@ -8,3 +8,7 @@ export function contentWritableFields(fields, capabilities, action, readonly) {
   const allowed = capabilities[action].fields;
   return fields.filter(field => !readonly(field) && (allowed === null || allowed?.includes(field.field)));
 }
+
+export function contentRecordValuesKey(record, fields) {
+  return JSON.stringify([record?.id ?? null, ...fields.map(field => [field.field, field.type ?? null, record?.[field.field] ?? null])]);
+}

@@ -12,7 +12,7 @@ import {
   useConfirmDialog,
 } from '../components/index.js';
 import { formatDateFieldValue } from '../date-format.js';
-import { canWriteContent, contentWritableFields } from '../content-access.js';
+import { canWriteContent, contentRecordValuesKey, contentWritableFields } from '../content-access.js';
 import { contentEmptyState } from '../content-empty-state.js';
 import { contentTableFields, defaultContentColumnKeys, isFileField, isImageField, isReadOnlyField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
@@ -199,6 +199,7 @@ function RecordForm({
   const canSave = canWriteContent(capabilities, action, record?.id ?? null);
   const allowedFieldsKey = JSON.stringify(capabilities?.[action]?.fields);
   const editable = useMemo(() => canSave ? contentWritableFields(fields, capabilities, action, isReadOnlyField) : fields.filter(field => !isReadOnlyField(field)), [fields, allowedFieldsKey, action, canSave]);
+  const recordValuesKey = contentRecordValuesKey(record, editable);
   const [values, setValues] = useState({});
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -209,7 +210,7 @@ function RecordForm({
       inputValueForField(field, record?.[field.field]),
     ])));
     setError('');
-  }, [editable, record]);
+  }, [recordValuesKey]);
 
   async function submit(event) {
     event.preventDefault();
