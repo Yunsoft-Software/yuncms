@@ -17,11 +17,15 @@ export function studioReadableFields(entry, permission) {
       hidden: field.hidden, sort: field.sort, interface: field.interface, options: field.options, schema_metadata: field.schema_metadata }));
 }
 
+export function validateStudioCapabilityIds(ids) {
+  if (!Array.isArray(ids) || ids.length > 100 || ids.some(id => !['string', 'number'].includes(typeof id) || (typeof id === 'number' && !Number.isFinite(id)) || !String(id) || String(id).length > 191)) throw Object.assign(new Error('Provide at most 100 finite record ids'), { code: 'INVALID_QUERY' });
+}
+
 export class StudioSchemaService extends BaseService {
   async readCapabilities(collection, ids = []) {
     const schema = await this.#snapshot(), entry = Object.hasOwn(schema.collections, collection) ? schema.collections[collection] : null;
     if (!entry || entry.system) throw Object.assign(new Error('Collection is unavailable'), { code: 'COLLECTION_NOT_FOUND' });
-    if (!Array.isArray(ids) || ids.length > 100 || ids.some(id => !['string', 'number'].includes(typeof id) || !String(id) || String(id).length > 191)) throw Object.assign(new Error('Provide at most 100 record ids'), { code: 'INVALID_QUERY' });
+    validateStudioCapabilityIds(ids);
     const items = new ItemsService(collection, this), read = await items.resolvePermission('read');
     const result = { records: Object.fromEntries(ids.map(id => [String(id), { update: false, delete: false }])) };
     for (const action of ['create', 'update', 'delete']) {

@@ -26,6 +26,7 @@ test('issue 76: read/update users never see create, row delete or bulk delete on
   await expect(page.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'New record', exact: true })).toHaveCount(0);
   expect((await request.post(`/items/${collection}`, { headers, data: { title: 'Forbidden' } })).status()).toBe(403);
+  expect((await request.get(`/studio-navigation/collections/${collection}/capabilities?ids=${encodeURIComponent('[1e309]')}`, { headers })).status()).toBe(400);
 });
 
 test('read-only users can inspect records but cannot save through inspector, full editor or a direct new route', async ({ page, request }) => {

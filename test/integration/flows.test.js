@@ -134,6 +134,8 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     const foreign = (await request(`/items/${articles}`, adminToken, 'POST', { title: 'Foreign capability record' })).body.data;
     const path = `/studio-navigation/collections/${articles}/capabilities`;
     assert.equal((await request(path, null)).status, 401);
+    assert.equal((await request(`/studio-navigation/collections/${notes}/capabilities`, staffToken)).status, 403);
+    assert.equal((await request(`${path}?ids=${encodeURIComponent('[1e309]')}`, staffToken)).status, 400);
     const result = await request(`${path}?ids=${encodeURIComponent(JSON.stringify([owned.id, foreign.id]))}`, staffToken);
     assert.equal(result.status, 200); assert.equal(result.body.data.create.allowed, true); assert.equal(result.body.data.delete.allowed, false);
     assert.deepEqual(result.body.data.update.fields, ['title', 'status']);
