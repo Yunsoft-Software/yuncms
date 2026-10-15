@@ -31,4 +31,5 @@ export { CodeField } from './CodeField.jsx';
 export { FlowInspector } from './FlowInspector.jsx';
 export { FlowRunHistory } from './FlowRunHistory.jsx';
 export { JsonField } from './JsonField.jsx';
+export { JsonImportField } from './JsonImportField.jsx';
 export { ManualFlowActions } from './ManualFlowActions.jsx';

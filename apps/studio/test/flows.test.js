@@ -63,10 +63,12 @@ test('palette, trigger defaults and deep links match the backend graph contract'
 
 test('Flow screens use shared components and centralized design without page-local visual styling', () => {
   const page = source('../src/screens/FlowsScreen.jsx'), canvas = source('../src/components/FlowCanvas.jsx'), inspector = source('../src/components/FlowInspector.jsx');
+  const jsonImport = source('../src/components/JsonImportField.jsx');
   const css = source('../src/studio.css');
   assert.match(css, /@import '@xyflow\/react\/dist\/style\.css'/); assert.match(css, /@import '\.\/flows\.css'/);
-  for (const text of [page, canvas, inspector]) { assert.doesNotMatch(text, /<style\b|\bstyle=\{|import ['"].*\.css['"]|\b(?:window\.)?(?:alert|prompt|confirm)\s*\(/); }
+  for (const text of [page, canvas, inspector, jsonImport]) { assert.doesNotMatch(text, /<style\b|\bstyle=\{|import ['"].*\.css['"]|\b(?:window\.)?(?:alert|prompt|confirm)\s*\(/); }
   assert.match(page, /<FlowCanvas/); assert.match(page, /<FlowInspector/); assert.match(page, /<Modal/);
+  assert.match(page, /<JsonImportField/); assert.match(jsonImport, /className="json-field-input"/);
   assert.match(canvas, /<Handle type="source"[^\n]*id="resolve"/); assert.match(canvas, /<Handle type="source"[^\n]*id="reject"/);
   assert.match(canvas, /flowGraphEdges\(flow\)/); assert.match(canvas, /onConnect/); assert.match(canvas, /onEdgeDoubleClick/);
   const app = source('../src/App.jsx'); assert.match(app, /id: 'flows'.*adminOnly: true/); assert.match(app, /section === 'flows'\) return session\?\.user\?\.admin/);

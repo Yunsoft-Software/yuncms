@@ -16,6 +16,7 @@ import { FlowRuntime } from '../../packages/api/src/flows/runtime.js';
 import { startFlowNetwork } from '../helpers/flow-network.mjs';
 import { fork } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
+import { exportFlowDefinition, importFlowDefinition } from '../../apps/studio/src/flow-graph.js';
 
 const node = (id, type, options = {}, extra = {}) => ({ id, key: id, name: id, type, options, position: { x: 350, y: 100 }, resolve: null, reject: null, ...extra });
 const definition = (operations, extra = {}) => ({ name: 'Integration flow', status: 'active', trigger: 'manual', accountability: 'trigger', options: { response: '$last' }, entry: operations[0]?.id ?? null, operations, ...extra });
@@ -128,6 +129,26 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     const latest = raced.find(r => r.status === 200).body.data;
     assert.equal((await request(`/flows/${flow.id}?revision=${latest.revision}`, adminToken, 'DELETE')).status, 204);
     const [[runs]] = await pool.query('SELECT COUNT(*) AS total FROM yuncms_flow_runs WHERE flow_id = ?', [flow.id]); assert.equal(Number(runs.total), 0);
+  });
+  await t.test('portable JSON round trips create independent inactive webhook, schedule and executable script definitions through the native API', async () => {
+    for (const extra of [
+      { trigger: 'webhook', options: { method: 'POST', public: true, response: '$last' } },
+      { trigger: 'schedule', accountability: 'user', run_as: staff.id, options: { cron: '0 * * * * *', response: '$last' } },
+      { trigger: 'manual', options: { response: '$last' } },
+    ]) {
+      const source = await create(definition([node('script', 'script', { format: 'module', code: "import mysql from 'mysql2/promise'; export default data => ({ value: data.$trigger.body.value * 2, driver: typeof mysql.createPool, literal: '{{ untouched }}' });" })], extra));
+      const portable = JSON.parse(JSON.stringify(exportFlowDefinition(source))), draft = importFlowDefinition(portable);
+      assert.equal(portable.id, undefined); assert.equal(portable.revision, undefined);
+      const saved = await request('/flows', adminToken, 'POST', draft); assert.equal(saved.status, 201);
+      const imported = saved.body.data; flowIds.push(imported.id);
+      assert.notEqual(imported.id, source.id); assert.equal(imported.status, 'inactive'); assert.deepEqual(imported.operations, source.operations); assert.deepEqual(imported.options, source.options);
+      assert.equal((await manager.readRuns(imported.id)).length, 0); assert.equal((await manager.readOne(source.id)).status, 'active');
+      if (imported.trigger === 'manual') {
+        const activated = await request(`/flows/${imported.id}`, adminToken, 'PUT', { ...imported, status: 'active' }); assert.equal(activated.status, 200);
+        const result = await request(`/flows/${imported.id}/run`, adminToken, 'POST', { body: { value: 21 } });
+        assert.equal(result.status, 200); assert.deepEqual(result.body.data.output, { value: 42, driver: 'function', literal: '{{ untouched }}' });
+      }
+    }
   });
   await t.test('issue 76 capabilities enforce native action/field/read-row masks and reject invalid identifiers or unauthenticated discovery', async () => {
     const owned = (await request(`/items/${articles}`, staffToken, 'POST', { title: 'Owned capability record', status: 'draft' })).body.data;

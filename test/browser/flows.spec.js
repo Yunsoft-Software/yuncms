@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { open as openFile, readFile } from 'node:fs/promises';
 import { isolateCreatedFlows } from './fixtures/flow-isolation.js';
 
 isolateCreatedFlows(test);
@@ -130,6 +131,49 @@ test('export and import preserve the graph while imports and duplicates start in
   await expect(page.locator('.flow-inspector').getByLabel('Name', { exact: true })).toHaveValue('Imported flow');
   await expect(page.locator('.flow-inspector').getByLabel('Status', { exact: true })).toHaveValue('inactive');
   await expect(page.locator('.react-flow__node')).toHaveCount(2);
+});
+
+test('downloaded JSON files import as independent inactive flows and preserve executable npm script source', async ({ page, request }) => {
+  const session = await authenticate(page, request);
+  const code = "import mysql from 'mysql2/promise'; export default data => ({ value: data.$trigger.body.value * 2, driver: typeof mysql.createPool, literal: '{{ untouched }}' });";
+  const original = await createFlow(request, session, 'Portable npm script', { operations: [{ id: 'output', key: 'output', name: 'Imported script', type: 'script', position: { x: 380, y: 100 }, options: { code, format: 'module' }, resolve: null, reject: null }] });
+  await page.goto(`/#/flows/${original.id}`);
+  const downloading = page.waitForEvent('download'); await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const download = await downloading, path = await download.path(), portable = JSON.parse(await readFile(path, 'utf8'));
+  expect(download.suggestedFilename()).toBe('Portable-npm-script.json'); expect(portable.id).toBeUndefined(); expect(portable.revision).toBeUndefined(); expect(portable.operations[0].options.code).toBe(code);
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
+  const dialog = page.getByRole('dialog'); await dialog.getByLabel('Choose a JSON file', { exact: true }).setInputFiles(path);
+  await expect(dialog.getByLabel('Flow definition (JSON)', { exact: true })).toHaveValue(JSON.stringify(portable, null, 2));
+  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-json-import.png`, fullPage: true });
+  await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+  await expect(page.locator('.flow-inspector').getByLabel('Status', { exact: true })).toHaveValue('inactive');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  const creating = page.waitForResponse(response => response.url().endsWith('/flows') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Save', exact: true }).click(); const saved = await creating;
+  expect(saved.status()).toBe(201); const imported = (await saved.json()).data;
+  expect(imported.id).not.toBe(original.id); expect(imported.status).toBe('inactive'); expect(imported.operations).toEqual(original.operations);
+  await page.locator('.flow-inspector').getByLabel('Status', { exact: true }).selectOption('active');
+  const activating = page.waitForResponse(response => response.url().endsWith(`/flows/${imported.id}`) && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'Save', exact: true }).click(); expect((await activating).status()).toBe(200);
+  await page.getByRole('button', { name: 'Run saved flow', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Trigger payload (JSON)', { exact: true }).fill('{"body":{"value":21}}');
+  await page.getByRole('dialog').getByRole('button', { name: 'Run saved flow', exact: true }).click();
+  await expect(page.getByTestId('flow-run-output')).toContainText('42'); await expect(page.getByTestId('flow-run-output')).toContainText('{{ untouched }}');
+});
+
+test('invalid files and pasted definitions stay inside the import dialog without replacing the saved graph', async ({ page, request }, info) => {
+  const session = await authenticate(page, request), original = await createFlow(request, session, 'Import validation regression');
+  await page.goto(`/#/flows/${original.id}`); await page.getByRole('button', { name: 'Import', exact: true }).click();
+  const dialog = page.getByRole('dialog'), picker = dialog.getByLabel('Choose a JSON file', { exact: true });
+  await picker.setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('{invalid') });
+  await expect(dialog.getByRole('alert')).toContainText('valid JSON'); await expect(dialog.getByRole('button', { name: 'Import', exact: true })).toBeDisabled();
+  const path = info.outputPath('oversized.json'), file = await openFile(path, 'w'); await file.truncate(20 * 1024 * 1024 + 1); await file.close();
+  await picker.setInputFiles(path); await expect(dialog.getByRole('alert')).toContainText('20 MiB');
+  await dialog.getByLabel('Flow definition (JSON)', { exact: true }).fill('{}'); await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('valid Flow definition');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.locator('.flow-inspector').getByLabel('Name', { exact: true })).toHaveValue(original.name);
+  await expect(page).toHaveURL(new RegExp(original.id + '$')); await expect(page.locator('.react-flow__edge')).toHaveCount(1);
 });
 
 test('staff cannot open the Flow manager and can run only explicitly granted collection actions', async ({ page, request }) => {

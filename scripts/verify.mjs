@@ -126,6 +126,7 @@ const FAST_TESTS = [
   'apps/studio/test/collection-visibility.test.js',
   'apps/studio/test/automations.test.js',
   'apps/studio/test/flows.test.js',
+  'apps/studio/test/json-import.test.js',
   'apps/studio/test/content-access.test.js',
   'apps/studio/test/content-inspector-next.test.js',
   'apps/studio/test/collection-ui.test.js',

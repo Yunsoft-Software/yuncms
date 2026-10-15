@@ -3,7 +3,8 @@ import { apiRequest } from '../api.js';
 import { addFlowOperation, exportFlowDefinition, importFlowDefinition, newFlowDraft, removeFlowOperation } from '../flow-graph.js';
 import { useI18n } from '../i18n.js';
 import { navigateStudio, studioPath } from '../studio-route.js';
-import { useConfirmDialog, FlowCanvas, FlowInspector, FlowRunHistory, JsonField, Modal } from '../components/index.js';
+import { parseJsonImportText } from '../json-import.js';
+import { useConfirmDialog, FlowCanvas, FlowInspector, FlowRunHistory, JsonField, JsonImportField, Modal } from '../components/index.js';
 
 export function FlowsScreen({ route }) {
   const { t } = useI18n(), confirmAction = useConfirmDialog();
@@ -13,6 +14,7 @@ export function FlowsScreen({ route }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [invalid, setInvalid] = useState(false);
   const [saved, setSaved] = useState(false), [baseline, setBaseline] = useState('');
   const [importOpen, setImportOpen] = useState(false), [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState(''), [importReading, setImportReading] = useState(false);
   const [runOpen, setRunOpen] = useState(false), [runPayload, setRunPayload] = useState({ body: { name: 'YunCMS' } });
   const [runInvalid, setRunInvalid] = useState(false), [paletteType, setPaletteType] = useState('transform');
   const loadedRoute = useRef(null);
@@ -71,6 +73,9 @@ export function FlowsScreen({ route }) {
     const url = URL.createObjectURL(new Blob([JSON.stringify(exportFlowDefinition(draft), null, 2)], { type: 'application/json' }));
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${(draft.name || 'flow').replace(/[^A-Za-z0-9_-]+/g, '-')}.json`; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  function importFailure(failure) {
+    setImportError(t(failure.code === 'JSON_IMPORT_TOO_LARGE' ? 'flow.importTooLarge' : failure.code === 'JSON_IMPORT_INVALID' ? 'flow.importInvalidJson' : 'flow.importInvalid'));
+  }
   async function runSaved() {
     await perform(async () => {
       try { await apiRequest(`/flows/${encodeURIComponent(draft.id)}/run`, { method: 'POST', body: runPayload }); }
@@ -84,7 +89,7 @@ export function FlowsScreen({ route }) {
   return <section className="flows-workspace" aria-label={t('flow.title')}>
     <header className="flow-heading"><div><h1>{draft.name || t('flow.title')}</h1><p>{t('flow.subtitle')}</p></div>
       <div className="flow-toolbar-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => navigate(studioPath.newFlow())}>{t('flow.new')}</button>
-        <button className="secondary-button" type="button" disabled={busy} onClick={() => { setImportText(''); setImportOpen(true); }}>{t('flow.import')}</button>
+        <button className="secondary-button" type="button" disabled={busy} onClick={() => { setImportText(''); setImportError(''); setImportReading(false); setImportOpen(true); }}>{t('flow.import')}</button>
         <button className="primary-button" type="button" disabled={busy || invalid || !draft.name.trim()} onClick={save}>{busy ? t('common.saving') : t('common.save')}</button></div>
     </header>
     {error && <div className="error-banner" role="alert">{error}</div>}{saved && <p className="success-banner" role="status">{t('common.saved')}</p>}
@@ -108,11 +113,13 @@ export function FlowsScreen({ route }) {
       <FlowInspector key={selected} flow={draft} selected={selected} configuration={configuration} onChange={change} disabled={busy} onValidityChange={valid => setInvalid(!valid)} onRemove={id => { change(removeFlowOperation(draft, id)); setSelected('trigger'); setInvalid(false); }} />
     </div>
     {draft.id && <FlowRunHistory runs={runs} selected={run} onSelect={setRun} />}
-    <Modal open={importOpen} title={t('flow.import')} description={t('flow.importHint')} onClose={() => setImportOpen(false)} actions={<><button type="button" className="text-button" onClick={() => setImportOpen(false)}>{t('common.cancel')}</button><button type="button" className="primary-button" onClick={() => {
-      try { const next = importFlowDefinition(JSON.parse(importText)); change(next); setSelected('trigger'); setInvalid(false); setImportOpen(false); }
-      catch (failure) { setError(failure.message); }
+    <Modal open={importOpen} title={t('flow.import')} description={t('flow.importHint')} onClose={() => setImportOpen(false)} actions={<><button type="button" className="text-button" onClick={() => setImportOpen(false)}>{t('common.cancel')}</button><button type="button" className="primary-button" disabled={importReading || Boolean(importError)} onClick={() => {
+      try { const next = importFlowDefinition(parseJsonImportText(importText)); change(next); setSelected('trigger'); setInvalid(false); setImportOpen(false); }
+      catch (failure) { importFailure(failure); }
     }}>{t('flow.import')}</button></>}>
-      <label className="field-label"><span>{t('flow.importJson')}</span><textarea className="json-field-input" rows={12} value={importText} onChange={event => setImportText(event.target.value)} /></label>
+      <JsonImportField value={importText} onChange={value => { setImportText(value); setImportError(''); }} onError={importFailure} onLoadingChange={setImportReading}
+        fileLabel={t('flow.importFile')} textLabel={t('flow.importJson')} loadingLabel={t('common.loading')} />
+      {importError && <div className="error-banner" role="alert">{importError}</div>}
     </Modal>
     <Modal open={runOpen} title={t('flow.run')} description={t('flow.runHint')} onClose={() => setRunOpen(false)} actions={<><button type="button" className="text-button" disabled={busy} onClick={() => setRunOpen(false)}>{t('common.cancel')}</button><button type="button" className="primary-button" disabled={busy || runInvalid} onClick={runSaved}>{t('flow.run')}</button></>}>
       <JsonField objectOnly label={t('flow.runPayload')} value={runPayload} onChange={setRunPayload} onValidityChange={valid => setRunInvalid(!valid)} errorLabel={t('flow.invalidJson')} />
