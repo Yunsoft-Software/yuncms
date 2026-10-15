@@ -95,8 +95,9 @@ test('flow migration, cron contracts and safe configuration defaults remain expl
   assert.equal(flowCronMatchesUtc(parseFlowCronExpression('*/5 * * * *'), utc), false);
   assert.equal(flowCronMatchesUtc(parseFlowCronExpression('*/5 * * * *'), new Date('2026-10-15T12:15:00Z')), true);
   assert.throws(() => parseFlowCronExpression('* * *'));
-  assert.deepEqual(loadConfig({}).flows, { requestHosts: [], envAllowList: [], scripts: SCRIPT_DEFAULTS });
-  assert.deepEqual(loadConfig({ FLOWS_REQUEST_ALLOWED_HOSTS: ' api.example.test, API.OTHER.TEST ', FLOWS_ENV_ALLOW_LIST: 'PUBLIC_URL, STAGE' }).flows, { requestHosts: ['api.example.test', 'api.other.test'], envAllowList: ['PUBLIC_URL', 'STAGE'], scripts: SCRIPT_DEFAULTS });
+  assert.deepEqual(loadConfig({}).flows, { admissionRequired: false, requestHosts: [], envAllowList: [], scripts: SCRIPT_DEFAULTS });
+  assert.deepEqual(loadConfig({ FLOWS_REQUEST_ALLOWED_HOSTS: ' api.example.test, API.OTHER.TEST ', FLOWS_ENV_ALLOW_LIST: 'PUBLIC_URL, STAGE' }).flows, { admissionRequired: false, requestHosts: ['api.example.test', 'api.other.test'], envAllowList: ['PUBLIC_URL', 'STAGE'], scripts: SCRIPT_DEFAULTS });
+  assert.equal(loadConfig({ FLOWS_ADMISSION_REQUIRED: 'true' }).flows.admissionRequired, true);
   assert.deepEqual(loadConfig({ FLOWS_SCRIPTS_ENABLED: 'true', FLOWS_SCRIPT_TIMEOUT_MS: '100', FLOWS_SCRIPT_MEMORY_MB: '32', FLOWS_SCRIPT_CONCURRENCY: '1' }).flows.scripts, { enabled: true, timeoutMs: 100, memoryMb: 32, concurrency: 1 });
   for (const [key, invalid] of [['FLOWS_SCRIPT_TIMEOUT_MS', ['99', '30001', 'NaN']], ['FLOWS_SCRIPT_MEMORY_MB', ['31', '513', '32.5']], ['FLOWS_SCRIPT_CONCURRENCY', ['0', '9', '-1']]]) {
     for (const value of invalid) assert.throws(() => loadConfig({ [key]: value }), new RegExp(key));

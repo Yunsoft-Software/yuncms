@@ -1,5 +1,14 @@
 # AGENTS.md
 
+## Current owner instruction — 2026-10-15 consumer integration
+
+For the authorized native Flow admission work on dev, prepare corresponding
+regression tests and documentation. The user's later instruction, “otomatik
+testleri de çalıştıralım”, explicitly authorizes running automated tests and
+necessary test builds in an isolated disposable MySQL environment. Record actual
+passes, failures and skips. Do not publish or merge main; the owner handles
+publication. No new branch, installed-package patches or consumer core forks.
+
 ## Product direction
 YunCMS is a small, reusable MySQL backend/CMS platform with a focused administration Studio. Keep the core understandable, stable and extensible; add features when they solve a real product need rather than for checklist parity with another product.
 
