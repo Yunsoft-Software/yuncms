@@ -251,13 +251,24 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
       const flow = await create(definition([node('wait', 'sleep', { milliseconds: 100 }, { resolve: 'create' }), node('create', 'create', { collection: notes, payload: { title: 'Concurrent {{ $trigger.index }}' } })]));
       const before = await count(notes);
       for (let index = 0; index < 20; index++) await internal.enqueue(flow, { index }, adminActor);
-      const drain = () => new Promise((resolve, reject) => {
-        const child = fork(new URL('../helpers/flow-drain.mjs', import.meta.url), [], { execArgv: [], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+      const workers = [0, 1].map(() => {
+        const child = fork(new URL('../helpers/flow-drain.mjs', import.meta.url), ['--await-start'], { execArgv: [], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
         let claimed, stderr = ''; child.stderr.on('data', chunk => { stderr += chunk; });
         child.on('message', message => { if (message.done) claimed = message.claimed; });
-        child.once('error', reject); child.once('exit', code => code === 0 ? resolve(claimed) : reject(Error(`Native drain worker failed: ${stderr}`)));
+        const ready = new Promise((resolve, reject) => {
+          child.on('message', message => { if (message.ready) resolve(); });
+          child.once('error', reject); child.once('exit', () => reject(Error(`Native worker exited before its start signal: ${stderr}`)));
+        });
+        const done = new Promise((resolve, reject) => {
+          child.once('error', reject); child.once('exit', code => code === 0 ? resolve(claimed) : reject(Error(`Native drain worker failed: ${stderr}`)));
+        });
+        t.after(() => { if (child.exitCode === null) child.kill('SIGKILL'); });
+        return { ready, done, start: () => child.send({ start: true }) };
       });
-      const completed = await Promise.allSettled([drain(), drain()]);
+      const completion = Promise.allSettled(workers.map(worker => worker.done));
+      await Promise.all(workers.map(worker => worker.ready));
+      for (const worker of workers) worker.start();
+      const completed = await completion;
       for (const result of completed) if (result.status === 'rejected') throw result.reason;
       const counts = completed.map(result => result.value); assert.equal(counts[0] + counts[1], 20); assert.ok(counts.every(count => count > 0));
       const runs = await manager.readRuns(flow.id); assert.equal(runs.length, 20); assert.deepEqual(runs.filter(run => run.status !== 'succeeded').map(({ status, error_code, trace }) => ({ status, error_code, trace })), [], 'Every claimed job must complete successfully');
