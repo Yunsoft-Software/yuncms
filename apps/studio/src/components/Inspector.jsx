@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useLayoutEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useI18n } from '../i18n.js';
@@ -29,15 +29,14 @@ export function Inspector({
   const previousFocusRef = useRef(null);
   const resolvedCloseLabel = closeLabel || t('common.close');
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return undefined;
     previousFocusRef.current = document.activeElement;
-    const frame = window.requestAnimationFrame(() => {
+    if (!panelRef.current?.contains(document.activeElement)) {
       const target = panelRef.current?.querySelector(FOCUSABLE_SELECTOR) || panelRef.current;
       target?.focus?.();
-    });
+    }
     return () => {
-      window.cancelAnimationFrame(frame);
       previousFocusRef.current?.focus?.();
     };
   }, [open]);

@@ -355,7 +355,7 @@ The Administrator sidebar includes links to Yunsoft project help, the GitHub rep
 
 # Accessibility and motion
 
-Studio uses shared dialogs, inspectors, command palette and picker controls with keyboard focus management. Important actions should not depend on hover alone, and state labels remain textual even when color also reinforces them.
+Studio uses shared dialogs, inspectors, command palette and picker controls with keyboard focus management. Opening a dialog or inspector preserves the field you focus and type into. Important actions should not depend on hover alone, and state labels remain textual even when color also reinforces them.
 
 When the operating system requests reduced motion, Studio removes workspace transitions, overlay movement and smooth scrolling while preserving the final state immediately.
 

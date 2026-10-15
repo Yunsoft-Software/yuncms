@@ -65,25 +65,55 @@ test('native row filters hide mutation actions per record and the editor exposes
 
 test('ordinary CRUD grants retain native create, quick update, confirmed row delete and bulk delete', async ({ page, request }) => {
   const headers = await open(page, request, 'content-writer@example.test');
-  await page.getByRole('button', { name: 'New record', exact: true }).click();
-  await page.locator('.record-editor').getByLabel('title', { exact: true }).fill('UI permission regression');
-  await page.locator('.record-editor').getByLabel('status', { exact: true }).fill('draft');
-  await page.getByRole('button', { name: 'Save record', exact: true }).click();
-  const row = page.locator('tbody tr').filter({ hasText: 'UI permission regression' }); await expect(row).toBeVisible();
-  await row.getByRole('button', { name: 'Quick edit', exact: true }).click();
-  await page.getByRole('dialog').getByLabel('status', { exact: true }).fill('review');
-  await page.getByRole('dialog').getByRole('button', { name: 'Save record', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Close inspector', exact: true }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(row).toContainText('review');
-  await row.getByRole('button', { name: 'Delete', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Delete record', exact: true }).click(); await expect(row).toHaveCount(0);
-  const records = [await create(request, headers, 'Bulk permission A'), await create(request, headers, 'Bulk permission B')];
-  await page.reload();
-  for (const record of records) await page.locator('tbody tr').filter({ hasText: record.id }).locator('input[type="checkbox"]').check();
-  await page.getByRole('button', { name: 'Delete selected', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Delete selected', exact: true }).click();
-  for (const record of records) await expect(page.locator('tbody tr').filter({ hasText: record.id })).toHaveCount(0);
+  const key = crypto.randomUUID(), title = `UI permission regression ${key}`, records = [];
+  try {
+    await page.getByRole('button', { name: 'New record', exact: true }).click();
+    await page.locator('.record-editor').getByLabel('title', { exact: true }).fill(title);
+    await page.locator('.record-editor').getByLabel('status', { exact: true }).fill('draft');
+    const creating = page.waitForResponse(response => response.url().endsWith(`/items/${collection}`) && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Save record', exact: true }).click();
+    const created = await creating; expect(created.status()).toBe(201); const item = (await created.json()).data; records.push(item);
+    await page.getByRole('searchbox', { name: 'Search', exact: true }).fill(key);
+    const row = page.locator('tbody tr').filter({ hasText: item.id }); await expect(row).toBeVisible();
+    await row.getByRole('button', { name: 'Quick edit', exact: true }).click();
+    const status = page.getByRole('dialog').getByLabel('status', { exact: true }); await status.fill('review'); await expect(status).toHaveValue('review');
+    const saving = page.waitForResponse(response => response.url().endsWith(`/items/${collection}/${item.id}`) && response.request().method() === 'PATCH');
+    await page.getByRole('dialog').getByRole('button', { name: 'Save record', exact: true }).click();
+    const saved = await saving; expect(saved.status()).toBe(200); expect(saved.request().postDataJSON().status).toBe('review');
+    await page.getByRole('dialog').getByRole('button', { name: 'Close inspector', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0); await expect(row).toContainText('review');
+    await row.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete record', exact: true }).click(); await expect(row).toHaveCount(0);
+    const bulk = [await create(request, headers, `Bulk permission A ${key}`), await create(request, headers, `Bulk permission B ${key}`)]; records.push(...bulk);
+    await page.reload(); await page.getByRole('searchbox', { name: 'Search', exact: true }).fill(key);
+    for (const record of bulk) await page.locator('tbody tr').filter({ hasText: record.id }).locator('input[type="checkbox"]').check();
+    await page.getByRole('button', { name: 'Delete selected', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete selected', exact: true }).click();
+    for (const record of bulk) await expect(page.locator('tbody tr').filter({ hasText: record.id })).toHaveCount(0);
+  } finally {
+    for (const record of records) expect([204, 404]).toContain((await request.delete(`/items/${collection}/${record.id}`, { headers })).status());
+  }
+});
+
+test('opening the inspector preserves immediate field focus and typed values across repeated native saves', async ({ page, request }) => {
+  const actor = await session(request, 'content-writer@example.test'), headers = { authorization: `Bearer ${actor.access_token}` };
+  const title = `Rapid inspector focus ${crypto.randomUUID()}`, record = await create(request, headers, title);
+  try {
+    await open(page, request, 'content-writer@example.test'); await page.getByRole('searchbox', { name: 'Search', exact: true }).fill(title);
+    const row = page.locator('tbody tr').filter({ hasText: record.id });
+    for (let index = 0; index < 5; index++) {
+      await row.getByRole('button', { name: 'Quick edit', exact: true }).click();
+      const field = page.getByRole('dialog').getByLabel('status', { exact: true }), value = `review-${index}`;
+      await field.fill(value);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      await expect(field).toBeFocused(); await expect(field).toHaveValue(value);
+      const saving = page.waitForResponse(response => response.url().endsWith(`/items/${collection}/${record.id}`) && response.request().method() === 'PATCH');
+      await page.getByRole('dialog').getByRole('button', { name: 'Save record', exact: true }).click();
+      const saved = await saving; expect(saved.status()).toBe(200); expect(saved.request().postDataJSON().status).toBe(value);
+      await page.getByRole('dialog').getByRole('button', { name: 'Close inspector', exact: true }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0); await expect(row).toContainText(value);
+    }
+  } finally { expect((await request.delete(`/items/${collection}/${record.id}`, { headers })).status()).toBe(204); }
 });
 
 test('closing an inspector during a real blocking Flow update keeps it closed when the save completes', async ({ page, request }) => {

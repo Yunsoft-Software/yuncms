@@ -15,6 +15,16 @@ test('shared inspector constrains long titles and preserves a reachable close co
   assert.match(workbenchCss, /\.studio-inspector-close\s*\{[^}]*flex: 0 0 32px;/);
 });
 
+test('shared dialogs initialize focus before paint and preserve a field already focused by the user', () => {
+  const modalSource = readFileSync(resolve(SRC, 'components/Modal.jsx'), 'utf8');
+  for (const source of [inspectorSource, modalSource]) {
+    assert.match(source, /useLayoutEffect\(\(\) =>/);
+    assert.match(source, /if \(!\w+Ref\.current\?\.contains\(document\.activeElement\)\)/);
+    assert.doesNotMatch(source, /requestAnimationFrame|cancelAnimationFrame/);
+    assert.match(source, /previousFocusRef\.current\?\.focus\?\.\(\)/);
+  }
+});
+
 test('Content quick edit reuses the existing RecordForm inside the shared inspector', () => {
   assert.match(contentSource, /import \{[\s\S]*Inspector,[\s\S]*RelationPicker,[\s\S]*\} from '\.\.\/components\/index\.js';/);
   assert.match(contentSource, /<Inspector/);

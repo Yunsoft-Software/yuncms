@@ -161,3 +161,17 @@ test('flow deletion uses the shared confirmation dialog and removes the saved gr
   await expect(page).toHaveURL(/#\/flows\/new$/);
   const response = await request.get(`/flows/${flow.id}`, { headers: { authorization: `Bearer ${session.access_token}` } }); expect(response.status()).toBe(404);
 });
+
+test('manual run modal preserves immediately typed payload and keyboard focus through native execution', async ({ page, request }) => {
+  const session = await authenticate(page, request), value = `Focused payload ${crypto.randomUUID()}`;
+  const flow = await createFlow(request, session, 'Modal focus regression', { operations: [{ id: 'output', key: 'output', name: 'Output', type: 'transform', position: { x: 380, y: 100 }, options: { value: '{{ $trigger.body.value }}' }, resolve: null, reject: null }] });
+  await page.goto(`/#/flows/${flow.id}`); await page.getByRole('button', { name: 'Run saved flow', exact: true }).click();
+  const field = page.getByRole('dialog').getByLabel('Trigger payload (JSON)', { exact: true }), payload = JSON.stringify({ body: { value } });
+  await field.fill(payload);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await expect(field).toBeFocused(); await expect(field).toHaveValue(payload);
+  const running = page.waitForResponse(response => response.url().endsWith(`/flows/${flow.id}/run`) && response.request().method() === 'POST');
+  await page.getByRole('dialog').getByRole('button', { name: 'Run saved flow', exact: true }).click();
+  const result = await running; expect(result.status()).toBe(200); expect(result.request().postDataJSON()).toEqual({ body: { value } });
+  expect((await result.json()).data.output).toBe(value); await expect(page.getByTestId('flow-run-output')).toContainText(value);
+});

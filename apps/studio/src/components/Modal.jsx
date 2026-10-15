@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useLayoutEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useI18n } from '../i18n.js';
@@ -30,22 +30,21 @@ export function Modal({
   const previousFocusRef = useRef(null);
   const resolvedEyebrow = eyebrow === undefined ? t('common.confirmation') : eyebrow;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return undefined;
 
     previousFocusRef.current = document.activeElement;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    const frame = window.requestAnimationFrame(() => {
+    if (!dialogRef.current?.contains(document.activeElement)) {
       const target = initialFocusRef?.current
         || dialogRef.current?.querySelector(FOCUSABLE_SELECTOR)
         || dialogRef.current;
       target?.focus();
-    });
+    }
 
     return () => {
-      window.cancelAnimationFrame(frame);
       document.body.style.overflow = previousOverflow;
       previousFocusRef.current?.focus?.();
     };
