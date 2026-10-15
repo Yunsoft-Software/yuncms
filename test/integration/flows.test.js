@@ -137,9 +137,11 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
       { trigger: 'manual', options: { response: '$last' } },
     ]) {
       const source = await create(definition([node('script', 'script', { format: 'module', code: "import mysql from 'mysql2/promise'; export default data => ({ value: data.$trigger.body.value * 2, driver: typeof mysql.createPool, literal: '{{ untouched }}' });" })], extra));
-      const portable = JSON.parse(JSON.stringify(exportFlowDefinition(source))), draft = importFlowDefinition(portable);
+      const exported = await request(`/flows/${source.id}/export`, adminToken); assert.equal(exported.status, 200);
+      const portable = exported.body, draft = importFlowDefinition(portable); assert.deepEqual(portable, JSON.parse(JSON.stringify(exportFlowDefinition(source))));
       assert.equal(portable.id, undefined); assert.equal(portable.revision, undefined);
-      const saved = await request('/flows', adminToken, 'POST', draft); assert.equal(saved.status, 201);
+      const saved = await request('/flows/import', adminToken, 'POST', { ...portable, id: source.id, revision: source.revision }); assert.equal(saved.status, 201);
+      assert.equal(draft.status, 'inactive');
       const imported = saved.body.data; flowIds.push(imported.id);
       assert.notEqual(imported.id, source.id); assert.equal(imported.status, 'inactive'); assert.deepEqual(imported.operations, source.operations); assert.deepEqual(imported.options, source.options);
       assert.equal((await manager.readRuns(imported.id)).length, 0); assert.equal((await manager.readOne(source.id)).status, 'active');
@@ -371,7 +373,7 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
       for (const worker of workers) worker.start();
       const completed = await completion;
       for (const result of completed) if (result.status === 'rejected') throw result.reason;
-      const counts = completed.map(result => result.value); assert.equal(counts[0] + counts[1], 20); assert.ok(counts.every(count => count > 0));
+      const counts = completed.map(result => result.value); assert.equal(counts[0] + counts[1], 20); assert.ok(counts.every(count => count > 0), `Both independent workers must claim jobs: ${JSON.stringify(counts)}`);
       const runs = await manager.readRuns(flow.id, { limit: 100 }); assert.equal(runs.length, 20); assert.deepEqual(runs.filter(run => run.status !== 'succeeded').map(({ status, error_code, trace }) => ({ status, error_code, trace })), [], 'Every claimed job must complete successfully');
       assert.equal(new Set(runs.map(run => run.output[0].id)).size, 20); assert.equal(await count(notes), before + 20);
     }
