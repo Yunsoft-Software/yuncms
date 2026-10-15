@@ -114,7 +114,7 @@ The database name must contain `test`, `ci` or `dev`. Never point the fixture at
 | `YUNCMS_TEST_UPGRADE` | Required (`1`) | `1` | Enables managed backup/restore and upgrade integration suite. |
 | `YUNCMS_UPGRADE_TEST_DB_DATABASE` | Required | e.g. `yuncms_upg_test` | Dedicated disposable database for backup and restore checks. |
 | `YUNCMS_TEST_DOCKER` | Required (`1`) | `1` | Enables containerized multi-user isolation integration tests. |
-| `YUNCMS_TEST_DOCKER_IMAGE` | Required when Docker tests are enabled | e.g. `yunsoftofficial/yuncms:0.1.37` | Prebuilt local candidate image for physical backup/restore; version and revision must match the source checkout. |
+| `YUNCMS_TEST_DOCKER_IMAGE` | Required when Docker tests are enabled | e.g. `yunsoftofficial/yuncms:0.1.38` | Prebuilt local candidate image for physical backup/restore; version and revision must match the source checkout. |
 | `YUNCMS_TEST_STRICT` | Optional (`1`) | `1` | Activates strict verification enforcement on release test runs. |
 
 ### Example Strict Verification Invocation
