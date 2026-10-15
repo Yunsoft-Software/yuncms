@@ -79,7 +79,8 @@ export function FlowsScreen({ route }) {
       }
     });
   }
-  if (!configuration) return <section className="flows-workspace">{error ? <div className="error-banner" role="alert">{error}</div> : <p role="status">{t('common.loading')}</p>}</section>;
+  const routeReady = loadedRoute.current === (route.flowId || route.view || 'list');
+  if (!configuration || !routeReady) return <section className="flows-workspace">{error ? <div className="error-banner" role="alert">{error}</div> : <p role="status">{t('common.loading')}</p>}</section>;
   return <section className="flows-workspace" aria-label={t('flow.title')}>
     <header className="flow-heading"><div><h1>{draft.name || t('flow.title')}</h1><p>{t('flow.subtitle')}</p></div>
       <div className="flow-toolbar-actions"><button className="secondary-button" type="button" disabled={busy} onClick={() => navigate(studioPath.newFlow())}>{t('flow.new')}</button>

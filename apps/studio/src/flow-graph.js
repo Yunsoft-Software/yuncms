@@ -73,3 +73,15 @@ export function flowGraphEdges(flow) {
   }
   return edges;
 }
+
+export function applyFlowMeasurements(previous, changes) {
+  let next = previous;
+  for (const change of changes) {
+    if (change.type !== 'dimensions' || !Number.isFinite(change.dimensions?.width) || !Number.isFinite(change.dimensions?.height)) continue;
+    const current = next.get(change.id), { width, height } = change.dimensions;
+    if (current?.width === width && current?.height === height) continue;
+    if (next === previous) next = new Map(previous);
+    next.set(change.id, { width, height });
+  }
+  return next;
+}

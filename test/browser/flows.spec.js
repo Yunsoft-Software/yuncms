@@ -75,6 +75,34 @@ test('condition success/failure connections merge into a shared node and survive
   await expect(page.locator('.flow-node-failed')).toHaveCount(1);
 });
 
+test('a saved graph retains visible nodes and connections across repeated real page reloads', async ({ page, request }, info) => {
+  test.setTimeout(60000);
+  const consoleMessages = []; page.on('console', message => { if (['warning', 'error'].includes(message.type())) consoleMessages.push(message.text()); });
+  const session = await authenticate(page, request), flow = await createFlow(request, session, 'Canvas reload regression');
+  try {
+    await page.goto(`/#/flows/${flow.id}`);
+    for (let attempt = 0; attempt < 16; attempt++) {
+      if (attempt) await page.reload();
+      await expect(page.locator('.react-flow__node[data-id="output"]')).toBeVisible();
+      await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+    }
+  } catch (error) {
+    const layout = await page.locator('.react-flow').evaluate(root => {
+      const elements = [...root.querySelectorAll('.react-flow__viewport, .react-flow__node, .react-flow__node > div, .react-flow__handle')].map(element => {
+      const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
+      return { class: element.className, x: rect.x, y: rect.y, width: rect.width, height: rect.height, display: style.display, visibility: style.visibility, transform: style.transform };
+      });
+      // Read-only failure diagnostics; no store/network/clock mutation is used by this test.
+      const nested = root.querySelector('.react-flow__node') ?? root;
+      let fiber = nested[Object.keys(nested).find(key => key.startsWith('__reactFiber$'))], state;
+      while (fiber) { if (typeof fiber.memoizedProps?.value?.getState === 'function') { state = fiber.memoizedProps.value.getState(); break; } fiber = fiber.return; }
+      return { elements, state: state ? { width: state.width, height: state.height, edges: state.edges, nodes: [...state.nodeLookup.values()].map(node => ({ id: node.id, measured: node.measured, handles: node.internals.handleBounds })) } : null };
+    });
+    await info.attach('browser-console', { body: JSON.stringify(consoleMessages), contentType: 'application/json' });
+    await info.attach('actual-canvas-layout', { body: JSON.stringify(layout, null, 2), contentType: 'application/json' }); throw error;
+  } finally { await request.delete(`/flows/${flow.id}?revision=${flow.revision}`, { headers: { authorization: `Bearer ${session.access_token}` } }); }
+});
+
 test('invalid JSON blocks saving and deleting a node clears dangling trigger connections', async ({ page, request }) => {
   const session = await authenticate(page, request); const flow = await createFlow(request, session, 'Node deletion flow');
   await page.goto(`/#/flows/${flow.id}`); await page.locator('.react-flow__node[data-id="output"]').click();

@@ -2,11 +2,23 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { addFlowOperation, connectFlowOperation, disconnectFlowOperation, exportFlowDefinition, FLOW_OPERATION_DEFAULTS, flowGraphEdges, importFlowDefinition, newFlowDraft, removeFlowOperation, triggerDefaults } from '../src/flow-graph.js';
+import { addFlowOperation, applyFlowMeasurements, connectFlowOperation, disconnectFlowOperation, exportFlowDefinition, FLOW_OPERATION_DEFAULTS, flowGraphEdges, importFlowDefinition, newFlowDraft, removeFlowOperation, triggerDefaults } from '../src/flow-graph.js';
 import { hasTranslation, SUPPORTED_LOCALES, translate } from '../src/localization.js';
 import { readStudioRoute, studioPath } from '../src/studio-route.js';
 import { FLOW_OPERATION_TYPES } from '../../../packages/core/src/flows/definition.js';
 const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+
+test('controlled canvas dimensions survive unrelated changes and stay separate from saved graph data', () => {
+  const previous = new Map([['trigger', { width: 230, height: 140 }]]);
+  assert.equal(applyFlowMeasurements(previous, [{ type: 'select', id: 'trigger', selected: true }]), previous);
+  const changes = [{ type: 'dimensions', id: 'operation', dimensions: { width: 240, height: 150 } }];
+  const next = applyFlowMeasurements(previous, changes);
+  assert.deepEqual(next.get('trigger'), previous.get('trigger')); assert.deepEqual(next.get('operation'), { width: 240, height: 150 }); assert.equal(previous.has('operation'), false);
+  assert.equal(applyFlowMeasurements(next, changes), next);
+  const canvas = source('../src/components/FlowCanvas.jsx'); assert.match(canvas, /measured: measured\.get\(node.id\)/); assert.match(canvas, /applyFlowMeasurements\(current, changes\)/);
+  assert.match(source('../src/screens/FlowsScreen.jsx'), /if \(!configuration \|\| !routeReady\)/);
+  assert.doesNotMatch(JSON.stringify(exportFlowDefinition(addFlowOperation(newFlowDraft(), 'transform', 'operation'))), /measured/);
+});
 
 test('graph editing preserves success/failure ports, converging branches and node coordinates', () => {
   let flow = newFlowDraft();
