@@ -74,14 +74,14 @@ export function flowGraphEdges(flow) {
   }
   return edges;
 }
-export function applyFlowMeasurements(previous, changes) {
-  let next = previous;
-  for (const change of changes) {
-    if (change.type !== 'dimensions' || !Number.isFinite(change.dimensions?.width) || !Number.isFinite(change.dimensions?.height)) continue;
-    const current = next.get(change.id), { width, height } = change.dimensions;
-    if (current?.width === width && current?.height === height) continue;
-    if (next === previous) next = new Map(previous);
-    next.set(change.id, { width, height });
-  }
-  return next;
+export function reconcileFlowCanvasNodes(previous, model) {
+  const lookup = new Map(previous.map(node => [node.id, node]));
+  const nodes = model.map(node => {
+    const current = lookup.get(node.id);
+    // Preserve untouched references: React Flow may have observed handles before emitting measured user data.
+    if (current && current.type === node.type && current.selected === node.selected && current.draggable === node.draggable
+      && current.position.x === node.position.x && current.position.y === node.position.y && JSON.stringify(current.data) === JSON.stringify(node.data)) return current;
+    return { ...current, ...node };
+  });
+  return nodes.length === previous.length && nodes.every((node, index) => node === previous[index]) ? previous : nodes;
 }

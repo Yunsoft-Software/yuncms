@@ -2,20 +2,26 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { addFlowOperation, applyFlowMeasurements, connectFlowOperation, disconnectFlowOperation, exportFlowDefinition, FLOW_OPERATION_DEFAULTS, flowGraphEdges, importFlowDefinition, newFlowDraft, removeFlowOperation, triggerDefaults } from '../src/flow-graph.js';
+import { addFlowOperation, reconcileFlowCanvasNodes, connectFlowOperation, disconnectFlowOperation, exportFlowDefinition, FLOW_OPERATION_DEFAULTS, flowGraphEdges, importFlowDefinition, newFlowDraft, removeFlowOperation, triggerDefaults } from '../src/flow-graph.js';
 import { hasTranslation, SUPPORTED_LOCALES, translate } from '../src/localization.js';
 import { readStudioRoute, studioPath } from '../src/studio-route.js';
 import { FLOW_OPERATION_TYPES } from '../../../packages/core/src/flows/definition.js';
 const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('controlled canvas dimensions survive unrelated changes and stay separate from saved graph data', () => {
-  const previous = new Map([['trigger', { width: 230, height: 140 }]]);
-  assert.equal(applyFlowMeasurements(previous, [{ type: 'select', id: 'trigger', selected: true }]), previous);
-  const changes = [{ type: 'dimensions', id: 'operation', dimensions: { width: 240, height: 150 } }];
-  const next = applyFlowMeasurements(previous, changes);
-  assert.deepEqual(next.get('trigger'), previous.get('trigger')); assert.deepEqual(next.get('operation'), { width: 240, height: 150 }); assert.equal(previous.has('operation'), false);
-  assert.equal(applyFlowMeasurements(next, changes), next);
-  const canvas = source('../src/components/FlowCanvas.jsx'); assert.match(canvas, /measured: measured\.get\(node.id\)/); assert.match(canvas, /applyFlowMeasurements\(current, changes\)/);
+test('canvas reconciliation retains untouched node references and measured state without saving runtime geometry', () => {
+  const previous = [
+    { id: 'trigger', type: 'flow', selected: true, position: { x: 40, y: 100 }, data: { label: 'Start' } },
+    { id: 'operation', type: 'flow', selected: false, position: { x: 380, y: 100 }, data: { label: 'Read' }, measured: { width: 240, height: 150 } },
+  ];
+  const model = previous.map(({ measured, ...node }) => structuredClone(node));
+  assert.equal(reconcileFlowCanvasNodes(previous, model), previous);
+  const changed = reconcileFlowCanvasNodes(previous, [model[0], { ...model[1], data: { label: 'Write' } }]);
+  assert.equal(changed[0], previous[0], 'An untouched node without user dimensions must retain its reference and internal handle cache');
+  assert.notEqual(changed[1], previous[1]); assert.equal(changed[1].measured, previous[1].measured);
+  assert.equal(reconcileFlowCanvasNodes(previous, [model[0]])[0], previous[0]);
+  const added = reconcileFlowCanvasNodes(previous, [...model, { id: 'new', type: 'flow', position: { x: 700, y: 100 }, data: { label: 'New' } }]);
+  assert.equal(added[0], previous[0]); assert.equal(added[1], previous[1]); assert.equal(added.length, 3);
+  const canvas = source('../src/components/FlowCanvas.jsx'); assert.match(canvas, /useNodesState\(modelNodes\)/); assert.match(canvas, /applyCanvasChanges\(changes\)/);
   assert.match(source('../src/screens/FlowsScreen.jsx'), /if \(!configuration \|\| !routeReady\)/);
   assert.doesNotMatch(JSON.stringify(exportFlowDefinition(addFlowOperation(newFlowDraft(), 'transform', 'operation'))), /measured/);
 });
