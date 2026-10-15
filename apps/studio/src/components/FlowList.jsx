@@ -20,7 +20,11 @@ export function FlowList({ state, onStateChange, onNew, onImport }) {
     }).catch(failure => { if (active) setError(failure.message); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [page, pageSize, search, status, trigger]);
-  const filter = patch => onStateChange({ ...state, ...patch, page: 1 });
+  function update(patch) {
+    if (Object.keys(patch).every(key => state[key] === patch[key])) return;
+    setRows([]); setLoading(true); onStateChange({ ...state, ...patch });
+  }
+  const filter = patch => update({ ...patch, page: 1 });
   return <section className="flows-workspace" aria-label={t('flow.title')}>
     <header className="flow-heading"><div><h1>{t('flow.title')}</h1><p>{t('flow.listHint')}</p></div><div className="flow-toolbar-actions">{canManage && <>
       <button type="button" className="secondary-button" onClick={onImport}>{t('flow.import')}</button>
@@ -39,7 +43,7 @@ export function FlowList({ state, onStateChange, onNew, onImport }) {
         {rows.map(flow => <tr key={flow.id}><td><a className="flow-name-link" href={studioPath.flow(flow.id)}>{flow.name}</a></td><td>{t(`flow.trigger.${flow.trigger}`)}</td><td><span className={`flow-status flow-status-${flow.status}`}>{t(`flow.${flow.status}`)}</span></td><td>{flow.updated_at ? new Date(flow.updated_at).toLocaleString(locale) : '—'}</td></tr>)}
       </tbody></table></div>}
       <Pagination page={page} pageSize={pageSize} totalItems={total} loading={loading} itemLabel={t('flow.items')}
-        pageSizeOptions={[10, 20]} onPageChange={next => onStateChange({ ...state, page: next })} onPageSizeChange={next => filter({ pageSize: next })} />
+        pageSizeOptions={[10, 20]} onPageChange={next => update({ page: next })} onPageSizeChange={next => filter({ pageSize: next })} />
     </div>
   </section>;
 }

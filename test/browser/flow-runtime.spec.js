@@ -13,7 +13,7 @@ async function create(request, operations, extra = {}) {
   expect(response.status()).toBe(201); const flow = (await response.json()).data; flowIds.push(flow.id); return flow;
 }
 async function open(page, flow) { await page.goto(`/?flow_case=${flow.id}#/flows/${flow.id}`); await expect(page.getByTestId('flow-canvas')).toBeVisible(); }
-async function history(page) {
+async function openHistory(page) {
   const dialog = page.getByRole('dialog', { name: 'Run history', exact: true });
   if (!await dialog.isVisible()) await page.getByRole('button', { name: 'Run history', exact: true }).click();
   await expect(dialog).toBeVisible(); return dialog;
@@ -163,7 +163,7 @@ test('private webhook executes real HTTPS, computes with an npm script and persi
   expect((await request.get(`/flows/trigger/${flow.id}`, { headers })).status()).toBe(404);
   const result = await request.post(`/flows/trigger/${flow.id}`, { headers, data: { name: 'Ada', value: 7 } }); expect(result.status()).toBe(200);
   expect((await records(request))[0].title).toBe(prefix + '-Ada');
-  await open(page, flow); await history(page); await page.locator('.flow-history-entry').first().click(); await expect(page.getByTestId('flow-run-output')).toContainText(prefix + '-Ada');
+  await open(page, flow); await openHistory(page); await page.locator('.flow-history-entry').first().click(); await expect(page.getByTestId('flow-run-output')).toContainText(prefix + '-Ada');
   const run = (await runs(request, flow))[0]; expect(run.trace.map(step => step.key)).toEqual(['request', 'script', 'created']); expect(run.trace[1].output.query).toBe('SELECT 7');
 });
 
@@ -198,13 +198,13 @@ test('actual UTC cron polling calls HTTPS and writes a record under a selected n
   await pause(request, flow); expect((await records(request)).some(record => record.title === prefix + '-cron')).toBe(true);
   const history = await runs(request, flow), successful = history.find(run => run.status === 'succeeded');
   expect(successful.trace[0].output.body.body.scheduled).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-  await page.reload(); await history(page); await page.locator('.flow-history-entry').filter({ hasText: 'Succeeded' }).first().click(); await expect(page.getByTestId('flow-run-output')).toContainText(prefix + '-cron');
+  await page.reload(); await openHistory(page); await page.locator('.flow-history-entry').filter({ hasText: 'Succeeded' }).first().click(); await expect(page.getByTestId('flow-run-output')).toContainText(prefix + '-cron');
 });
 
 test('blocking script rollback removes both the original HTTP mutation and a native RPC side write', async ({ page, request }) => {
   const flow = await create(request, [node('script', 'script', { code: `export default async (_, context) => { await context.items('${collection}').createOne({title:'${prefix}-side',status:'draft'}); throw new Error('Reject original'); }` })], { trigger: 'event', options: { mode: 'filter', events: ['items.create'], collections: [collection] } });
   const result = await request.post(`/items/${collection}`, { headers, data: { title: prefix + '-original', status: 'draft' } }); expect(result.status()).toBe(400); expect(await records(request)).toHaveLength(0); expect(await runs(request, flow)).toHaveLength(0);
-  await open(page, flow); await history(page); await expect(page.locator('.flow-history')).toContainText('Run this flow');
+  await open(page, flow); await openHistory(page); await expect(page.locator('.flow-history')).toContainText('Run this flow');
 });
 
 test('after-commit event action runs from the durable worker and performs HTTPS plus a second native write', async ({ page, request }) => {
@@ -213,7 +213,7 @@ test('after-commit event action runs from the durable worker and performs HTTPS 
   await expect.poll(async () => (await runs(request, flow)).some(run => run.status === 'succeeded'), { timeout: 12000 }).toBe(true);
   expect((await records(request)).map(row => row.title).sort()).toEqual([prefix + '-child', prefix + '-original']);
   expect((await runs(request, flow))[0].trace[0].output.body.body.source).toBe(id);
-  await pause(request, flow); await open(page, flow); await history(page); await page.locator('.flow-history-entry').first().click(); await expect(page.getByTestId('flow-run-output')).toContainText(prefix + '-child');
+  await pause(request, flow); await open(page, flow); await openHistory(page); await page.locator('.flow-history-entry').first().click(); await expect(page.getByTestId('flow-run-output')).toContainText(prefix + '-child');
 });
 
 test('all native CRUD nodes, redacted logging and actual SMTP delivery execute in one saved graph', async ({ page, request }) => {
@@ -270,7 +270,7 @@ test('queued revisions are skipped after an edit and real schedule polling conti
   await pause(request, scheduled);
   await expect.poll(async () => (await runs(request, queued))[0]?.status, { timeout: 12000 }).toBe('skipped');
   expect((await records(request)).some(row => row.title.endsWith('must-not-run'))).toBe(false);
-  await pause(request, slow); await open(page, queued); await history(page); await expect(page.locator('.flow-history')).toContainText('FLOW_DEFINITION_CHANGED');
+  await pause(request, slow); await open(page, queued); await openHistory(page); await expect(page.locator('.flow-history')).toContainText('FLOW_DEFINITION_CHANGED');
 });
 
 test('a queued trigger actor losing active status is denied when the real worker claims its job', async ({ page, request }) => {
@@ -285,6 +285,6 @@ test('a queued trigger actor losing active status is denied when the real worker
     await expect.poll(async () => (await runs(request, queued))[0]?.status, { timeout: 10000 }).toBe('failed');
     expect((await runs(request, queued))[0].error_code).toBe('FLOW_ACTOR_UNAVAILABLE');
     expect((await records(request)).some(row => row.title.endsWith('denied'))).toBe(false);
-    await pause(request, slow); await pause(request, queued); await open(page, queued); await history(page); await expect(page.locator('.flow-history')).toContainText('FLOW_ACTOR_UNAVAILABLE');
+    await pause(request, slow); await pause(request, queued); await open(page, queued); await openHistory(page); await expect(page.locator('.flow-history')).toContainText('FLOW_ACTOR_UNAVAILABLE');
   } finally { expect((await request.patch(`/users/${actor.id}`, { headers, data: { status: 'active' } })).status()).toBe(200); }
 });

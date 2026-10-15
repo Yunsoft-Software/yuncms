@@ -31,9 +31,9 @@ export function FlowRunHistory({ flowId, open, onClose, onSelect, refreshKey }) 
     }).catch(failure => { if (active) setError(failure.message); }).finally(() => { if (active) setDetailLoading(false); });
     return () => { active = false; };
   }, [open, flowId, selectedId, refresh, refreshKey, onSelect]);
-  function changePage(next) { setSelectedId(''); setSelected(null); setPage(next); }
+  function changePage(next) { setRows([]); setLoading(true); setSelectedId(''); setSelected(null); setPage(next); }
   return <Modal open={open} title={t('flow.runs')} eyebrow="" className="flow-history-modal" onClose={onClose}
-    actions={<><button type="button" className="secondary-button" disabled={loading || detailLoading} onClick={() => setRefresh(value => value + 1)}>{t('flow.refresh')}</button><button type="button" className="primary-button" onClick={onClose}>{t('common.close')}</button></>}>
+    actions={<><button type="button" className="secondary-button" disabled={loading || detailLoading} onClick={() => { setLoading(true); setRefresh(value => value + 1); }}>{t('flow.refresh')}</button><button type="button" className="primary-button" onClick={onClose}>{t('common.close')}</button></>}>
     <section className="flow-history" aria-label={t('flow.runs')} aria-busy={loading}>
       {error && <div className="error-banner" role="alert">{error}</div>}
       {loading && <p role="status">{t('common.loading')}</p>}
@@ -48,7 +48,7 @@ export function FlowRunHistory({ flowId, open, onClose, onSelect, refreshKey }) 
         </div>)}</div><div><h3>{t('flow.result')}</h3><pre data-testid="flow-run-output">{JSON.stringify(selected.output, null, 2)}</pre></div></>}
       </div></div>
       <Pagination page={page} pageSize={pageSize} totalItems={total} loading={loading} itemLabel={t('flow.runItems')} pageSizeOptions={[10, 20]}
-        onPageChange={changePage} onPageSizeChange={next => { setSelectedId(''); setSelected(null); setPageSize(next); setPage(1); }} />
+        onPageChange={changePage} onPageSizeChange={next => { if (next === pageSize) return; setRows([]); setLoading(true); setSelectedId(''); setSelected(null); setPageSize(next); setPage(1); }} />
     </section>
   </Modal>;
 }

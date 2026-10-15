@@ -269,7 +269,7 @@ test('native run history loads bounded summaries and separate details inside a p
 for (const locale of ['en', 'tr', 'es', 'de', 'fr', 'pt-BR', 'ja', 'zh-CN']) {
   test(`Flow catalogue, script editor, import and history controls are localized in ${locale}`, async ({ page, request }) => {
     await authenticate(page, request, undefined, locale); const labels = FLOW_LOCALES[locale], t = key => labels['flow.' + key];
-    await page.goto('/#/flows'); await expect(page.getByRole('heading', { name: t('title'), exact: true })).toBeVisible(); await expect(page.getByLabel(t('status'), { exact: true })).toContainText(t('allStatuses'));
+    await page.goto('/#/flows'); await expect(page.getByRole('heading', { name: t('title'), exact: true })).toBeVisible(); await expect(page.getByRole('combobox', { name: t('status'), exact: true })).toContainText(t('allStatuses'));
     await page.getByRole('button', { name: t('new'), exact: true }).click(); await expect(page.getByRole('button', { name: t('zoomIn'), exact: true })).toBeVisible();
     await page.getByLabel(t('operations'), { exact: true }).selectOption('script'); await page.getByRole('button', { name: t('addOperation'), exact: true }).click();
     await expect(page.getByLabel(t('scriptCode'), { exact: true })).toBeVisible(); await expect(page.getByLabel(t('scriptFormat'), { exact: true })).toContainText(t('scriptModule'));

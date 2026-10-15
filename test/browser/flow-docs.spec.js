@@ -36,6 +36,7 @@ test('documented greeting imports through Studio, edits as typed JSON and execut
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Flow definition (JSON)', { exact: true }).fill(JSON.stringify(example('manual-greeting')));
   await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Import', exact: true })).toHaveCount(0);
   await expect(page.locator('.flow-inspector').getByLabel('Status', { exact: true })).toHaveValue('inactive');
   await page.locator('.flow-inspector').getByLabel('Status', { exact: true }).selectOption('active');
   await page.getByRole('button', { name: 'Save', exact: true }).click(); await expect(page).toHaveURL(/#\/flows\/[a-f0-9-]+$/);
