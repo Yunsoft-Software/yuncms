@@ -573,6 +573,7 @@ See [`files.md`](files.md).
 GET /studio-navigation
 GET /studio-navigation/collections
 GET /studio-navigation/collections/:collection/fields
+GET /studio-navigation/collections/:collection/capabilities?ids=["RECORD_UUID"]
 GET /studio-navigation/relations
 GET /studio-settings
 GET /studio-settings/logo
@@ -584,7 +585,9 @@ Safe display settings are readable before authentication so the login/reset/veri
 
 Logo and favicon settings point to Files records rather than arbitrary external asset URLs.
 
-The three Studio metadata discovery paths require authentication. They return only project collections with native read permission, fields in the caller's read allowlist (plus the primary key), and relations between visible collections/fields. Collection metadata is limited to navigation display properties. These read-only endpoints support ordinary Content users; `/schema` administration remains privileged. Field/row restrictions on the actual `/items` operations remain authoritative.
+Studio metadata discovery paths require authentication. They return only project collections with native read permission, fields in the caller's read allowlist (plus the primary key), and relations between visible collections/fields. Collection metadata is limited to navigation display properties. These read-only endpoints support ordinary Content users; `/schema` administration remains privileged. Field/row restrictions on the actual `/items` operations remain authoritative.
+
+`GET /studio-navigation/collections/:collection/capabilities` requires native collection-read permission and returns `{create:{allowed,fields},update:{allowed,fields},delete:{allowed,fields},records:{}}`. Actions without a native grant return `allowed:false` and an empty field list. Optional `ids` is a URL-encoded JSON array of at most 100 string/number primary keys. With ids, `records[id]` contains `update`/`delete` booleans evaluated against both the native read-row filter and the mutation filter; unreadable or unmatched ids return false. Only project collections are discoverable. Invalid ids/extra query options return 400, unauthenticated callers 401, and unknown/system collections 404. This is a current UI capability snapshot; `/items` checks the authoritative permissions again when a mutation occurs.
 
 See [`studio.md`](studio.md) and [`studio-customization.md`](studio-customization.md).
 

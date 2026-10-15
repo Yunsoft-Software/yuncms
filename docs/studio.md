@@ -404,3 +404,7 @@ Check `AUTH_PROVIDERS` and the provider configuration, then verify `/auth/provid
 - [Authentication](auth.md)
 - [Public registration](public-registration.md)
 - [AI assistant](ai-assistant.md)
+
+### Content action permissions
+
+Content reads native create/update/delete capabilities separately from read access. New record, Delete record and Delete selected appear only with the corresponding grant; row filters also hide unavailable per-record actions. Read-only users can inspect records with disabled fields and no Save button. Editable forms expose only native writable fields, including when read permission covers more fields. Opening a record/new-record URL does not grant write access. Manual Flow actions keep their own explicit role/selection grants. All writes are checked again by native `/items` authorization.

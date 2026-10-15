@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { contentWritableFields } from '../src/content-access.js';
 
 import {
   contentTableFields,
@@ -19,8 +20,8 @@ test('server-owned current_user fields are read-only in Studio for object and JS
   for (const metadata of [{ defaultPreset: 'current_user' }, JSON.stringify({ defaultPreset: 'current_user' })]) {
     const field = { field: 'owner', type: 'uuid', readonly: 0, schema_metadata: metadata };
     assert.equal(isReadOnlyField(field), true);
-    assert.match(readFileSync(new URL('../src/screens/ContentScreen.jsx', import.meta.url), 'utf8'), /fields\.filter\(\(field\) => !isReadOnlyField\(field\)\)/);
-
+    assert.deepEqual(contentWritableFields([field, { field: 'title' }], { update: { allowed: true, fields: null } }, 'update', isReadOnlyField), [{ field: 'title' }]);
+    assert.match(readFileSync(new URL('../src/screens/ContentScreen.jsx', import.meta.url), 'utf8'), /contentWritableFields\(fields, capabilities, action, isReadOnlyField\)/);
   }
 });
 

@@ -12,6 +12,7 @@ import {
   useConfirmDialog,
 } from '../components/index.js';
 import { formatDateFieldValue } from '../date-format.js';
+import { canWriteContent, contentWritableFields } from '../content-access.js';
 import { contentEmptyState } from '../content-empty-state.js';
 import { contentTableFields, defaultContentColumnKeys, isFileField, isImageField, isReadOnlyField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
@@ -191,9 +192,13 @@ function RecordForm({
   onCancel,
   onOpenFull,
   compact = false,
+  capabilities = null,
 }) {
   const { t } = useI18n();
-  const editable = useMemo(() => fields.filter((field) => !isReadOnlyField(field)), [fields]);
+  const action = record?.id ? 'update' : 'create';
+  const canSave = canWriteContent(capabilities, action, record?.id ?? null);
+  const allowedFieldsKey = JSON.stringify(capabilities?.[action]?.fields);
+  const editable = useMemo(() => canSave ? contentWritableFields(fields, capabilities, action, isReadOnlyField) : fields.filter(field => !isReadOnlyField(field)), [fields, allowedFieldsKey, action, canSave]);
   const [values, setValues] = useState({});
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -208,6 +213,7 @@ function RecordForm({
 
   async function submit(event) {
     event.preventDefault();
+    if (!canSave) return;
     setSaving(true);
     setError('');
     try {
@@ -242,7 +248,7 @@ function RecordForm({
         <button className="text-button" type="button" onClick={onCancel}>{t('common.cancel')}</button>
       </div>
 
-      <div className="form-grid record-form-grid">
+      <fieldset className="form-grid record-form-grid" disabled={!canSave}>
         {editable.map((field) => {
           const relationLookup = relationLookups[field.field];
           const currentValue = values[field.field] ?? '';
@@ -305,7 +311,7 @@ function RecordForm({
             </label>
           );
         })}
-      </div>
+      </fieldset>
 
       {error && <div className="error-banner" role="alert">{error}</div>}
       <div className="form-actions">
@@ -314,9 +320,9 @@ function RecordForm({
             {t('content.openFullEditor')}
           </button>
         )}
-        <button className="primary-button" type="submit" disabled={saving}>
+        {canSave && <button className="primary-button" type="submit" disabled={saving}>
           {saving ? t('common.saving') : t('content.saveRecord')}
-        </button>
+        </button>}
       </div>
     </form>
   );
@@ -328,6 +334,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
   const requestVersion = useRef(0);
   const schemaLoadingRef = useRef(true);
   const [fields, setFields] = useState([]);
+  const [capabilities, setCapabilities] = useState(null);
   const [relationLookups, setRelationLookups] = useState({});
   const [files, setFiles] = useState([]);
   const [items, setItems] = useState([]);
@@ -384,6 +391,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     const version = ++requestVersion.current;
     schemaLoadingRef.current = true;
     setFields([]);
+    setCapabilities(null);
     setRelationLookups({});
     setFiles([]);
     setItems([]);
@@ -397,9 +405,10 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     setSchemaLoading(true);
     setError('');
     try {
-      const [fieldResponse, relationResponse] = await Promise.all([
+      const [fieldResponse, relationResponse, capabilityResponse] = await Promise.all([
         apiRequest(`${readSession()?.user?.admin ? '/schema' : '/studio-navigation'}/collections/${encodeURIComponent(target)}/fields`),
         readSession()?.user?.admin ? apiRequest('/schema/relations') : apiRequest('/studio-navigation/relations'),
+        apiRequest(`/studio-navigation/collections/${encodeURIComponent(target)}/capabilities`),
       ]);
       const loadedFields = fieldResponse?.data ?? [];
       const loadedRelations = relationResponse?.data ?? [];
@@ -409,6 +418,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
       ]);
       if (version !== requestVersion.current) return;
       setFields(loadedFields);
+      setCapabilities(capabilityResponse.data);
       setRelationLookups(lookups);
       setFiles(fileResponse?.data ?? []);
     } catch (requestError) {
@@ -441,6 +451,9 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
       const response = await apiRequest(path);
       if (version !== requestVersion.current) return;
       const nextItems = response?.data ?? [];
+      const access = await apiRequest(`/studio-navigation/collections/${encodeURIComponent(target)}/capabilities?ids=${encodeURIComponent(JSON.stringify(nextItems.map(item => item.id)))}`);
+      if (version !== requestVersion.current) return;
+      setCapabilities(current => ({ ...access.data, records: { ...current?.records, ...access.data.records } }));
       setItems(nextItems);
       setMeta(response?.meta ?? null);
       setSelectedRecordIds(new Set());
@@ -501,12 +514,20 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
   }, [collection, route.recordId, route.view]);
 
   useEffect(() => {
+    if (!collection || route.view !== 'record' || !route.recordId) return;
+    let active = true;
+    apiRequest(`/studio-navigation/collections/${encodeURIComponent(collection)}/capabilities?ids=${encodeURIComponent(JSON.stringify([route.recordId]))}`)
+      .then(response => { if (active) setCapabilities(current => ({ ...response.data, records: { ...current?.records, ...response.data.records } })); }).catch(() => { if (active) setCapabilities(null); });
+    return () => { active = false; };
+  }, [collection, route.view, route.recordId, fields]);
+
+  useEffect(() => {
     if (!collection || schemaLoading || schemaLoadingRef.current || fields.length === 0) return;
     loadItems(collection, fields);
   }, [collection, fields, filters, offset, pageSize, schemaLoading, search, sortDirection, sortField]);
 
   async function removeRecord(record) {
-    if (!record?.id) return;
+    if (!record?.id || !canWriteContent(capabilities, 'delete', record.id)) return;
     const accepted = await requestConfirmation({
       title: t('content.deleteRecord'),
       description: t('content.deleteRecordDescription', { id: record.id, collection: collectionLabel || collection }),
@@ -534,7 +555,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
 
   async function removeSelectedRecords() {
     const selected = items.filter((record) => selectedRecordIds.has(String(record.id)));
-    if (selected.length === 0) return;
+    if (selected.length === 0 || selected.some(record => !canWriteContent(capabilities, 'delete', record.id))) return;
     const accepted = await requestConfirmation({
       title: t('content.bulkDeleteTitle'),
       description: t('content.bulkDeleteDescription', {
@@ -717,6 +738,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
           collection={collection}
           collectionLabel={collectionLabel}
           fields={fields}
+          capabilities={capabilities}
           relationLookups={relationLookups}
           files={files}
           record={editing}
@@ -768,9 +790,9 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
             <span><small>{t('content.records')}</small><strong>{meta?.total_count ?? '—'}</strong></span>
             <span><small>{t('dataModel.fields')}</small><strong>{fields.length}</strong></span>
           </div>
-          <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.contentNew(collection))}>
+          {canWriteContent(capabilities, 'create') && <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.contentNew(collection))}>
             {t('content.newRecord')}
-          </button>
+          </button>}
         </div>
       </section>
 
@@ -944,7 +966,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
           <strong>{t('content.selectedCount', { count: selectedCount })}</strong>
           <div>
             <button className="text-button" type="button" onClick={() => setSelectedRecordIds(new Set())}>{t('common.cancel')}</button>
-            <button className="danger-button" type="button" onClick={removeSelectedRecords}>{t('content.bulkDelete')}</button>
+            {selectedRecordIds.size > 0 && [...selectedRecordIds].every(id => canWriteContent(capabilities, 'delete', id)) && <button className="danger-button" type="button" onClick={removeSelectedRecords}>{t('content.bulkDelete')}</button>}
           </div>
         </div>
       )}
@@ -953,7 +975,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
       ) : !itemsLoading && totalCount === 0 && !hasActiveControls ? (
         <section className="panel empty-state empty-state-action">
           <div><h2>{t('content.noRecordsYet')}</h2><p>{t('content.firstRecordDescription', { collection: visibleCollectionName })}</p></div>
-          <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.contentNew(collection))}>{t('content.createFirstRecord')}</button>
+          {canWriteContent(capabilities, 'create') && <button className="primary-button" type="button" onClick={() => onNavigate?.(studioPath.contentNew(collection))}>{t('content.createFirstRecord')}</button>}
         </section>
       ) : !itemsLoading && totalCount === 0 ? (
         <section className="panel empty-state empty-state-action">
@@ -1019,9 +1041,9 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                         </td>
                       ))}
                       <td className="row-actions">
-                        <button className="text-button" type="button" onClick={() => setInspectedRecord(record)}>{t('content.quickEdit')}</button>
-                        <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.contentRecord(collection, record.id))}>{t('common.edit')}</button>
-                        <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>
+                        {canWriteContent(capabilities, 'update', record.id) && <button className="text-button" type="button" onClick={() => setInspectedRecord(record)}>{t('content.quickEdit')}</button>}
+                        {canWriteContent(capabilities, 'update', record.id) && <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.contentRecord(collection, record.id))}>{t('common.edit')}</button>}
+                        {canWriteContent(capabilities, 'delete', record.id) && <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>}
                       </td>
                     </tr>
                   );
@@ -1050,9 +1072,9 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                     ))}
                   </dl>
                   <div className="mobile-card-actions">
-                    <button className="secondary-button" type="button" onClick={() => setInspectedRecord(record)}>{t('content.quickEdit')}</button>
-                    <button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.contentRecord(collection, record.id))}>{t('common.edit')}</button>
-                    <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>
+                    {canWriteContent(capabilities, 'update', record.id) && <button className="secondary-button" type="button" onClick={() => setInspectedRecord(record)}>{t('content.quickEdit')}</button>}
+                    {canWriteContent(capabilities, 'update', record.id) && <button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.contentRecord(collection, record.id))}>{t('common.edit')}</button>}
+                    {canWriteContent(capabilities, 'delete', record.id) && <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>}
                   </div>
                 </article>
               );
@@ -1087,6 +1109,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
             collection={collection}
             collectionLabel={collectionLabel}
             fields={fields}
+            capabilities={capabilities}
             relationLookups={relationLookups}
             files={files}
             record={inspectedRecord}

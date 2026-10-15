@@ -1,0 +1,86 @@
+import { test, expect } from '@playwright/test';
+
+const collection = 'browser_flow_records';
+async function session(request, email) {
+  const response = await request.post('/auth/login', { data: { email, password: 'Browser-flow-fixture-123!' } }); expect(response.status()).toBe(200);
+  return (await response.json()).data;
+}
+async function open(page, request, email, path = `/#/content/${collection}`) {
+  const value = await session(request, email);
+  await page.addInitScript(data => { sessionStorage.setItem('yuncms.studio.session', JSON.stringify(data)); localStorage.setItem('yuncms.studio.locale', 'en'); }, value);
+  await page.goto(path); return { authorization: `Bearer ${value.access_token}` };
+}
+async function create(request, headers, title, status = 'draft') {
+  const response = await request.post(`/items/${collection}`, { headers, data: { title, status } }); expect(response.status()).toBe(201); return (await response.json()).data;
+}
+
+test('issue 76: read/update users never see create, row delete or bulk delete on desktop or mobile', async ({ page, request }) => {
+  const headers = await open(page, request, 'flows-staff@example.test');
+  await expect(page.locator('tbody tr').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New record', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
+  await page.locator('tbody input[type="checkbox"]').first().check();
+  await expect(page.getByRole('button', { name: 'Delete selected', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Quick edit', exact: true }).first()).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New record', exact: true })).toHaveCount(0);
+  expect((await request.post(`/items/${collection}`, { headers, data: { title: 'Forbidden' } })).status()).toBe(403);
+});
+
+test('read-only users can inspect records but cannot save through inspector, full editor or a direct new route', async ({ page, request }) => {
+  const headers = await open(page, request, 'content-reader@example.test');
+  const response = await request.get(`/items/${collection}`, { headers }); const record = (await response.json()).data[0];
+  await expect(page.locator('tbody tr').first()).toBeVisible();
+  for (const name of ['Quick edit', 'Edit', 'Delete', 'New record']) await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0);
+  await page.locator('tbody tr').first().click();
+  await expect(page.getByRole('dialog')).toBeVisible(); await expect(page.getByRole('button', { name: 'Save record', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('dialog').locator('input').first()).toBeDisabled();
+  await page.goto(`/#/content/${collection}/${record.id}`);
+  await expect(page.locator('.record-editor')).toBeVisible(); await expect(page.getByRole('button', { name: 'Save record', exact: true })).toHaveCount(0);
+  await page.goto(`/#/content/${collection}/new`);
+  await expect(page.locator('.record-editor')).toBeVisible(); await expect(page.getByRole('button', { name: 'Save record', exact: true })).toHaveCount(0);
+  expect((await request.patch(`/items/${collection}/${record.id}`, { headers, data: { title: 'Denied' } })).status()).toBe(403);
+});
+
+test('native row filters hide mutation actions per record and the editor exposes only writable fields', async ({ page, request }) => {
+  const admin = await session(request, 'flows-admin@example.test'), headers = { authorization: `Bearer ${admin.access_token}` };
+  const allowed = await create(request, headers, 'Allowed action row'), locked = await create(request, headers, 'Locked action row', 'locked');
+  try {
+    const staffHeaders = await open(page, request, 'content-filtered@example.test');
+    const allowedRow = page.locator('tbody tr').filter({ hasText: allowed.id }), lockedRow = page.locator('tbody tr').filter({ hasText: locked.id });
+    await expect(allowedRow.getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
+    await expect(lockedRow.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
+    await expect(lockedRow.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
+    await allowedRow.getByRole('button', { name: 'Edit', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save record', exact: true })).toBeVisible();
+    await expect(page.locator('.record-editor').getByLabel('title', { exact: true })).toHaveCount(0);
+    await expect(page.locator('.record-editor').getByLabel('status', { exact: true })).toBeVisible();
+    expect((await request.delete(`/items/${collection}/${locked.id}`, { headers: staffHeaders })).status()).toBe(404);
+    expect((await request.get(`/items/${collection}/${locked.id}`, { headers })).status()).toBe(200);
+    expect((await request.patch(`/items/${collection}/${allowed.id}`, { headers: staffHeaders, data: { title: 'Denied field' } })).status()).toBe(403);
+  } finally { for (const item of [allowed, locked]) await request.delete(`/items/${collection}/${item.id}`, { headers }); }
+});
+
+test('ordinary CRUD grants retain native create, quick update, confirmed row delete and bulk delete', async ({ page, request }) => {
+  const headers = await open(page, request, 'content-writer@example.test');
+  await page.getByRole('button', { name: 'New record', exact: true }).click();
+  await page.locator('.record-editor').getByLabel('title', { exact: true }).fill('UI permission regression');
+  await page.locator('.record-editor').getByLabel('status', { exact: true }).fill('draft');
+  await page.getByRole('button', { name: 'Save record', exact: true }).click();
+  const row = page.locator('tbody tr').filter({ hasText: 'UI permission regression' }); await expect(row).toBeVisible();
+  await row.getByRole('button', { name: 'Quick edit', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('status', { exact: true }).fill('review');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save record', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close inspector', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(row).toContainText('review');
+  await row.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete record', exact: true }).click(); await expect(row).toHaveCount(0);
+  const records = [await create(request, headers, 'Bulk permission A'), await create(request, headers, 'Bulk permission B')];
+  await page.reload();
+  for (const record of records) await page.locator('tbody tr').filter({ hasText: record.id }).locator('input[type="checkbox"]').check();
+  await page.getByRole('button', { name: 'Delete selected', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete selected', exact: true }).click();
+  for (const record of records) await expect(page.locator('tbody tr').filter({ hasText: record.id })).toHaveCount(0);
+});

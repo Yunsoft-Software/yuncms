@@ -37,11 +37,17 @@ try {
   await new FieldsService(basic).createOne(collection, { field: 'status', type: 'string' });
   const adminRole = await new RolesService(basic).createOne({ name: 'Browser flow administrator', admin: true }); roleIds.push(adminRole.id);
   const staffRole = await new RolesService(basic).createOne({ name: 'Browser flow staff' }); roleIds.push(staffRole.id);
-  for (const [email, role] of [['flows-admin@example.test', adminRole.id], ['flows-staff@example.test', staffRole.id]]) {
+  const readerRole = await new RolesService(basic).createOne({ name: 'Browser content reader' }); roleIds.push(readerRole.id);
+  const writerRole = await new RolesService(basic).createOne({ name: 'Browser content writer' }); roleIds.push(writerRole.id);
+  const filteredRole = await new RolesService(basic).createOne({ name: 'Browser filtered writer' }); roleIds.push(filteredRole.id);
+  for (const [email, role] of [['flows-admin@example.test', adminRole.id], ['flows-staff@example.test', staffRole.id], ['content-reader@example.test', readerRole.id], ['content-writer@example.test', writerRole.id], ['content-filtered@example.test', filteredRole.id]]) {
     userIds.push((await new UsersService(basic).createOne({ email, role, password: 'Browser-flow-fixture-123!' })).id);
   }
   const schema = await cache.get(pool);
   for (const action of ['read', 'update']) await new PermissionsService({ ...basic, schema }).createOne({ role: staffRole.id, collection, action, fields: ['id', 'title', 'status'] });
+  for (const [role, actions] of [[readerRole.id, ['read']], [writerRole.id, ['read', 'create', 'update', 'delete']], [filteredRole.id, ['read', 'update', 'delete']]]) {
+    for (const action of actions) await new PermissionsService({ ...basic, schema }).createOne({ role, collection, action, fields: role === filteredRole.id && action === 'update' ? ['status'] : ['id', 'title', 'status'], ...(role === filteredRole.id && ['update', 'delete'].includes(action) ? { filter: { status: { _neq: 'locked' } } } : {}) });
+  }
   await new ItemsService(collection, { ...basic, schema }).createOne({ title: 'Documentation article', status: 'draft' });
   runtime = new FlowRuntime({ database: pool, schemaCache: cache, services, emitter, storage, logger }).registerHooks();
   const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger });

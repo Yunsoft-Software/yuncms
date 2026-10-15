@@ -134,6 +134,25 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     try { assert.equal((await request(`/flows/${rule.id}/run`, adminToken, 'POST', {})).status, 403); assert.equal(messages.length, 1); }
     finally { reject(); }
   });
+  await t.test('issue 76 capabilities enforce native action/field/read-row masks and reject invalid identifiers or unauthenticated discovery', async () => {
+    const owned = (await request(`/items/${articles}`, staffToken, 'POST', { title: 'Owned capability record', status: 'draft' })).body.data;
+    const foreign = (await request(`/items/${articles}`, adminToken, 'POST', { title: 'Foreign capability record' })).body.data;
+    const path = `/studio-navigation/collections/${articles}/capabilities`;
+    assert.equal((await request(path, null)).status, 401);
+    const result = await request(`${path}?ids=${encodeURIComponent(JSON.stringify([owned.id, foreign.id]))}`, staffToken);
+    assert.equal(result.status, 200); assert.equal(result.body.data.create.allowed, true); assert.equal(result.body.data.delete.allowed, false);
+    assert.deepEqual(result.body.data.update.fields, ['title', 'status']);
+    assert.deepEqual(result.body.data.records[owned.id], { update: true, delete: false });
+    assert.deepEqual(result.body.data.records[foreign.id], { update: false, delete: false });
+    const admin = await request(`${path}?ids=${encodeURIComponent(JSON.stringify([owned.id]))}`, adminToken);
+    assert.equal(admin.body.data.delete.allowed, true); assert.equal(admin.body.data.update.fields, null); assert.equal(admin.body.data.records[owned.id].delete, true);
+    for (const value of ['null', '{}', 'not-json', JSON.stringify(Array(101).fill('key'))]) assert.equal((await request(`${path}?ids=${encodeURIComponent(value)}`, staffToken)).status, 400);
+    assert.equal((await request(`${path}?ids[]=key`, staffToken)).status, 400);
+    for (const collection of ['yuncms_users', 'constructor', '__proto__', "a' OR 1=1 --"]) assert.equal((await request(`/studio-navigation/collections/${encodeURIComponent(collection)}/capabilities`, staffToken)).status, 404);
+    const injected = await request(`${path}?ids=${encodeURIComponent(JSON.stringify(["' OR 1=1 --"]))}`, staffToken);
+    assert.equal(injected.status, 200); assert.equal(injected.body.data.records["' OR 1=1 --"].update, false);
+    assert.equal((await request(`/items/${articles}/${owned.id}`, staffToken)).status, 200);
+  });
   await t.test('downloadable documentation recipes import through HTTP and execute their advertised native behavior', async () => {
     const root = new URL('../../docs/examples/flows/', import.meta.url), examples = new Map();
     for (const name of readdirSync(root).filter(name => name.endsWith('.json'))) {

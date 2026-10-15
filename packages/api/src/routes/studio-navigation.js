@@ -19,6 +19,14 @@ export function createStudioNavigationRouter() {
   const schemaService = req => new req.context.services.StudioSchemaService(serviceOptionsFromRequest(req));
   router.get('/collections', async (req, res) => { requireStudioUser(req); res.json({ data: await schemaService(req).readCollections() }); });
   router.get('/collections/:collection/fields', async (req, res) => { requireStudioUser(req); res.json({ data: await schemaService(req).readFields(req.params.collection) }); });
+  router.get('/collections/:collection/capabilities', async (req, res) => {
+    requireStudioUser(req);
+    if (Object.keys(req.query).some(key => key !== 'ids')) throw Object.assign(new Error('Unsupported capability query option'), { code: 'INVALID_QUERY' });
+    let ids = [];
+    try { if (req.query.ids !== undefined) { if (typeof req.query.ids !== 'string') throw Error(); ids = JSON.parse(req.query.ids); } }
+    catch { throw Object.assign(new Error('ids must be a JSON array'), { code: 'INVALID_QUERY' }); }
+    res.json({ data: await schemaService(req).readCapabilities(req.params.collection, ids) });
+  });
   router.get('/relations', async (req, res) => { requireStudioUser(req); res.json({ data: await schemaService(req).readRelations() }); });
 
   router.get('/groups', async (req, res, next) => {

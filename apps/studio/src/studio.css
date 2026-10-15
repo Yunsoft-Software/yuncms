@@ -55,3 +55,6 @@
 @import './studio-compat.css';
 @import './automations.css';
 @import './flows.css';
+
+
+.record-form-grid { border: 0; padding: 0; margin: 0; min-width: 0; }
