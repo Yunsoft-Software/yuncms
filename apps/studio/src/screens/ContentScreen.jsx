@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { apiRequest, readSession } from '../api.js';
 import {
@@ -200,17 +200,19 @@ function RecordForm({
   const allowedFieldsKey = JSON.stringify(capabilities?.[action]?.fields);
   const editable = useMemo(() => canSave ? contentWritableFields(fields, capabilities, action, isReadOnlyField) : fields.filter(field => !isReadOnlyField(field)), [fields, allowedFieldsKey, action, canSave]);
   const recordValuesKey = contentRecordValuesKey(record, editable);
-  const [values, setValues] = useState({});
+  const initialValues = () => Object.fromEntries(editable.map(field => [field.field, inputValueForField(field, record?.[field.field])]));
+  const [values, setValues] = useState(initialValues);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    setValues(Object.fromEntries(editable.map((field) => [
-      field.field,
-      inputValueForField(field, record?.[field.field]),
-    ])));
+  useLayoutEffect(() => {
+    setValues(initialValues());
     setError('');
   }, [recordValuesKey]);
+
+  function changeValue(field, value) {
+    setValues(current => ({ ...current, [field]: value }));
+  }
 
   async function submit(event) {
     event.preventDefault();
@@ -249,7 +251,7 @@ function RecordForm({
         <button className="text-button" type="button" onClick={onCancel}>{t('common.cancel')}</button>
       </div>
 
-      <fieldset className="form-grid record-form-grid" disabled={!canSave}>
+      <fieldset className="form-grid record-form-grid" disabled={!canSave || saving}>
         {editable.map((field) => {
           const relationLookup = relationLookups[field.field];
           const currentValue = values[field.field] ?? '';
@@ -266,7 +268,7 @@ function RecordForm({
                   files={files}
                   t={t}
                   onFileUploaded={onFileUploaded}
-                  onChange={(value) => setValues((current) => ({ ...current, [field.field]: value }))}
+                  onChange={(value) => changeValue(field.field, value)}
                 />
               ) : relationLookup ? (
                 <RelationPicker
@@ -279,19 +281,19 @@ function RecordForm({
                   searchPlaceholder={t('content.relationSearch')}
                   emptyLabel={t('content.relationEmpty')}
                   noneLabel={t('common.none')}
-                  onChange={(value) => setValues((current) => ({ ...current, [field.field]: value }))}
+                  onChange={(value) => changeValue(field.field, value)}
                 />
               ) : field.type === 'boolean' ? (
                 <input
                   type="checkbox"
                   checked={Boolean(values[field.field])}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.field]: event.target.checked }))}
+                  onChange={(event) => changeValue(field.field, event.currentTarget.checked)}
                 />
               ) : field.type === 'text' || field.type === 'json' ? (
                 <textarea
                   rows={field.type === 'json' ? 6 : 4}
                   value={values[field.field] ?? ''}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.field]: event.target.value }))}
+                  onChange={(event) => changeValue(field.field, event.currentTarget.value)}
                   required={Boolean(field.required)}
                 />
               ) : (
@@ -299,7 +301,7 @@ function RecordForm({
                   type={fieldInputType(field)}
                   step={field.type === 'decimal' ? 'any' : undefined}
                   value={values[field.field] ?? ''}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.field]: event.target.value }))}
+                  onChange={(event) => changeValue(field.field, event.currentTarget.value)}
                   required={Boolean(field.required)}
                 />
               )}

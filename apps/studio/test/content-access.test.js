@@ -22,4 +22,8 @@ test('equivalent native record snapshots preserve a draft while changed identity
   assert.notEqual(contentRecordValuesKey({ ...record, status: 'review' }, fields), key);
   assert.notEqual(contentRecordValuesKey(record, [{ field: 'title', type: 'text' }, fields[1]]), key);
   assert.match(readFileSync(new URL('../src/screens/ContentScreen.jsx', import.meta.url), 'utf8'), /\[recordValuesKey\]/);
+  const source = readFileSync(new URL('../src/screens/ContentScreen.jsx', import.meta.url), 'utf8');
+  assert.match(source, /useState\(initialValues\)/); assert.match(source, /useLayoutEffect\(\(\) => \{\s*setValues\(initialValues\(\)\)/);
+  assert.doesNotMatch(source, /setValues\([^\n]*event\.(?:target|currentTarget)/);
+  assert.match(source, /disabled=\{!canSave \|\| saving\}/);
 });
