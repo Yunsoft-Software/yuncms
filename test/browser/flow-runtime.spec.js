@@ -275,16 +275,20 @@ test('queued revisions are skipped after an edit and real schedule polling conti
 
 test('a queued trigger actor losing active status is denied when the real worker claims its job', async ({ page, request }) => {
   test.setTimeout(30000);
-  const slow = await create(request, [node('wait', 'sleep', { milliseconds: 2500 })], { trigger: 'event', options: { mode: 'action', events: ['items.create'], collections: [collection] } });
-  const queued = await create(request, [node('created', 'create', { collection, payload: { title: prefix + '-denied', status: 'draft' } })], { trigger: 'event', options: { mode: 'action', events: ['items.create'], collections: [collection] } });
   const staff = await login(request, 'content-writer@example.test'), actor = config.users.find(user => user.email === 'content-writer@example.test');
-  const response = await request.post(`/items/${collection}`, { headers: { authorization: `Bearer ${staff.access_token}` }, data: { title: prefix + '-original' } }); expect(response.status()).toBe(201);
-  await expect.poll(async () => (await runs(request, slow))[0]?.status, { timeout: 10000 }).toBe('running');
-  expect((await request.patch(`/users/${actor.id}`, { headers, data: { status: 'suspended' } })).status()).toBe(200);
+  expect((await request.post('/extensions/flow-fixture/worker/pause', { headers })).status()).toBe(204);
   try {
+    const queued = await create(request, [node('created', 'create', { collection, payload: { title: prefix + '-denied', status: 'draft' } })], { trigger: 'event', options: { mode: 'action', events: ['items.create'], collections: [collection] } });
+    const response = await request.post(`/items/${collection}`, { headers: { authorization: `Bearer ${staff.access_token}` }, data: { title: prefix + '-original' } }); expect(response.status()).toBe(201);
+    expect((await runs(request, queued))[0].status).toBe('pending');
+    expect((await request.patch(`/users/${actor.id}`, { headers, data: { status: 'suspended' } })).status()).toBe(200);
+    expect((await request.post('/extensions/flow-fixture/worker/resume', { headers })).status()).toBe(204);
     await expect.poll(async () => (await runs(request, queued))[0]?.status, { timeout: 10000 }).toBe('failed');
     expect((await runs(request, queued))[0].error_code).toBe('FLOW_ACTOR_UNAVAILABLE');
     expect((await records(request)).some(row => row.title.endsWith('denied'))).toBe(false);
-    await pause(request, slow); await pause(request, queued); await open(page, queued); await openHistory(page); await expect(page.locator('.flow-history')).toContainText('FLOW_ACTOR_UNAVAILABLE');
-  } finally { expect((await request.patch(`/users/${actor.id}`, { headers, data: { status: 'active' } })).status()).toBe(200); }
+    await pause(request, queued); await open(page, queued); await openHistory(page); await expect(page.locator('.flow-history')).toContainText('FLOW_ACTOR_UNAVAILABLE');
+  } finally {
+    expect((await request.patch(`/users/${actor.id}`, { headers, data: { status: 'active' } })).status()).toBe(200);
+    expect((await request.post('/extensions/flow-fixture/worker/resume', { headers })).status()).toBe(204);
+  }
 });

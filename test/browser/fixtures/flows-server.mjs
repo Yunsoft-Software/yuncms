@@ -64,6 +64,10 @@ try {
   const fixture = express.Router();
   fixture.use((req, _res, next) => { if (!req.accountability.admin) throw Object.assign(new Error('Fixture management requires administrator access'), { code: 'FORBIDDEN' }); next(); });
   fixture.get('/', (_req, res) => res.json({ data: { httpsUrl: network.httpsUrl, untrustedUrl: network.untrustedUrl, requests: network.requests, messages: network.messages } }));
+  // Exercise the real lifecycle, without replacing the queue, services or clock.
+  // Re-register native admission hooks while the actual polling worker is stopped.
+  fixture.post('/worker/pause', async (_req, res) => { await runtime.stop(); runtime.registerHooks(); res.status(204).end(); });
+  fixture.post('/worker/resume', (_req, res) => { runtime.start(); res.status(204).end(); });
   fixture.get('/logs', async (_req, res) => {
     await new Promise(resolve => logStream.write('', resolve));
     res.json({ data: (await readFile(logPath, 'utf8')).split('\n').filter(Boolean).map(line => JSON.parse(line)) });
