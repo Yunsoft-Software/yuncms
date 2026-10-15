@@ -228,7 +228,7 @@ function RecordForm({
         method: record?.id ? 'PATCH' : 'POST',
         body: payload,
       });
-      onSaved(result?.data ?? null);
+      await onSaved(result?.data ?? null);
     } catch (requestError) {
       setError(requestError.message || t('content.saveError'));
     } finally {
@@ -1121,7 +1121,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
               onNavigate?.(studioPath.contentRecord(collection, recordId));
             }}
             onSaved={async (saved) => {
-              if (saved) setInspectedRecord(saved);
+              if (saved) setInspectedRecord(current => current && String(current.id) === String(saved.id) ? saved : current);
               setNotice(t('common.saved'));
               await loadItems();
             }}

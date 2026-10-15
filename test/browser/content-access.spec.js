@@ -84,3 +84,19 @@ test('ordinary CRUD grants retain native create, quick update, confirmed row del
   await page.getByRole('dialog').getByRole('button', { name: 'Delete selected', exact: true }).click();
   for (const record of records) await expect(page.locator('tbody tr').filter({ hasText: record.id })).toHaveCount(0);
 });
+
+test('closing an inspector during a real blocking Flow update keeps it closed when the save completes', async ({ page, request }) => {
+  const admin = await session(request, 'flows-admin@example.test'), adminHeaders = { authorization: `Bearer ${admin.access_token}` };
+  const record = await create(request, adminHeaders, 'Close during native save');
+  const response = await request.post('/flows', { headers: adminHeaders, data: { name: 'Slow native update for inspector regression', status: 'active', trigger: 'event', accountability: 'trigger', options: { mode: 'filter', events: ['items.update'], collections: [collection] }, entry: 'wait', operations: [{ id: 'wait', key: 'wait', name: 'Native delay', type: 'sleep', options: { milliseconds: 800 }, position: { x: 380, y: 100 }, resolve: null, reject: null }] } });
+  expect(response.status()).toBe(201); const flow = (await response.json()).data;
+  try {
+    await open(page, request, 'content-writer@example.test');
+    const row = page.locator('tbody tr').filter({ hasText: record.id }); await row.getByRole('button', { name: 'Quick edit', exact: true }).click();
+    await page.getByRole('dialog').getByLabel('status', { exact: true }).fill('review');
+    const saving = page.waitForResponse(result => result.url().endsWith(`/items/${collection}/${record.id}`) && result.request().method() === 'PATCH');
+    await page.getByRole('dialog').getByRole('button', { name: 'Save record', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Close inspector', exact: true }).click(); await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect((await saving).status()).toBe(200); await expect(row).toContainText('review'); await expect(page.getByRole('dialog')).toHaveCount(0);
+  } finally { await request.delete(`/flows/${flow.id}?revision=${flow.revision}`, { headers: adminHeaders }); await request.delete(`/items/${collection}/${record.id}`, { headers: adminHeaders }); }
+});
