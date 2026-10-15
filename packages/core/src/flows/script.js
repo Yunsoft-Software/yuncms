@@ -18,6 +18,7 @@ function safeValue(value) {
   const result = JSON.parse(text); assertFlowJson(result); return result;
 }
 function clientError(error) {
+  if (!error || typeof error !== 'object') return { code: 'FLOW_OPERATION_FAILED', status: 500, message: 'Native operation failed' };
   return { code: error.code ?? 'FLOW_OPERATION_FAILED', status: error.status ?? (['FORBIDDEN', 'FORBIDDEN_FIELD'].includes(error.code) ? 403 : 400), message: error.status >= 500 ? 'Native operation failed' : String(error.message).slice(0, 1000) };
 }
 async function nativeCall(message, context) {
@@ -82,6 +83,7 @@ export async function executeFlowScript(options, data, context) {
         if (message.type !== 'call' || ++calls > 100 || inflight.size >= 16) { void finish(flowError('FLOW_SCRIPT_CALL_LIMIT', 'Script supports 100 native calls and 16 concurrent calls')); return; }
         const work = flowExecutionStorage.run(execution, () => nativeCall(message, context))
           .then(value => { send({ type: 'reply', id: message.id, value }); }, error => { send({ type: 'reply', id: message.id, error: clientError(error) }); })
+          .catch(() => { void finish(flowError('FLOW_SCRIPT_PROTOCOL', 'Native script reply failed', 500)); })
           .finally(() => inflight.delete(work));
         inflight.add(work);
       });

@@ -16,8 +16,8 @@ function call(collection, method, args, emitEvents) {
   return promise;
 }
 function serializeError(error) {
-  return { code: typeof error.code === 'string' ? error.code.slice(0, 100) : 'FLOW_SCRIPT_ERROR',
-    message: String(error.message ?? 'Script failed').slice(0, 1000), status: Number.isInteger(error.status) && error.status >= 400 && error.status < 500 ? error.status : 400 };
+  return { code: typeof error?.code === 'string' ? error.code.slice(0, 100) : 'FLOW_SCRIPT_ERROR',
+    message: String(error?.message ?? error ?? 'Script failed').slice(0, 1000), status: Number.isInteger(error?.status) && error.status >= 400 && error.status < 500 ? error.status : 400 };
 }
 process.on('message', async message => {
   if (message.type === 'reply') {

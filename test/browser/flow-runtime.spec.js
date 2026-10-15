@@ -112,6 +112,8 @@ test('script data calls retain selected-user authority despite forged input and 
 
 for (const [title, code, expected] of [
   ['invalid syntax', 'export default function (', 'FLOW_SCRIPT_ERROR'],
+  ['null exception', 'export default () => { throw null; }', 'FLOW_SCRIPT_ERROR'],
+  ['primitive exception', "export default () => { throw 'script primitive'; }", 'FLOW_SCRIPT_ERROR'],
   ['missing npm package', "import x from 'missing-flow-package-fixture'; export default () => x", 'ERR_MODULE_NOT_FOUND'],
   ['oversized output', "export default () => 'x'.repeat(262145)", 'FLOW_OUTPUT_LIMIT'],
 ]) test(`script ${title} fails with a real process and a visible node trace`, async ({ page, request }) => {

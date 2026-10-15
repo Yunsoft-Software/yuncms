@@ -188,6 +188,12 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
       assert.equal((await request(`/flows/${denied.id}/run`, adminToken, 'POST', {})).status, status);
       assert.equal((await manager.readRuns(denied.id))[0].status, 'failed');
     }
+    const rejectPrimitive = emitter.registerFilter('items.create', payload => { if (payload.title === 'primitive-native-denied') throw null; return payload; });
+    try {
+      const before = await count(articles), flow = await create(definition([node('script', 'script', { code: `export default async (_, c) => c.items('${articles}').createOne({title:'primitive-native-denied'})` })]));
+      const result = await request(`/flows/${flow.id}/run`, adminToken, 'POST', {});
+      assert.equal(result.status, 400); assert.equal(result.body.errors[0].code, 'FLOW_OPERATION_FAILED'); assert.equal(await count(articles), before); assert.equal((await request('/health', null)).status, 200);
+    } finally { rejectPrimitive(); }
     const before = [await count(articles), await count(notes)];
     const filter = await create(definition([node('script', 'script', { code: `export default async (_, context) => { await context.items('${notes}').createOne({title:'rollback-script'}); throw new Error('Reject original mutation'); }` })], { trigger: 'event', accountability: 'system', options: { mode: 'filter', events: ['items.create'], collections: [articles] } }));
     assert.equal((await request(`/items/${articles}`, staffToken, 'POST', { title: 'Script rollback original' })).status, 400);

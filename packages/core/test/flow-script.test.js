@@ -38,6 +38,8 @@ test('syntax, missing package, invalid export, circular output and oversized out
     ['export default function (', 'FLOW_SCRIPT_ERROR'],
     ["import missing from 'yuncms-does-not-exist-fixture'; export default () => missing;", 'ERR_MODULE_NOT_FOUND'],
     ['export default 42', 'FLOW_SCRIPT_EXPORT_INVALID'],
+    ['export default () => { throw null; }', 'FLOW_SCRIPT_ERROR'],
+    ["export default () => { throw 'script primitive'; }", 'FLOW_SCRIPT_ERROR'],
     ['export default () => { const a = {}; a.a = a; return a; }', 'FLOW_SCRIPT_ERROR'],
     ["export default () => 'x'.repeat(262145)", 'FLOW_OUTPUT_LIMIT'],
   ]) await assert.rejects(executeFlowScript({ code }, {}, context()), { code: expected });
