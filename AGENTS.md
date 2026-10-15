@@ -75,3 +75,5 @@ Do not add compatibility behavior merely to imitate another product. New behavio
 4. Run the narrowest relevant test available in the current environment.
 5. Update user-facing documentation when the public contract changed.
 6. Commit with a short descriptive message.
+
+- Flow coverage must use pure logic or real execution: never mock/stub the database, services, HTTP/HTTPS, SMTP, script processes, scheduler clocks or browser network. Use guarded disposable MySQL, native APIs and actual Playwright interactions; report executed results. Preserve unrelated legacy test coverage.

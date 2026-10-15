@@ -13,7 +13,7 @@ Start with [your first flow](#your-first-flow), then follow the [branching examp
 | Run an action on selected Content records | [Content actions](#give-a-content-role-a-manual-action) |
 | Configure event hooks, webhooks or UTC schedules | [Trigger setup](#configure-the-other-triggers) |
 | Choose execution permissions and pass values | [Execution permissions](#execution-permissions), [Data chain](#data-chain-and-templates) |
-| Configure one of the twelve operation types | [Operation reference](#built-in-operations) |
+| Configure one of the thirteen operation types | [Operation reference](#built-in-operations) |
 | Integrate through HTTP or diagnose a failed run | [REST reference](#rest-reference-and-minimal-definition), [Troubleshooting](#troubleshooting) |
 
 ## Build and run a flow in Studio
@@ -184,10 +184,11 @@ Trigger option `response` selects the output path (for example `$last` or `resul
 
 ## Built-in operations
 
-All options accept templates. The following JSON objects are operation **options**, not complete definitions.
+Options accept templates except script source, which is executed literally. The following JSON objects are operation **options**, not complete definitions.
 
 | Type | Options/example | Result |
 | --- | --- | --- |
+| `script` | `{"format":"module","code":"export default data => data.$trigger.body"}` | JSON return value from trusted JavaScript; opt-in server execution, including installed Node/npm modules. See [Run script](#run-script). |
 | `transform` | `{"value":{"name":"{{ $trigger.body.name }}"}}` | JSON value. |
 | `condition` | `{"rules":{"$trigger.body.approved":{"_eq":true}}}` | Resolve on match, reject otherwise. Optional `value` supplies an object to test instead of the chain. Missing fields do not match. Supports `_and`, `_or`, `_eq`, `_neq`, `_null`, `_nnull`, `_gt`, `_gte`, `_lt`, `_lte`, `_in`, `_nin`, `_contains`, `_starts_with`, `_ends_with`. |
 | `read` | `{"collection":"articles","query":{"fields":["id","title"],"limit":10}}` | Native item array. Optional `ids` reads specific ids; reads are bounded to 100 items. Uses the native [query language](api-query-language.md). |
@@ -202,6 +203,48 @@ All options accept templates. The following JSON objects are operation **options
 | `error` | `{"code":"REVIEW_REQUIRED","status":422,"message":"Review this record first"}` | Throws a configured 4xx error. Code uses uppercase letters, numbers and underscores. A reject connection may handle it. |
 
 CRUD option `emit_events` defaults to `false`. It suppresses additional **Flow** event dispatch from that operation while native extension guards, audit and transaction behavior remain active. Setting it to `true` enables other matching flows; ancestry tracking still prevents recursive flow loops. Multi-item updates/deletes follow native per-item transaction behavior unless already inside a blocking filter transaction; do not assume a whole manual graph is one atomic transaction.
+
+## Run script
+
+**Run script executes trusted server code. It is disabled by default.** An Administrator with permission to edit a script can access the API process's filesystem, environment, network and installed packages. Separate processes and deadlines contain ordinary crashes and CPU loops; they are **not a security sandbox**. Enable this only when all Flow administrators are trusted to run server code. The Request node's hostname allowlist and `$env` allowlist do not restrict arbitrary Node imports, `process.env` or a script's own network calls.
+
+Set `FLOWS_SCRIPTS_ENABLED=true` in the running project's environment and restart the API. Inactive script definitions can be saved and reviewed while execution is disabled; activating one returns `FLOW_SCRIPT_DISABLED` until enabled. The inspector shows the current server setting. Choose **Run script**, select **ES module** or **CommonJS**, and enter JavaScript in its shared code field.
+
+![Saved script using a Node builtin, an installed npm package and native data services](assets/screenshots/studio-flows-script.png)
+
+ES modules export one default function. Its first argument is the complete data chain, not only the trigger body. Code is executed literally: `{{ ... }}` is not interpolated inside source. Return a JSON value for the node's result:
+
+```js
+import { createHash } from 'node:crypto';
+import { ExtensionError } from '@yunsoft/yuncms-extensions-sdk';
+
+export default async function (data, context) {
+  const title = data.$trigger.body?.title;
+  if (typeof title !== 'string' || !title.trim()) {
+    throw new ExtensionError('TITLE_REQUIRED', 'Supply a title', { status: 422 });
+  }
+  const item = await context.items('articles').createOne({ title, status: 'review' });
+  return { id: item.id, fingerprint: createHash('sha256').update(title).digest('hex') };
+}
+```
+
+For CommonJS choose `format: "commonjs"` and use `module.exports = async function (data, context) { ... }`. `require('node:crypto')` and installed npm packages work in that format. ESM supports static and dynamic `import`. Install dependencies in the **running project's** `node_modules` with npm, include them in the deployment/image, and restart/redeploy when required. YunCMS does not install packages from script source or infer dependencies from flow imports. Packages must support Node.js 24 and the selected module format. Relative imports resolve from the temporary script directory; use installed packages for reusable code. Exporting a non-function fails with `FLOW_SCRIPT_EXPORT_INVALID`.
+
+| Context member | Contract |
+| --- | --- |
+| `accountability` | Verified execution actor selected by the flow; input cannot replace it. |
+| `requestId` | Verified request id, or null for work with no originating request. |
+| `env` | The same allowlisted values as `$env`. This is a convenience, not a restriction on trusted Node code. |
+| `log(value)` and `console.log/info/warn/error/debug` | Redacted structured application logging. Avoid secrets in arbitrary strings. |
+| `items(collection, {emit_events: false})` | Native project-collection service proxy: `readOne(id, query?)`, `readMany(query?)`, `createOne(payload)`, `createMany(payloads)`, `updateOne(id, payload)`, `deleteOne(id)`. |
+
+The native proxy runs services directly with the flow's current accountability, schema, original transaction and native guards. It preserves read/write field masks, row filters and validation. Generic system-collection access is rejected. `readMany` returns at most 100 records; `createMany` accepts 1–100. A script may issue 100 native calls with at most 16 outstanding at once. Calls already admitted are drained before completion/rollback; await your calls and return only after the intended work is complete. Additional **Flow** events are suppressed by default; `emit_events: true` enables them with ancestry protection. Native extension hooks and audits remain active. In a blocking event, a failed script rolls back both the original write and native proxy writes; filesystem, direct package/SQL and network side effects are outside that transaction. Use the native proxy rather than raw drivers when permission/transaction guarantees are needed.
+
+Source is limited to 64 KiB and input/output to the graph's 256 KiB JSON limit. `undefined` becomes null, BigInt values become decimal strings, and circular/non-JSON output fails. The Failure connection can handle script errors. Syntax errors, missing dependencies and thrown exceptions are recorded as failed nodes. Error codes/messages and custom 4xx statuses are propagated; use the SDK's `ExtensionError` for explicit validation. Scripts run once per invocation; failures do not trigger automatic retry.
+
+Defaults are **5 seconds**, **128 MiB main V8 heap**, and **2 concurrent scripts per API process**. Configure `FLOWS_SCRIPT_TIMEOUT_MS` (100–30000), `FLOWS_SCRIPT_MEMORY_MB` (32–512), and `FLOWS_SCRIPT_CONCURRENCY` (1–8). The heap limit is not a total OS-memory limit: buffers, native libraries, worker threads and child processes need additional memory. The graph's 30-second deadline also applies. A timeout kills the script process group on POSIX; an independent watchdog also terminates ordinary orphaned scripts if the API parent disappears. These controls are not protection against deliberately hostile server code. Windows terminates the script process; descendant-process cleanup is not guaranteed there.
+
+Use [order calculation](flows-recipes.md#8-calculate-an-order-in-a-trusted-script) and [CommonJS imports](flows-recipes.md#9-use-an-installed-package-from-commonjs) for complete importable examples. Keep credentials outside source and exported definitions.
 
 ## REST reference and minimal definition
 
@@ -249,7 +292,7 @@ Definitions and data chains are limited to 256 KiB, 100 nodes, 100 steps per gra
 
 Run history redacts sensitive key names using the native audit redactor and bounds each stored value to 64 KiB. Redaction is not detection of secrets embedded in arbitrary text. Avoid embedding credentials in definitions, arbitrary messages, non-secret field names or exported JSON.
 
-The built-in catalogue does not execute arbitrary JavaScript. Trusted server code can supply an `operations` Map to `FlowsService` for additional operations, just as it supplies the native services, emitter and verified accountability. Custom operations remain trusted server code and must honor the supplied deadline and native service boundaries. Internal callers use services directly, not YunCMS HTTP endpoints.
+Trusted server code can also supply an `operations` Map to `FlowsService` for additional operation types. Custom operations must honor the supplied deadline and native service boundaries. Internal callers use services directly, not YunCMS HTTP endpoints.
 
 ## Troubleshooting
 
@@ -265,6 +308,9 @@ The built-in catalogue does not execute arbitrary JavaScript. Trusted server cod
 | `FLOW_ACTOR_UNAVAILABLE` | The selected/trigger user must still be active and have an allowed current role. Choose an eligible normal Run as user. |
 | `FLOW_REQUEST_FORBIDDEN` | Add the exact intended hostname to `FLOWS_REQUEST_ALLOWED_HOSTS` and restart. Empty is deny-all; wildcards and URLs are not hostnames. |
 | `FLOW_REQUEST_REDIRECT` / `FLOW_REQUEST_FAILED` | Requests do not follow 3xx redirects and reject non-2xx responses. Use the final intended URL and inspect the external service separately. |
+| `FLOW_SCRIPT_DISABLED` | Enable `FLOWS_SCRIPTS_ENABLED=true` and restart before activating a script flow. Inactive definitions can be edited while disabled. |
+| `FLOW_SCRIPT_BUSY` / `FLOW_SCRIPT_TIMEOUT` / `FLOW_SCRIPT_EXIT` | Inspect script concurrency, deadline and process failure. A failed run can follow its Failure connector; work is never automatically retried. |
+| `ERR_MODULE_NOT_FOUND` / `MODULE_NOT_FOUND` / `FLOW_SCRIPT_EXPORT_INVALID` | Install the dependency in the running project, rebuild the deployment if needed, and export a function in the chosen module format. |
 | `MAIL_NOT_CONFIGURED` | Configure SMTP and restart before using Send email. Test with a controlled recipient or test transport. |
 | `FLOW_TIMEOUT` / `FLOW_STEP_LIMIT` / `FLOW_RECURSION_LIMIT` | Reduce work, split the graph or reduce child inputs. Do not create a recursive child/event loop. |
 | Pending run becomes **Skipped** | Its definition was edited or deactivated before it was claimed; the queued revision is no longer current. |
@@ -274,3 +320,9 @@ The built-in catalogue does not execute arbitrary JavaScript. Trusted server cod
 Downloadable examples and the screenshots in this guide use synthetic data. Capture dates and scenario files are recorded in the [screenshot manifest](assets/screenshots/manifest.json); the original capture information for older Studio images is retained.
 
 The trigger/data-chain/resolve-reject behavior was studied in the [Directus Flows documentation](https://directus.com/docs/guides/flows/), [trigger guide](https://directus.com/docs/guides/flows/triggers) and [data-chain guide](https://directus.com/docs/guides/flows/data-chain). YunCMS implements its own bounded service and graph contracts; definitions are not a Directus import format.
+
+## Validate a deployment before enabling flows
+
+Use a separate disposable MySQL database whose name contains `test`, `ci` or `dev`. Never point acceptance fixtures at production. Set the normal `DB_*` connection variables, `YUNCMS_TEST_MYSQL=1`, and `YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1`, then run `npm run test:flows` from the source checkout. This command builds Studio and sequentially runs pure unit/source checks, actual Node script processes, real MySQL/API integration and Chromium Playwright. It fails on skipped, cancelled or failing tests; reports and logs are local under `.yuncms/flows-tests/acceptance/`. Chromium must already be installed (`npx playwright install chromium`). To run the same scenarios in all three engines, install them with `npx playwright install chromium firefox webkit` and set `YUNCMS_BROWSER_ENGINES=chromium,firefox,webkit`; the default is `chromium`. Node.js 24 and `openssl` are required for the real TLS fixtures.
+
+The suite creates synthetic users/collections/flows, runs real HTTPS with trusted and untrusted certificates, sends SMTP to a local TCP server, polls actual UTC time, executes imports, checks native authorization/transaction rollback, competes with two real workers, kills a worker and waits for its real one-minute lease, and checks script crashes/timeouts/heap limits. Network fixtures bind only to localhost. No database, HTTP/HTTPS, SMTP, script process, scheduler clock or browser request is mocked. Existing unrelated legacy repository suites retain their own coverage. These checks do not validate your production credentials, external provider availability, replica sizing or business-specific scripts; repeat the relevant scenarios with controlled integrations before activation.

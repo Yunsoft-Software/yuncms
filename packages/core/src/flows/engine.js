@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { redactAuditValue } from '../services/audit-service.js';
 import { FLOW_LIMITS, FLOW_OPERATION_TYPES, assertFlowJson, flowError, flowPath, normalizeFlow, resolveFlowTemplates } from './definition.js';
 import { flowExecutionStorage, withFlowEvents } from './context.js';
+import { executeFlowScript } from './script.js';
 
 export function safeFlowValue(value, maxBytes = 65536) {
   const json = JSON.stringify(redactAuditValue(value), (_key, entry) => {
@@ -66,10 +67,14 @@ async function requestOperation(options, context) {
   if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD'].includes(method)) throw flowError('INVALID_FLOW_OPERATION', 'Unsupported request method');
   const headers = new Headers(options.headers ?? {});
   if (options.body !== undefined && !['GET', 'HEAD'].includes(method) && !headers.has('content-type')) headers.set('content-type', 'application/json');
-  const response = await (context.fetch ?? fetch)(url, {
+  let response;
+  try { response = await fetch(url, {
     method, headers, redirect: 'manual', signal: context.signal,
     ...(options.body !== undefined && !['GET', 'HEAD'].includes(method) ? { body: typeof options.body === 'string' ? options.body : JSON.stringify(options.body) } : {}),
-  });
+  }); } catch (error) {
+    if (context.signal.aborted) throw error;
+    throw flowError('FLOW_REQUEST_FAILED', 'External request could not complete', 502);
+  }
   if (response.status >= 300 && response.status < 400) throw flowError('FLOW_REQUEST_REDIRECT', 'Flow requests do not follow redirects', 502);
   if (!response.ok) throw flowError('FLOW_REQUEST_FAILED', `External request returned ${response.status}`, 502);
   let length = 0, text = '';
@@ -94,8 +99,9 @@ function boundedIds(value) {
 }
 
 async function operation(node, data, context) {
-  const options = resolveFlowTemplates(node.options, data);
+  const options = node.type === 'script' ? node.options : resolveFlowTemplates(node.options, data);
   switch (node.type) {
+    case 'script': return executeFlowScript(options, data, context);
     case 'transform': return options.value ?? null;
     case 'condition': {
       if (!options.rules || typeof options.rules !== 'object' || Array.isArray(options.rules)) throw flowError('INVALID_FLOW_OPERATION', 'Condition rules are required');
@@ -134,7 +140,7 @@ async function operation(node, data, context) {
     default: {
       if (context.operations?.has(node.type)) return context.operations.get(node.type)(options, { ...context, data: structuredClone(data) });
       if (!['read', 'create', 'update', 'delete'].includes(node.type)) throw flowError('INVALID_FLOW_OPERATION', 'Unsupported operation');
-      if (typeof options.collection !== 'string' || !context.schema.collections?.[options.collection] || context.schema.collections[options.collection].system) throw flowError('INVALID_FLOW_OPERATION', 'Data operations require a project collection');
+      if (typeof options.collection !== 'string' || !Object.hasOwn(context.schema.collections ?? {}, options.collection) || context.schema.collections[options.collection].system) throw flowError('INVALID_FLOW_OPERATION', 'Data operations require a project collection');
       const service = new context.services.ItemsService(options.collection, context);
       return withFlowEvents(options.emit_events === true, async () => {
         if (node.type === 'read') {

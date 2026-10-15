@@ -49,7 +49,7 @@ test('create, drag, connect, save, reload and run a manual Flow against the nati
   await page.getByRole('button', { name: 'Run saved flow', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Run saved flow', exact: true }).click();
   await expect(page.getByTestId('flow-run-output')).toContainText('Hello YunCMS');
-  await page.screenshot({ path: '.yuncms/flows-tests/flow-editor-desktop.png', fullPage: true });
+  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-editor-desktop.png`, fullPage: true });
 });
 
 test('condition success/failure connections merge into a shared node and survive persistence', async ({ page, request }) => {
@@ -146,7 +146,7 @@ test('mobile and dark Flow layouts use central tokens without horizontal page ov
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
   const surface = await page.evaluate(() => { const probe = document.createElement('span'); probe.style.backgroundColor = 'var(--studio-surface)'; document.body.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; });
   await expect(page.locator('.flow-graph-node').first()).toHaveCSS('background-color', surface);
-  await page.screenshot({ path: '.yuncms/flows-tests/flow-editor-mobile-dark.png', fullPage: true });
+  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-editor-mobile-dark.png`, fullPage: true });
 });
 
 test('flow deletion uses the shared confirmation dialog and removes the saved graph', async ({ page, request }) => {

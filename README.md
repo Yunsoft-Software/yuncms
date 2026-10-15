@@ -502,7 +502,7 @@ The complete user/operator/integrator index is **[docs/README.md](docs/README.md
 - **[AI Assistant](docs/ai-assistant.md)**
 - **[AI Automations](docs/ai-automations.md)**
 - **[Flows](docs/flows.md)** — visual triggers, operations, branches, manual Content actions and execution history.
-- **[Flow recipes](docs/flows-recipes.md)** — eight importable examples with setup, requests, expected outputs and screenshots in the guide.
+- **[Flow recipes](docs/flows-recipes.md)** — eleven importable examples, including trusted scripts and HTTPS verification with setup, requests, expected outputs and screenshots in the guide.
 
 ## Production and operations
 

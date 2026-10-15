@@ -63,6 +63,12 @@ export function loadConfig(env = process.env) {
     flows: {
       requestHosts: readString(env.FLOWS_REQUEST_ALLOWED_HOSTS, '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean),
       envAllowList: readString(env.FLOWS_ENV_ALLOW_LIST, '').split(',').map(value => value.trim()).filter(Boolean),
+      scripts: {
+        enabled: readBoolean(env.FLOWS_SCRIPTS_ENABLED, false),
+        timeoutMs: readInteger(env.FLOWS_SCRIPT_TIMEOUT_MS, 5000, 'FLOWS_SCRIPT_TIMEOUT_MS', { min: 100, max: 30000 }),
+        memoryMb: readInteger(env.FLOWS_SCRIPT_MEMORY_MB, 128, 'FLOWS_SCRIPT_MEMORY_MB', { min: 32, max: 512 }),
+        concurrency: readInteger(env.FLOWS_SCRIPT_CONCURRENCY, 2, 'FLOWS_SCRIPT_CONCURRENCY', { min: 1, max: 8 }),
+      },
     },
     server: {
       host: readString(env.HOST, '127.0.0.1'),

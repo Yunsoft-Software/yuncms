@@ -347,9 +347,9 @@ Administrators can open **Settings → AI Automations** (`#/automations`) to def
 
 Administrators open **Settings → Flows** (`#/flows`) to build a graph from one trigger and connected operations. Drag nodes and connect Resolve/Reject outputs; branches can merge into a common operation. The inspector edits trigger permissions and JSON operation options, while run history highlights execution on the canvas. Save before running a manual flow. Imports and duplicates start inactive.
 
-Ordinary authenticated Content users see only manual flows explicitly granted to their role and collection. Selection-required actions are disabled until records are selected; confirmation uses Studio's shared dialog. The Content screen discovers only readable collection/field metadata and continues to enforce native item permissions. See [Flows](flows.md) for a walkthrough, all five triggers, twelve operations, templates and execution scopes.
+Ordinary authenticated Content users see only manual flows explicitly granted to their role and collection. Selection-required actions are disabled until records are selected; confirmation uses Studio's shared dialog. The Content screen discovers only readable collection/field metadata and continues to enforce native item permissions. See [Flows](flows.md) for a walkthrough, all five triggers, thirteen operations, templates and execution scopes.
 
-The [illustrated editor walkthrough](flows.md#your-first-flow) shows JSON editing, confirmation, branching, run traces, Content actions and trigger setup. [Flow recipes](flows-recipes.md) supplies eight inactive JSON definitions you can import and adapt to your collections, roles and users.
+The [illustrated editor walkthrough](flows.md#your-first-flow) shows JSON editing, confirmation, branching, run traces, Content actions and trigger setup. [Flow recipes](flows-recipes.md) supplies eleven inactive JSON definitions you can import and adapt to your collections, roles and users.
 
 The Administrator sidebar includes links to Yunsoft project help, the GitHub repository and GitHub Sponsors. The AI and automation screens also show a small help card; dismissing it is remembered in that browser's local storage.
 

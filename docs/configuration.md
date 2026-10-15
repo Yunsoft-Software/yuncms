@@ -48,11 +48,19 @@ YunCMS connects to MySQL with `timezone: 'Z'` and `dateStrings: ['DATE']`. In ad
 ```env
 FLOWS_REQUEST_ALLOWED_HOSTS=
 FLOWS_ENV_ALLOW_LIST=
+FLOWS_SCRIPTS_ENABLED=false
+FLOWS_SCRIPT_TIMEOUT_MS=5000
+FLOWS_SCRIPT_MEMORY_MB=128
+FLOWS_SCRIPT_CONCURRENCY=2
 ```
 
 Both lists are empty by default. `FLOWS_REQUEST_ALLOWED_HOSTS` is a comma-separated list of exact hostnames allowed by the Flow Request operation (case-insensitive; no wildcard, URL or port). HTTP(S) requests do not follow redirects. Allow only destinations operators intend flows to reach, including any explicitly permitted private-network hosts.
 
 `FLOWS_ENV_ALLOW_LIST` lists exact environment-variable names exposed through the Flow `$env` data chain. Variables absent from the server environment are omitted. Allowlisted values can be used in responses and external operations; keep secrets out unless that disclosure is intentional. Changes require restarting the API. See [Flows](flows.md) for execution scopes, SMTP operations, UTC scheduling, history and bounds.
+
+`FLOWS_SCRIPTS_ENABLED` defaults to `false`. Set it to `true` only for trusted administrators: a script can import Node/npm modules and has the server user's filesystem, environment and network privileges. It is not sandboxed. Dependencies must already be installed in the running project; no package installation occurs when importing a flow.
+
+`FLOWS_SCRIPT_TIMEOUT_MS` defaults to 5000 (100–30000), `FLOWS_SCRIPT_MEMORY_MB` to 128 (32–512, main V8 heap only), and `FLOWS_SCRIPT_CONCURRENCY` to 2 (1–8, per API process). The graph deadline still applies. These values are visible, without secrets, in `/flows/configuration`. Changes require restarting the API. See [Run script](flows.md#run-script) for code formats, native service calls, trust boundaries and failure behavior.
 
 ## Redis shared state
 

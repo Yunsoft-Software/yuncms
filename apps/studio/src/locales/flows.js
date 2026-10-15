@@ -1,4 +1,7 @@
 const EN = {
+  'flow.operation.script': 'Run script', 'flow.scriptCode': 'JavaScript code', 'flow.scriptFormat': 'Script format',
+  'flow.scriptHint': 'Full server privileges. Trusted code only. Import installed project packages; use context.items(collection) for native data access. Return JSON.',
+  'flow.scriptDisabled': 'A server administrator must enable trusted scripts with FLOWS_SCRIPTS_ENABLED before activation.',
   'flow.completed': 'Flow finished.', 'flow.confirmationData': 'Confirmation data (JSON)', 'flow.allowedRoles': 'Allowed trigger roles', 'flow.requireSelection': 'Require selected records', 'flow.requireConfirmation': 'Require confirmation',
   'flow.title': 'Flows', 'flow.subtitle': 'Connect triggers and operations to automate your project.', 'flow.new': 'New flow',
   'flow.canvas': 'Flow canvas', 'flow.triggerLabel': 'Trigger', 'flow.operations': 'Operations', 'flow.addOperation': 'Add operation',
@@ -30,6 +33,9 @@ const EN = {
   'flow.copySuffix': 'copy', 'flow.step': 'Step', 'flow.duration': 'Duration', 'flow.noSelection': 'Select the trigger or an operation to configure it.',
 };
 const TR = {
+  'flow.operation.script': 'Script çalıştır', 'flow.scriptCode': 'JavaScript kodu', 'flow.scriptFormat': 'Script biçimi',
+  'flow.scriptHint': 'Tam sunucu yetkisi taşır. Yalnızca güvenilir kod kullanın. Projede kurulu paketleri import edin; native veri erişimi için context.items(koleksiyon) kullanın. JSON döndürün.',
+  'flow.scriptDisabled': 'Etkinleştirmeden önce sunucu yöneticisi FLOWS_SCRIPTS_ENABLED ile güvenilir scriptleri açmalıdır.',
   'flow.completed': 'Akış tamamlandı.', 'flow.confirmationData': 'Onay verisi (JSON)', 'flow.allowedRoles': 'Tetikleyebilen roller', 'flow.requireSelection': 'Kayıt seçimi gerekli', 'flow.requireConfirmation': 'Onay gerekli',
   'flow.title': 'Akışlar', 'flow.subtitle': 'Projenizi otomatikleştirmek için tetikleyici ve işlem düğümlerini bağlayın.', 'flow.new': 'Yeni akış',
   'flow.canvas': 'Akış tuvali', 'flow.triggerLabel': 'Tetikleyici', 'flow.operations': 'İşlemler', 'flow.addOperation': 'İşlem ekle',

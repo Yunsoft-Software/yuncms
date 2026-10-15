@@ -36,11 +36,11 @@ test('documented greeting imports through Studio, edits as typed JSON and execut
   await page.getByRole('button', { name: 'Save', exact: true }).click(); await expect(page).toHaveURL(/#\/flows\/[a-f0-9-]+$/);
   await page.locator('.react-flow__node[data-id="greeting"]').click();
   await expect(page.getByLabel('Operation options (JSON)', { exact: true })).toHaveValue(/\$trigger.body.name/);
-  await page.locator('.flow-inspector').screenshot({ path: `${output}/docs-flow-operation.png` });
+  await page.locator('.flow-inspector').screenshot({ path: `${output}/${test.info().project.name}/docs-flow-operation.png` });
   await page.getByRole('button', { name: 'Run saved flow', exact: true }).click();
   const confirmation = page.getByRole('dialog');
   await confirmation.getByLabel('Trigger payload (JSON)', { exact: true }).fill('{"body":{"name":"YunCMS"}}');
-  await confirmation.screenshot({ path: `${output}/docs-flow-run-dialog.png` });
+  await confirmation.screenshot({ path: `${output}/${test.info().project.name}/docs-flow-run-dialog.png` });
   await confirmation.getByRole('button', { name: 'Run saved flow', exact: true }).click();
   await expect(page.getByTestId('flow-run-output')).toContainText('Hello YunCMS');
 });
@@ -52,8 +52,8 @@ test('documented approval graph runs both paths and renders the shared result an
   await run(page, { body: { approved: true } }); await expect(page.getByTestId('flow-run-output')).toContainText('approved');
   await run(page, { body: { approved: false } }); await expect(page.getByTestId('flow-run-output')).toContainText('needs_review');
   await expect(page.locator('.flow-node-failed')).toHaveCount(1);
-  await page.locator('.flow-workbench').screenshot({ path: `${output}/docs-flow-branches.png` });
-  await page.locator('.flow-history').screenshot({ path: `${output}/docs-flow-history.png` });
+  await page.locator('.flow-workbench').screenshot({ path: `${output}/${test.info().project.name}/docs-flow-branches.png` });
+  await page.locator('.flow-history').screenshot({ path: `${output}/${test.info().project.name}/docs-flow-history.png` });
 });
 
 test('documented webhook access and schedule configuration match the native API and inspector', async ({ page, request }) => {
@@ -65,7 +65,7 @@ test('documented webhook access and schedule configuration match the native API 
   expect(response.status()).toBe(200); expect((await response.json()).data.output.message).toBe('Hello YunCMS');
   await page.goto(`/#/flows/${webhook.id}`); await expect(page.getByLabel('Webhook URL')).toHaveValue(new RegExp(webhook.id));
   await expect(page.getByLabel('Allow requests without authentication')).not.toBeChecked();
-  await page.locator('.flow-inspector').screenshot({ path: `${output}/docs-flow-webhook.png` });
+  await page.locator('.flow-inspector').screenshot({ path: `${output}/${test.info().project.name}/docs-flow-webhook.png` });
   const config = await request.get('/flows/configuration', { headers: { authorization: `Bearer ${session.access_token}` } });
   const staff = (await config.json()).data.users.find(user => user.email === 'flows-staff@example.test');
   const schedule = await create(request, session, 'schedule-read', { run_as: staff.id, operations: example('schedule-read').operations.map(node => ({ ...node, options: { ...node.options, collection: 'browser_flow_records' } })) });
@@ -73,7 +73,7 @@ test('documented webhook access and schedule configuration match the native API 
   await page.reload(); // Refresh the manager catalogue after creating another definition through the API.
   await expect(page.getByLabel('Cron expression (UTC)')).toHaveValue('0 0 8 * * *');
   await expect(page.getByLabel('Run as')).toHaveValue(staff.id);
-  await page.locator('.flow-inspector').screenshot({ path: `${output}/docs-flow-schedule.png` });
+  await page.locator('.flow-inspector').screenshot({ path: `${output}/${test.info().project.name}/docs-flow-schedule.png` });
 });
 
 test('documented Content action confirms a selected record and updates status under ordinary user permissions', async ({ page, request }) => {
@@ -90,10 +90,10 @@ test('documented Content action confirms a selected record and updates status un
   await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto('/#/content/browser_flow_records');
   const action = page.getByRole('button', { name: 'Mark for review', exact: true }); await expect(action).toBeDisabled();
   await page.locator('tbody input[type="checkbox"]').first().check();
-  await page.screenshot({ path: `${output}/docs-flow-content-action.png` });
+  await page.screenshot({ path: `${output}/${test.info().project.name}/docs-flow-content-action.png` });
   await action.click();
   await expect(page.getByRole('dialog')).toContainText('Set the selected records to review status?');
-  await page.screenshot({ path: `${output}/docs-flow-content-confirmation.png` });
+  await page.screenshot({ path: `${output}/${test.info().project.name}/docs-flow-content-confirmation.png` });
   await page.getByRole('dialog').getByRole('button', { name: 'Run saved flow', exact: true }).click();
   await expect(page.getByText('Flow finished.', { exact: true })).toBeVisible();
   await expect(page.locator('tbody')).toContainText('review');
@@ -106,5 +106,5 @@ test('documented blocking hook displays the before-write mode and deliberately o
   await page.goto(`/#/flows/${flow.id}`);
   await expect(page.getByLabel('Event mode')).toHaveValue('filter');
   await expect(page.getByLabel('Response data-chain path')).toHaveValue('');
-  await page.locator('.flow-inspector').screenshot({ path: `${output}/docs-flow-event-filter.png` });
+  await page.locator('.flow-inspector').screenshot({ path: `${output}/${test.info().project.name}/docs-flow-event-filter.png` });
 });

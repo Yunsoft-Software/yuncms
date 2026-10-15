@@ -2,7 +2,7 @@ import { ExtensionError } from '@yunsoft/yuncms-extensions-sdk';
 
 export const FLOW_LIMITS = Object.freeze({ nodes: 100, bytes: 262144, steps: 100, depth: 8, iterations: 100, durationMs: 30000 });
 export const FLOW_TRIGGERS = Object.freeze(['manual', 'event', 'webhook', 'schedule', 'operation']);
-export const FLOW_OPERATION_TYPES = Object.freeze(['transform', 'condition', 'read', 'create', 'update', 'delete', 'log', 'sleep', 'request', 'mail', 'trigger', 'error']);
+export const FLOW_OPERATION_TYPES = Object.freeze(['transform', 'condition', 'read', 'create', 'update', 'delete', 'log', 'sleep', 'request', 'mail', 'trigger', 'error', 'script']);
 const KEY = /^[A-Za-z][A-Za-z0-9_]{0,59}$/;
 const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
 export function flowError(code, message, status = 400) {

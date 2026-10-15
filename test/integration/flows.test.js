@@ -5,13 +5,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
+import { createWriteStream } from 'node:fs';
 import {
   bootstrapDatabase, CollectionsService, createAccountability, createCoreServiceRegistry, createDatabasePool,
   createStorageRegistry, createSystemAccountability, FieldsService, FlowsService, HookEmitter, ItemsService,
-  loadConfig, LocalStorageDriver, PermissionsService, RolesService, SchemaCache, SmtpMailer, UsersService,
+  loadConfig, LocalStorageDriver, PermissionsService, RolesService, SchemaCache, SmtpMailer, UsersService, createJsonLogger,
 } from '@yunsoft/yuncms-core';
 import { createApp } from '../../packages/api/src/app.js';
 import { FlowRuntime } from '../../packages/api/src/flows/runtime.js';
+import { startFlowNetwork } from '../helpers/flow-network.mjs';
+import { fork } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const node = (id, type, options = {}, extra = {}) => ({ id, key: id, name: id, type, options, position: { x: 350, y: 100 }, resolve: null, reject: null, ...extra });
 const definition = (operations, extra = {}) => ({ name: 'Integration flow', status: 'active', trigger: 'manual', accountability: 'trigger', options: { response: '$last' }, entry: operations[0]?.id ?? null, operations, ...extra });
@@ -26,7 +30,9 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
   const run = randomBytes(5).toString('hex'), articles = `it_flow_articles_${run}`, notes = `it_flow_notes_${run}`;
   const root = await mkdtemp(join(tmpdir(), 'yuncms-flows-'));
   const storage = createStorageRegistry({ local: new LocalStorageDriver({ root }) });
-  const cache = new SchemaCache({ versionCheckTtlMs: 0 }), logger = { info() {}, warn() {}, error() {} }, emitter = new HookEmitter({ logger });
+  const log = createWriteStream(join(root, 'server.jsonl'), { flags: 'a' });
+  const cache = new SchemaCache({ versionCheckTtlMs: 0 }), logger = createJsonLogger({ output: log, errorOutput: log }), emitter = new HookEmitter({ logger });
+  const network = await startFlowNetwork();
   const services = createCoreServiceRegistry().toObject(), roleIds = [], userIds = [], flowIds = [];
   let server, runtime;
   t.after(async () => {
@@ -39,7 +45,7 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     }
     for (const id of userIds) await pool.query('DELETE FROM yuncms_users WHERE id = ?', [id]);
     for (const id of roleIds) { await pool.query('DELETE FROM yuncms_permissions WHERE role = ?', [id]); await pool.query('DELETE FROM yuncms_roles WHERE id = ?', [id]); }
-    await pool.end(); await rm(root, { recursive: true, force: true });
+    await network.close(); await pool.end(); await new Promise(resolve => log.end(resolve)); await rm(root, { recursive: true, force: true });
   });
   await bootstrapDatabase(pool);
   const roles = new RolesService(basic), users = new UsersService(basic);
@@ -59,9 +65,10 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
   for (const action of ['read', 'create', 'update']) await permissions.createOne({ role: staffRole.id, collection: articles, action,
     fields: action === 'read' ? ['id', 'title', 'status', 'created_by'] : ['title', 'status'], ...(action === 'read' ? { filter: { created_by: { _eq: '$CURRENT_USER' } } } : {}) });
   const adminActor = createAccountability({ user: admin.id, role: adminRole.id, admin: true });
-  const messages = [];
-  const mailer = new SmtpMailer({ from: 'flows@example.test', emitter, transport: { async sendMail(message) { messages.push(message); return { messageId: 'local-fixture' }; } } });
-  const shared = { database: pool, schemaCache: cache, services, emitter, storage, logger, mailer };
+  const messages = network.messages;
+  const mailer = new SmtpMailer({ host: '127.0.0.1', port: network.smtpPort, from: 'flows@example.test', emitter });
+  const flowOptions = { scripts: { enabled: true }, requestHosts: ['localhost'], flowEnv: { TEST_PUBLIC_VALUE: 'visible' } };
+  const shared = { database: pool, schemaCache: cache, services, emitter, storage, logger, mailer, ...flowOptions };
   const manager = new FlowsService({ ...shared, accountability: adminActor });
   const internal = new FlowsService({ ...shared, accountability: system });
   runtime = new FlowRuntime(shared).registerHooks();
@@ -69,7 +76,7 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     if (context.collection === articles && payload.title === 'native-denied') throw Object.assign(new Error('Native guard'), { code: 'FORBIDDEN' });
     return payload;
   });
-  const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger, flowsOptions: { mailer } });
+  const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger, flowsOptions: { mailer, ...flowOptions } });
   server = await new Promise(resolve => { const instance = app.listen(0, '127.0.0.1', () => resolve(instance)); });
   const base = `http://127.0.0.1:${server.address().port}`;
   const request = async (path, token, method = 'GET', body) => {
@@ -92,7 +99,7 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     assert.equal((await request('/flows', adminToken)).status, 200);
     assert.equal((await request(`/flows/${encodeURIComponent("' OR 1=1 --")}`, adminToken)).status, 404);
     const configResponse = await request('/flows/configuration', adminToken);
-    assert.equal(configResponse.status, 200); assert.equal(configResponse.body.data.operations.length, 12);
+    assert.equal(configResponse.status, 200); assert.equal(configResponse.body.data.operations.length, 13);
   });
   await t.test('Studio read-only metadata exposes granted collections and fields while keeping schema management private', async () => {
     const visible = await request('/studio-navigation/collections', staffToken);
@@ -122,18 +129,6 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     assert.equal((await request(`/flows/${flow.id}?revision=${latest.revision}`, adminToken, 'DELETE')).status, 204);
     const [[runs]] = await pool.query('SELECT COUNT(*) AS total FROM yuncms_flow_runs WHERE flow_id = ?', [flow.id]); assert.equal(Number(runs.total), 0);
   });
-  await t.test('HTTP-triggered email uses configured native SMTP and preserves native mail filter authority', async () => {
-    const rule = await create(definition([node('mail', 'mail', { to: 'reader@example.test', subject: 'Hello', text: 'Local fixture only' })]));
-    const unsubscribe = emitter.registerFilter('mail.send', (payload, context) => { assert.equal(context.accountability.user, admin.id); assert.equal(context.accountability.admin, true); return payload; });
-    try {
-      const result = await request(`/flows/${rule.id}/run`, adminToken, 'POST', {});
-      assert.equal(result.status, 200); assert.equal(result.body.data.output, null);
-      assert.equal(messages.length, 1); assert.equal(messages[0].to, 'reader@example.test');
-    } finally { unsubscribe(); }
-    const reject = emitter.registerFilter('mail.send', () => { throw Object.assign(new Error('Native mail guard'), { code: 'FORBIDDEN' }); });
-    try { assert.equal((await request(`/flows/${rule.id}/run`, adminToken, 'POST', {})).status, 403); assert.equal(messages.length, 1); }
-    finally { reject(); }
-  });
   await t.test('issue 76 capabilities enforce native action/field/read-row masks and reject invalid identifiers or unauthenticated discovery', async () => {
     const owned = (await request(`/items/${articles}`, staffToken, 'POST', { title: 'Owned capability record', status: 'draft' })).body.data;
     const foreign = (await request(`/items/${articles}`, adminToken, 'POST', { title: 'Foreign capability record' })).body.data;
@@ -153,6 +148,110 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     assert.equal(injected.status, 200); assert.equal(injected.body.data.records["' OR 1=1 --"].update, false);
     assert.equal((await request(`/items/${articles}/${owned.id}`, staffToken)).status, 200);
   });
+  await t.test('real TLS requests enforce trust, host allowlist, redirects, body limits, parsing and native request data', async () => {
+    const rule = await create(definition([node('request', 'request', { url: network.httpsUrl + '/echo', method: 'POST', headers: { 'x-flow-proof': 'real-tls' }, body: { value: '{{ $trigger.body.value }}' } })]));
+    const result = await request(`/flows/${rule.id}/run`, adminToken, 'POST', { body: { value: [false, 7] }, accountability: { admin: true } });
+    assert.equal(result.status, 200); assert.deepEqual(result.body.data.output.body, { method: 'POST', body: { value: [false, 7] }, proof: 'real-tls' });
+    const cases = [
+      [network.httpsUrl.replace('localhost', '127.0.0.1') + '/echo', 403, 'FLOW_REQUEST_FORBIDDEN'],
+      [network.untrustedUrl, 502, 'FLOW_REQUEST_FAILED'],
+      [network.httpsUrl + '/redirect', 502, 'FLOW_REQUEST_REDIRECT'],
+      [network.httpsUrl + '/invalid-json', 502, 'FLOW_REQUEST_INVALID_JSON'],
+      [network.httpsUrl + '/too-large', 400, 'FLOW_OUTPUT_LIMIT'],
+      [network.httpsUrl + '/failure', 502, 'FLOW_REQUEST_FAILED'],
+    ];
+    for (const [url, status, code] of cases) {
+      const flow = await create(definition([node('request', 'request', { url })]));
+      const response = await request(`/flows/${flow.id}/run`, adminToken, 'POST', {});
+      assert.equal(response.status, status, url); assert.equal(response.body.errors[0].code, code);
+      assert.equal((await manager.readRuns(flow.id))[0].status, 'failed');
+    }
+    const text = await create(definition([node('request', 'request', { url: network.httpsUrl + '/text' })]));
+    assert.equal((await request(`/flows/${text.id}/run`, adminToken, 'POST', {})).body.data.output.body, 'real TLS text');
+    const slow = await create(definition([node('request', 'request', { url: network.httpsUrl + '/slow' })]));
+    await assert.rejects(internal.runTriggered(slow.id, {}, adminActor, { signal: AbortSignal.timeout(120) }), { code: 'FLOW_TIMEOUT' });
+    assert.equal((await manager.readRuns(slow.id))[0].error_code, 'FLOW_TIMEOUT');
+  });
+  await t.test('real script child processes preserve native field/row/guard authority and blocking transaction rollback', async () => {
+    const success = await create(definition([node('script', 'script', { format: 'module', code: `import { createHash } from 'node:crypto'; import mysql from 'mysql2/promise'; export default async (data, context) => { const row = await context.items('${articles}').createOne({title: 'Script native record', status: 'draft'}); return {id: row.id, driver: typeof mysql.createPool, actor: context.accountability.user, digest: createHash('sha256').update('abc').digest('hex'), literal: '{{ unchanged }}'}; }` })], { accountability: 'user', run_as: staff.id }));
+    const result = await request(`/flows/${success.id}/run`, adminToken, 'POST', { accountability: { admin: true }, body: { code: 'process.exit(1)' } });
+    assert.equal(result.status, 200); assert.equal(result.body.data.output.actor, staff.id); assert.equal(result.body.data.output.driver, 'function'); assert.equal(result.body.data.output.literal, '{{ unchanged }}');
+    const id = result.body.data.output.id; assert.equal((await request(`/items/${articles}/${id}`, staffToken)).status, 200);
+    for (const [code, status] of [
+      [`export default async (_, c) => c.items('${articles}').updateOne('${id}', {private_note:'denied'})`, 403],
+      [`export default async (_, c) => c.items('${articles}').createOne({title:'native-denied'})`, 403],
+      ["export default async (_, c) => c.items('yuncms_users').readMany()", 400],
+    ]) {
+      const denied = await create(definition([node('script', 'script', { code })], { accountability: 'user', run_as: staff.id }));
+      assert.equal((await request(`/flows/${denied.id}/run`, adminToken, 'POST', {})).status, status);
+      assert.equal((await manager.readRuns(denied.id))[0].status, 'failed');
+    }
+    const before = [await count(articles), await count(notes)];
+    const filter = await create(definition([node('script', 'script', { code: `export default async (_, context) => { await context.items('${notes}').createOne({title:'rollback-script'}); throw new Error('Reject original mutation'); }` })], { trigger: 'event', accountability: 'system', options: { mode: 'filter', events: ['items.create'], collections: [articles] } }));
+    assert.equal((await request(`/items/${articles}`, staffToken, 'POST', { title: 'Script rollback original' })).status, 400);
+    assert.deepEqual([await count(articles), await count(notes)], before); assert.equal((await manager.readRuns(filter.id)).length, 0);
+  });
+  await t.test('real script execution enforces server enablement, process timeout and failure recovery paths', async () => {
+    const disabled = createApp({ pool, config, schemaCache: cache, storage, emitter, logger });
+    const secondServer = await new Promise(resolve => { const instance = disabled.listen(0, '127.0.0.1', () => resolve(instance)); });
+    try {
+      const response = await fetch(`http://127.0.0.1:${secondServer.address().port}/flows`, { method: 'POST', headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' }, body: JSON.stringify(definition([node('script', 'script', { code: 'export default () => 1' })])) });
+      assert.equal(response.status, 409); assert.equal((await response.json()).errors[0].code, 'FLOW_SCRIPT_DISABLED');
+    } finally { await new Promise(resolve => secondServer.close(resolve)); }
+    const flow = await create(definition([node('script', 'script', { code: 'export default () => { while (true) {} }' })]));
+    await assert.rejects(internal.runTriggered(flow.id, {}, adminActor, { signal: AbortSignal.timeout(150) }), { code: 'FLOW_TIMEOUT' });
+    assert.equal((await manager.readRuns(flow.id))[0].error_code, 'FLOW_TIMEOUT');
+    const recovered = await create(definition([node('script', 'script', { code: 'export default () => { throw new Error("Handled script failure"); }' }, { reject: 'recover' }), node('recover', 'transform', { value: { recovered: true, code: '{{ $last.code }}' } })]));
+    const result = await request(`/flows/${recovered.id}/run`, adminToken, 'POST', {});
+    assert.equal(result.status, 200); assert.deepEqual(result.body.data.output, { recovered: true, code: 'FLOW_SCRIPT_ERROR' });
+  });
+  await t.test('two actual Node workers claim durable jobs once each using physical MySQL locks', async () => {
+    for (let round = 0; round < 3; round++) {
+      const flow = await create(definition([node('wait', 'sleep', { milliseconds: 100 }, { resolve: 'create' }), node('create', 'create', { collection: notes, payload: { title: 'Concurrent {{ $trigger.index }}' } })]));
+      const before = await count(notes);
+      for (let index = 0; index < 20; index++) await internal.enqueue(flow, { index }, adminActor);
+      const drain = () => new Promise((resolve, reject) => {
+        const child = fork(new URL('../helpers/flow-drain.mjs', import.meta.url), [], { execArgv: [], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+        let claimed, stderr = ''; child.stderr.on('data', chunk => { stderr += chunk; });
+        child.on('message', message => { if (message.done) claimed = message.claimed; });
+        child.once('error', reject); child.once('exit', code => code === 0 ? resolve(claimed) : reject(Error(`Native drain worker failed: ${stderr}`)));
+      });
+      const completed = await Promise.allSettled([drain(), drain()]);
+      for (const result of completed) if (result.status === 'rejected') throw result.reason;
+      const counts = completed.map(result => result.value); assert.equal(counts[0] + counts[1], 20); assert.ok(counts.every(count => count > 0));
+      const runs = await manager.readRuns(flow.id); assert.equal(runs.length, 20); assert.ok(runs.every(run => run.status === 'succeeded'));
+      assert.equal(new Set(runs.map(run => run.output[0].id)).size, 20); assert.equal(await count(notes), before + 20);
+    }
+  });
+  await t.test('an actually killed worker is marked interrupted after its real lease expires and is never retried automatically', async () => {
+    const flow = await create(definition([node('wait', 'sleep', { milliseconds: 5000 })]));
+    const id = await internal.enqueue(flow, {}, adminActor);
+    const child = fork(new URL('../helpers/flow-drain.mjs', import.meta.url), [], { execArgv: [], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
+    const exited = new Promise(resolve => child.once('exit', resolve));
+    let job;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const [[row]] = await pool.query('SELECT status, lease_until FROM yuncms_flow_runs WHERE id = ?', [id]);
+      if (row.status === 'running') { job = row; break; } await delay(25);
+    }
+    assert.ok(job); child.kill('SIGKILL'); await exited;
+    const wait = Math.max(0, new Date(job.lease_until).getTime() - Date.now() + 200);
+    await delay(wait); // Real clock and the production one-minute lease: no clock replacement or SQL timestamp manipulation.
+    assert.equal(await internal.runNext(), false);
+    const runs = await manager.readRuns(flow.id); assert.equal(runs.length, 1); assert.equal(runs[0].status, 'failed'); assert.equal(runs[0].error_code, 'FLOW_RUN_INTERRUPTED');
+    assert.equal(await internal.runNext(), false);
+  });
+  await t.test('HTTP-triggered email uses configured native SMTP and preserves native mail filter authority', async () => {
+    const rule = await create(definition([node('mail', 'mail', { to: 'reader@example.test', subject: 'Hello', text: 'Local fixture only' })]));
+    const unsubscribe = emitter.registerFilter('mail.send', (payload, context) => { assert.equal(context.accountability.user, admin.id); assert.equal(context.accountability.admin, true); return payload; });
+    try {
+      const result = await request(`/flows/${rule.id}/run`, adminToken, 'POST', {});
+      assert.equal(result.status, 200); assert.equal(result.body.data.output, null);
+      assert.equal(messages.length, 1); assert.ok(messages[0].to.some(value => value.includes('reader@example.test'))); assert.match(messages[0].raw, /Local fixture only/);
+    } finally { unsubscribe(); }
+    const reject = emitter.registerFilter('mail.send', () => { throw Object.assign(new Error('Native mail guard'), { code: 'FORBIDDEN' }); });
+    try { assert.equal((await request(`/flows/${rule.id}/run`, adminToken, 'POST', {})).status, 403); assert.equal(messages.length, 1); }
+    finally { reject(); }
+  });
   await t.test('downloadable documentation recipes import through HTTP and execute their advertised native behavior', async () => {
     const root = new URL('../../docs/examples/flows/', import.meta.url), examples = new Map();
     for (const name of readdirSync(root).filter(name => name.endsWith('.json'))) {
@@ -162,7 +261,7 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
       assert.equal(response.status, 201, name); assert.equal(response.body.data.status, 'inactive', name);
       examples.set(name, response.body.data); flowIds.push(response.body.data.id);
     }
-    assert.equal(examples.size, 8);
+    assert.equal(examples.size, 11);
     const activate = async name => {
       const response = await request(`/flows/${examples.get(name).id}`, adminToken, 'PUT', { ...examples.get(name), status: 'active' });
       assert.equal(response.status, 200); examples.set(name, response.body.data); return response.body.data;
@@ -192,6 +291,16 @@ test('native Flows API, graph execution, event transactions and durable jobs enf
     await runtime.tick(new Date('2026-10-15T08:00:00Z'));
     const runs = await manager.readRuns(schedule.id); assert.equal(runs.length, 1); assert.equal(runs[0].status, 'succeeded');
     assert.ok(runs[0].output.some(item => item.id === record.body.data.id && item.status === 'review'));
+    const total = await activate('script-order-total.json');
+    const totalResult = await request(`/flows/${total.id}/run`, adminToken, 'POST', { body: { lines: [{ quantity: 2, unit_price_cents: 1490 }, { quantity: 1, unit_price_cents: 500 }] } });
+    assert.equal(totalResult.status, 200); assert.equal(totalResult.body.data.output.total_cents, 3480);
+    assert.equal((await request(`/flows/${total.id}/run`, adminToken, 'POST', { body: { lines: [] } })).status, 422);
+    const commonjs = await activate('script-commonjs.json');
+    assert.equal((await request(`/flows/${commonjs.id}/run`, adminToken, 'POST', { body: { value: 21 } })).body.data.output.query, 'SELECT 21 AS value');
+    const verification = examples.get('webhook-https-record.json'); verification.operations[0].options.url = network.httpsUrl + '/verify';
+    const webhookRecord = await activate('webhook-https-record.json');
+    assert.equal((await request(`/flows/trigger/${webhookRecord.id}`, adminToken, 'POST', { title: 'Verified example', approved: true })).status, 200);
+    assert.equal((await request(`/flows/trigger/${webhookRecord.id}`, adminToken, 'POST', { title: 'Denied example', approved: false })).status, 422);
   });
   await t.test('run-as preserves native field, row and hook boundaries for allowed manual roles', async () => {
     const rule = await create(definition([node('create', 'create', { collection: articles, payload: { title: 'Scoped record' } })], { accountability: 'user', run_as: staff.id, options: { response: '$last', allowed_roles: [staffRole.id], collections: [articles] } }));

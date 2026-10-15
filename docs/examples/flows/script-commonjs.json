@@ -1,0 +1,31 @@
+{
+  "name": "CommonJS package import",
+  "description": "",
+  "status": "inactive",
+  "trigger": "manual",
+  "accountability": "trigger",
+  "run_as": null,
+  "options": {
+    "response": "$last",
+    "require_confirmation": true
+  },
+  "entry": "script",
+  "operations": [
+    {
+      "id": "script",
+      "key": "script",
+      "name": "script",
+      "type": "script",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "format": "commonjs",
+        "code": "const { createHash } = require('node:crypto');\nconst mysql = require('mysql2');\nmodule.exports = async function (data) {\n  return { query: mysql.format('SELECT ? AS value', [data.$trigger.body.value]), fingerprint: createHash('sha256').update(String(data.$trigger.body.value)).digest('hex') };\n};\n"
+      },
+      "resolve": null,
+      "reject": null
+    }
+  ]
+}

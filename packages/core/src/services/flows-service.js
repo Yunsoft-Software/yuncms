@@ -7,6 +7,7 @@ import { FLOW_LIMITS, FLOW_OPERATION_TYPES, assertFlowJson, flowError, normalize
 import { executeFlowGraph, safeFlowValue } from '../flows/engine.js';
 import { parseFlowCronExpression } from '../flows/cron.js';
 import { flowExecutionStorage } from '../flows/context.js';
+import { SCRIPT_DEFAULTS, validateScriptOptions } from '../flows/script.js';
 
 export const FLOW_FILTER_EVENTS = Object.freeze(['items.create', 'items.update', 'items.delete', 'users.update', 'users.delete', 'users.password.update']);
 export const FLOW_ACTION_EVENTS = Object.freeze([...FLOW_FILTER_EVENTS, 'users.create', 'files.create', 'files.update', 'files.delete']);
@@ -32,7 +33,7 @@ export class FlowsService extends BaseService {
     this.operations = options.operations ?? new Map();
     this.requestHosts = options.requestHosts ?? [];
     this.flowEnv = options.flowEnv ?? {};
-    this.fetch = options.fetch;
+    this.scripts = { ...SCRIPT_DEFAULTS, ...options.scripts };
   }
 
   requireManager() {
@@ -59,11 +60,16 @@ export class FlowsService extends BaseService {
     const [roles] = await this.database.query('SELECT id, name, admin, public FROM yuncms_roles ORDER BY name LIMIT 500');
     const [users] = await this.database.query("SELECT u.id, u.email FROM yuncms_users u INNER JOIN yuncms_roles r ON r.id = u.role WHERE u.status = 'active' AND r.admin = 0 AND r.public = 0 ORDER BY u.email LIMIT 500");
     return { roles, users, collections: Object.values(schema.collections).filter(c => !c.system).map(c => ({ collection: c.collection, name: c.name ?? c.collection })),
-      operations: [...new Set([...FLOW_OPERATION_TYPES, ...this.operations.keys()])], filter_events: FLOW_FILTER_EVENTS, action_events: FLOW_ACTION_EVENTS, limits: FLOW_LIMITS };
+      operations: [...new Set([...FLOW_OPERATION_TYPES, ...this.operations.keys()])], filter_events: FLOW_FILTER_EVENTS, action_events: FLOW_ACTION_EVENTS, limits: FLOW_LIMITS,
+      scripts: { enabled: this.scripts.enabled, timeoutMs: this.scripts.timeoutMs, memoryMb: this.scripts.memoryMb, concurrency: this.scripts.concurrency } };
   }
   async save(input, id = null) {
     this.requireManager();
     const flow = normalizeFlow(input, { operationTypes: [...FLOW_OPERATION_TYPES, ...this.operations.keys()] });
+    for (const operation of flow.operations) if (operation.type === 'script') {
+      validateScriptOptions(operation.options);
+      if (flow.status === 'active' && !this.scripts.enabled) throw flowError('FLOW_SCRIPT_DISABLED', 'Enable trusted server scripts before activating this flow', 409);
+    }
     if (flow.trigger === 'schedule') {
       try { parseFlowCronExpression(flow.options.cron); } catch { throw flowError('INVALID_FLOW', 'Provide a valid 5 or 6 field cron expression'); }
     }
@@ -151,7 +157,7 @@ export class FlowsService extends BaseService {
       const result = await executeFlowGraph(flow, { database, schema, accountability, services, trigger,
         emitter: this.emitter, storage: this.storage, logger: this.logger, mailer: this.mailer, permissionCache: this.permissionCache,
         requestId: this.requestId, requestHosts: this.requestHosts, env: this.flowEnv, operations: this.operations,
-        fetch: this.fetch, ...(signal ? { signal } : {}), ...(budget ? { budget } : {}),
+        scripts: this.scripts, ...(signal ? { signal } : {}), ...(budget ? { budget } : {}),
         triggerFlow: async (childId, payload, context) => {
           const child = await this.#load(childId, database);
           if (child.trigger !== 'operation') throw flowError('INVALID_FLOW_OPERATION', 'Choose a flow with Another flow trigger');

@@ -211,7 +211,7 @@ export function createApp({
 
   if (aiRouter) app.use('/ai', aiRouter);
   if (automationsRouter) app.use('/automations', automationsRouter);
-  app.use('/flows', createFlowsRouter({ schemaCache: schemaCache ?? undefined, mailer, ...flowsOptions }));
+  app.use('/flows', createFlowsRouter({ schemaCache: schemaCache ?? undefined, mailer, scripts: config.flows?.scripts, ...flowsOptions }));
   if (mcpRouter) app.use('/mcp', mcpRouter);
   app.use('/studio-navigation', createStudioNavigationRouter());
   app.use('/studio-settings', createStudioSettingsRouter());

@@ -1,0 +1,91 @@
+{
+  "name": "Verify a webhook before creating an article",
+  "description": "",
+  "status": "inactive",
+  "trigger": "webhook",
+  "accountability": "trigger",
+  "run_as": null,
+  "options": {
+    "method": "POST",
+    "public": false,
+    "response": "$last"
+  },
+  "entry": "verification",
+  "operations": [
+    {
+      "id": "verification",
+      "key": "verification",
+      "name": "verification",
+      "type": "request",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "url": "https://api.example.test/verify",
+        "method": "POST",
+        "body": {
+          "approved": "{{ $trigger.body.approved }}"
+        }
+      },
+      "resolve": "check",
+      "reject": null
+    },
+    {
+      "id": "check",
+      "key": "check",
+      "name": "check",
+      "type": "condition",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "rules": {
+          "verification.body.verified": {
+            "_eq": true
+          }
+        }
+      },
+      "resolve": "created",
+      "reject": "denied"
+    },
+    {
+      "id": "created",
+      "key": "created",
+      "name": "created",
+      "type": "create",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "collection": "articles",
+        "payload": {
+          "title": "{{ $trigger.body.title }}",
+          "status": "review"
+        },
+        "emit_events": false
+      },
+      "resolve": null,
+      "reject": null
+    },
+    {
+      "id": "denied",
+      "key": "denied",
+      "name": "denied",
+      "type": "error",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "code": "WEBHOOK_VERIFICATION_FAILED",
+        "status": 422,
+        "message": "The external verification did not approve this record."
+      },
+      "resolve": null,
+      "reject": null
+    }
+  ]
+}

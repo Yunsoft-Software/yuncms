@@ -10,7 +10,7 @@ These recipes accompany the [illustrated Flow guide](flows.md). Each linked JSON
 - Review execution permissions before activation. A normal role needs its own native field and row permissions. The scheduled selected-user example cannot be saved until its Run as placeholder has been replaced with a real eligible user.
 - Save, activate and save again when importing through Studio. Imports force inactive status. API updates require the returned current `revision` and the full definition.
 
-The requests below assume `YUNCMS_URL=http://localhost:3008`, an appropriate bearer token in `TOKEN`, and a saved flow id in `FLOW_ID`. Store real credentials locally, outside Git. The examples do not require an external request or email recipient.
+The requests below assume `YUNCMS_URL=http://localhost:3008`, an appropriate bearer token in `TOKEN`, and a saved flow id in `FLOW_ID`. Store real credentials locally, outside Git. Recipes 1–7 need no external service. Script recipes require explicit server enablement; recipe 10 requires an operator-controlled HTTPS endpoint.
 
 ## 1. Greet a manual caller
 
@@ -177,3 +177,36 @@ Select the previous operation's Success or Failure port and connect the next ope
 - To return a particular earlier result, select the trigger and set its response path to that key. `$all` returns the entire data chain, including allowlisted environment values, so choose it deliberately.
 
 See [queue and limits](flows.md#queue-schedules-and-bounds) and [troubleshooting](flows.md#troubleshooting) before enabling a flow that changes data or reaches an external system.
+
+## 8. Calculate an order in a trusted script
+
+**Definition:** [script-order-total.json](examples/flows/script-order-total.json). **Requirements:** trusted Administrator, `FLOWS_SCRIPTS_ENABLED=true`, and the SDK installed with YunCMS. **Graph:** trigger → `calculate` (`script`). No database mutation occurs.
+
+Import, activate and run with:
+
+```json
+{"body":{"lines":[{"quantity":2,"unit_price_cents":1490},{"quantity":1,"unit_price_cents":500}]}}
+```
+
+The ESM script imports `node:crypto` and the installed `@yunsoft/yuncms-extensions-sdk` package. It returns `total_cents: 3480` and a SHA-256 `fingerprint` of the input lines. An empty/invalid list or invalid quantity/price returns HTTP 422 with `ORDER_INVALID`. Values use integer cents. Open the failed run to inspect the `calculate` step. The [script reference](flows.md#run-script) explains enablement and trust boundaries.
+
+## 9. Use an installed package from CommonJS
+
+**Definition:** [script-commonjs.json](examples/flows/script-commonjs.json). **Requirements:** enabled trusted scripts and `mysql2` in the running project's dependencies. **Graph:** trigger → `script` (`script`).
+
+Run with `{"body":{"value":21}}`. This script uses `require('mysql2')` and `require('node:crypto')`, exports a function through `module.exports`, and returns `query: "SELECT 21 AS value"` plus a SHA-256 fingerprint. It formats a query without executing SQL. Prefer `context.items()` for actual data work so native permissions and transactions apply.
+
+## 10. Verify a private webhook over HTTPS before creating a record
+
+**Definition:** [webhook-https-record.json](examples/flows/webhook-https-record.json). **Requirements:** an `articles` collection with `title`/`status`, a trusted HTTPS verification endpoint, and its exact hostname in `FLOWS_REQUEST_ALLOWED_HOSTS`. **Graph:** private POST webhook → `verification` (Request) → condition → create or error. No script enablement is required.
+
+Replace `https://api.example.test/verify` with an endpoint you control. It must accept JSON `{"approved":true|false}` and return `{"verified":true|false}` with a JSON content type and valid trusted TLS certificate. Choose the desired normal Run as user with native article-create/read permissions, or deliberately keep Administrator trigger authority. Activate and send:
+
+```bash
+curl --fail-with-body "$YUNCMS_URL/flows/trigger/$FLOW_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Verified submission","approved":true}'
+```
+
+If the endpoint returns `verified: true`, the flow creates one record with `status: "review"` and returns the native created-item array. If it returns false, the API returns 422 `WEBHOOK_VERIFICATION_FAILED` without creating a record. Without authentication the private webhook returns 403. HTTP errors, redirects, untrusted certificates and invalid/oversized JSON fail before creation; inspect run history for the failing step. The HTTPS request is an external side effect and is not transactional.

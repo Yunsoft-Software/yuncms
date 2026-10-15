@@ -27,6 +27,7 @@ export { AuthBrandPanel, LanguageSwitcher, StudioBrand, YunsoftFooter } from './
 export { UploadQueue } from './UploadQueue.jsx';
 export { YunsoftSupportCard, YunsoftSupportLinks } from './YunsoftSupportCard.jsx';
 export { FlowCanvas } from './FlowCanvas.jsx';
+export { CodeField } from './CodeField.jsx';
 export { FlowInspector } from './FlowInspector.jsx';
 export { FlowRunHistory } from './FlowRunHistory.jsx';
 export { JsonField } from './JsonField.jsx';

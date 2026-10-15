@@ -1,6 +1,7 @@
 import { FLOW_OPERATION_DEFAULTS, triggerDefaults } from '../flow-graph.js';
 import { useI18n } from '../i18n.js';
 import { JsonField } from './JsonField.jsx';
+import { CodeField } from './CodeField.jsx';
 
 export function FlowInspector({ flow, selected, configuration, onChange, onRemove, onValidityChange, disabled }) {
   const { t } = useI18n();
@@ -53,7 +54,11 @@ export function FlowInspector({ flow, selected, configuration, onChange, onRemov
         <label className="field-label"><span>{t('flow.type')}</span><select value={node.type} onChange={event => patchNode({ type: event.target.value, options: structuredClone(FLOW_OPERATION_DEFAULTS[event.target.value] ?? {}) })}>
           {configuration.operations.map(type => <option key={type} value={type}>{t(`flow.operation.${type}`)}</option>)}</select></label>
         {['read', 'create', 'update', 'delete'].includes(node.type) && <label className="field-label"><span>{t('flow.collection')}</span>{selectCollection(node.options.collection, collection => patchNode({ options: { ...node.options, collection } }))}</label>}
-        <JsonField objectOnly key={`${node.id}:${node.type}`} label={t('flow.options')} value={node.options} onChange={value => patchNode({ options: value })} onValidityChange={onValidityChange} hint={t('flow.jsonHint')} errorLabel={t('flow.invalidJson')} rows={10} />
+        {node.type === 'script' ? <>
+          {!configuration.scripts?.enabled && <p className="notice-banner" role="status">{t('flow.scriptDisabled')}</p>}
+          <label className="field-label"><span>{t('flow.scriptFormat')}</span><select aria-label={t('flow.scriptFormat')} value={node.options.format ?? 'module'} onChange={event => patchNode({ options: { ...node.options, format: event.target.value } })}><option value="module">JavaScript module (ESM)</option><option value="commonjs">CommonJS</option></select></label>
+          <CodeField label={t('flow.scriptCode')} value={node.options.code ?? ''} onChange={code => { patchNode({ options: { ...node.options, code } }); onValidityChange?.(Boolean(code.trim()) && new TextEncoder().encode(code).length <= 65536); }} hint={t('flow.scriptHint')} />
+        </> : <JsonField objectOnly key={`${node.id}:${node.type}`} label={t('flow.options')} value={node.options} onChange={value => patchNode({ options: value })} onValidityChange={onValidityChange} hint={t('flow.jsonHint')} errorLabel={t('flow.invalidJson')} rows={10} />}
         <button type="button" className="danger-button" onClick={() => onRemove(node.id)}>{t('flow.removeOperation')}</button>
       </>}
     </fieldset>

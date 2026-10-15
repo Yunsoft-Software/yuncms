@@ -1,0 +1,31 @@
+{
+  "name": "Calculate an order total",
+  "description": "",
+  "status": "inactive",
+  "trigger": "manual",
+  "accountability": "trigger",
+  "run_as": null,
+  "options": {
+    "response": "$last",
+    "require_confirmation": true
+  },
+  "entry": "total",
+  "operations": [
+    {
+      "id": "total",
+      "key": "total",
+      "name": "total",
+      "type": "script",
+      "position": {
+        "x": 380,
+        "y": 100
+      },
+      "options": {
+        "format": "module",
+        "code": "import { createHash } from 'node:crypto';\nimport { ExtensionError } from '@yunsoft/yuncms-extensions-sdk';\n\nexport default async function (data) {\n  const lines = data.$trigger.body?.lines;\n  if (!Array.isArray(lines) || !lines.length || lines.length > 100 || lines.some(line =>\n    !Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 1000 ||\n    !Number.isInteger(line.unit_price_cents) || line.unit_price_cents < 0 || line.unit_price_cents > 1000000)) {\n    throw new ExtensionError('ORDER_INVALID', 'Provide 1 to 100 valid order lines.', { status: 422 });\n  }\n  return {\n    total_cents: lines.reduce((sum, line) => sum + line.quantity * line.unit_price_cents, 0),\n    fingerprint: createHash('sha256').update(JSON.stringify(lines)).digest('hex')\n  };\n}\n"
+      },
+      "resolve": null,
+      "reject": null
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 export const FLOW_OPERATION_DEFAULTS = Object.freeze({
+  script: { format: 'module', code: 'export default async function (data, context) {\n  return { value: data.$trigger.body?.value ?? null };\n}\n' },
   transform: { value: { message: 'Hello {{ $trigger.body.name }}' } },
   condition: { rules: { '$trigger.body.approved': { _eq: true } } },
   read: { collection: '', query: { limit: 10 } },
@@ -73,7 +74,6 @@ export function flowGraphEdges(flow) {
   }
   return edges;
 }
-
 export function applyFlowMeasurements(previous, changes) {
   let next = previous;
   for (const change of changes) {

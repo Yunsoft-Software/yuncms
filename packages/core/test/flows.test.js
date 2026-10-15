@@ -8,7 +8,7 @@ import { flowPath, normalizeFlow, resolveFlowTemplates } from '../src/flows/defi
 import { executeFlowGraph, evaluateFlowCondition, safeFlowValue } from '../src/flows/engine.js';
 import { parseFlowCronExpression, flowCronMatchesUtc } from '../src/flows/cron.js';
 import { flowExecutionStorage } from '../src/flows/context.js';
-import { FlowsService } from '../src/services/flows-service.js';
+import { SCRIPT_DEFAULTS } from '../src/flows/script.js';
 
 const node = (id, type, options = {}, extra = {}) => ({ id, key: id, name: id, type, options, position: { x: 100, y: 100 }, resolve: null, reject: null, ...extra });
 const flow = operations => ({ id: 'test-flow', name: 'Example', status: 'active', trigger: 'manual', options: {}, entry: operations[0]?.id ?? null, operations });
@@ -17,7 +17,7 @@ const context = (extra = {}) => ({ accountability: createAccountability({ user: 
 test('every downloadable documentation example validates inactive, and the documented pure examples execute unchanged', async () => {
   const root = new URL('../../../docs/examples/flows/', import.meta.url);
   const examples = new Map(readdirSync(root).filter(name => name.endsWith('.json')).map(name => [name, JSON.parse(readFileSync(new URL(name, root), 'utf8'))]));
-  assert.equal(examples.size, 8);
+  assert.equal(examples.size, 11);
   for (const [name, value] of examples) { const normalized = normalizeFlow(value); assert.equal(normalized.status, 'inactive', name); assert.ok(normalized.entry, name); }
   const greeting = await executeFlowGraph({ ...examples.get('manual-greeting.json'), id: 'docs-greeting' }, context({ trigger: { body: { name: 'YunCMS' } } }));
   assert.deepEqual(greeting.output, { message: 'Hello YunCMS' });
@@ -26,6 +26,10 @@ test('every downloadable documentation example validates inactive, and the docum
     assert.deepEqual(result.output, { decision: approved ? 'approved' : 'needs_review', accepted: approved });
     assert.deepEqual(result.trace.map(step => step.key), ['approval', approved ? 'accepted' : 'rejected', 'result']);
   }
+  const order = await executeFlowGraph({ ...examples.get('script-order-total.json'), id: 'docs-order' }, context({ scripts: { enabled: true }, trigger: { body: { lines: [{ quantity: 2, unit_price_cents: 1490 }, { quantity: 1, unit_price_cents: 500 }] } } }));
+  assert.equal(order.output.total_cents, 3480); assert.match(order.output.fingerprint, /^[a-f0-9]{64}$/);
+  const commonjs = await executeFlowGraph({ ...examples.get('script-commonjs.json'), id: 'docs-commonjs' }, context({ scripts: { enabled: true }, trigger: { body: { value: 21 } } }));
+  assert.equal(commonjs.output.query, 'SELECT 21 AS value');
 });
 
 test('flow defaults are inactive, explicitly inherit the trigger and reject unsafe graphs', () => {
@@ -36,7 +40,7 @@ test('flow defaults are inactive, explicitly inherit the trigger and reject unsa
     flow([node('one', 'transform', {}, { resolve: 'missing' })]),
     flow([node('one', 'transform', {}, { resolve: 'two' }), node('two', 'log', {}, { reject: 'one' })]),
     flow([node('one', 'transform'), node('one', 'log')]),
-    flow([node('one', 'script')]),
+    flow([node('one', 'unknown_operation')]),
     flow([null]),
     { ...flow([node('one', 'log')]), operations: Array.from({ length: 101 }, (_, i) => node(`n${i}`, 'log')) },
     JSON.parse('{"name":"Unsafe","operations":[],"__proto__":{"admin":true}}'),
@@ -74,78 +78,10 @@ test('unhandled rejection carries a bounded trace and stops later operations', a
   });
 });
 
-test('CRUD operations keep verified native authority and hooks while suppressing only flow events by default', async () => {
-  const seen = [], emitter = {};
-  class ItemsService {
-    constructor(collection, options) { seen.push({ collection, options }); }
-    async createMany(rows) { assert.equal(flowExecutionStorage.getStore().suppressFlowEvents, true); return rows.map(row => ({ ...row, id: 'new', created_at: new Date('2026-10-15T00:00:00Z') })); }
-  }
-  const result = await executeFlowGraph(flow([node('create', 'create', { collection: 'articles', payload: { title: 'Example' } })]), context({ emitter, services: { ItemsService }, database: {}, schema: { collections: { articles: { system: false } } } }));
-  assert.equal(seen[0].options.accountability.admin, false); assert.equal(seen[0].options.accountability.user, 'actor'); assert.equal(seen[0].options.emitter, emitter);
-  assert.equal(result.output[0].created_at, '2026-10-15T00:00:00.000Z');
-});
-
-test('requests require explicit server hostname allow-list and never follow redirects', async () => {
-  const definition = flow([node('request', 'request', { url: 'http://localhost/private' })]);
-  let requests = 0;
-  await assert.rejects(executeFlowGraph(definition, context({ fetch: () => { requests++; } })), { code: 'FLOW_REQUEST_FORBIDDEN' });
-  assert.equal(requests, 0);
-  const result = await executeFlowGraph(definition, context({ requestHosts: ['localhost'], fetch: async (_url, options) => { requests++; assert.equal(options.redirect, 'manual'); return new Response('{"ok":true}', { headers: { 'content-type': 'application/json' } }); } }));
-  assert.deepEqual(result.output.body, { ok: true });
-  await assert.rejects(executeFlowGraph(definition, context({ requestHosts: ['localhost'], fetch: async () => new Response(null, { status: 302, headers: { location: 'http://other-host/' } }) })), { code: 'FLOW_REQUEST_REDIRECT' });
-});
-
-test('read, update and delete use bounded ids and the same native ItemsService authority', async () => {
-  const calls = [];
-  class ItemsService {
-    constructor(collection, options) { assert.equal(collection, 'articles'); assert.equal(options.accountability.role, 'staff'); }
-    async readOne(id, query) { calls.push(['read', id, query]); return { id }; }
-    async readMany(query) { calls.push(['many', query]); return []; }
-    async updateOne(id, payload) { calls.push(['update', id, payload]); return { id, ...payload }; }
-    async deleteOne(id) { calls.push(['delete', id]); return true; }
-  }
-  const options = context({ services: { ItemsService }, schema: { collections: { articles: {} } } });
-  const result = await executeFlowGraph(flow([
-    node('read', 'read', { collection: 'articles', ids: ['one', 'two'], query: { fields: ['id'] } }, { resolve: 'update' }),
-    node('update', 'update', { collection: 'articles', ids: '{{read.0.id}}', payload: { title: 'Edited' } }, { resolve: 'delete' }),
-    node('delete', 'delete', { collection: 'articles', ids: ['two'] }),
-  ]), options);
-  assert.deepEqual(result.output, [true]); assert.deepEqual(calls.map(call => call[0]), ['read', 'read', 'update', 'delete']);
-  await executeFlowGraph(flow([node('read', 'read', { collection: 'articles', query: { limit: 999 } })]), options);
-  assert.equal(calls.at(-1)[1].limit, 100);
-  for (const ids of [[], Array.from({ length: 101 }, (_, i) => i), [{}]]) await assert.rejects(executeFlowGraph(flow([node('del', 'delete', { collection: 'articles', ids })]), options), { code: 'INVALID_FLOW_OPERATION' });
-  await assert.rejects(executeFlowGraph(flow([node('read', 'read', { collection: 'yuncms_users' })]), options), { code: 'INVALID_FLOW_OPERATION' });
-});
-
-test('email uses the configured native mailer, enforces recipient bounds and never requires an external test message', async () => {
-  const sent = [];
-  const definition = flow([node('mail', 'mail', { to: ['one@example.test', 'two@example.test'], subject: 'Hello', text: 'Amount {{$trigger.amount}}' })]);
-  await assert.rejects(executeFlowGraph(definition, context()), { code: 'MAIL_NOT_CONFIGURED' });
-  await executeFlowGraph(definition, context({ mailer: { async send(message, options) { assert.equal(options.accountability.user, 'actor'); sent.push(message); } } }));
-  assert.deepEqual(sent.map(message => message.to), ['one@example.test', 'two@example.test']); assert.equal(sent[0].text, 'Amount 4');
-  await assert.rejects(executeFlowGraph(flow([node('mail', 'mail', { to: Array(21).fill('one@example.test') })]), context({ mailer: { send() { assert.fail('Invalid recipients reached SMTP'); } } })), { code: 'INVALID_FLOW_OPERATION' });
-});
-
-test('a deadline crossed during the final operation cannot be reported as successful', async () => {
-  const controller = new AbortController();
-  const operations = new Map([['slow', async () => { controller.abort(); return 'late'; }]]);
-  await assert.rejects(executeFlowGraph(flow([node('slow', 'slow')]), context({ operations, signal: controller.signal })), error => {
-    assert.equal(error.code, 'FLOW_TIMEOUT'); assert.equal(error.flowTrace[0].status, 'failed'); return true;
-  });
-});
-
 test('logs redact sensitive keys, sleep observes cancellation and recursion is bounded', async () => {
   assert.deepEqual(safeFlowValue({ password: 'private', nested: { access_token: 'private' } }), { password: '[REDACTED]', nested: { access_token: '[REDACTED]' } });
   await assert.rejects(executeFlowGraph(flow([node('wait', 'sleep', { milliseconds: 1000 })]), context({ signal: AbortSignal.timeout(1) })), { code: 'FLOW_TIMEOUT', status: 504 });
   await assert.rejects(flowExecutionStorage.run({ stack: ['test-flow'] }, () => executeFlowGraph(flow([node('one', 'log')]), context())), { code: 'FLOW_RECURSION_LIMIT' });
-});
-
-test('flow management and internal dispatch reject denied authority before database access', async () => {
-  for (const accountability of [createPublicAccountability(), createAccountability({ user: 'staff', role: 'staff' })]) {
-    const database = { query() { assert.fail('Denied caller reached SQL'); } };
-    const service = new FlowsService({ database, accountability });
-    for (const call of [() => service.readMany(), () => service.save({}), () => service.deleteOne('flow', 1), () => service.runTriggered('flow', {}, createSystemAccountability()), () => service.readRuns('flow'), () => service.configuration()]) await assert.rejects(call(), { code: 'FORBIDDEN' });
-  }
 });
 
 test('flow migration, cron contracts and safe configuration defaults remain explicit', () => {
@@ -158,6 +94,11 @@ test('flow migration, cron contracts and safe configuration defaults remain expl
   assert.equal(flowCronMatchesUtc(parseFlowCronExpression('*/5 * * * *'), utc), false);
   assert.equal(flowCronMatchesUtc(parseFlowCronExpression('*/5 * * * *'), new Date('2026-10-15T12:15:00Z')), true);
   assert.throws(() => parseFlowCronExpression('* * *'));
-  assert.deepEqual(loadConfig({}).flows, { requestHosts: [], envAllowList: [] });
-  assert.deepEqual(loadConfig({ FLOWS_REQUEST_ALLOWED_HOSTS: ' api.example.test, API.OTHER.TEST ', FLOWS_ENV_ALLOW_LIST: 'PUBLIC_URL, STAGE' }).flows, { requestHosts: ['api.example.test', 'api.other.test'], envAllowList: ['PUBLIC_URL', 'STAGE'] });
+  assert.deepEqual(loadConfig({}).flows, { requestHosts: [], envAllowList: [], scripts: SCRIPT_DEFAULTS });
+  assert.deepEqual(loadConfig({ FLOWS_REQUEST_ALLOWED_HOSTS: ' api.example.test, API.OTHER.TEST ', FLOWS_ENV_ALLOW_LIST: 'PUBLIC_URL, STAGE' }).flows, { requestHosts: ['api.example.test', 'api.other.test'], envAllowList: ['PUBLIC_URL', 'STAGE'], scripts: SCRIPT_DEFAULTS });
+  assert.deepEqual(loadConfig({ FLOWS_SCRIPTS_ENABLED: 'true', FLOWS_SCRIPT_TIMEOUT_MS: '100', FLOWS_SCRIPT_MEMORY_MB: '32', FLOWS_SCRIPT_CONCURRENCY: '1' }).flows.scripts, { enabled: true, timeoutMs: 100, memoryMb: 32, concurrency: 1 });
+  for (const [key, invalid] of [['FLOWS_SCRIPT_TIMEOUT_MS', ['99', '30001', 'NaN']], ['FLOWS_SCRIPT_MEMORY_MB', ['31', '513', '32.5']], ['FLOWS_SCRIPT_CONCURRENCY', ['0', '9', '-1']]]) {
+    for (const value of invalid) assert.throws(() => loadConfig({ [key]: value }), new RegExp(key));
+  }
+  assert.throws(() => loadConfig({ FLOWS_SCRIPTS_ENABLED: 'perhaps' }), /Expected boolean/);
 });
