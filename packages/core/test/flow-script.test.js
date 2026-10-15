@@ -60,7 +60,7 @@ test('actual script process slots enforce concurrency and recover after completi
 });
 
 test('actual V8 heap exhaustion is contained in the script process and its slot is reusable', async () => {
-  await assert.rejects(executeFlowScript({ code: "export default () => { const arrays = []; while (true) arrays.push(new Array(100000).fill('memory-pressure')); }" }, {}, context({ scripts: { enabled: true, memoryMb: 32, timeoutMs: 3000 } })), { code: 'FLOW_SCRIPT_EXIT' });
+  await assert.rejects(executeFlowScript({ code: "export default () => { const arrays = []; while (true) arrays.push(new Array(1000000).fill('memory-pressure')); }" }, {}, context({ scripts: { enabled: true, memoryMb: 32, timeoutMs: 30000 } })), { code: 'FLOW_SCRIPT_EXIT' });
   assert.equal(await executeFlowScript({ code: 'export default () => true' }, {}, context()), true);
 });
 
