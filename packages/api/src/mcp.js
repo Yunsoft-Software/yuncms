@@ -3,6 +3,7 @@ import { automationServiceFromRequest } from './routes/automations.js';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
 import {
+  isAccountabilityCollectionDenied,
   readManyWithRelations,
   readOneWithRelations,
 } from '@yunsoft/yuncms-core';
@@ -154,13 +155,14 @@ export async function describeReadableCollection(req, collection) {
   const fields = visibleFields.map((field) => {
     const metadata = schema.fields[field];
     const relation = snapshot.relationByManyField?.get(`${collection}.${field}`) ?? null;
+    const readableRelation = relation && !isAccountabilityCollectionDenied(req.accountability, relation.one_collection);
     return {
       field,
       name: metadata.name ?? field,
       type: metadata.type,
       required: Boolean(metadata.required),
       readonly: Boolean(metadata.readonly),
-      ...(relation ? {
+      ...(readableRelation ? {
         relation: {
           collection: relation.one_collection,
           field: relation.one_field ?? snapshot.collections?.[relation.one_collection]?.primary_key ?? 'id',

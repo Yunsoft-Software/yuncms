@@ -85,6 +85,13 @@ Every schema/data operation runs with the accountability already resolved for th
 
 If a user cannot access data through ordinary YunCMS permissions, the assistant cannot use that data to answer the user either.
 
+Applications can further restrict AI access with the server-side
+[`ai.tools.policy` hook](extensions.md#ai-policy-lifecycle). A collection fence
+also applies to an administrator using AI, while the same account retains its
+normal access through the application UI. Discovery, item operations and
+relation reads use that scoped identity. A client access-mode selection cannot
+remove the server's restrictions.
+
 ## Data changes
 
 Data-changing abilities are disabled in persisted settings by default.

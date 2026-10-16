@@ -72,6 +72,22 @@ Protected invariants remain in force even when role management itself is delegat
 - a role still referenced by users cannot be removed through an unsafe shortcut;
 - the Public role cannot be assigned to an authenticated user.
 
+## Server request collection fences
+
+Trusted server code can narrow a single request with
+`restrictAccountabilityCollections(accountability, deniedCollections)` from
+`@yunsoft/yuncms-core`. It returns a frozen copy with the same user, role and
+administrative identity, plus an immutable collection fence. Existing denials
+are preserved when another fence is added. The original actor is unchanged.
+
+`PermissionsService.resolve` enforces this fence before administrator/system
+shortcuts and permission-cache reads. Items operations and relation queries
+retain their normal role, field and row checks. Collection names are exact
+native identifiers; wildcards are unsupported. Malformed scopes fail closed.
+The fence is a trusted service-context input; it is never accepted as a client
+permission grant or persisted role change. Dedicated privileged services keep
+their own admission rules.
+
 ## Permission records
 
 A permission is scoped to:

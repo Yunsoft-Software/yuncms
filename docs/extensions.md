@@ -398,6 +398,7 @@ Custom and legacy storage drivers are **not required** to implement `getStream()
 Native AI chat authentication and tool authorization remain in the API. Hook-enabled assistant instances dispatch veto-only admission filters before provider work. Admission filter return values do not change caller write/delete flags.
 
 - `ai.chat.before`: request messages, locale and caller access flags; throw a typed error to deny the chat.
+- `ai.tools.policy`: starts with `{ denied_collections: [] }`; return the server-owned collection fence for this chat. It runs before provider/tool work and can only narrow the existing caller's collection access.
 - `ai.chat.completed`: successful final message, operations and aggregate usage; a filter may add a receipt or reject completion persistence.
 - `ai.chat.failed`: error code, including admission/completion failures.
 - `ai.provider.before`: one provider round's server-generated `call_id`, configured maximum output and conservative `estimated_max_tokens` (UTF-8 input/tool bytes plus output and protocol allowance). Reserve application capacity here.
@@ -405,6 +406,23 @@ Native AI chat authentication and tool authorization remain in the API. Hook-ena
 - `ai.provider.failed`: the same `call_id` and safe error code; release unfinished reservations. A later chat/tool failure does not undo provider rounds that have already completed.
 
 Context carries the verified caller, request id, native database/schema/services and storage through normal request service options. Provider credentials are absent from payloads. `totalTokens` uses reported non-negative integer usage when available; otherwise it is an explicitly marked estimate. Native HTTP chat responses expose aggregate `usage: { total_tokens, estimated }`. Internal assistant instances without a hook emitter retain the previous response shape.
+
+For example, an application can keep configuration available to its normal
+administrator while withholding it from general AI tools:
+
+```js
+filter('ai.tools.policy', policy => ({
+  denied_collections: [...policy.denied_collections, 'project_settings'],
+}));
+```
+
+The policy must contain only `denied_collections`, an array of at most 1,000 exact
+collection names. Discovery, descriptions, Items tools and relation reads share
+the same native permission fence, including for administrators and warm caches.
+Relation descriptions omit targets withheld by that fence. Client chat fields
+cannot remove it. An invalid policy returns `AI_COLLECTION_POLICY_INVALID` with
+HTTP 503 before a provider is contacted. Ordinary requests keep their original
+identity and permissions.
 
 Business ledgers, reservations, expiry and failure recovery belong to extensions. Hooks alone do not provide a durable event queue or guarantee exact provider billing; preserve pending reservations and reconciliation evidence across crashes.
 

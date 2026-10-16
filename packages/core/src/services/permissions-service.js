@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isAccountabilityCollectionDenied } from '../accountability.js';
 
 import { assertPermissionValidationRule } from '../permission-validation.js';
 import { compileFilter } from '../query.js';
@@ -115,6 +116,11 @@ export class PermissionsService extends BaseService {
 
   async resolve(action, collection) {
     assertAction(action);
+    // A server-owned request fence also constrains administrators and cached
+    // permissions. It cannot widen the actor's ordinary role permissions.
+    if (isAccountabilityCollectionDenied(this.accountability, collection)) {
+      throw forbidden(`Access to ${collection} is restricted for this request`);
+    }
     const key = cacheKey(this.accountability, action, collection);
     if (this.permissionCache) {
       const cached = await this.permissionCache.get(key);

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { serviceOptionsFromRequest } from '../service-options.js';
 import { canonicalStudioLocale, STUDIO_LOCALE_CODES } from '@yunsoft/yuncms-core';
 
+import { resolveAiCollectionRequest } from './collection-policy.js';
 import {
   aiToolDefinitions,
   executeAiTool,
@@ -243,7 +244,8 @@ export class AiAssistantService {
     const context = { ...serviceOptionsFromRequest(req), services: req.context.services };
     try {
       await this.emitter.filter('ai.chat.before', structuredClone(input), context);
-      const result = await this.#executeChat(req, input);
+      const scoped = await resolveAiCollectionRequest(req, this.emitter);
+      const result = await this.#executeChat(scoped, input);
       return await this.emitter.filter('ai.chat.completed', result, context);
     } catch (error) {
       await this.emitter.action('ai.chat.failed', { code: error.code || 'AI_PROVIDER_UNAVAILABLE' }, context);

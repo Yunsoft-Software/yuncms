@@ -14,6 +14,7 @@ export const HOOK_EVENTS = Object.freeze({
   aiChatBefore: 'ai.chat.before',
   aiChatCompleted: 'ai.chat.completed',
   aiChatFailed: 'ai.chat.failed',
+  aiToolsPolicy: 'ai.tools.policy',
   itemQuery: 'items.query',
   itemRead: 'items.read',
   itemCreate: 'items.create',

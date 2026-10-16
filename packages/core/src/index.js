@@ -34,6 +34,8 @@ export {
   createPublicAccountability,
   createSystemAccountability,
   requireAccountability,
+  restrictAccountabilityCollections,
+  isAccountabilityCollectionDenied,
 } from './accountability.js';
 export { createRequestContext } from './context.js';
 export { createInitialAdmin, findExistingAdmin, findPublicRole, ensurePublicRole } from './setup.js';
