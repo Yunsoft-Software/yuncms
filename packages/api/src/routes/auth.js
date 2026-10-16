@@ -76,6 +76,24 @@ async function reportExternalFailure(serviceInstance, providerId, error) {
   } catch {}
 }
 
+export function authActionRateKey(req) {
+  const path = req.route?.path;
+  let subject = '';
+  if (path === '/register' || path === '/password-reset/request') {
+    subject = req.body?.email;
+  } else if (path === '/email-verification/request') {
+    subject = req.accountability?.user
+      ? req.body?.user ?? req.accountability.user
+      : req.body?.email;
+  } else if (path === '/login/:provider' || path === '/callback/:provider') {
+    subject = req.params?.provider;
+  }
+  // Confirmation/exchange routes consume tokens, not client email/user fields.
+  // Invalid recipient types stay in the IP bucket until native validation runs.
+  const key = typeof subject === 'string' ? subject.trim().toLowerCase() : '';
+  return `${req.ip || req.socket?.remoteAddress || 'unknown'}:${key}`;
+}
+
 export function createAuthRouter({
   mailer = null,
   config = null,
@@ -107,7 +125,7 @@ export function createAuthRouter({
     scope: 'auth:action',
     windowMs: limits.actionWindowMs ?? 15 * 60_000,
     max: limits.actionMax ?? 5,
-    key: (req) => `${req.ip || req.socket?.remoteAddress || 'unknown'}:${String(req.body?.email ?? req.body?.user ?? req.params?.provider ?? '').trim().toLowerCase()}`,
+    key: authActionRateKey,
   });
 
   router.use(noStore);

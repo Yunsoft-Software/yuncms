@@ -148,6 +148,14 @@ AUTH_ACTION_RATE_MAX=5
 
 The login limiter keys requests using client identity plus the attempted account identifier. Refresh and security-sensitive auth actions have separate windows and limits.
 
+Action limits use a recipient only on routes that consume that recipient:
+registration/password-reset requests use the email, verification requests use
+the email or native authenticated recipient, and provider routes use the route's
+provider. Token confirmations and exchanges use the client IP bucket; unrelated
+`email` or `user` body fields cannot select another bucket. Rejected requests do
+not consume a confirmation token or change credentials. The same keys apply to
+the memory and Redis stores.
+
 ## Pressure/load shedding
 
 ```env
