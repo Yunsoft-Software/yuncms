@@ -324,10 +324,16 @@ POST   /schema/collections/:collection/fields
 GET    /schema/collections/:collection/fields/:field
 PATCH  /schema/collections/:collection/fields/:field
 PATCH  /schema/collections/:collection/fields/:field/schema
+POST   /schema/collections/:collection/fields/:field/recovery/inspect
+POST   /schema/collections/:collection/fields/:field/recovery
 DELETE /schema/collections/:collection/fields/:field?destructive=true
 ```
 
 Creation and physical schema updates accept boolean `unique` and `indexed` options. Unique constraints are enforced by MySQL and conflicting writes or existing data return 409 `DUPLICATE_KEY`. See [data-model field constraints](data-model.md) for supported storage, NULL/collation behavior and safe migrations.
+
+If interrupted creation leaves a physical column without field metadata, normal creation returns 409 `SCHEMA_RECOVERY_REQUIRED`. It never adopts or drops the column. An administrator can inspect recovery with `{ "definition": { "field": "content", "type": "text" } }`, then explicitly confirm the same definition using `{ "definition": { "field": "content", "type": "text" }, "expectedSignature": "<inspection signature>", "confirm": true }`. Inspection returns the actual/expected physical shape, `compatible`, `schemaVersion` and `signature`; confirmation returns 201 with the recovered field. Different physical schemas return 409 `SCHEMA_RECOVERY_MISMATCH`; changed definitions/schema versions return 409 `SCHEMA_RECOVERY_STALE`. Existing metadata returns 409 `FIELD_EXISTS`. Inspect again after a stale response. Both endpoints require native schema-manager accountability; public and non-administrator roles remain forbidden.
+
+Recovery writes metadata and increments schema version atomically, without changing the original column or records. Native `schema.field.create` admission still applies. JSON, relation-owned fields, extra foreign/check constraints and system collections cannot be recovered this way. See [interrupted field recovery](data-model.md#interrupted-field-creation) for precautions and the direct service methods.
 
 Example string field:
 

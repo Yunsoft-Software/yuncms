@@ -37,6 +37,10 @@ test('known client errors map to stable http statuses', () => {
   assert.equal(statusForError({ code: 'SYSTEM_COLLECTION_USE_DEDICATED_SERVICE' }), 403);
   assert.equal(statusForError({ code: 'COLLECTION_NOT_FOUND' }), 404);
   assert.equal(statusForError({ code: 'DUPLICATE_KEY' }), 409);
+  for (const code of ['SCHEMA_RECOVERY_REQUIRED', 'SCHEMA_RECOVERY_MISMATCH', 'SCHEMA_RECOVERY_STALE']) {
+    assert.equal(statusForError({ code }), 409);
+  }
+  assert.equal(statusForError({ code: 'UNSUPPORTED_SCHEMA_RECOVERY' }), 400);
 });
 
 test('malformed external auth state is a safe client error', () => {

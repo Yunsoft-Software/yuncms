@@ -126,6 +126,26 @@ To upgrade an existing field, call `fields.updateSchema("orders", "business_key"
 
 `unique: false` removes only the field-owned unique index. If `indexed: true` is retained, it becomes an ordinary index; otherwise it is removed. If a many-to-one foreign key relies on this index, YunCMS retains an ordinary index automatically; explicitly requesting `indexed: false` without another supporting index is rejected with `INVALID_SCHEMA_PAYLOAD`. One-to-one relation constraints are separately owned and remain enforced. Existing data is never deduplicated, deleted or rewritten by enabling/disabling uniqueness. Metadata transaction failures trigger compensating DDL; failed compensation is reported as `SCHEMA_PARTIAL_FAILURE`. Before a production migration, back up the database, resolve conflicts explicitly and pause writers to avoid writes during compensation. DDL can lock a large table; field creation, physical field updates and managed-field additions reject execution inside a managed application transaction with `INVALID_SCHEMA_PAYLOAD` to avoid MySQL implicitly committing pending writes. Installing a new YunCMS version does not automatically constrain fields whose old `unique` option was ignored; request the migration explicitly.
 
+### Interrupted field creation
+
+MySQL can commit `ALTER TABLE` before field metadata is committed. A killed process may therefore leave a physical column without its `yuncms_fields` row. Retrying normal creation returns `SCHEMA_RECOVERY_REQUIRED` with the affected collection/field in the message; it never silently adopts, overwrites or drops an unknown column.
+
+Back up the database, pause external schema writers and establish the intended field definition from the application's schema source. A native administrator/system caller can run:
+
+```js
+const definition = { field: 'content', type: 'text' };
+const preview = await fields.inspectRecovery('messages', 'content', definition);
+// Review preview.physical and preview.expected; proceed only with the intended field.
+if (!preview.compatible) throw new Error('Physical field requires operator investigation');
+await fields.recoverOne('messages', 'content', {
+  definition, expectedSignature: preview.signature, confirm: true,
+});
+```
+
+The same operations are available through the [schema REST API](rest-api.md). Recovery compares server-normalized type, collation, nullability, default, extra attributes and exact indexes, rejects foreign/check constraints, and binds confirmation to the definition and current schema version. It uses an empty temporary table on the same connection to normalize the definition; the database account needs `CREATE TEMPORARY TABLES`. That temporary table is removed, and the original column/data are never changed. Metadata insertion and the schema version increment share a transaction and the normal schema lock. Native field-create admission remains authoritative. Failed metadata transactions remain explicitly retryable.
+
+Existing native metadata, system collections, relation-owned fields and JSON recovery are outside this operation. A mismatch or stale confirmation requires a new inspection/operator investigation, not a force flag. After successful recovery, restart the application's ordinary bootstrap; its normal metadata discovery can continue with existing data intact. Recovery is an operator action, not an automatic startup repair.
+
 ### Writing JSON and time values
 
 REST item mutations and `ItemsService` accept objects or arrays for `json` fields. Valid pre-serialized JSON text is also accepted and is not encoded a second time.

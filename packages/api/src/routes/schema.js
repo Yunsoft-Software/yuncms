@@ -152,6 +152,18 @@ export function createSchemaRouter({ schemaCache = null } = {}) {
     res.status(201).json({ data });
   });
 
+  router.post('/collections/:collection/fields/:field/recovery/inspect', async (req, res) => {
+    const data = await service(req, 'FieldsService').inspectRecovery(req.params.collection, req.params.field, req.body?.definition);
+    res.json({ data });
+  });
+
+  router.post('/collections/:collection/fields/:field/recovery', async (req, res) => {
+    const data = await service(req, 'FieldsService').recoverOne(req.params.collection, req.params.field, req.body ?? {});
+    clearSchemaCache();
+    await auditSchema(req, { action: 'schema.field.recover', collection: req.params.collection, itemKey: data.field, payload: { after: data } });
+    res.status(201).json({ data });
+  });
+
   router.get('/collections/:collection/fields/:field', async (req, res) => {
     const data = await service(req, 'FieldsService').readOne(
       req.params.collection,

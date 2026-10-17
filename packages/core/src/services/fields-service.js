@@ -8,6 +8,8 @@ import { SchemaMetadataRepository } from '../schema-metadata-repository.js';
 import { normalizeDisplayName, resolveSchemaName } from '../schema-key.js';
 import { incrementSchemaVersion } from '../schema-version.js';
 import { assertSchemaDDLAllowed } from '../schema-ddl.js';
+import { fieldRecoveryError, fieldRecoverySignature, inspectFieldRecovery } from '../field-recovery.js';
+import { readSchemaVersion } from '../schema-version.js';
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { assertSchemaManager } from './schema-access.js';
@@ -219,6 +221,9 @@ export class FieldsService extends BaseService {
           return { ...created, schemaVersion };
         });
       } catch (error) {
+        if (!physicalFieldCreated && error.code === 'ER_DUP_FIELDNAME') {
+          throw fieldRecoveryError('SCHEMA_RECOVERY_REQUIRED', collection, field);
+        }
         const cleanupErrors = [];
 
         try {
@@ -241,6 +246,49 @@ export class FieldsService extends BaseService {
         }
         throw safeFieldIndexError(error);
       }
+    });
+  }
+
+  async inspectRecovery(collection, field, definition) {
+    return this.recoverOne(collection, field, { definition }, { inspect: true });
+  }
+
+  async recoverOne(collection, field, { definition, expectedSignature, confirm } = {}, { inspect = false } = {}) {
+    assertSchemaManager(this.accountability);
+    assertIdentifier(collection, 'collection name');
+    assertFieldName(field);
+    if (field === 'id') throw fieldRecoveryError('SYSTEM_SCHEMA_READ_ONLY', collection, field);
+    if (!definition || typeof definition !== 'object' || Array.isArray(definition) || definition.field !== field) {
+      throw invalidSchemaPayload('Recovery requires the exact field definition');
+    }
+    if (!inspect && (confirm !== true || !/^[a-f0-9]{64}$/.test(expectedSignature ?? ''))) {
+      throw invalidSchemaPayload('Explicit recovery confirmation and inspected physical signature are required');
+    }
+    const compiled = compileFieldColumn(definition);
+    return withAdvisoryLock(this.database, 'yuncms:schema', async connection => {
+      assertSchemaDDLAllowed(connection);
+      const metadata = new SchemaMetadataRepository(connection);
+      const currentCollection = await metadata.readCollection(collection);
+      if (!currentCollection) throw fieldRecoveryError('COLLECTION_NOT_FOUND', collection, field);
+      if (currentCollection.system) throw fieldRecoveryError('SYSTEM_SCHEMA_READ_ONLY', collection, field);
+      if (await metadata.readField(collection, field)) throw fieldRecoveryError('FIELD_EXISTS', collection, field);
+      const preview = await inspectFieldRecovery(connection, collection, field, definition, await readSchemaVersion(connection));
+      if (inspect) return preview;
+      if (!preview.compatible) throw fieldRecoveryError('SCHEMA_RECOVERY_MISMATCH', collection, field);
+      if (preview.signature !== expectedSignature) throw fieldRecoveryError('SCHEMA_RECOVERY_STALE', collection, field);
+      return withConnectionTransaction(connection, async () => {
+        await this.filter('schema.field.create', definition, { collection, key: field, database: connection, recovery: true });
+        if (fieldRecoverySignature({ collection, field, definition, physical: preview.physical, schemaVersion: preview.schemaVersion }) !== expectedSignature) {
+          throw fieldRecoveryError('SCHEMA_RECOVERY_STALE', collection, field);
+        }
+        const created = await metadata.createField({
+          collection, field, name: normalizeDisplayName(definition.name ?? field), type: definition.type,
+          required: definition.required === true, readonly: definition.readonly === true, hidden: definition.hidden === true,
+          sort: definition.sort ?? null, interface: definition.interface ?? null, options: definition.options ?? null,
+          schemaMetadata: { ...compiled.schemaMetadata, indexed: definition.indexed === true, unique: definition.unique === true },
+        });
+        return { ...created, schemaVersion: await incrementSchemaVersion(connection) };
+      });
     });
   }
 

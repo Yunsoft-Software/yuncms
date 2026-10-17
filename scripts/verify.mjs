@@ -44,6 +44,7 @@ const FAST_TESTS = [
   'packages/core/test/schema-query.test.js',
   'packages/core/test/schema-access.test.js',
   'packages/core/test/field-index.test.js',
+  'packages/core/test/field-recovery.test.js',
   'packages/core/test/schema-key.test.js',
   'packages/core/test/schema-metadata-interface.test.js',
   'packages/core/test/collection-visibility.test.js',
