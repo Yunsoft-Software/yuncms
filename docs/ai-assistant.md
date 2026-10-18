@@ -16,12 +16,89 @@ An Administrator can configure:
 - OpenAI-compatible provider base URL;
 - model identifier;
 - provider API key;
+- optional server-owned gateway routing;
 - whether data-changing tools are available at all;
 - bounded history, tool-call, output and timeout limits.
 
 Saved changes take effect for the next request without restarting the API process.
 
 The saved API key is never returned to Studio. The settings response exposes only whether a credential exists (`has_api_key`).
+
+## OpenAI-compatible providers
+
+YunCMS sends non-streaming `POST BASE_URL/chat/completions` requests with Bearer
+authentication. The URL and model identifier are freely configurable. There is
+no required OpenRouter account, DigitalOcean endpoint or GLM hosting provider.
+The provider shortcuts in Studio only fill the URL; **Custom OpenAI-compatible
+endpoint** also supports private/self-hosted compatible services.
+
+| Studio shortcut | Base URL | Provider reference |
+| --- | --- | --- |
+| OpenAI | `https://api.openai.com/v1` | [Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) |
+| OpenRouter | `https://openrouter.ai/api/v1` | [Provider routing](https://openrouter.ai/docs/guides/routing/provider-selection) |
+| Z.AI / GLM | `https://api.z.ai/api/paas/v4` | [OpenAI-compatible API](https://docs.z.ai/guides/develop/openai/python) |
+| DeepSeek | `https://api.deepseek.com` | [API setup](https://api-docs.deepseek.com/) |
+| Groq | `https://api.groq.com/openai/v1` | [OpenAI compatibility](https://console.groq.com/docs/openai) |
+
+Use the model identifier and API key issued by the selected service. YunCMS does
+not choose a model or infer one from the provider shortcut. Choose a model that
+supports function tools for schema/record access and JSON object output for
+[automations](ai-automations.md). A compatible API address does not guarantee
+every model supports those capabilities. Native Anthropic Messages and OpenAI
+Responses endpoints are different protocols; they require a compatible Chat
+Completions gateway for this integration.
+
+Changing the provider URL in Studio disables AI, clears staged credentials and
+gateway routing, and marks the saved key for removal. Enter the new provider's
+key and explicitly enable AI when ready. Closing without saving discards those
+changes. The server also rejects an endpoint change that would reuse a saved key
+without an explicit replacement or removal. URL changes clear old routing unless
+new routing is explicitly supplied in the same settings patch.
+
+### Optional gateway routing
+
+Standard compatible providers need no gateway configuration. Leave the advanced
+**Gateway routing** field as `{}`. YunCMS then omits `provider` from the upstream
+request. It also omits empty `tools` and `tool_choice` fields for automation
+generation.
+
+Gateways such as OpenRouter can accept an optional `provider` object. Configure it
+in Studio or through Administrator-only `PATCH /ai/settings`:
+
+```json
+{
+  "provider": {
+    "only": ["provider-a", "provider-b"],
+    "order": ["provider-a", "provider-b"],
+    "quantizations": ["bf16", "fp16"],
+    "require_parameters": true,
+    "allow_fallbacks": true
+  }
+}
+```
+
+These names and precisions are operator choices, not YunCMS defaults. Check the
+gateway's current endpoint catalog and capability support. YunCMS does not
+silently substitute another provider or precision.
+
+Supported keys are `only`, `order`, `ignore`, `quantizations`,
+`require_parameters` and `allow_fallbacks`. Lists contain 1–32 distinct identifiers
+of 1–128 ASCII letters, digits, underscores, dots, slashes or hyphens; the complete
+object is limited to 8 KiB. Flags must be booleans. Unknown keys, credentials,
+destinations, messages, model/tool overrides and token-limit overrides are rejected.
+`provider: null` or `{}` clears routing. A supplied object replaces the complete
+previous routing object; omitting it preserves routing when the URL is unchanged.
+
+The same stored routing is used for native chat, automation previews and workers.
+Ordinary chat payloads cannot override the server's URL, model or routing. Native
+admission, Run as accountability, usage settlement, permissions and strict output
+validation still apply. `GET /ai/settings` returns routing only to Administrators;
+provider API keys remain encrypted and are never returned.
+
+The additive `0025-ai-provider-routing` migration stores this optional object as
+nullable MySQL JSON and preserves existing provider settings and encrypted keys.
+Use the native bootstrap/upgrade workflow before starting an updated API against
+an existing installation.
 
 ## Credential storage
 

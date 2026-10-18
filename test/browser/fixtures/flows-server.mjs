@@ -98,7 +98,8 @@ try {
     const provider = JSON.parse(await readFile(process.env.YUNCMS_TEST_REAL_PROVIDER_FILE, 'utf8'));
     await settingsStore.update({ enabled: true, writes_enabled: true,
       api_key: provider.OPENROUTER_API_KEY || provider.OPENROUTER_KEY || provider.AI_API_KEY,
-      model: provider.AI_CHAT_MODEL, base_url: provider.OPENROUTER_BASE_URL || provider.AI_BASE_URL });
+      model: provider.AI_CHAT_MODEL, base_url: provider.OPENROUTER_BASE_URL || provider.AI_BASE_URL,
+      provider: provider.AI_PROVIDER_ROUTING ?? null });
     allowAiGeneration = true; res.status(204).end();
   });
   fixture.post('/ai/deny', (_req, res) => { allowAiGeneration = false; res.status(204).end(); });

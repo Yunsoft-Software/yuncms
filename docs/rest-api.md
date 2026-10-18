@@ -618,7 +618,16 @@ The built-in Studio assistant uses the authenticated request's normal accountabi
 
 `POST /ai/chat` accepts `locale` values `en`, `tr`, `es`, `de`, `fr`, `pt-BR`, `ja` and `zh-CN`. YunCMS canonicalizes locale casing, asks the provider to answer in the selected language and falls back to English when the value is missing or unsupported.
 
-See [`ai-assistant.md`](ai-assistant.md) for configuration, privacy, write modes and prompt-injection boundaries.
+| Method and path | Access and behavior |
+| --- | --- |
+| `GET /ai/status` | Authenticated user; configuration availability without credentials or routing details. |
+| `GET /ai/settings` | Administrator; provider URL/model, optional routing, safety limits and `has_api_key`, never the saved key. |
+| `PATCH /ai/settings` | Administrator; update the same settings. `provider` is a bounded optional gateway routing object; `null` or `{}` clears it. Changing URL requires explicit key replacement/removal and clears old routing unless supplied again. |
+| `POST /ai/chat` | Authenticated user; bounded messages, locale and permitted access mode. The destination, model and routing come from server settings. |
+
+See [`ai-assistant.md`](ai-assistant.md) for compatible provider shortcuts, custom
+endpoints, the complete routing contract, configuration, privacy, write modes and
+prompt-injection boundaries.
 
 # AI automations
 

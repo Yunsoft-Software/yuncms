@@ -362,7 +362,12 @@ These protect managed setup/update/backup subprocesses from hanging forever. Inc
 
 The built-in AI assistant's provider/model/key settings are configured through Studio rather than ordinary `.env` values. The API key is encrypted using a local YunCMS secret key file under project state. Back up the required AI settings/key material together according to the [upgrade/backup guidance](upgrades.md).
 
-See [AI assistant](ai-assistant.md).
+Studio offers provider URL shortcuts and a custom OpenAI-compatible Chat
+Completions endpoint. Administrators can optionally configure gateway routing;
+it is omitted for ordinary providers by default. Endpoint changes require an
+explicit replacement/removal of the saved key. See [AI assistant](ai-assistant.md)
+for provider selection and the optional routing contract shared by chat and
+automations.
 
 ## Example: single-process installation
 

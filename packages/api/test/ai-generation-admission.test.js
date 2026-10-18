@@ -13,7 +13,7 @@ test('automation JSON mode is explicit while ordinary assistant requests keep th
   const messages = [{ role: 'user', content: 'Return JSON.' }], tools = [];
   assert.equal(Object.hasOwn(providerRequestBody(messages, tools, config), 'response_format'), false);
   assert.deepEqual(providerRequestBody(messages, tools, config, { type: 'json_object' }), {
-    model: config.model, messages, tools, tool_choice: 'auto', max_tokens: config.maxOutputTokens,
+    model: config.model, messages, max_tokens: config.maxOutputTokens,
     response_format: { type: 'json_object' },
   });
 });

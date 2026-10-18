@@ -113,6 +113,7 @@ test('real native API/provider: AI admission denies before work and exposes comp
   const assistant = new AiAssistantService({ config: { ...DEFAULT_AI_SETTINGS, enabled: true,
     apiKey: provider.OPENROUTER_API_KEY || provider.OPENROUTER_KEY || provider.AI_API_KEY,
     model: provider.AI_CHAT_MODEL, baseUrl: provider.OPENROUTER_BASE_URL || provider.AI_BASE_URL || 'https://openrouter.ai/api/v1',
+    provider: provider.AI_PROVIDER_ROUTING ?? null,
   }, emitter });
   const providerFailurePayloads = [];
   let deny = true, complete = 0, failed = 0, providerStarted = 0, providerCompleted = 0, providerFailed = 0;
@@ -135,13 +136,13 @@ test('real native API/provider: AI admission denies before work and exposes comp
   const login = await fetch(base + '/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: user.email, password }) });
   assert.equal(login.status, 200);
   const token = (await login.json()).data.access_token;
-  const request = () => fetch(base + '/ai/chat', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ messages: [{ role: 'user', content: 'Reply only OK. Do not call tools.' }] }) });
+  const request = (extra = {}) => fetch(base + '/ai/chat', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ messages: [{ role: 'user', content: 'Reply only OK. Do not call tools.' }], ...extra }) });
   assert.equal((await request()).status, 402);
   assert.equal(complete, 0);
   assert.equal(providerStarted, 0);
   deny = false;
-  const response = await request();
+  const response = await request({ provider: { only: ['client-cannot-select-a-provider'] }, model: 'client-cannot-select-a-model', base_url: 'https://untrusted.invalid' });
   assert.equal(response.status, 200);
   assert.ok((await response.json()).data.message);
   assert.equal(complete, 1);

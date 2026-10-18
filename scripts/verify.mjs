@@ -26,6 +26,8 @@ const TEST_ROOTS = [
 ];
 
 const FAST_TESTS = [
+  'packages/api/test/ai-provider-routing.test.js',
+  'apps/studio/test/ai-providers.test.js',
   'packages/core/test/accountability-collection-scope.test.js',
   'packages/api/test/ai-collection-policy.test.js',
   'packages/core/test/core.test.js',

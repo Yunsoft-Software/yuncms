@@ -3,6 +3,7 @@ import { serviceOptionsFromRequest } from '../service-options.js';
 import { canonicalStudioLocale, STUDIO_LOCALE_CODES } from '@yunsoft/yuncms-core';
 
 import { resolveAiCollectionRequest } from './collection-policy.js';
+import { normalizeProviderRouting } from './provider-routing.js';
 import {
   aiToolDefinitions,
   executeAiTool,
@@ -125,7 +126,10 @@ function providerAssistantMessage(message, toolCalls) {
 }
 
 export function providerRequestBody(messages, tools, config, responseFormat = null) {
-  return { model: config.model, messages, tools, tool_choice: 'auto', max_tokens: config.maxOutputTokens,
+  const provider = normalizeProviderRouting(config.provider);
+  return { model: config.model, messages, max_tokens: config.maxOutputTokens,
+    ...(tools.length ? { tools, tool_choice: 'auto' } : {}),
+    ...(provider ? { provider } : {}),
     ...(responseFormat ? { response_format: responseFormat } : {}) };
 }
 

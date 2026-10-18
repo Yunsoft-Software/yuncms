@@ -60,6 +60,7 @@ function columnAssignments(normalized, key) {
   if (Object.hasOwn(normalized, 'enabled')) add('enabled', normalized.enabled ? 1 : 0);
   if (Object.hasOwn(normalized, 'baseUrl')) add('base_url', normalized.baseUrl);
   if (Object.hasOwn(normalized, 'model')) add('model', normalized.model);
+  if (Object.hasOwn(normalized, 'provider')) add('provider', normalized.provider == null ? null : JSON.stringify(normalized.provider));
   if (Object.hasOwn(normalized, 'apiKey')) add('api_key_ciphertext', encryptAiSecret(normalized.apiKey, key));
   if (normalized.clearApiKey === true) add('api_key_ciphertext', null);
   if (Object.hasOwn(normalized, 'writesEnabled')) add('writes_enabled', normalized.writesEnabled ? 1 : 0);
@@ -83,7 +84,7 @@ export class AiSettingsStore {
 
   async #row() {
     const [rows] = await this.database.query(
-      `SELECT id, enabled, base_url, model, api_key_ciphertext, writes_enabled,
+      `SELECT id, enabled, base_url, model, provider, api_key_ciphertext, writes_enabled,
               max_tool_rounds, max_tool_calls_per_round, max_history, max_message_chars,
               max_tool_result_bytes, max_output_tokens, timeout_ms, updated_at
        FROM yuncms_ai_settings
@@ -108,6 +109,12 @@ export class AiSettingsStore {
   async update(patch = {}) {
     const normalized = normalizeAiSettingsPatch(patch);
     const current = await this.#row();
+    if (Object.hasOwn(normalized, 'baseUrl') && normalized.baseUrl !== current.base_url.replace(/\/+$/, '')) {
+      if (current.api_key_ciphertext && !Object.hasOwn(normalized, 'apiKey') && normalized.clearApiKey !== true) {
+        throw settingsError('INVALID_AI_CONFIG', 'Enter a new API key or clear the saved key before changing the provider URL');
+      }
+      if (!Object.hasOwn(normalized, 'provider')) normalized.provider = null;
+    }
     const { assignments, params } = columnAssignments(normalized, this.key);
     if (assignments.length === 0) throw settingsError('INVALID_AI_CONFIG', 'AI settings patch has no effective changes');
 

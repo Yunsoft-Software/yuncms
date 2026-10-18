@@ -2,11 +2,16 @@ import { useEffect, useState } from 'react';
 
 import { saveAiSettings } from '../api.js';
 import { useI18n } from '../i18n.js';
+import { AI_PROVIDERS, aiProviderPreset, changeAiProviderEndpoint } from '../ai-providers.js';
+import { JsonField } from './JsonField.jsx';
 
 function formFromSettings(settings) {
   return {
     enabled: Boolean(settings?.enabled),
     baseUrl: settings?.base_url || 'https://api.openai.com/v1',
+    preset: aiProviderPreset(settings?.base_url || 'https://api.openai.com/v1'),
+    provider: settings?.provider ?? null,
+    endpointChanged: false,
     model: settings?.model || '',
     apiKey: '',
     clearApiKey: false,
@@ -27,15 +32,22 @@ export function AiSettingsPanel({ settings, onSaved, onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [routingValid, setRoutingValid] = useState(true);
 
   useEffect(() => {
     setForm(formFromSettings(settings));
     setError('');
     setNotice('');
+    setRoutingValid(true);
   }, [settings?.updated_at]);
 
   function set(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function endpoint(baseUrl, preset = 'custom') {
+    setForm(current => changeAiProviderEndpoint(current, baseUrl, preset));
+    setRoutingValid(true);
   }
 
   async function handleSubmit(event) {
@@ -48,6 +60,7 @@ export function AiSettingsPanel({ settings, onSaved, onClose }) {
         enabled: form.enabled,
         base_url: form.baseUrl,
         model: form.model || null,
+        provider: form.provider,
         writes_enabled: form.writesEnabled,
         max_tool_rounds: Number(form.maxToolRounds),
         max_tool_calls_per_round: Number(form.maxToolCallsPerRound),
@@ -82,23 +95,36 @@ export function AiSettingsPanel({ settings, onSaved, onClose }) {
 
       {error && <div className="error-banner" role="alert">{error}</div>}
       {notice && <div className="success-banner" role="status">{notice}</div>}
+      {form.endpointChanged && <p>{t('ai.providerChanged')}</p>}
 
       <div className="ai-settings-grid">
         <label className="ai-setting-wide">
+          <span>{t('ai.provider')}</span>
+          <select aria-label={t('ai.provider')} value={form.preset} onChange={event => {
+            const preset = event.target.value;
+            endpoint(AI_PROVIDERS.find(provider => provider.id === preset)?.baseUrl || form.baseUrl, preset);
+          }}>
+            {AI_PROVIDERS.map(provider => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+            <option value="custom">{t('ai.customProvider')}</option>
+          </select>
+          <small>{t('ai.providerHint')}</small>
+        </label>
+        <label className="ai-setting-wide">
           <span>{t('ai.baseUrl')}</span>
-          <input value={form.baseUrl} onChange={(event) => set('baseUrl', event.target.value)} placeholder="https://api.openai.com/v1" />
+          <input aria-label={t('ai.baseUrl')} type="url" required value={form.baseUrl} onChange={(event) => endpoint(event.target.value)} placeholder="https://api.example.com/v1" />
           <small>{t('ai.baseUrlHint')}</small>
         </label>
 
         <label>
           <span>{t('ai.model')}</span>
-          <input value={form.model} onChange={(event) => set('model', event.target.value)} placeholder="gpt-5.6" />
+          <input value={form.model} onChange={(event) => set('model', event.target.value)} placeholder="model-id" />
         </label>
 
         <label>
           <span>{t('ai.apiKey')}</span>
           <input
             type="password"
+            aria-label={t('ai.apiKey')}
             autoComplete="new-password"
             value={form.apiKey}
             onChange={(event) => {
@@ -135,6 +161,9 @@ export function AiSettingsPanel({ settings, onSaved, onClose }) {
 
       <details className="ai-advanced-settings">
         <summary>{t('ai.advancedSettings')}</summary>
+        <JsonField key={form.baseUrl + String(settings?.updated_at)} label={t('ai.providerRouting')} value={form.provider || {}}
+          objectOnly onChange={value => set('provider', value)} onValidityChange={setRoutingValid}
+          hint={t('ai.providerRoutingHint')} errorLabel={t('ai.invalidProviderRouting')} />
         <div className="ai-settings-grid compact">
           <label><span>{t('ai.maxToolRounds')}</span><input type="number" min="1" max="12" value={form.maxToolRounds} onChange={(event) => set('maxToolRounds', event.target.value)} /></label>
           <label><span>{t('ai.maxToolCalls')}</span><input type="number" min="1" max="20" value={form.maxToolCallsPerRound} onChange={(event) => set('maxToolCallsPerRound', event.target.value)} /></label>
@@ -147,7 +176,7 @@ export function AiSettingsPanel({ settings, onSaved, onClose }) {
       </details>
 
       <div className="ai-settings-actions">
-        <button className="primary-button" type="submit" disabled={saving}>{saving ? t('ai.settingsSaving') : t('ai.settingsSave')}</button>
+        <button className="primary-button" type="submit" disabled={saving || !routingValid}>{saving ? t('ai.settingsSaving') : t('ai.settingsSave')}</button>
       </div>
     </form>
   );

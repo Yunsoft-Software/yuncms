@@ -1,9 +1,12 @@
+import { normalizeProviderRouting, providerRoutingFromRow } from './provider-routing.js';
+
 const DEFAULT_AI_BASE_URL = 'https://api.openai.com/v1';
 
 export const DEFAULT_AI_SETTINGS = Object.freeze({
   enabled: false,
   baseUrl: DEFAULT_AI_BASE_URL,
   model: null,
+  provider: null,
   writesEnabled: false,
   maxToolRounds: 6,
   maxToolCallsPerRound: 8,
@@ -18,6 +21,7 @@ const PATCH_KEYS = new Set([
   'enabled',
   'base_url',
   'model',
+  'provider',
   'api_key',
   'clear_api_key',
   'writes_enabled',
@@ -88,6 +92,7 @@ export function normalizeAiSettingsPatch(patch = {}) {
   if (Object.hasOwn(patch, 'enabled')) normalized.enabled = normalizeBoolean(patch.enabled, 'enabled');
   if (Object.hasOwn(patch, 'base_url')) normalized.baseUrl = normalizeBaseUrl(patch.base_url);
   if (Object.hasOwn(patch, 'model')) normalized.model = normalizeOptionalString(patch.model, 'model', { max: 200 });
+  if (Object.hasOwn(patch, 'provider')) normalized.provider = normalizeProviderRouting(patch.provider);
   if (Object.hasOwn(patch, 'api_key')) {
     const apiKey = normalizeOptionalString(patch.api_key, 'API key', { max: 8_192 });
     if (!apiKey) throw configError('API key cannot be empty; use clear_api_key to remove it');
@@ -113,6 +118,7 @@ export function aiRuntimeSettingsFromRow(row, { apiKey = null } = {}) {
     baseUrl: normalizeBaseUrl(row.base_url),
     apiKey,
     model: normalizeOptionalString(row.model, 'model', { max: 200 }),
+    provider: providerRoutingFromRow(row.provider),
     writesEnabled: Boolean(row.writes_enabled),
     maxToolRounds: normalizeInteger(row.max_tool_rounds, 'max_tool_rounds', { min: 1, max: 12 }),
     maxToolCallsPerRound: normalizeInteger(row.max_tool_calls_per_round, 'max_tool_calls_per_round', { min: 1, max: 20 }),
@@ -130,6 +136,7 @@ export function aiAdminSettingsFromRow(row) {
     enabled: runtime.enabled,
     base_url: runtime.baseUrl,
     model: runtime.model,
+    provider: runtime.provider,
     has_api_key: Boolean(row.api_key_ciphertext),
     writes_enabled: runtime.writesEnabled,
     max_tool_rounds: runtime.maxToolRounds,

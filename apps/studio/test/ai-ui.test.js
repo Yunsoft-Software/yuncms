@@ -76,6 +76,15 @@ test('AI settings form never pre-fills or renders the saved API key', () => {
   assert.doesNotMatch(settingsSource, /value=\{settings[^}]*api_key/);
 });
 
+test('AI provider selection and optional routing reuse central components and cannot save invalid JSON', () => {
+  assert.match(settingsSource, /AI_PROVIDERS\.map/);
+  assert.match(settingsSource, /changeAiProviderEndpoint/);
+  assert.match(settingsSource, /<JsonField/);
+  assert.match(settingsSource, /disabled=\{saving \|\| !routingValid\}/);
+  assert.match(settingsSource, /provider: form\.provider/);
+  assert.doesNotMatch(settingsSource, /style=|window\.prompt|window\.alert/);
+});
+
 test('Yapay Zeka UI never exposes MCP terminology to Studio users', () => {
   for (const source of [screenSource, settingsSource, trSource]) {
     assert.doesNotMatch(source, /\bMCP\b/i);

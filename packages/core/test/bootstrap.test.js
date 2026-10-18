@@ -340,6 +340,14 @@ test('UTC auth deadlines migration is required and cleans up active sessions, pe
   ]);
 });
 
+test('optional AI provider routing is an additive required migration after the released Flow schema', () => {
+  const migration = CORE_MIGRATIONS.at(-1);
+  assert.equal(migration.id, '0025-ai-provider-routing');
+  assert.ok(REQUIRED_CORE_MIGRATION_IDS.includes(migration.id));
+  assert.equal(CORE_MIGRATIONS.at(-2).id, '0024-flow-read-permissions');
+  assert.deepEqual(migration.statements, ['ALTER TABLE yuncms_ai_settings ADD COLUMN provider JSON NULL AFTER model']);
+});
+
 test('advisory lock uses one connection and always releases it', async () => {
   const calls = [];
   let released = false;
