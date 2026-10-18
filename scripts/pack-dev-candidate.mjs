@@ -41,10 +41,35 @@ async function checkArtifacts(directory, expected) {
     if ('sha512-' + digest(bytes, 'sha512') !== item.integrity || digest(bytes, 'sha256') !== item.sha256) throw Error('CANDIDATE_INTEGRITY_MISMATCH');
   }
 }
+/** Transfer already accepted bytes; never repack on a different filesystem. */
+export async function importCandidateArtifacts({ artifacts, output, expected, revision }) {
+  if (!expected || expected.source_revision !== revision || !SHA.test(revision)) throw Error('CANDIDATE_MANIFEST_MISMATCH');
+  const names = ['@yunsoft/yuncms-core', '@yunsoft/yuncms-api', '@yunsoft/yuncms'];
+  if (expected.schema_version !== 1 || expected.source_repository !== 'https://github.com/Yunsoft-Software/yuncms.git'
+    || expected.packages?.length !== names.length || new Set(expected.packages.map(item => item.filename)).size !== names.length
+    || names.some(name => expected.packages.filter(item => item.name === name).length !== 1)
+    || expected.packages.some(item => !item.version?.endsWith('-dev.' + revision.slice(0, 12)))) throw Error('CANDIDATE_MANIFEST_MISMATCH');
+  artifacts = resolve(artifacts); output = resolve(output);
+  const manifest = await json(join(artifacts, 'candidate.json'));
+  if (JSON.stringify(manifest) !== JSON.stringify(expected)) throw Error('CANDIDATE_MANIFEST_MISMATCH');
+  await checkArtifacts(artifacts, expected);
+  // Validate the complete source before creating or replacing any output artifact.
+  await mkdir(output, { recursive: true });
+  if (await realpath(artifacts) !== await realpath(output)) {
+    for (const item of expected.packages) await cp(join(artifacts, item.filename), join(output, item.filename), { errorOnExist: true, force: false });
+    await writeFile(join(output, 'candidate.json'), JSON.stringify(expected, null, 2) + '\n', { flag: 'wx' });
+  }
+  await checkArtifacts(output, expected);
+  return expected;
+}
 /** Archives committed source only. Does not build, test, install, migrate or publish. */
-export async function packDevCandidate({ repo, revision, output, npmCli, expectedFile }) {
+export async function packDevCandidate({ repo, revision, output, npmCli, expectedFile, artifacts }) {
   repo = resolve(repo); output = resolve(output);
   if (!SHA.test(revision)) throw Error('EXACT_SOURCE_REVISION_REQUIRED');
+  if (artifacts) {
+    if (!expectedFile) throw Error('EXPECTED_CANDIDATE_MANIFEST_REQUIRED');
+    return importCandidateArtifacts({ artifacts, output, expected: await json(resolve(expectedFile)), revision });
+  }
   if (!npmCli || !isAbsolute(npmCli)) throw Error('NPM_CLI_PATH_REQUIRED');
   const git = args => run('git', args, repo).trim();
   if (git(['rev-parse', '--verify', revision + '^{commit}']) !== revision) throw Error('SOURCE_REVISION_MISMATCH');
@@ -106,11 +131,11 @@ export async function packDevCandidate({ repo, revision, output, npmCli, expecte
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const args = process.argv.slice(2), values = {};
   for (let index = 0; index < args.length; index += 2) {
-    if (!['--repo', '--revision', '--output', '--npm-cli', '--expected'].includes(args[index]) || !args[index + 1]) throw Error('INVALID_CANDIDATE_ARGUMENTS');
+    if (!['--repo', '--revision', '--output', '--npm-cli', '--expected', '--artifacts'].includes(args[index]) || !args[index + 1]) throw Error('INVALID_CANDIDATE_ARGUMENTS');
     values[args[index].slice(2)] = args[index + 1];
   }
   if (!values.repo || !values.revision || !values.output) throw Error('Usage: pack-dev-candidate --repo PATH --revision COMMIT --output PATH --npm-cli ABSOLUTE_PATH [--expected PATH]');
   const result = await packDevCandidate({ repo: values.repo, revision: values.revision, output: values.output,
-    npmCli: values['npm-cli'] || process.env.npm_execpath, expectedFile: values.expected });
+    npmCli: values['npm-cli'] || process.env.npm_execpath, expectedFile: values.expected, artifacts: values.artifacts });
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
 }

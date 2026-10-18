@@ -26,6 +26,31 @@ be local ignored artifacts; the recorded source commit and integrity values must
 remain available. Pass `--expected /path/to/candidate.json` to reconstruct only
 that exact candidate using the same npm version; any mismatch is an error.
 
+## Transfer a candidate between operating systems
+
+Repacking is only supported when it reproduces the recorded hashes. Filesystem
+and archive metadata can differ between operating systems, even with identical
+source and npm versions. A hash mismatch must never be accepted as equivalent.
+
+For cross-platform consumption, distribute the complete accepted candidate
+directory (the three `.tgz` files and `candidate.json`) through your trusted
+artifact channel. Keep a separately trusted copy of its expected manifest, then
+import the exact bytes without running npm pack or rebuilding Studio:
+
+```sh
+node scripts/pack-dev-candidate.mjs --repo . --revision FULL_COMMIT_SHA \
+  --output /dedicated/import-directory --expected /trusted/candidate.json \
+  --artifacts /downloaded/candidate-directory
+```
+
+The importer checks the repository identity, exact source revision, package set,
+manifest equality, SHA-512 and SHA-256 before copying, and verifies the copied
+bytes again. Use a fresh output directory; existing files are not overwritten.
+Import does not need a local npm CLI, source checkout or baseline release tag.
+This is an artifact distribution contract, not a guarantee of byte-identical
+Windows/NTFS repacking. Official releases should use exact registry versions or
+the checksum-verified npm tarballs attached to the corresponding GitHub release.
+
 Use ordinary npm file-tarball dependencies and a lockfile in the consuming project.
 Recreate missing artifacts before `npm ci`. No global npm link, module-loader
 patch or installed-package editing is involved. A clean machine needs the pinned
