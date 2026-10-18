@@ -284,10 +284,11 @@ export class AiAssistantService {
     ];
     const operations = [];
     let totalTokens = 0, estimated = false;
+    const providerContext = this.emitter
+      ? { ...serviceOptionsFromRequest(req), services: req.context.services } : null;
 
     for (let round = 0; round <= config.maxToolRounds; round += 1) {
-      const assistantMessage = await this.#providerCompletion(providerMessages, tools, config,
-        { ...serviceOptionsFromRequest(req), services: req.context.services });
+      const assistantMessage = await this.#providerCompletion(providerMessages, tools, config, providerContext);
       totalTokens += assistantMessage.nativeUsage.totalTokens;
       estimated ||= assistantMessage.nativeUsage.estimated;
       const toolCalls = normalizeToolCalls(
