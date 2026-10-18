@@ -20,6 +20,14 @@ Output fields must be writable scalar fields: string, text, JSON, boolean, integ
 
 The provider must return a JSON object containing exactly the output fields. Missing/extra fields, tool calls, oversized output or invalid values fail the run. YunCMS validates values through the collection schema and the Run as user's update permission before writing them.
 
+Preview and background generation both use the native `ai.provider.before`,
+`ai.provider.completed` and `ai.provider.failed` lifecycle. Extensions can reject
+provider work or reserve and settle capacity through these hooks. Their verified
+execution identity is the rule's **Run as** user, including for an Administrator's
+preview. An admission rejection stops generation and leaves the record unchanged;
+the background run records the error through its normal failure/retry policy.
+See [AI policy lifecycle](extensions.md#ai-policy-lifecycle).
+
 ## Triggers and queue behavior
 
 - Creation triggers run after a record is committed. Bulk creation emits individual record events and can enqueue each record.

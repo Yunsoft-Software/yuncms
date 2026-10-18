@@ -130,7 +130,7 @@ export class AiAutomationsService {
     const input = Object.fromEntries(rule.input_fields.map((field) => [field, record[field]]));
     const output = validateGeneratedFields(await this.assistant.generateFields({
       instruction: rule.instruction, input, outputFields: rule.output_fields,
-    }), rule.output_fields);
+    }, { ...options, services: this.services, requestId: randomUUID() }), rule.output_fields);
     items.validatePayload(output, options.schema.collections[rule.collection], await items.resolvePermission('update'));
     return { record, output };
   }

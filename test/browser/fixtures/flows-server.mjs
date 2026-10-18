@@ -12,6 +12,14 @@ import {
 import { createApp } from '../../../packages/api/src/app.js';
 import { FlowRuntime } from '../../../packages/api/src/flows/runtime.js';
 import { startFlowNetwork } from '../../helpers/flow-network.mjs';
+import { randomBytes } from 'node:crypto';
+import { ExtensionError } from '@yunsoft/yuncms-extensions-sdk';
+import { AiAssistantService } from '../../../packages/api/src/ai/service.js';
+import { AiSettingsStore } from '../../../packages/api/src/ai/settings-store.js';
+import { AiAutomationsService } from '../../../packages/api/src/automations/service.js';
+import { AiAutomationWorker } from '../../../packages/api/src/automations/worker.js';
+import { createAiRouter } from '../../../packages/api/src/routes/ai.js';
+import { createAutomationsRouter } from '../../../packages/api/src/routes/automations.js';
 
 if (process.env.YUNCMS_TEST_MYSQL !== '1' || process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE !== '1') throw Error('Browser acceptance requires an explicitly authorized disposable MySQL database');
 const config = loadConfig({ ...process.env, API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
@@ -24,12 +32,15 @@ const emitter = new HookEmitter({ logger }), services = createCoreServiceRegistr
 const storage = createStorageRegistry({ local: new LocalStorageDriver({ root }) });
 const basic = { database: pool, accountability }, roleIds = [], userIds = [];
 const collection = 'browser_flow_records';
-let server, runtime, network;
+let server, runtime, network, automationWorker;
+const aiAdmissionEvents = [];
 async function close() {
+  await automationWorker?.stop();
   await runtime?.stop();
   if (server) await new Promise(resolve => server.close(resolve));
   await network?.close();
   for (const id of userIds) await pool.query('DELETE FROM yuncms_flows WHERE user_created = ?', [id]);
+  for (const id of userIds) await pool.query('DELETE FROM yuncms_ai_automations WHERE run_as = ?', [id]);
   await pool.query(`DROP TABLE IF EXISTS \`${collection}\``);
   await pool.query('DELETE FROM yuncms_collections WHERE collection = ?', [collection]);
   for (const id of userIds) await pool.query('DELETE FROM yuncms_users WHERE id = ?', [id]);
@@ -51,6 +62,22 @@ try {
     userIds.push((await new UsersService(basic).createOne({ email, role, password: 'Browser-flow-fixture-123!' })).id);
   }
   const schema = await cache.get(pool);
+  // A real extension policy rejects all provider work in this disposable fixture.
+  // Neither preview nor the native worker may bypass it or incur provider usage.
+  emitter.registerFilter('ai.provider.before', (payload, context) => {
+    aiAdmissionEvents.push({ call_id: payload.call_id, user: context.accountability.user,
+      admin: context.accountability.admin, requestId: context.requestId });
+    throw new ExtensionError('AI_TOKENS_EXHAUSTED', 'AI capacity exhausted', { status: 402 });
+  });
+  const settingsStore = new AiSettingsStore({ database: pool, key: randomBytes(32) });
+  await settingsStore.update({ enabled: true, writes_enabled: true, api_key: 'disposable-invalid-key',
+    base_url: 'https://invalid.invalid/v1', model: 'unused' });
+  const assistant = new AiAssistantService({ settingsStore, emitter, logger });
+  const automationOptions = { assistant, settingsStore, schemaCache: cache };
+  const automations = new AiAutomationsService({ ...automationOptions, ...basic, services, emitter, logger });
+  for (const event of ['items.create', 'items.update']) emitter.registerAction(event,
+    (payload, context) => automations.enqueue(event, payload, context));
+  automationWorker = new AiAutomationWorker(automations);
   await new PermissionsService({ ...basic, schema }).createOne({ role: flowViewerRole.id, collection: 'yuncms_flows', action: 'read', filter: { name: { _starts_with: 'Delegated browser ' } } });
   for (const action of ['read', 'update']) await new PermissionsService({ ...basic, schema }).createOne({ role: staffRole.id, collection, action, fields: ['id', 'title', 'status'] });
   for (const [role, actions] of [[readerRole.id, ['read']], [writerRole.id, ['read', 'create', 'update', 'delete']], [filteredRole.id, ['read', 'update', 'delete']]]) {
@@ -63,7 +90,7 @@ try {
   runtime = new FlowRuntime({ database: pool, schemaCache: cache, services, emitter, storage, logger, mailer, ...flowsOptions }).registerHooks();
   const fixture = express.Router();
   fixture.use((req, _res, next) => { if (!req.accountability.admin) throw Object.assign(new Error('Fixture management requires administrator access'), { code: 'FORBIDDEN' }); next(); });
-  fixture.get('/', (_req, res) => res.json({ data: { httpsUrl: network.httpsUrl, untrustedUrl: network.untrustedUrl, requests: network.requests, messages: network.messages } }));
+  fixture.get('/', (_req, res) => res.json({ data: { httpsUrl: network.httpsUrl, untrustedUrl: network.untrustedUrl, requests: network.requests, messages: network.messages, aiAdmissionEvents } }));
   // Exercise the real lifecycle, without replacing the queue, services or clock.
   // Re-register native admission hooks while the actual polling worker is stopped.
   fixture.post('/worker/pause', async (_req, res) => { await runtime.stop(); runtime.registerHooks(); res.status(204).end(); });
@@ -72,9 +99,12 @@ try {
     await new Promise(resolve => logStream.write('', resolve));
     res.json({ data: (await readFile(logPath, 'utf8')).split('\n').filter(Boolean).map(line => JSON.parse(line)) });
   });
-  const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger, mailer, flowsOptions, endpointExtensions: [{ id: 'flow-fixture', router: fixture }] });
+  const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger, mailer, flowsOptions,
+    aiRouter: createAiRouter({ assistant, settingsStore }), automationsRouter: createAutomationsRouter(automationOptions),
+    endpointExtensions: [{ id: 'flow-fixture', router: fixture }] });
   server = await new Promise(resolve => { const instance = app.listen(Number(process.env.YUNCMS_BROWSER_PORT ?? 34074), '127.0.0.1', () => resolve(instance)); });
   runtime.start();
+  automationWorker.start();
   process.stdout.write('Disposable native Flow browser server ready.\n');
 } catch (error) { await close(); throw error; }
 let stopping = false;
