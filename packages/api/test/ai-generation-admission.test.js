@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAccountability, HookEmitter } from '@yunsoft/yuncms-core';
 import { AiAssistantService } from '../src/ai/service.js';
+import { statusForError } from '../src/error-response.js';
 
 const config = { enabled: true, apiKey: 'disposable-invalid-key', model: 'unused',
   baseUrl: 'https://invalid.invalid/v1', maxMessageChars: 12000, maxOutputTokens: 1000, timeoutMs: 1000 };
@@ -9,7 +10,11 @@ const input = { instruction: 'Summarize', input: { message: 'Admission regressio
 
 test('hook-enabled field generation fails closed without an execution identity', async () => {
   const assistant = new AiAssistantService({ config, emitter: new HookEmitter() });
-  await assert.rejects(assistant.generateFields(input), { code: 'AI_ADMISSION_UNAVAILABLE' });
+  await assert.rejects(assistant.generateFields(input), error => {
+    assert.equal(error.code, 'AI_ADMISSION_UNAVAILABLE');
+    assert.equal(statusForError(error), 503);
+    return true;
+  });
 });
 
 test('field generation admission uses the verified execution identity and propagates denial', async () => {
