@@ -91,14 +91,15 @@ test('real provider and MySQL: preview and workers share admission, Run as and u
   assert.equal(blocked.status, 'failed'); assert.equal(blocked.error_code, 'AI_TOKENS_EXHAUSTED');
   assert.equal(blocked.attempts, 1); assert.equal((await items.readOne(record.id)).summary, 'original');
   deny = false;
-  const proposed = await preview(); assert.equal(proposed.status, 200);
-  assert.equal((await proposed.json()).data.proposed.summary, marker);
+  const proposed = await preview(), proposedBody = await proposed.json();
+  assert.equal(proposed.status, 200, JSON.stringify(proposedBody));
+  assert.equal(proposedBody.data.proposed.summary, marker);
   assert.equal((await items.readOne(record.id)).summary, 'original');
   const retry = await fetch(`${base}/automations/runs/${blocked.id}/retry`, { method: 'POST', headers });
   assert.equal(retry.status, 200);
   await new AiAutomationWorker(service).tick();
   const [[settled]] = await database.query('SELECT * FROM yuncms_ai_automation_runs WHERE id=?', [blocked.id]);
-  assert.equal(settled.status, 'succeeded'); assert.equal(settled.attempts, 1);
+  assert.equal(settled.status, 'succeeded', settled.error_code); assert.equal(settled.attempts, 1);
   assert.equal((await items.readOne(record.id)).summary, marker);
   assert.equal(started.length, 4); assert.equal(completed.length, 2); assert.equal(failed.length, 2);
   assert.equal(new Set(started).size, 4);

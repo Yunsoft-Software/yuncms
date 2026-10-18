@@ -18,6 +18,10 @@ An automation reads a record, sends only its configured input fields to the conf
 
 Output fields must be writable scalar fields: string, text, JSON, boolean, integer, bigint, decimal, date, datetime or timestamp. Primary keys, system-managed fields, readonly fields and relations cannot be outputs. Rules cannot target system collections. The Run as user cannot have an Administrator or Public role.
 
+Automation generation sends `response_format: { "type": "json_object" }` and
+instructs the provider to return JSON. Use a provider/model that supports this
+OpenAI-compatible JSON mode; there is no fallback to unrestricted text if it is
+rejected. Ordinary assistant conversations retain their existing text/tool mode.
 The provider must return a JSON object containing exactly the output fields. Missing/extra fields, tool calls, oversized output or invalid values fail the run. YunCMS validates values through the collection schema and the Run as user's update permission before writing them.
 
 Malformed JSON (including Markdown fences or trailing prose) produces

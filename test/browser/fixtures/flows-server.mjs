@@ -34,6 +34,7 @@ const basic = { database: pool, accountability }, roleIds = [], userIds = [];
 const collection = 'browser_flow_records';
 let server, runtime, network, automationWorker;
 const aiAdmissionEvents = [];
+let allowAiGeneration = false;
 async function close() {
   await automationWorker?.stop();
   await runtime?.stop();
@@ -62,12 +63,13 @@ try {
     userIds.push((await new UsersService(basic).createOne({ email, role, password: 'Browser-flow-fixture-123!' })).id);
   }
   const schema = await cache.get(pool);
-  // A real extension policy rejects all provider work in this disposable fixture.
-  // Neither preview nor the native worker may bypass it or incur provider usage.
+  // Default-deny real extension policy. Only the administrator fixture endpoint
+  // can enable a bounded real-provider browser acceptance scenario.
   emitter.registerFilter('ai.provider.before', (payload, context) => {
     aiAdmissionEvents.push({ call_id: payload.call_id, user: context.accountability.user,
       admin: context.accountability.admin, requestId: context.requestId });
-    throw new ExtensionError('AI_TOKENS_EXHAUSTED', 'AI capacity exhausted', { status: 402 });
+    if (!allowAiGeneration) throw new ExtensionError('AI_TOKENS_EXHAUSTED', 'AI capacity exhausted', { status: 402 });
+    return payload;
   });
   const settingsStore = new AiSettingsStore({ database: pool, key: randomBytes(32) });
   await settingsStore.update({ enabled: true, writes_enabled: true, api_key: 'disposable-invalid-key',
@@ -91,6 +93,15 @@ try {
   const fixture = express.Router();
   fixture.use((req, _res, next) => { if (!req.accountability.admin) throw Object.assign(new Error('Fixture management requires administrator access'), { code: 'FORBIDDEN' }); next(); });
   fixture.get('/', (_req, res) => res.json({ data: { httpsUrl: network.httpsUrl, untrustedUrl: network.untrustedUrl, requests: network.requests, messages: network.messages, aiAdmissionEvents } }));
+  fixture.post('/ai/allow', async (_req, res) => {
+    if (!process.env.YUNCMS_TEST_REAL_PROVIDER_FILE) throw Error('Real provider file is required for browser AI acceptance');
+    const provider = JSON.parse(await readFile(process.env.YUNCMS_TEST_REAL_PROVIDER_FILE, 'utf8'));
+    await settingsStore.update({ enabled: true, writes_enabled: true,
+      api_key: provider.OPENROUTER_API_KEY || provider.OPENROUTER_KEY || provider.AI_API_KEY,
+      model: provider.AI_CHAT_MODEL, base_url: provider.OPENROUTER_BASE_URL || provider.AI_BASE_URL });
+    allowAiGeneration = true; res.status(204).end();
+  });
+  fixture.post('/ai/deny', (_req, res) => { allowAiGeneration = false; res.status(204).end(); });
   // Exercise the real lifecycle, without replacing the queue, services or clock.
   // Re-register native admission hooks while the actual polling worker is stopped.
   fixture.post('/worker/pause', async (_req, res) => { await runtime.stop(); runtime.registerHooks(); res.status(204).end(); });

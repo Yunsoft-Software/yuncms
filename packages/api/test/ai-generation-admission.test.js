@@ -1,13 +1,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAccountability, HookEmitter } from '@yunsoft/yuncms-core';
-import { AiAssistantService, safeJsonParse } from '../src/ai/service.js';
+import { AiAssistantService, providerRequestBody, safeJsonParse } from '../src/ai/service.js';
 import { statusForError } from '../src/error-response.js';
 import { DEFAULT_AI_SETTINGS } from '../src/ai/config.js';
 
 const config = { enabled: true, apiKey: 'disposable-invalid-key', model: 'unused',
   baseUrl: 'https://invalid.invalid/v1', maxMessageChars: 12000, maxOutputTokens: 1000, timeoutMs: 1000 };
 const input = { instruction: 'Summarize', input: { message: 'Admission regression' }, outputFields: ['summary'] };
+
+test('automation JSON mode is explicit while ordinary assistant requests keep their existing contract', () => {
+  const messages = [{ role: 'user', content: 'Return JSON.' }], tools = [];
+  assert.equal(Object.hasOwn(providerRequestBody(messages, tools, config), 'response_format'), false);
+  assert.deepEqual(providerRequestBody(messages, tools, config, { type: 'json_object' }), {
+    model: config.model, messages, tools, tool_choice: 'auto', max_tokens: config.maxOutputTokens,
+    response_format: { type: 'json_object' },
+  });
+});
 
 test('generated JSON is parsed strictly without repairing fenced, truncated or trailing provider text', () => {
   assert.deepEqual(safeJsonParse('{"summary":"accepted"}'), { summary: 'accepted' });
