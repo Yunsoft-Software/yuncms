@@ -344,4 +344,4 @@ export class AiAssistantService {
   }
 }
 
-export { aiError, normalizeAssistantContent, normalizeToolCalls, systemPrompt };
+export { aiError, normalizeAssistantContent, normalizeToolCalls, safeJsonParse, systemPrompt };

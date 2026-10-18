@@ -20,6 +20,13 @@ Output fields must be writable scalar fields: string, text, JSON, boolean, integ
 
 The provider must return a JSON object containing exactly the output fields. Missing/extra fields, tool calls, oversized output or invalid values fail the run. YunCMS validates values through the collection schema and the Run as user's update permission before writing them.
 
+Malformed JSON (including Markdown fences or trailing prose) produces
+`AI_TOOL_ARGUMENTS_INVALID`. YunCMS does not repair that output or automatically
+retry this terminal error; the record stays unchanged and the failed run remains
+visible in history. A provider completion may still incur usage even when its
+content is rejected. Validate the chosen provider/model with representative
+previews; a successful later run does not make an earlier failed run successful.
+
 Preview and background generation both use the native `ai.provider.before`,
 `ai.provider.completed` and `ai.provider.failed` lifecycle. Extensions can reject
 provider work or reserve and settle capacity through these hooks. Their verified
