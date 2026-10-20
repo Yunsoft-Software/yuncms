@@ -100,6 +100,7 @@ writing to MySQL. A default applies only when the field is omitted on creation;
 it does not replace an explicit `null`. Partial updates may omit required fields.
 Numeric `0`, boolean `false`, and `null` for nullable fields remain valid. Native
 bulk service writes apply the same validation and preserve transaction atomicity.
+Rejected writes leave records and successful mutation/audit events unchanged.
 
 `datetime` and `timestamp` fields can use the current-time preset:
 
