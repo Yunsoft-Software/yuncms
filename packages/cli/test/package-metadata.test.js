@@ -36,7 +36,7 @@ test('runtime and Studio dependencies stay above audited security baselines', as
 
   assert.equal(coreManifest.dependencies.nodemailer, '10.0.13');
   assert.equal(lockfile.packages['node_modules/nodemailer'].version, '10.0.13');
-  assert.equal(lockfile.packages['node_modules/hono'].version, '4.13.7');
+  assert.equal(lockfile.packages['node_modules/hono'].version, '4.13.13');
   assert.equal(apiManifest.dependencies['proxy-addr'], '2.0.8');
   assert.equal(lockfile.packages['node_modules/proxy-addr'].version, '2.0.8');
   assert.equal(studioManifest.devDependencies['source-map-js'], '1.2.2');
@@ -44,7 +44,13 @@ test('runtime and Studio dependencies stay above audited security baselines', as
   const rootManifest = JSON.parse(await readFile(resolve(PACKAGES_ROOT, '../package.json'), 'utf8'));
   assert.equal(rootManifest.devDependencies['@modelcontextprotocol/client'], '2.3.1');
   assert.equal(lockfile.packages['node_modules/@modelcontextprotocol/client'].version, '2.3.1');
-  assert.equal(lockfile.packages['node_modules/@modelcontextprotocol/client/node_modules/@modelcontextprotocol/core'].version, '2.3.1');
+  assert.equal(apiManifest.dependencies['@modelcontextprotocol/server'], '2.3.1');
+  assert.equal(apiManifest.dependencies['@modelcontextprotocol/node'], '2.1.1');
+  assert.equal(studioManifest.devDependencies.vite, '8.2.4');
+  assert.equal(lockfile.packages['node_modules/vite'].version, '8.2.4');
+  const sdkEntries = Object.entries(lockfile.packages).filter(([path]) => /node_modules\/@modelcontextprotocol\/(?:server|core)$/.test(path));
+  assert.ok(sdkEntries.length >= 2);
+  for (const [path, metadata] of sdkEntries) assert.equal(metadata.version, '2.3.1', path);
 });
 
 test('release verification serializes integration files that share the MySQL fixture', async () => {

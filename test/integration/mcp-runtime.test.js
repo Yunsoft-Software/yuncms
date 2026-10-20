@@ -119,7 +119,7 @@ function toolPayload(result) {
 test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write accountability', {
   skip: !ENABLED,
   timeout: 90_000,
-}, async () => {
+}, async t => {
   const baseConfig = loadConfig({ ...process.env, API_RATE_LIMIT_ENABLED: 'false' });
   requireDisposableDatabase(baseConfig);
   const pool = createDatabasePool(baseConfig.database);
@@ -288,6 +288,29 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
     for (const writeTool of WRITE_TOOL_NAMES) {
       assert.equal(readTools.tools.some((tool) => tool.name === writeTool), false);
     }
+
+    await t.test('actual SDK/native HTTP bounds input elements and body bytes, then serves valid calls', async () => {
+      const args = { collection, filter: Object.fromEntries(Array.from({ length: 10_001 }, (_, i) => ['field_' + i, 0])) };
+      assert.ok(Buffer.byteLength(JSON.stringify(args)) < 1024 * 1024);
+      const rejected = await client.callTool({ name: 'items.read_many', arguments: args });
+      assert.equal(rejected.isError, true); assert.match(JSON.stringify(rejected.content), /maximum of 10000 elements/);
+      const large = await fetch(`http://127.0.0.1:${port}/mcp`, { method: 'POST', headers: {
+        authorization: `Bearer ${generatedToken.token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream',
+      }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'items.read_many', arguments: { collection, padding: 'x'.repeat(1024 * 1024) } } }) });
+      assert.equal(large.status, 413);
+      const recovered = toolPayload(await client.callTool({ name: 'items.read_one', arguments: { collection, id: seeded[0].id, fields: 'id,title' } }));
+      assert.equal(recovered.data.id, seeded[0].id);
+    });
+
+    await t.test('concurrent independent SDK clients retain their own record responses', async () => {
+      const peers = await Promise.all([connectClient(port, generatedToken.token), connectClient(port, generatedToken.token)]);
+      try {
+        for (let round = 0; round < 4; round++) {
+          const results = await Promise.all(peers.map((peer, index) => peer.callTool({ name: 'items.read_one', arguments: { collection, id: seeded[index].id, fields: 'id,title' } })));
+          for (let index = 0; index < 2; index++) assert.equal(toolPayload(results[index]).data.id, seeded[index].id);
+        }
+      } finally { await Promise.all(peers.map(peer => peer.close())); }
+    });
 
     const listed = toolPayload(await client.callTool({
       name: 'schema.list_collections',

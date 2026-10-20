@@ -3,12 +3,22 @@ import test from 'node:test';
 
 import {
   createMcpAccessGuard,
+  createRequestMcpServer,
   createToolResult,
+  MCP_REQUEST_LIMITS,
   READ_TOOL_NAMES,
   requireMcpAdministrator,
   registerMcpTools,
   WRITE_TOOL_NAMES,
 } from '../src/mcp.js';
+
+test('MCP input budgets are bounded and each native request receives an independent real SDK server', async () => {
+  assert.deepEqual(MCP_REQUEST_LIMITS, { maxToolInputElements: 10_000, maxRequestBodySize: 1024 * 1024 });
+  assert.equal(Object.isFrozen(MCP_REQUEST_LIMITS), true);
+  const first = createRequestMcpServer({}), second = createRequestMcpServer({});
+  assert.notEqual(first, second); assert.notEqual(first.server, second.server);
+  await first.close(); await second.close();
+});
 
 function fakeServer() {
   const tools = new Map();

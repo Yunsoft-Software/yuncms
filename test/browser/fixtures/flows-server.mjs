@@ -20,6 +20,8 @@ import { AiAutomationsService } from '../../../packages/api/src/automations/serv
 import { AiAutomationWorker } from '../../../packages/api/src/automations/worker.js';
 import { createAiRouter } from '../../../packages/api/src/routes/ai.js';
 import { createAutomationsRouter } from '../../../packages/api/src/routes/automations.js';
+import { createMcpRouter } from '../../../packages/api/src/mcp.js';
+import { McpSettingsStore } from '../../../packages/api/src/mcp/settings-store.js';
 
 if (process.env.YUNCMS_TEST_MYSQL !== '1' || process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE !== '1') throw Error('Browser acceptance requires an explicitly authorized disposable MySQL database');
 const config = loadConfig({ ...process.env, API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
@@ -112,6 +114,7 @@ try {
     res.json({ data: (await readFile(logPath, 'utf8')).split('\n').filter(Boolean).map(line => JSON.parse(line)) });
   });
   const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger, mailer, flowsOptions,
+    mcpRouter: createMcpRouter({ settingsStore: new McpSettingsStore({ database: pool }), logger }),
     aiRouter: createAiRouter({ assistant, settingsStore }), automationsRouter: createAutomationsRouter(automationOptions),
     endpointExtensions: [{ id: 'flow-fixture', router: fixture }] });
   server = await new Promise(resolve => { const instance = app.listen(Number(process.env.YUNCMS_BROWSER_PORT ?? 34074), '127.0.0.1', () => resolve(instance)); });

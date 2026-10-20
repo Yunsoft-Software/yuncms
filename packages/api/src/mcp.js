@@ -11,6 +11,11 @@ import * as z from 'zod/v4';
 
 import { serviceOptionsFromRequest } from './service-options.js';
 
+export const MCP_REQUEST_LIMITS = Object.freeze({
+  maxToolInputElements: 10_000,
+  maxRequestBodySize: 1024 * 1024,
+});
+
 const READ_TOOL_NAMES = Object.freeze([
   'schema.list_collections',
   'schema.describe_collection',
@@ -320,6 +325,7 @@ export function createRequestMcpServer(req, mcpConfig = {}) {
   const server = new McpServer(
     { name: 'yuncms', version: '0.1.7' },
     {
+      maxToolInputElements: MCP_REQUEST_LIMITS.maxToolInputElements,
       instructions: mcpConfig.writesEnabled
         ? 'Use schema tools before item tools when the collection shape is unknown. YunCMS RBAC applies to every tool call.'
         : 'This YunCMS MCP endpoint is read-only. Use schema tools before item tools when the collection shape is unknown. YunCMS RBAC applies to every tool call.',
@@ -417,7 +423,7 @@ export function createMcpRouter({ settingsStore, logger = console, automationOpt
     });
     const handler = createMcpHandler(
       () => createRequestMcpServer(req, { ...req.mcpConfig, automationOptions }),
-      { legacy: 'stateless', onerror: reportError },
+      { legacy: 'stateless', maxRequestBodySize: MCP_REQUEST_LIMITS.maxRequestBodySize, onerror: reportError },
     );
     const nodeHandler = toNodeHandler(handler, { onerror: reportError });
     try {

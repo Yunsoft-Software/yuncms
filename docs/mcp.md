@@ -122,6 +122,18 @@ These call `ItemsService` directly with request accountability. Normal create/up
 
 Enabling the tools does not grant permissions by itself. A client can only perform actions allowed to the connected YunCMS user or, when authentication is disabled, to the Public role.
 
+## Input limits
+
+Each tool call accepts at most 10,000 array elements and object keys combined,
+counted recursively before schema validation or native tool execution. Larger
+arguments return a bounded `isError: true` tool result. The native HTTP JSON body
+limit remains 1 MiB; larger requests return HTTP 413. These server-owned limits
+cannot be raised through MCP settings.
+
+YunCMS creates an independent MCP server for every HTTP request and authenticates
+through native YunCMS sessions/API tokens before invoking the SDK. A rejected
+tool call does not prevent later valid requests from the same client.
+
 ## Result limits
 
 The serialized result byte limit is configured in the panel. Oversized results return a bounded `MCP_RESULT_TOO_LARGE` tool error. To-many relation expansion also retains the core relation-row and query-cost limits documented in [Items query language](api-query-language.md).

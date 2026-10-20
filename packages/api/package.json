@@ -32,8 +32,8 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@modelcontextprotocol/node": "2.0.0",
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/node": "2.1.1",
+    "@modelcontextprotocol/server": "2.3.1",
     "@node-saml/node-saml": "5.1.0",
     "@yunsoft/yuncms-core": "0.1.41",
     "@yunsoft/yuncms-extensions-sdk": "0.1.41",
