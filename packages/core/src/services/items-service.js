@@ -210,7 +210,7 @@ export class ItemsService extends BaseService {
     }
 
     const entries = Object.entries(payload);
-    for (const [field] of entries) {
+    for (const [field, value] of entries) {
       const fieldSchema = schema.fields[field];
       if (!fieldSchema) throw serviceError('INVALID_PAYLOAD', `Unknown field: ${field}`, field);
       if (parseMetadata(fieldSchema.schema_metadata).defaultPreset === 'current_user') {
@@ -219,6 +219,11 @@ export class ItemsService extends BaseService {
       if (fieldSchema.readonly) throw serviceError('FIELD_READ_ONLY', `Field is read-only: ${field}`, field);
       if (permission.fields && !permission.fields.includes(field)) {
         throw serviceError('FORBIDDEN_FIELD', `Field is not allowed for ${permission.action}: ${field}`, field);
+      }
+      // An explicit null never requests a default. Validate both create and
+      // partial update payloads before they reach MySQL's NOT NULL constraint.
+      if (fieldSchema.required && value == null) {
+        throw serviceError('REQUIRED_FIELD_MISSING', `Required field is missing: ${field}`, field);
       }
     }
 

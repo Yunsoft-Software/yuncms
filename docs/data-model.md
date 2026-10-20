@@ -94,6 +94,13 @@ System-managed and custom system-extension fields remain visually distinct from 
 
 Set `required: true` when a field must be non-null. Normal scalar fields can have literal defaults where supported.
 
+Item creation and updates reject an explicit `null` for a required field with
+HTTP 400, code `REQUIRED_FIELD_MISSING`, and the field name in `path`, before
+writing to MySQL. A default applies only when the field is omitted on creation;
+it does not replace an explicit `null`. Partial updates may omit required fields.
+Numeric `0`, boolean `false`, and `null` for nullable fields remain valid. Native
+bulk service writes apply the same validation and preserve transaction atomicity.
+
 `datetime` and `timestamp` fields can use the current-time preset:
 
 ```json

@@ -72,6 +72,7 @@ const FAST_TESTS = [
   'packages/core/test/studio-schema-service.test.js',
   'packages/core/test/o2o-relation.test.js',
   'packages/core/test/items-service.test.js',
+  'packages/core/test/items-required-fields.test.js',
   'packages/core/test/items-query-hooks.test.js',
   'packages/core/test/items-transactions.test.js',
   'packages/core/test/items-system-fields.test.js',
