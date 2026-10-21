@@ -60,6 +60,9 @@ export function loadConfig(env = process.env) {
   }
 
   return {
+    ai: {
+      providerObservationsEnabled: readBoolean(env.AI_PROVIDER_OBSERVATIONS_ENABLED, false),
+    },
     flows: {
       admissionRequired: readBoolean(env.FLOWS_ADMISSION_REQUIRED, false),
       requestHosts: readString(env.FLOWS_REQUEST_ALLOWED_HOSTS, '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean),

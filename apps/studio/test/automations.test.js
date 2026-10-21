@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { emptyAutomation, editableAutomation, toggleAutomationField } from '../src/automation-form.js';
+import { emptyAutomation, editableAutomation, setAutomationConstraint, toggleAutomationField } from '../src/automation-form.js';
 import { AUTOMATION_LOCALES } from '../src/locales/automations.js';
 import { readStudioRoute, studioPath } from '../src/studio-route.js';
 
@@ -11,6 +11,21 @@ test('automation form strips server properties and keeps inputs and outputs disj
   assert.deepEqual(moved.input_fields, []); assert.deepEqual(moved.output_fields, ['message']);
   assert.equal(emptyAutomation().enabled, false);
   assert.deepEqual(editableAutomation({ ...draft, id: 'server-id', revision: 2 }), draft);
+});
+
+test('explicit equality bindings round-trip and cannot disappear when their fields move', () => {
+  const draft = { ...emptyAutomation(), input_fields: ['source'], output_fields: ['summary'] };
+  const bound = setAutomationConstraint(draft, 'summary', 'source');
+  assert.deepEqual(bound.output_constraints, { summary: { must_equal_input: 'source' } });
+  const editable = editableAutomation({ ...bound, id: 'server-id' });
+  assert.deepEqual(editable, bound); editable.output_constraints.summary.must_equal_input = 'other';
+  assert.equal(bound.output_constraints.summary.must_equal_input, 'source');
+  for (const [key, field] of [['input_fields', 'source'], ['output_fields', 'summary'], ['output_fields', 'source']]) {
+    assert.throws(() => toggleAutomationField(bound, key, field), { code: 'AUTOMATION_CONSTRAINT_FIELD_IN_USE' });
+  }
+  assert.deepEqual(setAutomationConstraint(bound, 'summary', '').output_constraints, {});
+  const component = readFileSync(new URL('../src/components/AutomationOutputConstraints.jsx', import.meta.url), 'utf8');
+  assert.match(component, /must_equal_input/); assert.doesNotMatch(component, /style=|window\.(alert|prompt)/);
 });
 
 test('automation route, administrator boundaries, preview and reusable confirmation wiring are present', () => {

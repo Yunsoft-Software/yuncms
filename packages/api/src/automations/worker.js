@@ -1,5 +1,6 @@
 import { quoteIdentifier, withConnectionTransaction } from '@yunsoft/yuncms-core';
 import { AI_AUTOMATION_ORIGIN, automationError, recordFingerprint } from './config.js';
+import { enforceOutputConstraints } from './output-constraints.js';
 
 const RETRYABLE = new Set(['AI_PROVIDER_TIMEOUT', 'AI_PROVIDER_UNAVAILABLE', 'ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT']);
 
@@ -34,7 +35,7 @@ export class AiAutomationWorker {
     if (!rule || !rule.enabled || rule.revision !== job.revision) return 'skipped';
     const settings = await service.settingsStore.readRuntime();
     if (!settings.enabled || !settings.writesEnabled) throw automationError('AI_WRITES_DISABLED', 'Enable AI writes before running automations');
-    const { record, output } = await service.generate(rule, job.item_key);
+    const { record, output, outputConstraints } = await service.generate(rule, job.item_key);
     const allFields = [...rule.input_fields, ...rule.output_fields];
     const fingerprint = recordFingerprint(record, allFields);
     const connection = await service.database.getConnection();
@@ -58,7 +59,11 @@ export class AiAutomationWorker {
         });
         const current = await items.readOne(job.item_key, { fields: allFields });
         if (!current || recordFingerprint(current, allFields) !== fingerprint) return 'skipped';
-        if (!await items.updateOne(job.item_key, output)) throw automationError('FORBIDDEN', 'Run as cannot update this record');
+        const updated = await items.updateOne(job.item_key, output);
+        if (!updated) throw automationError('FORBIDDEN', 'Run as cannot update this record');
+        // Check the final native result too: extension mutation filters run inside
+        // updateOne. A mismatch rolls back its SQL/audit and deferred actions.
+        enforceOutputConstraints(updated, outputConstraints ?? {});
         await connection.query("UPDATE yuncms_ai_automation_runs SET status = 'succeeded', error_code = NULL, finished_at = CURRENT_TIMESTAMP(3) WHERE id = ?", [job.id]);
         return 'succeeded';
       });

@@ -429,3 +429,26 @@ Business ledgers, reservations, expiry and failure recovery belong to extensions
 Native mysql2 advisory locks are namespaced by the selected database. Independent instances on one MySQL server do not share schema/singleton locks. `databaseAdvisoryLockName(databaseName, logicalName)` returns the same bounded name for code that must coordinate with a native lock directly. Two processes using the same database still serialize. `withAdvisoryLock` accepts a pool or caller-owned mysql2 connection; locks acquired inside a managed outer transaction stay held until commit/rollback and are released before a borrowed connection returns to its pool. Caller-owned connections are not released by the lock helper. Keep one database per instance and restart all processes together when upgrading from global lock names. Custom query adapters without a mysql2 database identity retain explicit lock names.
 
 Provider failure actions include `provider_completed` and `usage`. If a completion hook fails after the provider returned, consumers must retain or charge the reported usage; only a provider request that did not complete can release its entire reservation. Unknown usage after interruption requires conservative reconciliation.
+## Provider observations
+
+Set `AI_PROVIDER_OBSERVATIONS_ENABLED=1` only on an owned diagnostic runtime to
+enable the `ai.provider.observed` **action**. It runs after admission, with the
+same verified execution context and `call_id` as `ai.provider.before` and
+`ai.provider.completed`/`failed`. A denial makes no provider request observation.
+
+The frozen payload contains `phase` (`request` or `response`), `call_id`, `model`,
+`body`, `body_sha256` and `body_utf8_bytes`; the response phase also contains
+`http_status`. Request `body` is the exact serialized JSON sent to fetch.
+Response `body` is the native UTF-8 decoded HTTP text before envelope parsing,
+not compressed network bytes. It may itself contain malformed generated JSON.
+Non-success HTTP responses expose status with a null body; oversized responses
+are not exposed. No authorization headers or configured API keys are included.
+
+This is an observation point, not a transformer or admission hook. Return values
+are ignored, the body is immutable and the original provider response is retained.
+Observer failures are redacted in normal logs and cannot fail the provider call;
+each observation waits at most one second. A slow listener may finish later.
+Keep listeners bounded and scope them to synthetic diagnostic calls. Raw bodies
+can contain private inputs: write only to local, access-restricted, ignored files;
+never print them or expose them through an endpoint. No raw storage happens unless
+an operator installs such a listener, and the server flag defaults to off.

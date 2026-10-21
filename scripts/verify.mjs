@@ -26,6 +26,7 @@ const TEST_ROOTS = [
 ];
 
 const FAST_TESTS = [
+  'packages/api/test/automation-output-constraints.test.js',
   'packages/api/test/mcp.test.js',
   'packages/api/test/ai-provider-routing.test.js',
   'apps/studio/test/ai-providers.test.js',

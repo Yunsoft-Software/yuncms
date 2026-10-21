@@ -271,6 +271,7 @@ export function registerMcpTools(server, req, {
     const ruleSchema = z.object({ name: z.string().min(1).max(120), collection: collectionSchema,
       run_as: z.string().min(1).max(36), instruction: z.string().min(1).max(8000),
       input_fields: z.array(collectionSchema).min(1).max(10), output_fields: z.array(collectionSchema).min(1).max(10),
+      output_constraints: z.record(collectionSchema, z.object({ must_equal_input: collectionSchema }).strict()).optional(),
       enabled: z.boolean().optional(), on_create: z.boolean().optional(), on_update: z.boolean().optional(),
     }).strict();
     register('automations.preview', 'Generate proposed output for an existing sample record without saving it.',

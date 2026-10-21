@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { normalizeOutputConstraints } from './output-constraints.js';
 
 export function automationError(code, message) {
   return Object.assign(new Error(message), { code });
@@ -6,7 +7,7 @@ export function automationError(code, message) {
 
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 export const AI_AUTOMATION_ORIGIN = Symbol('YunCMS AI automation');
-const KEYS = new Set(['name', 'collection', 'run_as', 'enabled', 'on_create', 'on_update', 'input_fields', 'output_fields', 'instruction']);
+const KEYS = new Set(['name', 'collection', 'run_as', 'enabled', 'on_create', 'on_update', 'input_fields', 'output_fields', 'output_constraints', 'instruction']);
 
 export function normalizeAutomation(input) {
   const fail = (message) => { throw automationError('INVALID_AUTOMATION', message); };
@@ -36,6 +37,7 @@ export function normalizeAutomation(input) {
   if (!IDENTIFIER.test(rule.collection) || rule.collection.startsWith('yuncms_')) fail('Choose a project collection');
   if (!rule.on_create && !rule.on_update) fail('Choose at least one trigger');
   if (rule.output_fields.some((field) => rule.input_fields.includes(field))) fail('Input and output fields must not overlap');
+  rule.output_constraints = normalizeOutputConstraints(input.output_constraints, rule.input_fields, rule.output_fields);
   return rule;
 }
 
@@ -43,7 +45,8 @@ export function automationFromRow(row) {
   if (!row) return null;
   const parse = (value) => typeof value === 'string' ? JSON.parse(value) : value;
   return { ...row, enabled: Boolean(row.enabled), on_create: Boolean(row.on_create), on_update: Boolean(row.on_update),
-    input_fields: parse(row.input_fields), output_fields: parse(row.output_fields) };
+    input_fields: parse(row.input_fields), output_fields: parse(row.output_fields),
+    output_constraints: normalizeOutputConstraints(parse(row.output_constraints) ?? undefined, parse(row.input_fields), parse(row.output_fields)) };
 }
 
 export function matchesAutomation(rule, event, payload, context) {

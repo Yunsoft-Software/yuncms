@@ -18,7 +18,47 @@ An automation reads a record, sends only its configured input fields to the conf
 
 Output fields must be writable scalar fields: string, text, JSON, boolean, integer, bigint, decimal, date, datetime or timestamp. Primary keys, system-managed fields, readonly fields and relations cannot be outputs. Rules cannot target system collections. The Run as user cannot have an Administrator or Public role.
 
-Automation generation sends `response_format: { "type": "json_object" }` and
+## Exact input equality
+
+For a value that must be copied without any change, declare a constraint instead
+of relying on the instruction alone. In Studio, choose an output's input under
+**Exact input equality**. REST and MCP rule bodies accept the same mapping:
+
+```json
+{ "output_constraints": { "summary": { "must_equal_input": "source_text" } } }
+```
+
+Both fields must be configured on that rule: `source_text` in `input_fields`,
+`summary` in `output_fields`. Equality bindings currently support `string`/`text`
+fields. Other scalar outputs may share the rule; JSON outputs require a separate
+rule when equality constraints are enabled. Run as must still be able to read
+both fields and update the output. The declaration does not grant access.
+
+The provider receives a strict JSON Schema requiring exactly the output keys,
+with a one-value `enum` containing the authorized input snapshot for each bound
+output. Choose a provider/model supporting this schema mode. YunCMS retains the
+configured model and routing, and never falls back to unrestricted text. It also
+checks the result itself: a schema claim from the provider is not trusted as the
+only validation. Strings must be exactly equal, including whitespace and Unicode;
+there is no trimming, normalization, replacement or output repair. Null is valid
+only when the bound output is nullable. Missing, mistyped, null-to-required or
+oversized input constraints fail before a provider request.
+
+A mismatch returns HTTP 400 / `AI_OUTPUT_CONSTRAINT_FAILED`, with the output
+field path and without either value. Preview returns no proposal and does not
+write. A worker records a terminal failure at attempt 1; it does not automatically
+retry. The final native update result is checked inside the transaction too, so
+mutation filters cannot accidentally commit a value that violates the binding.
+Its record/audit changes and success actions are rolled back or withheld.
+Actual provider usage is still settled. Changed rule revisions, permissions and
+record fingerprints retain their normal stale/denied behavior.
+
+Constraints are optional. New unconstrained rules retain JSON object mode. A PUT
+that omits `output_constraints` preserves the existing mapping, including from
+older API clients. An Administrator can explicitly send `{}` to remove it.
+Studio requires removing a binding before moving its fields or collection.
+
+Unconstrained automation generation sends `response_format: { "type": "json_object" }` and
 instructs the provider to return JSON. Use a provider/model that supports this
 OpenAI-compatible JSON mode; there is no fallback to unrestricted text if it is
 rejected. Ordinary assistant conversations retain their existing text/tool mode.
@@ -81,11 +121,12 @@ Create/replace bodies contain only the following properties; generated IDs, revi
   "on_update": true,
   "input_fields": ["message"],
   "output_fields": ["summary"],
+  "output_constraints": {},
   "instruction": "Write a concise summary of message in summary."
 }
 ```
 
-`name` is required and at most 120 characters; `instruction` is required and at most 8,000. At least one trigger must be selected. Preview record keys are nonempty strings of at most 191 characters. Input size also obeys the AI provider's configured message limit; generated JSON is capped at 50,000 characters.
+`name` is required and at most 120 characters; `instruction` is required and at most 8,000. At least one trigger must be selected. Preview record keys are nonempty strings of at most 191 characters. Input size also obeys the AI provider's configured message limit; generated JSON is capped at 50,000 bytes. A dynamically generated equality schema is also capped at 50,000 UTF-8 bytes and is included in the native pre-call capacity estimate.
 
 ## Configure with an agent through MCP
 

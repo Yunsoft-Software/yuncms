@@ -25,6 +25,7 @@ import { utcAuthDeadlinesMigration } from './migrations/0022-utc-auth-deadlines.
 import { flowsMigration } from './migrations/0023-flows.js';
 import { flowReadPermissionsMigration } from './migrations/0024-flow-read-permissions.js';
 import { aiProviderRoutingMigration } from './migrations/0025-ai-provider-routing.js';
+import { aiOutputConstraintsMigration } from './migrations/0026-ai-output-constraints.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -54,6 +55,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   flowsMigration,
   flowReadPermissionsMigration,
   aiProviderRoutingMigration,
+  aiOutputConstraintsMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(

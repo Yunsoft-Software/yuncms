@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 
 import { HookEmitter } from '../src/hooks.js';
 
+test('provider observation action failures do not leak raw error text or codes into application logs', async () => {
+  const errors = [], emitter = new HookEmitter({ logger: { error: (...args) => errors.push(args) } });
+  emitter.registerAction('ai.provider.observed', () => { throw Object.assign(new Error('Synthetic private body'), { code: 'PRIVATE_BODY_CODE' }); });
+  await emitter.action('ai.provider.observed', Object.freeze({ body: 'Synthetic private body' }));
+  assert.equal(errors.length, 1);
+  assert.deepEqual(Object.keys(errors[0][1]).sort(), ['event', 'extensionId']);
+  assert.equal(JSON.stringify(errors).includes('Synthetic private body'), false);
+  assert.equal(JSON.stringify(errors).includes('PRIVATE_BODY_CODE'), false);
+});
+
 test('filters run in registration order and may transform payload', async () => {
   const emitter = new HookEmitter();
   emitter.registerFilter('items.create', (payload) => ({ ...payload, title: payload.title.trim() }));

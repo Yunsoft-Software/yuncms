@@ -76,7 +76,8 @@ try {
   const settingsStore = new AiSettingsStore({ database: pool, key: randomBytes(32) });
   await settingsStore.update({ enabled: true, writes_enabled: true, api_key: 'disposable-invalid-key',
     base_url: 'https://invalid.invalid/v1', model: 'unused' });
-  const assistant = new AiAssistantService({ settingsStore, emitter, logger });
+  const assistant = new AiAssistantService({ settingsStore, emitter, logger,
+    providerObservationsEnabled: config.ai.providerObservationsEnabled });
   const automationOptions = { assistant, settingsStore, schemaCache: cache };
   const automations = new AiAutomationsService({ ...automationOptions, ...basic, services, emitter, logger });
   for (const event of ['items.create', 'items.update']) emitter.registerAction(event,

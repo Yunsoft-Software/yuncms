@@ -31,6 +31,13 @@ test('loadConfig uses stable defaults and parses numeric values', () => {
   assert.equal(config.database.host, '127.0.0.1');
 });
 
+test('raw provider observations require an explicit server-only opt-in', () => {
+  assert.equal(loadConfig({}).ai.providerObservationsEnabled, false);
+  assert.equal(loadConfig({ AI_PROVIDER_OBSERVATIONS_ENABLED: '0' }).ai.providerObservationsEnabled, false);
+  assert.equal(loadConfig({ AI_PROVIDER_OBSERVATIONS_ENABLED: '1' }).ai.providerObservationsEnabled, true);
+  assert.throws(() => loadConfig({ AI_PROVIDER_OBSERVATIONS_ENABLED: 'maybe' }), /Expected boolean/);
+});
+
 test('file and image interfaces require UUID physical storage', () => {
   assert.match(compileFieldColumn({ type: 'uuid', interface: 'file' }).sql, /^CHAR\(36\)/);
   assert.match(compileFieldColumn({ type: 'uuid', interface: 'image' }).sql, /^CHAR\(36\)/);

@@ -360,6 +360,12 @@ These protect managed setup/update/backup subprocesses from hanging forever. Inc
 
 ## AI assistant configuration
 
+`AI_PROVIDER_OBSERVATIONS_ENABLED` defaults to `false`. An explicit `true`/`1`
+enables the trusted `ai.provider.observed` action for private diagnostics; restart
+the API after changing it. This is server-only and cannot be enabled through AI
+settings REST calls or Studio. Core does not log or store provider bodies, and
+there is no public observation endpoint. See [provider observations](extensions.md#provider-observations).
+
 The built-in AI assistant's provider/model/key settings are configured through Studio rather than ordinary `.env` values. The API key is encrypted using a local YunCMS secret key file under project state. Back up the required AI settings/key material together according to the [upgrade/backup guidance](upgrades.md).
 
 Studio offers provider URL shortcuts and a custom OpenAI-compatible Chat

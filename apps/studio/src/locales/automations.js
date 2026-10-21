@@ -36,7 +36,12 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.contact": "Talk to Yunsoft",
     "support.star": "Star on GitHub",
     "support.sponsor": "Sponsor YunCMS",
-    "automation.adminOnly": "Only administrators can manage AI automations."
+    "automation.adminOnly": "Only administrators can manage AI automations.",
+    "automation.constraints": "Exact input equality",
+    "automation.constraintsHint": "Optional. Selected text outputs must exactly match the selected input. Unsupported provider schemas fail without a text fallback. JSON outputs cannot be combined with these constraints.",
+    "automation.mustEqualInput": "{field}: must equal input",
+    "automation.noConstraint": "No equality constraint",
+    "automation.constraintFieldInUse": "Remove the equality constraint before changing its input, output or collection."
   },
   "tr": {
     "automation.title": "AI Otomasyonları",
@@ -75,7 +80,12 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.contact": "Yunsoft’a ulaşın",
     "support.star": "GitHub’da yıldız verin",
     "support.sponsor": "YunCMS’e sponsor ol",
-    "automation.adminOnly": "Yapay zekâ otomasyonlarını yalnız yöneticiler yönetebilir."
+    "automation.adminOnly": "Yapay zekâ otomasyonlarını yalnız yöneticiler yönetebilir.",
+    "automation.constraints": "Giriş değeriyle tam eşitlik",
+    "automation.constraintsHint": "İsteğe bağlıdır. Seçilen metin çıktısı giriş değeriyle birebir aynı olmalıdır. Desteklenmeyen sağlayıcı şemasında metin moduna dönülmez. Bu kısıtlar JSON çıktılarıyla birlikte kullanılamaz.",
+    "automation.mustEqualInput": "{field}: eşit olması gereken giriş",
+    "automation.noConstraint": "Eşitlik kısıtı yok",
+    "automation.constraintFieldInUse": "Giriş, çıkış veya koleksiyonu değiştirmeden önce eşitlik kısıtını kaldırın."
   },
   "es": {
     "automation.title": "Automatizaciones de IA",
@@ -114,7 +124,12 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.contact": "Contactar a Yunsoft",
     "support.star": "Dar estrella en GitHub",
     "support.sponsor": "Patrocinar YunCMS",
-    "automation.adminOnly": "Solo los administradores pueden gestionar las automatizaciones de IA."
+    "automation.adminOnly": "Solo los administradores pueden gestionar las automatizaciones de IA.",
+    "automation.constraints": "Igualdad exacta con la entrada",
+    "automation.constraintsHint": "Opcional. El texto debe coincidir exactamente con la entrada seleccionada. Un esquema no compatible falla sin volver a texto libre. No se combina con salidas JSON.",
+    "automation.mustEqualInput": "{field}: debe ser igual a la entrada",
+    "automation.noConstraint": "Sin restricción de igualdad",
+    "automation.constraintFieldInUse": "Quite la restricción antes de cambiar la entrada, la salida o la colección."
   },
   "de": {
     "automation.title": "KI-Automatisierungen",
@@ -153,7 +168,12 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.contact": "Yunsoft kontaktieren",
     "support.star": "Stern auf GitHub",
     "support.sponsor": "YunCMS unterstützen",
-    "automation.adminOnly": "Nur Administratoren können KI-Automatisierungen verwalten."
+    "automation.adminOnly": "Nur Administratoren können KI-Automatisierungen verwalten.",
+    "automation.constraints": "Exakte Eingabegleichheit",
+    "automation.constraintsHint": "Optional. Textausgaben müssen exakt der gewählten Eingabe entsprechen. Nicht unterstützte Schemata führen zu einem Fehler ohne Text-Fallback. JSON-Ausgaben sind nicht kombinierbar.",
+    "automation.mustEqualInput": "{field}: muss Eingabe entsprechen",
+    "automation.noConstraint": "Keine Gleichheitsbedingung",
+    "automation.constraintFieldInUse": "Entfernen Sie die Bedingung, bevor Sie Eingabe, Ausgabe oder Sammlung ändern."
   },
   "fr": {
     "automation.title": "Automatisations IA",
@@ -192,7 +212,12 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.contact": "Contacter Yunsoft",
     "support.star": "Étoile sur GitHub",
     "support.sponsor": "Soutenir YunCMS",
-    "automation.adminOnly": "Seuls les administrateurs peuvent gérer les automatisations IA."
+    "automation.adminOnly": "Seuls les administrateurs peuvent gérer les automatisations IA.",
+    "automation.constraints": "Égalité exacte avec l’entrée",
+    "automation.constraintsHint": "Facultatif. Le texte doit correspondre exactement à l’entrée choisie. Un schéma non pris en charge échoue sans repli vers du texte libre. Les sorties JSON ne sont pas combinables.",
+    "automation.mustEqualInput": "{field} : doit être égal à l’entrée",
+    "automation.noConstraint": "Aucune contrainte d’égalité",
+    "automation.constraintFieldInUse": "Retirez la contrainte avant de modifier l’entrée, la sortie ou la collection."
   },
   "pt-BR": {
     "automation.title": "Automações de IA",
@@ -231,7 +256,12 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.contact": "Fale com a Yunsoft",
     "support.star": "Estrela no GitHub",
     "support.sponsor": "Patrocinar YunCMS",
-    "automation.adminOnly": "Somente administradores podem gerenciar automações de IA."
+    "automation.adminOnly": "Somente administradores podem gerenciar automações de IA.",
+    "automation.constraints": "Igualdade exata com a entrada",
+    "automation.constraintsHint": "Opcional. O texto deve ser idêntico à entrada selecionada. Esquemas não suportados falham sem retornar ao texto livre. Saídas JSON não podem ser combinadas.",
+    "automation.mustEqualInput": "{field}: deve ser igual à entrada",
+    "automation.noConstraint": "Sem restrição de igualdade",
+    "automation.constraintFieldInUse": "Remova a restrição antes de alterar a entrada, a saída ou a coleção."
   },
   "ja": {
     "automation.title": "AI自動化",
@@ -270,7 +300,12 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.contact": "Yunsoftに相談",
     "support.star": "GitHubでスター",
     "support.sponsor": "YunCMS を支援",
-    "automation.adminOnly": "AI自動化を管理できるのは管理者だけです。"
+    "automation.adminOnly": "AI自動化を管理できるのは管理者だけです。",
+    "automation.constraints": "入力値との完全一致",
+    "automation.constraintsHint": "任意です。選択したテキスト出力は入力値と完全に一致する必要があります。未対応のスキーマはテキストに切り替えず失敗します。JSON 出力とは併用できません。",
+    "automation.mustEqualInput": "{field}: 一致する入力",
+    "automation.noConstraint": "一致制約なし",
+    "automation.constraintFieldInUse": "入力、出力、コレクションを変更する前に一致制約を解除してください。"
   },
   "zh-CN": {
     "automation.title": "AI 自动化",
@@ -309,6 +344,11 @@ export const AUTOMATION_LOCALES = Object.freeze({
     "support.contact": "联系 Yunsoft",
     "support.star": "在 GitHub 加星",
     "support.sponsor": "赞助 YunCMS",
-    "automation.adminOnly": "只有管理员可以管理 AI 自动化。"
+    "automation.adminOnly": "只有管理员可以管理 AI 自动化。",
+    "automation.constraints": "与输入完全相等",
+    "automation.constraintsHint": "可选。所选文本输出必须与输入值完全一致。不支持的模式将失败，不回退到自由文本。不能与 JSON 输出组合使用。",
+    "automation.mustEqualInput": "{field}：必须等于输入",
+    "automation.noConstraint": "无相等约束",
+    "automation.constraintFieldInUse": "更改输入、输出或集合前，请先移除相等约束。"
   }
 });

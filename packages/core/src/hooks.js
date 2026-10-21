@@ -11,6 +11,7 @@ export const HOOK_EVENTS = Object.freeze({
   aiProviderBefore: 'ai.provider.before',
   aiProviderCompleted: 'ai.provider.completed',
   aiProviderFailed: 'ai.provider.failed',
+  aiProviderObserved: 'ai.provider.observed',
   aiChatBefore: 'ai.chat.before',
   aiChatCompleted: 'ai.chat.completed',
   aiChatFailed: 'ai.chat.failed',
@@ -188,8 +189,12 @@ export class HookEmitter {
         this.logger?.error?.('YunCMS extension action failed after successful lifecycle point', {
           event,
           extensionId: registration.extensionId,
-          code: error?.code ?? null,
-          message: error?.message ?? String(error),
+          // Observation listeners may handle raw provider bodies. Their errors
+          // must never copy those bodies into the normal application log.
+          ...(event === HOOK_EVENTS.aiProviderObserved ? {} : {
+            code: error?.code ?? null,
+            message: error?.message ?? String(error),
+          }),
         });
       }
     }

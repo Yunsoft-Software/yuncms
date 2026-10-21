@@ -106,4 +106,7 @@ test('MCP exposes automation management only to authenticated admins and honors 
   assert.equal(make(true, false).has('automations.save'), false);
   assert.equal(make(true, true).has('automations.save'), true);
   assert.equal(make(true, true).get('automations.delete').definition.annotations.destructiveHint, true);
+  const schema = make(true, true).get('automations.save').definition.inputSchema;
+  assert.equal(schema.safeParse({ rule: { ...rule, output_constraints: { summary: { must_equal_input: 'message' } } } }).success, true);
+  assert.equal(schema.safeParse({ rule: { ...rule, output_constraints: { summary: { must_equal_input: 'message', repair: true } } } }).success, false);
 });

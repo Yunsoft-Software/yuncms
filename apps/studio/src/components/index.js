@@ -1,4 +1,5 @@
 export { AiSettingsPanel } from './AiSettingsPanel.jsx';
+export { AutomationOutputConstraints } from './AutomationOutputConstraints.jsx';
 export { AppRail, StudioNextFrame } from './AppRail.jsx';
 export { BrandAssetPicker } from './BrandAssetPicker.jsx';
 export { CollectionIcon } from './CollectionIcon.jsx';

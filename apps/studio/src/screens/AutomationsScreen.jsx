@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiRequest, aiStatus } from '../api.js';
-import { editableAutomation, emptyAutomation, toggleAutomationField } from '../automation-form.js';
-import { useConfirmDialog, YunsoftSupportCard } from '../components/index.js';
+import { editableAutomation, emptyAutomation, setAutomationConstraint, toggleAutomationField } from '../automation-form.js';
+import { AutomationOutputConstraints, useConfirmDialog, YunsoftSupportCard } from '../components/index.js';
 import { useI18n } from '../i18n.js';
 
 function FieldChecklist({ label, fields, selected, onToggle, disabled }) {
@@ -53,6 +53,16 @@ export function AutomationsScreen() {
   }, [id]);
 
   function patch(values) { setDraft((current) => ({ ...current, ...values })); setPreview(null); setSaved(false); }
+  function toggleField(key, field) {
+    try {
+      const next = toggleAutomationField(draft, key, field);
+      if (Object.keys(next.output_constraints ?? {}).length && next.output_fields.some(output => collection?.fields.find(entry => entry.field === output)?.type === 'json')) {
+        setError(t('automation.constraintsHint')); return;
+      }
+      setDraft(next); setPreview(null); setSaved(false); setError('');
+    }
+    catch { setError(t('automation.constraintFieldInUse')); }
+  }
   function choose(rule = null) {
     setId(rule?.id ?? null); setDraft(rule ? editableAutomation(rule) : emptyAutomation());
     setPreview(null); setSample(''); setError(''); setSaved(false);
@@ -97,7 +107,10 @@ export function AutomationsScreen() {
             <div className="automation-grid">
               <label className="field-label"><span>{t('common.name')}</span><input required maxLength={120} value={draft.name} onChange={(event) => patch({ name: event.target.value })} /></label>
               <label className="field-label"><span>{t('automation.collection')}</span><select required value={draft.collection}
-                onChange={(event) => patch({ collection: event.target.value, input_fields: [], output_fields: [] })}><option value="">{t('common.none')}</option>
+                onChange={(event) => {
+                  if (Object.keys(draft.output_constraints ?? {}).length) { setError(t('automation.constraintFieldInUse')); return; }
+                  patch({ collection: event.target.value, input_fields: [], output_fields: [], output_constraints: {} });
+                }}><option value="">{t('common.none')}</option>
                 {configuration.collections.map((entry) => <option key={entry.collection} value={entry.collection}>{entry.name}</option>)}</select></label>
             </div>
             <label className="field-label"><span>{t('automation.runAs')}</span><select required value={draft.run_as} onChange={(event) => patch({ run_as: event.target.value })}>
@@ -107,10 +120,12 @@ export function AutomationsScreen() {
             </div>
             <div className="automation-grid">
               <FieldChecklist label={t('automation.inputs')} fields={collection?.fields ?? []} selected={draft.input_fields} disabled={!collection}
-                onToggle={(field) => { setDraft((current) => toggleAutomationField(current, 'input_fields', field)); setPreview(null); setSaved(false); }} />
+                onToggle={(field) => toggleField('input_fields', field)} />
               <FieldChecklist label={t('automation.outputs')} fields={(collection?.fields ?? []).filter((field) => field.output)} selected={draft.output_fields} disabled={!collection}
-                onToggle={(field) => { setDraft((current) => toggleAutomationField(current, 'output_fields', field)); setPreview(null); setSaved(false); }} />
+                onToggle={(field) => toggleField('output_fields', field)} />
             </div>
+            {!!draft.output_fields.length && <AutomationOutputConstraints fields={collection?.fields ?? []} draft={draft} t={t}
+              onChange={(output, input) => { setDraft(setAutomationConstraint(draft, output, input)); setPreview(null); setSaved(false); setError(''); }} />}
             <label className="field-label"><span>{t('automation.instruction')}</span><textarea required rows={5} maxLength={8000} value={draft.instruction} placeholder={t('automation.example')}
               onChange={(event) => patch({ instruction: event.target.value })} /></label>
             <div className="automation-actions"><button className="primary-button" type="submit" disabled={!configuration.users.length}>{busy ? t('common.saving') : t('common.save')}</button>

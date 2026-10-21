@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { createAccountability, isSystemManagedField, SchemaCache, withTransaction } from '@yunsoft/yuncms-core';
 import { AI_AUTOMATION_ORIGIN, automationError, automationFromRow, matchesAutomation, normalizeAutomation, validateGeneratedFields } from './config.js';
+import { buildOutputContract, enforceOutputConstraints, validateConstraintDefinitions } from './output-constraints.js';
 
 const OUTPUT_TYPES = new Set(['string', 'text', 'json', 'boolean', 'integer', 'bigint', 'decimal', 'date', 'datetime', 'timestamp']);
-const COLUMNS = ['name', 'collection', 'run_as', 'enabled', 'on_create', 'on_update', 'input_fields', 'output_fields', 'instruction'];
+const COLUMNS = ['name', 'collection', 'run_as', 'enabled', 'on_create', 'on_update', 'input_fields', 'output_fields', 'output_constraints', 'instruction'];
 
 export class AiAutomationsService {
   constructor({ database, accountability, services, schemaCache = new SchemaCache(), emitter = null,
@@ -32,7 +33,7 @@ export class AiAutomationsService {
     );
     return { users, collections: Object.values(schema.collections).filter((entry) => !entry.system).map((entry) => ({
       collection: entry.collection, name: entry.name ?? entry.collection,
-      fields: Object.values(entry.fields).map((field) => ({ field: field.field, name: field.name ?? field.field,
+      fields: Object.values(entry.fields).map((field) => ({ field: field.field, name: field.name ?? field.field, type: field.type,
         output: field.field !== entry.primary_key && !field.readonly && !isSystemManagedField(field)
           && OUTPUT_TYPES.has(field.type) && !schema.relationByManyField?.has(`${entry.collection}.${field.field}`),
       })),
@@ -66,6 +67,7 @@ export class AiAutomationsService {
         throw automationError('INVALID_AUTOMATION', `Output field is not writable scalar data: ${field}`);
       }
     }
+    validateConstraintDefinitions(rule, collection);
     const options = { database, schema, accountability: createAccountability({ user: user.id, role: user.role }),
       emitter: this.emitter, storage: this.storage, logger: this.logger };
     const permissions = new this.services.PermissionsService(options);
@@ -80,21 +82,27 @@ export class AiAutomationsService {
 
   async save(input, id = null) {
     this.requireAdministrator();
-    const rule = normalizeAutomation(input);
-    await this.executionOptions(rule);
-    const values = COLUMNS.map((column) => ['input_fields', 'output_fields'].includes(column)
-      ? JSON.stringify(rule[column]) : typeof rule[column] === 'boolean' ? Number(rule[column]) : rule[column]);
-    if (id) {
-      const [result] = await this.database.query(
-        `UPDATE yuncms_ai_automations SET ${COLUMNS.map((column) => `${column} = ?`).join(', ')}, revision = revision + 1 WHERE id = ?`,
-        [...values, id],
-      );
-      if (!result.affectedRows) throw automationError('NOT_FOUND', 'Automation not found');
-    } else {
-      id = randomUUID();
-      await this.database.query(`INSERT INTO yuncms_ai_automations (id, ${COLUMNS.join(', ')}) VALUES (${Array(10).fill('?').join(', ')})`, [id, ...values]);
-    }
-    return this.read(id);
+    return withTransaction(this.database, async database => {
+      const previous = id ? await this.read(id, database, { lock: true }) : null;
+      if (id && !previous) throw automationError('NOT_FOUND', 'Automation not found');
+      // Lock before preserving omitted constraints, so an older concurrent
+      // client cannot silently overwrite a newer constraint definition.
+      const rule = normalizeAutomation(previous && !Object.hasOwn(input ?? {}, 'output_constraints')
+        ? { ...input, output_constraints: previous.output_constraints } : input);
+      await this.executionOptions(rule, database);
+      const values = COLUMNS.map((column) => ['input_fields', 'output_fields', 'output_constraints'].includes(column)
+        ? JSON.stringify(rule[column]) : typeof rule[column] === 'boolean' ? Number(rule[column]) : rule[column]);
+      if (id) {
+        await database.query(
+          `UPDATE yuncms_ai_automations SET ${COLUMNS.map((column) => `${column} = ?`).join(', ')}, revision = revision + 1 WHERE id = ?`,
+          [...values, id],
+        );
+      } else {
+        id = randomUUID();
+        await database.query(`INSERT INTO yuncms_ai_automations (id, ${COLUMNS.join(', ')}) VALUES (${Array(COLUMNS.length + 1).fill('?').join(', ')})`, [id, ...values]);
+      }
+      return this.read(id, database);
+    });
   }
 
   async remove(id) {
@@ -128,11 +136,13 @@ export class AiAutomationsService {
     const record = await items.readOne(itemKey, { fields });
     if (!record) throw automationError('NOT_FOUND', 'Record is missing or inaccessible to Run as');
     const input = Object.fromEntries(rule.input_fields.map((field) => [field, record[field]]));
+    const contract = buildOutputContract(rule, input, options.schema.collections[rule.collection]);
     const output = validateGeneratedFields(await this.assistant.generateFields({
-      instruction: rule.instruction, input, outputFields: rule.output_fields,
+      instruction: rule.instruction, input, outputFields: rule.output_fields, outputSchema: contract.schema,
     }, { ...options, services: this.services, requestId: randomUUID() }), rule.output_fields);
+    enforceOutputConstraints(output, contract.expected);
     items.validatePayload(output, options.schema.collections[rule.collection], await items.resolvePermission('update'));
-    return { record, output };
+    return { record, output, outputConstraints: contract.expected };
   }
 
   async preview(input, itemKey) {
