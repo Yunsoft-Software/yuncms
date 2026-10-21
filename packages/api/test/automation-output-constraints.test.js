@@ -91,6 +91,14 @@ test('legacy generation remains JSON object mode; declared constraints request s
   assert.throws(() => normalizeAiSettingsPatch({ provider_observations_enabled: true }), { code: 'INVALID_AI_CONFIG' });
 });
 
+test('final native results must preserve the bound input snapshot as well as its output', () => {
+  const expected = { summary: 'snapshot' };
+  assert.equal(enforceOutputConstraints({ summary: 'snapshot', source: 'snapshot' }, expected, rule.output_constraints).source, 'snapshot');
+  for (const result of [{ summary: 'snapshot', source: 'changed by a filter' }, { summary: 'snapshot' }]) {
+    assert.throws(() => enforceOutputConstraints(result, expected, rule.output_constraints), { code: 'AI_OUTPUT_CONSTRAINT_FAILED', path: 'summary' });
+  }
+});
+
 test('native capacity reservations include the actual dynamic schema, preserving the legacy estimate otherwise', () => {
   const messages = [{ role: 'user', content: 'input' }], tools = [], config = { maxOutputTokens: 1500 };
   const legacy = Buffer.byteLength(JSON.stringify(messages) + JSON.stringify(tools), 'utf8') + 1500 + 1024;

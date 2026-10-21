@@ -63,7 +63,7 @@ export class AiAutomationWorker {
         if (!updated) throw automationError('FORBIDDEN', 'Run as cannot update this record');
         // Check the final native result too: extension mutation filters run inside
         // updateOne. A mismatch rolls back its SQL/audit and deferred actions.
-        enforceOutputConstraints(updated, outputConstraints ?? {});
+        enforceOutputConstraints(updated, outputConstraints ?? {}, rule.output_constraints);
         await connection.query("UPDATE yuncms_ai_automation_runs SET status = 'succeeded', error_code = NULL, finished_at = CURRENT_TIMESTAMP(3) WHERE id = ?", [job.id]);
         return 'succeeded';
       });

@@ -69,9 +69,11 @@ export function buildOutputContract(rule, input, collection) {
   return { schema, expected: Object.freeze(expected) };
 }
 
-export function enforceOutputConstraints(output, expected) {
+export function enforceOutputConstraints(output, expected, bindings = null) {
   for (const [field, value] of Object.entries(expected)) {
-    if (!output || !Object.hasOwn(output, field) || output[field] !== value) {
+    const input = bindings?.[field]?.must_equal_input;
+    if (!output || !Object.hasOwn(output, field) || output[field] !== value
+      || (bindings && (!input || !Object.hasOwn(output, input) || output[input] !== value))) {
       throw constraintError('AI_OUTPUT_CONSTRAINT_FAILED', field, 'Generated output does not match its configured input field');
     }
   }

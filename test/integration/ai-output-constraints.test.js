@@ -196,6 +196,21 @@ test('real provider/native MySQL: declared output equality, observations and tra
     } finally { onCompleted = null; await service.remove(rule.id); }
   });
 
+  await t.test('a native filter cannot change a bound input while leaving a stale copied output', async () => {
+    const { record, rule } = await fixture(), source = 'bound source native-json-' + randomUUID();
+    await permissions.updateOne(writePermission.id, { fields: ['summary', 'source_text'] });
+    const remove = emitter.registerFilter('items.update', (payload, context) => context.collection === collection && context.requestId?.startsWith('ai-automation:')
+      ? { ...payload, source_text: 'Synthetic altered bound input' } : payload);
+    try {
+      await items.updateOne(record.id, { source_text: source }); const audit = await auditCount(); await worker.tick();
+      const run = await latest(rule), stored = await readSql(record.id);
+      if (process.env.YUNCMS_TEST_AI_OBSERVATION_DIR) await writeFile(process.env.YUNCMS_TEST_AI_OBSERVATION_DIR + '/source-filter-' + run.id + '.private.json',
+        JSON.stringify({ status: run.status, attempts: run.attempts, error_code: run.error_code, expectedSourceHash: hash(source), actualSourceHash: hash(stored.source_text), originalSummaryPreserved: stored.summary === 'Original summary', auditUnchanged: await auditCount() === audit }), { mode: 0o600 });
+      assert.equal(run.status, 'failed'); assert.equal(run.error_code, 'AI_OUTPUT_CONSTRAINT_FAILED'); assert.equal(run.attempts, 1);
+      assert.equal(hash(stored.source_text), hash(source)); assert.equal(stored.summary, 'Original summary'); assert.equal(await auditCount(), audit);
+    } finally { remove(); await permissions.updateOne(writePermission.id, { fields: ['summary'] }); await service.remove(rule.id); }
+  });
+
   await t.test('source changed during generation survives and cannot be overwritten with the old snapshot', async () => {
     const { record, rule } = await fixture(), concurrent = 'concurrent native-json-' + randomUUID();
     try { await items.updateOne(record.id, { source_text: 'snapshot native-json-' + randomUUID() }); onCompleted = () => items.updateOne(record.id, { source_text: concurrent }); await worker.tick();

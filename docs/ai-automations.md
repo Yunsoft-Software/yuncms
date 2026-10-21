@@ -48,7 +48,8 @@ A mismatch returns HTTP 400 / `AI_OUTPUT_CONSTRAINT_FAILED`, with the output
 field path and without either value. Preview returns no proposal and does not
 write. A worker records a terminal failure at attempt 1; it does not automatically
 retry. The final native update result is checked inside the transaction too, so
-mutation filters cannot accidentally commit a value that violates the binding.
+mutation filters cannot accidentally commit a value that violates the binding
+or changes its bound input snapshot while leaving the copied output stale.
 Its record/audit changes and success actions are rolled back or withheld.
 Actual provider usage is still settled. Changed rule revisions, permissions and
 record fingerprints retain their normal stale/denied behavior.
