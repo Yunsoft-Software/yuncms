@@ -30,7 +30,6 @@ export async function collectEnvironment(prompts) {
     PORT: String(DEFAULT_SERVER_PORT),
     STUDIO_ORIGIN: studioUrl,
     AUTH_PUBLIC_URL: studioUrl,
-    AUTH_TOTP_KEY: '',
     FILES_LOCAL_ROOT: 'uploads',
     DB_HOST,
     DB_PORT,

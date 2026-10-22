@@ -49,10 +49,12 @@ test('native TOTP migration is additive with owned credential/challenge rows and
   assert.equal(migration.statements.some(sql=>/DROP|ALTER TABLE yuncms_users/.test(sql)),false);
 });
 
-test('generated CLI environments expose the optional TOTP setting without an implicit shared key', async () => {
+test('generated CLI environments keep TOTP optional and preserve explicitly inherited key configuration', async () => {
   const { collectEnvironment } = await import('../../cli/src/init-command.js');
   const environment = await collectEnvironment({ line: async (_label, options) => options?.defaultValue ?? 'owned', secret: async () => 'owned-db-password' });
-  assert.equal(environment.AUTH_TOTP_KEY,'');assert.equal(loadConfig(environment).auth.totpKey,null);
+  assert.equal(environment.AUTH_TOTP_KEY,undefined);assert.equal(loadConfig(environment).auth.totpKey,null);
+  const inherited = randomBytes(32).toString('hex');
+  assert.equal(loadConfig({ AUTH_TOTP_KEY: inherited, ...environment }).auth.totpKey, inherited);
   const { readFile } = await import('node:fs/promises');
   const compose = await readFile(new URL('../../../compose.yaml', import.meta.url), 'utf8');
   assert.match(compose, /AUTH_TOTP_KEY: \$\{AUTH_TOTP_KEY:-\}/);
