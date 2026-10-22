@@ -53,6 +53,9 @@ test('generated CLI environments expose the optional TOTP setting without an imp
   const { collectEnvironment } = await import('../../cli/src/init-command.js');
   const environment = await collectEnvironment({ line: async (_label, options) => options?.defaultValue ?? 'owned', secret: async () => 'owned-db-password' });
   assert.equal(environment.AUTH_TOTP_KEY,'');assert.equal(loadConfig(environment).auth.totpKey,null);
+  const { readFile } = await import('node:fs/promises');
+  const compose = await readFile(new URL('../../../compose.yaml', import.meta.url), 'utf8');
+  assert.match(compose, /AUTH_TOTP_KEY: \$\{AUTH_TOTP_KEY:-\}/);
 });
 
 test('the TOTP bridge does not mint a session from a raw user id or a serialized admission flag', async () => {

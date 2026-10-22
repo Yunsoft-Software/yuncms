@@ -33,6 +33,7 @@ services:
       LOG_LEVEL: ${YUNCMS_LOG_LEVEL:-info}
       STUDIO_ORIGIN: ${YUNCMS_PUBLIC_URL:-http://localhost:3008}
       AUTH_PUBLIC_URL: ${YUNCMS_PUBLIC_URL:-http://localhost:3008}
+      AUTH_TOTP_KEY: ${AUTH_TOTP_KEY:-}
       TRUST_PROXY_HOPS: ${YUNCMS_TRUST_PROXY_HOPS:-0}
       DB_HOST: mysql
       DB_PORT: 3306
