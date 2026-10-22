@@ -24,7 +24,7 @@ export function TwoFactorPanel() {
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
-  return <section className="panel form-stack" aria-label={t('tfa.title')}>
+  return <section className="panel form-panel" aria-label={t('tfa.title')}>
     <h2>{t('tfa.title')}</h2><p>{t('tfa.description')}</p>
     {error && <div className="error-banner" role="alert">{error}</div>}
     {notice && <div className="notice-banner" role="status">{notice}</div>}

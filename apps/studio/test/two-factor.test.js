@@ -21,6 +21,7 @@ test('local, LDAP and browser handoff helpers persist only complete sessions; th
     const text=await readFile(new URL(path,import.meta.url),'utf8');assert.match(text,/<SecondFactorInput/);assert.doesNotMatch(text,/window\.(prompt|alert)|style=\{/);
   }
   const barrel=await readFile(new URL('../src/components/index.js',import.meta.url),'utf8');assert.match(barrel,/export \{ TwoFactorPanel \}/);assert.match(barrel,/export \{ SecondFactorInput \}/);
+  const panel=await readFile(new URL('../src/components/TwoFactorPanel.jsx',import.meta.url),'utf8');assert.match(panel,/className="panel form-panel"/);
 });
 test('all supported locales supply the complete two-factor workflow vocabulary', () => {
   const keys=Object.keys(TFA_LOCALES.en).sort();assert.equal(Object.keys(TFA_LOCALES).length,8);
