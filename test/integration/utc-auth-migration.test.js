@@ -18,6 +18,7 @@ import {
 } from '@yunsoft/yuncms-core';
 import { resetDatabaseObjects } from '../../packages/cli/src/database-reset.js';
 import { SessionsService } from '../../packages/core/src/services/sessions-service.js';
+import { seedLegacySession } from '../helpers/legacy-session.js';
 
 const MYSQL_ENABLED = process.env.YUNCMS_TEST_MYSQL === '1';
 const MIGRATION_ENABLED = process.env.YUNCMS_TEST_MIGRATION === '1';
@@ -94,7 +95,7 @@ test('0022 UTC migration revokes legacy sessions/action-tokens/transactions/fini
 
     // 2. Synthetic legacy resources that must be revoked by 0022
     const sessions = new SessionsService({ accountability: system, database: pool });
-    const legacySession = await sessions.createForUser(user);
+    const legacySession = await seedLegacySession(pool, user);
 
     const actionTokenId = randomUUID();
     await pool.query(

@@ -19,6 +19,7 @@ import {
 } from '@yunsoft/yuncms-core';
 import { resetDatabaseObjects } from '../../packages/cli/src/database-reset.js';
 import { SessionsService } from '../../packages/core/src/services/sessions-service.js';
+import { seedLegacySession } from '../helpers/legacy-session.js';
 
 const MYSQL_ENABLED = process.env.YUNCMS_TEST_MYSQL === '1';
 const MIGRATION_ENABLED = process.env.YUNCMS_TEST_MIGRATION === '1';
@@ -86,7 +87,7 @@ test('real MySQL applies 0013 and every later migration once, revoking legacy se
       collection: 'yuncms_files',
       action: 'read',
     });
-    const session = await new SessionsService({ accountability: system, database: pool }).createForUser(user);
+    const session = await seedLegacySession(pool, user);
 
     const upgraded = await bootstrapDatabase(pool);
     assert.deepEqual(upgraded.newlyApplied, externalAuthAndLater.map((migration) => migration.id));
