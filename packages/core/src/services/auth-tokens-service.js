@@ -137,6 +137,7 @@ export class AuthTokensService extends BaseService {
         [actionToken.id],
       );
       await connection.query('DELETE FROM yuncms_sessions WHERE user = ?', [actionToken.user]);
+      await connection.query('DELETE FROM yuncms_mfa_challenges WHERE user = ?', [actionToken.user]);
       await connection.query(
         `DELETE FROM yuncms_auth_tokens
          WHERE user = ? AND type = ? AND id <> ?`,

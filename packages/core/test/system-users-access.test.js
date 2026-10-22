@@ -117,6 +117,10 @@ test('self password change remains available and revokes existing sessions', asy
         calls.push({ type: 'sessions', user: params[0] });
         return [{ affectedRows: 2 }, []];
       }
+      if (normalized.startsWith('DELETE FROM yuncms_mfa_challenges')) {
+        calls.push({ type: 'challenges', user: params[0] });
+        return [{ affectedRows: 1 }, []];
+      }
       throw new Error(`Unexpected query: ${normalized}`);
     },
   };
@@ -133,6 +137,7 @@ test('self password change remains available and revokes existing sessions', asy
   assert.equal(passwordCall.user, 'user-self');
   assert.match(passwordCall.hash, /^scrypt\$/);
   assert.equal(sessionsCall.user, 'user-self');
+  assert.equal(calls.find(entry => entry?.type === 'challenges').user, 'user-self');
   assert.equal(calls.includes('commit'), true);
   assert.equal(calls.includes('release'), true);
 });

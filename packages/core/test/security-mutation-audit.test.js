@@ -28,6 +28,7 @@ test('password changes emit an audit-safe event without password material', asyn
       if (normalized.startsWith('SELECT id, email, role, status')) return [[{ id: 'user-1', email: 'user@example.test', status: 'active' }], []];
       if (normalized.startsWith('UPDATE yuncms_users SET password_hash')) return [{ affectedRows: 1 }, []];
       if (normalized.startsWith('DELETE FROM yuncms_sessions')) return [{ affectedRows: 2 }, []];
+      if (normalized.startsWith('DELETE FROM yuncms_mfa_challenges')) return [{ affectedRows: 1 }, []];
       throw new Error(`Unexpected query: ${normalized}`);
     },
   };

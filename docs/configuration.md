@@ -412,3 +412,13 @@ Configure the reverse proxy/load balancer separately and set `TRUST_PROXY_HOPS` 
 - [Public registration](public-registration.md)
 - [Files](files.md)
 - [MCP](mcp.md)
+
+## Native TOTP encryption
+
+`AUTH_TOTP_KEY` is optional and has no default. Set it to 32 random bytes encoded
+as 64 hexadecimal characters (`openssl rand -hex 32`) to make native authenticator
+enrollment available. Keep the same secret across replicas and restarts; back it
+up separately from the database. Invalid nonempty values reject configuration.
+An absent key advertises TOTP unavailable; it never bypasses an already enabled
+factor. See [native two-factor authentication](auth.md#native-totp-two-factor-authentication)
+for discovery, setup, challenges, recovery, limits and session rotation.

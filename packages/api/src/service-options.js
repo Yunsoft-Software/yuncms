@@ -10,5 +10,6 @@ export function serviceOptionsFromRequest(req) {
     storage: req.context.storage,
     permissionCache: req.context.permissionCache,
     requestId: req.id,
+    authConfig: req.context.env?.auth ?? null,
   };
 }

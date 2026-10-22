@@ -9,7 +9,8 @@ import {
 import { dispatchAfterCommit, withTransaction } from '../transaction.js';
 import { filterNativeMutation } from '../native-lifecycle.js';
 import { BaseService } from './base-service.js';
-import { SessionsService } from './sessions-service.js';
+import { TotpService } from './totp-service.js';
+import { PRIMARY_FACTOR_VERIFIED } from '../auth/totp.js';
 
 const AUTH_TRANSACTION_TTL_MS = 5 * 60 * 1000;
 
@@ -54,17 +55,6 @@ function safeProfile(profile) {
   return Object.keys(safe).length ? safe : null;
 }
 
-function publicUser(user) {
-  return {
-    id: user.id,
-    email: user.email,
-    role: user.role ?? null,
-    role_name: user.role_name ?? null,
-    admin: Boolean(user.role_admin ?? user.admin),
-    status: user.status,
-    email_verified_at: user.email_verified_at ?? null,
-  };
-}
 
 function isDuplicateEntry(error) {
   return error?.code === 'ER_DUP_ENTRY' || error?.errno === 1062;
@@ -301,22 +291,7 @@ export class ExternalAuthService extends BaseService {
     }
 
     if (!user || user.status !== 'active') throw externalAuthError('EXTERNAL_USER_INACTIVE', 'Linked YunCMS user is not active');
-    const sessions = new SessionsService({
-      accountability: this.accountability,
-      database: this.database,
-      schema: this.schema,
-      emitter: this.emitter,
-      logger: this.logger,
-      requestId: this.requestId,
-    });
-    const tokens = await sessions.createForUser(user, { ip, userAgent });
-    await this.action('auth.login.success', {
-      method: 'external',
-      provider: providerId,
-      user: user.id,
-      role: user.role ?? null,
-    });
-    return { user: publicUser(user), ...tokens };
+    return new TotpService({ ...this }).startLogin(user, { method: 'external', provider: providerId, ip, userAgent, [PRIMARY_FACTOR_VERIFIED]: true });
   }
 
   async loginFailed(provider, reason = 'external_auth_failed') {

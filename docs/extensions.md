@@ -452,3 +452,14 @@ Keep listeners bounded and scope them to synthetic diagnostic calls. Raw bodies
 can contain private inputs: write only to local, access-restricted, ignored files;
 never print them or expose them through an endpoint. No raw storage happens unless
 an operator installs such a listener, and the server flag defaults to off.
+
+### Native two-factor account events
+
+`auth.tfa.enabled`, `auth.tfa.disabled` and `auth.tfa.recovery.updated` are actions
+emitted after the native account transaction commits. Payloads contain only
+`{ key, user }`; context includes explicit accountability, the request id,
+`collection: 'yuncms_users'`, and committed transaction context. They are also
+recorded by the native audit listener. They do not expose passwords, seeds,
+OTP values, recovery codes or token secrets. Successful second-factor completion
+emits the normal `auth.login.success` only after a complete session exists, with
+`second_factor: true`; merely issuing a challenge does not emit login success.

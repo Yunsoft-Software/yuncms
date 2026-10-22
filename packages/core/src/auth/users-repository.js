@@ -11,14 +11,14 @@ export async function readAuthenticationUserByEmail(database, email) {
   return rows[0] ?? null;
 }
 
-export async function readAuthenticationUserById(database, id) {
+export async function readAuthenticationUserById(database, id, { lock = false } = {}) {
   const [rows] = await database.query(
     `SELECT u.id, u.email, u.password_hash, u.role, u.status, u.email_verified_at,
             r.name AS role_name, r.admin AS role_admin, r.public AS role_public
      FROM yuncms_users u
      LEFT JOIN yuncms_roles r ON r.id = u.role
      WHERE u.id = ?
-     LIMIT 1`,
+     LIMIT 1${lock ? ' FOR UPDATE' : ''}`,
     [id],
   );
   return rows[0] ?? null;

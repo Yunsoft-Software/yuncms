@@ -16,6 +16,8 @@ export { FilePreview } from './FilePreview.jsx';
 export { FilePreviewModal } from './FilePreviewModal.jsx';
 export { Inspector } from './Inspector.jsx';
 export { Modal } from './Modal.jsx';
+export { SecondFactorInput } from './SecondFactorInput.jsx';
+export { TwoFactorPanel } from './TwoFactorPanel.jsx';
 export { OverflowTooltipLabel } from './OverflowTooltipLabel.jsx';
 export { Pagination, paginateClientItems } from './Pagination.jsx';
 export { PublicRegistrationSettings } from './PublicRegistrationSettings.jsx';

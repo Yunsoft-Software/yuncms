@@ -32,8 +32,10 @@ import { LoginScreen } from './screens/LoginScreen.jsx';
 import { McpScreen } from './screens/McpScreen.jsx';
 import { RolesPermissionsScreen } from './screens/RolesPermissionsScreen.jsx';
 import { UsersScreen } from './screens/UsersScreen.jsx';
+import { SecurityScreen } from './screens/SecurityScreen.jsx';
 
 const settingsSections = [
+  { id: 'security', labelKey: 'tfa.title', icon: 'roles' },
   { id: 'data-model', labelKey: 'nav.dataModel', icon: 'model' },
   { id: 'users', labelKey: 'nav.users', icon: 'users' },
   { id: 'roles', labelKey: 'nav.roles', icon: 'roles' },
@@ -284,6 +286,7 @@ export function App() {
       ? <McpScreen />
       : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;
     if (section === 'appearance') return <AppearanceScreen />;
+    if (section === 'security') return <SecurityScreen />;
     return (
       <ContentRouteScreen
         collection={contentCollection}
@@ -322,6 +325,7 @@ export function App() {
       roles: studioPath.roles(),
       files: studioPath.files(),
       ai: studioPath.ai(),
+      security: studioPath.security(),
       mcp: studioPath.mcp(),
       automations: studioPath.automations(),
       flows: studioPath.flows(),

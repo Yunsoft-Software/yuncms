@@ -1,3 +1,4 @@
+import { TFA_LOCALES } from './locales/two-factor.js';
 import { AUTOMATION_LOCALES } from './locales/automations.js';
 import { FLOW_LOCALES } from './locales/flows.js';
 import { SUPPORTED_LOCALES } from './locale-registry.js';
@@ -74,14 +75,14 @@ import { UX_PT_BR } from './locales/ux-pt-br.js';
 import { UX_TR } from './locales/ux-tr.js';
 import { UX_ZH_CN } from './locales/ux-zh-cn.js';
 
-export const EN = Object.freeze({ ...FLOW_LOCALES['en'], ...AUTOMATION_LOCALES['en'], ...BASE_EN, ...UI_EN, ...UX_EN, ...ICONS_EN, ...AI_EN, ...MCP_EN, ...NAVIGATION_EN, ...REGISTRATION_EN, ...STUDIO_NEXT_EN });
-export const TR = Object.freeze({ ...FLOW_LOCALES['tr'], ...AUTOMATION_LOCALES['tr'], ...BASE_TR, ...UI_TR, ...UX_TR, ...ICONS_TR, ...AI_TR, ...MCP_TR, ...NAVIGATION_TR, ...REGISTRATION_TR, ...STUDIO_NEXT_TR });
-export const ES = Object.freeze({ ...FLOW_LOCALES['es'], ...AUTOMATION_LOCALES['es'], ...BASE_ES, ...UI_ES, ...UX_ES, ...ICONS_ES, ...AI_ES, ...MCP_ES, ...NAVIGATION_ES, ...REGISTRATION_ES, ...STUDIO_NEXT_ES });
-export const DE = Object.freeze({ ...FLOW_LOCALES['de'], ...AUTOMATION_LOCALES['de'], ...BASE_DE, ...UI_DE, ...UX_DE, ...ICONS_DE, ...AI_DE, ...MCP_DE, ...NAVIGATION_DE, ...REGISTRATION_DE, ...STUDIO_NEXT_DE });
-export const FR = Object.freeze({ ...FLOW_LOCALES['fr'], ...AUTOMATION_LOCALES['fr'], ...BASE_FR, ...UI_FR, ...UX_FR, ...ICONS_FR, ...AI_FR, ...MCP_FR, ...NAVIGATION_FR, ...REGISTRATION_FR, ...STUDIO_NEXT_FR });
-export const PT_BR = Object.freeze({ ...FLOW_LOCALES['pt-BR'], ...AUTOMATION_LOCALES['pt-BR'], ...BASE_PT_BR, ...UI_PT_BR, ...UX_PT_BR, ...ICONS_PT_BR, ...AI_PT_BR, ...MCP_PT_BR, ...NAVIGATION_PT_BR, ...REGISTRATION_PT_BR, ...STUDIO_NEXT_PT_BR });
-export const JA = Object.freeze({ ...FLOW_LOCALES['ja'], ...AUTOMATION_LOCALES['ja'], ...BASE_JA, ...UI_JA, ...UX_JA, ...ICONS_JA, ...AI_JA, ...MCP_JA, ...NAVIGATION_JA, ...REGISTRATION_JA, ...STUDIO_NEXT_JA });
-export const ZH_CN = Object.freeze({ ...FLOW_LOCALES['zh-CN'], ...AUTOMATION_LOCALES['zh-CN'], ...BASE_ZH_CN, ...UI_ZH_CN, ...UX_ZH_CN, ...ICONS_ZH_CN, ...AI_ZH_CN, ...MCP_ZH_CN, ...NAVIGATION_ZH_CN, ...REGISTRATION_ZH_CN, ...STUDIO_NEXT_ZH_CN });
+export const EN = Object.freeze({ ...TFA_LOCALES['en'], ...FLOW_LOCALES['en'], ...AUTOMATION_LOCALES['en'], ...BASE_EN, ...UI_EN, ...UX_EN, ...ICONS_EN, ...AI_EN, ...MCP_EN, ...NAVIGATION_EN, ...REGISTRATION_EN, ...STUDIO_NEXT_EN });
+export const TR = Object.freeze({ ...TFA_LOCALES['tr'], ...FLOW_LOCALES['tr'], ...AUTOMATION_LOCALES['tr'], ...BASE_TR, ...UI_TR, ...UX_TR, ...ICONS_TR, ...AI_TR, ...MCP_TR, ...NAVIGATION_TR, ...REGISTRATION_TR, ...STUDIO_NEXT_TR });
+export const ES = Object.freeze({ ...TFA_LOCALES['es'], ...FLOW_LOCALES['es'], ...AUTOMATION_LOCALES['es'], ...BASE_ES, ...UI_ES, ...UX_ES, ...ICONS_ES, ...AI_ES, ...MCP_ES, ...NAVIGATION_ES, ...REGISTRATION_ES, ...STUDIO_NEXT_ES });
+export const DE = Object.freeze({ ...TFA_LOCALES['de'], ...FLOW_LOCALES['de'], ...AUTOMATION_LOCALES['de'], ...BASE_DE, ...UI_DE, ...UX_DE, ...ICONS_DE, ...AI_DE, ...MCP_DE, ...NAVIGATION_DE, ...REGISTRATION_DE, ...STUDIO_NEXT_DE });
+export const FR = Object.freeze({ ...TFA_LOCALES['fr'], ...FLOW_LOCALES['fr'], ...AUTOMATION_LOCALES['fr'], ...BASE_FR, ...UI_FR, ...UX_FR, ...ICONS_FR, ...AI_FR, ...MCP_FR, ...NAVIGATION_FR, ...REGISTRATION_FR, ...STUDIO_NEXT_FR });
+export const PT_BR = Object.freeze({ ...TFA_LOCALES['pt-BR'], ...FLOW_LOCALES['pt-BR'], ...AUTOMATION_LOCALES['pt-BR'], ...BASE_PT_BR, ...UI_PT_BR, ...UX_PT_BR, ...ICONS_PT_BR, ...AI_PT_BR, ...MCP_PT_BR, ...NAVIGATION_PT_BR, ...REGISTRATION_PT_BR, ...STUDIO_NEXT_PT_BR });
+export const JA = Object.freeze({ ...TFA_LOCALES['ja'], ...FLOW_LOCALES['ja'], ...AUTOMATION_LOCALES['ja'], ...BASE_JA, ...UI_JA, ...UX_JA, ...ICONS_JA, ...AI_JA, ...MCP_JA, ...NAVIGATION_JA, ...REGISTRATION_JA, ...STUDIO_NEXT_JA });
+export const ZH_CN = Object.freeze({ ...TFA_LOCALES['zh-CN'], ...FLOW_LOCALES['zh-CN'], ...AUTOMATION_LOCALES['zh-CN'], ...BASE_ZH_CN, ...UI_ZH_CN, ...UX_ZH_CN, ...ICONS_ZH_CN, ...AI_ZH_CN, ...MCP_ZH_CN, ...NAVIGATION_ZH_CN, ...REGISTRATION_ZH_CN, ...STUDIO_NEXT_ZH_CN });
 
 export const DICTIONARIES = Object.freeze({
   en: EN,

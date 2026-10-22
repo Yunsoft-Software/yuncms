@@ -81,6 +81,7 @@ test('Studio exposes administrator-only MCP settings backed by dedicated API rou
 
 test('authentication contract carries administrator state into the Studio session', async () => {
   const authSource = await readFile(new URL('../../../packages/core/src/services/auth-service.js', import.meta.url), 'utf8');
-  assert.match(authSource, /admin: Boolean\(user\.role_admin \?\? user\.admin\)/);
+  const totpSource = await readFile(new URL('../../../packages/core/src/services/totp-service.js', import.meta.url), 'utf8');
+  assert.match(totpSource, /admin: Boolean\(user\.role_admin \?\? user\.admin\)/);
   assert.match(authSource, /admin: result\.admin === true/);
 });

@@ -7,8 +7,10 @@ import {
   login,
   loginWithProvider,
   apiRequest,
+  verifySecondFactor,
 } from '../api.js';
-import { AuthBrandPanel, YunsoftFooter } from '../components/index.js';
+import { AuthBrandPanel, SecondFactorInput, YunsoftFooter } from '../components/index.js';
+import { authenticationResult, factorVerification } from '../two-factor.js';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
 
@@ -37,6 +39,7 @@ export function LoginScreen({ onAuthenticated }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [challenge, setChallenge] = useState(null), [factorCode, setFactorCode] = useState(''), [recovery, setRecovery] = useState(false);
   const registrationEnabled = settings.public_registration_enabled === true;
   const registrationRequiresEmailVerification =
     settings.public_registration_require_email_verification === true;
@@ -71,7 +74,10 @@ export function LoginScreen({ onAuthenticated }) {
     exchangeAuthCode(authCode)
       .then((session) => {
         clearBrowserAuthCode();
-        if (!cancelled) onAuthenticated(session);
+        if (!cancelled) {
+          if (authenticationResult(session) === 'challenge') setChallenge(session);
+          else onAuthenticated(session);
+        }
       })
       .catch((requestError) => {
         clearBrowserAuthCode();
@@ -87,6 +93,10 @@ export function LoginScreen({ onAuthenticated }) {
     setNotice('');
     setSubmitting(true);
     try {
+      if (challenge) {
+        const session = await verifySecondFactor(challenge.challenge_token, factorVerification(factorCode, recovery));
+        setFactorCode(''); setChallenge(null); onAuthenticated(session); return;
+      }
       if (resetMode) {
         setVerificationPending(false);
         await apiRequest('/auth/password-reset/request', {
@@ -121,6 +131,7 @@ export function LoginScreen({ onAuthenticated }) {
         ? await loginWithProvider(ldapProvider.id, email, password)
         : await login(email, password);
       setVerificationPending(false);
+      if (authenticationResult(session) === 'challenge') { setChallenge(session); setPassword(''); setFactorCode(''); return; }
       onAuthenticated(session);
     } catch (requestError) {
       if (requestError?.code === 'EMAIL_NOT_VERIFIED') {
@@ -204,6 +215,13 @@ export function LoginScreen({ onAuthenticated }) {
           </div>
 
           <form className="form-stack" onSubmit={handleSubmit}>
+            {challenge ? <>
+              <p>{t('tfa.challenge')}</p>
+              <SecondFactorInput value={factorCode} onChange={setFactorCode} recovery={recovery} onRecoveryChange={setRecovery} disabled={submitting} />
+              {error && <div className="error-banner" role="alert">{error}</div>}
+              <button className="primary-button" type="submit" disabled={submitting}>{t('tfa.verify')}</button>
+              <button className="text-button" type="button" disabled={submitting} onClick={() => { setChallenge(null); setFactorCode(''); setRecovery(false); setError(''); }}>{t('auth.backToSignIn')}</button>
+            </> : <>
             <label className="field-label">
               <span>{ldapProvider?.label ?? t('auth.email')}</span>
               <input
@@ -306,9 +324,10 @@ export function LoginScreen({ onAuthenticated }) {
                 {t('auth.backToSignIn')}
               </button>
             )}
+            </>}
           </form>
 
-          {!resetMode && !registerMode && !ldapProvider && (browserProviders.length > 0 || ldapProviders.length > 0) && (
+          {!challenge && !resetMode && !registerMode && !ldapProvider && (browserProviders.length > 0 || ldapProviders.length > 0) && (
             <div className="form-stack" aria-label={t('auth.authenticationProviders')}>
               {browserProviders.map((provider) => (
                 <button

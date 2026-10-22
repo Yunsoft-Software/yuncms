@@ -3,6 +3,10 @@ import { isExtensionError } from '@yunsoft/yuncms-extensions-sdk';
 
 const STATUS_BY_CODE = new Map([
   ['INVALID_CREDENTIALS', 401],
+  ['MFA_REQUIRED', 401],
+  ['INVALID_TFA_VERIFICATION', 400],
+  ['TFA_UNAVAILABLE', 503],
+  ['TFA_KEY_INVALID', 503],
   ['UNAUTHORIZED', 401],
   ['FORBIDDEN', 403],
   ['FORBIDDEN_FIELD', 403],

@@ -66,6 +66,7 @@ export { createServiceRegistry } from './services/service-registry.js';
 export { createCoreServiceRegistry } from './services/core-services.js';
 export { AuthService } from './services/auth-service.js';
 export { AuthTokensService } from './services/auth-tokens-service.js';
+export { TotpService } from './services/totp-service.js';
 export { ExternalAuthService, AUTH_TRANSACTION_TTL_MS } from './services/external-auth-service.js';
 export { ApiTokensService } from './services/api-tokens-service.js';
 export { AuditService, redactAuditValue } from './services/audit-service.js';

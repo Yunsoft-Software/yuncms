@@ -24,7 +24,7 @@ import { createMcpRouter } from '../../../packages/api/src/mcp.js';
 import { McpSettingsStore } from '../../../packages/api/src/mcp/settings-store.js';
 
 if (process.env.YUNCMS_TEST_MYSQL !== '1' || process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE !== '1') throw Error('Browser acceptance requires an explicitly authorized disposable MySQL database');
-const config = loadConfig({ ...process.env, API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
+const config = loadConfig({ ...process.env, API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', AUTH_ACTION_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
 if (!/(test|ci|dev)/i.test(config.database.database)) throw Error('Browser fixture requires a disposable test/ci/dev database');
 const pool = createDatabasePool({ ...config.database, connectionLimit: 5 }), accountability = createSystemAccountability();
 const root = await mkdtemp(join(tmpdir(), 'yuncms-flows-browser-'));

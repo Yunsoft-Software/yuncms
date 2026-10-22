@@ -414,6 +414,7 @@ Read **[Files and Storage](docs/files.md)**.
 YunCMS supports:
 
 - email/password sessions;
+- optional native TOTP two-factor authentication with single-use recovery codes;
 - rotating refresh credentials;
 - static API tokens;
 - logout / logout-all;

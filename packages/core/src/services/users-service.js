@@ -308,6 +308,7 @@ export class UsersService extends BaseService {
 
       if (Object.hasOwn(patch, 'status') && patch.status !== 'active') {
         await connection.query('DELETE FROM yuncms_sessions WHERE user = ?', [id]);
+        await connection.query('DELETE FROM yuncms_mfa_challenges WHERE user = ?', [id]);
       }
 
       const [rows] = await connection.query(
@@ -369,6 +370,7 @@ export class UsersService extends BaseService {
         throw error;
       }
       await connection.query('DELETE FROM yuncms_sessions WHERE user = ?', [id]);
+      await connection.query('DELETE FROM yuncms_mfa_challenges WHERE user = ?', [id]);
       await service.action('users.password.update', { key: id });
       return true;
     });

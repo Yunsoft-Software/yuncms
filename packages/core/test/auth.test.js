@@ -95,6 +95,7 @@ test('login session user exposes the administrator flag required by Studio navig
     maxmem: 16 * 1024 * 1024,
   });
   const database = {
+    async beginTransaction() {}, async commit() {}, async rollback() {},
     async query(sql) {
       const normalized = sql.replace(/\s+/g, ' ').trim();
       if (normalized.startsWith('SELECT u.id, u.email, u.password_hash')) {
@@ -111,6 +112,8 @@ test('login session user exposes the administrator flag required by Studio navig
         }], []];
       }
       if (normalized.startsWith('INSERT INTO yuncms_sessions')) return [{ affectedRows: 1 }, []];
+      if (normalized.includes('FROM yuncms_user_totp')) return [[], []];
+      if (normalized.startsWith('SELECT id, status FROM yuncms_users')) return [[{ id: 'admin-1', status: 'active' }], []];
       throw new Error(`Unexpected query: ${normalized}`);
     },
   };

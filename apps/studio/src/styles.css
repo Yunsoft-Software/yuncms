@@ -62,6 +62,12 @@ code {
   overflow-wrap: anywhere;
 }
 
+.credential-codes {
+  max-inline-size: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .auth-layout {
   min-height: 100vh;
   display: grid;

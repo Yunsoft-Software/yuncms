@@ -314,3 +314,123 @@ See [Setup and CLI](setup-cli.md).
 - [Roles and permissions](permissions.md)
 - [REST API](rest-api.md)
 - [Security](security.md)
+
+## Native TOTP two-factor authentication
+
+TOTP is optional and uses standard authenticator apps (RFC 6238, SHA-1, six digits,
+30-second periods). An operator enables the capability by configuring a stable
+`AUTH_TOTP_KEY`: 32 random bytes encoded as 64 hexadecimal characters. Generate
+it with `openssl rand -hex 32`, store it as a deployment secret, and back it up
+with the database. An absent key keeps enrollment unavailable; an invalid key
+prevents startup. Losing or replacing the key does not disable enrolled factors:
+TOTP verification fails closed until the correct key is restored. The key is
+independent of AI and external-provider settings.
+
+Discover support without authentication:
+
+```text
+GET /auth/capabilities
+```
+
+The response includes `data.totp` with `available`, `algorithm: "SHA1"`,
+`digits: 6`, `period: 30`, and `recovery_codes: 8`. This describes the installation,
+not whether a particular account is enrolled. Account status is session-only:
+`GET /auth/tfa` returns `available`, `enabled`, `enrollment_pending`, and
+`recovery_codes_remaining`. It never returns a saved seed or recovery codes.
+Static API tokens cannot use the self-service TOTP endpoints.
+
+### Enrollment and account security
+
+Studio exposes **Settings → Two-factor authentication** to every signed-in user.
+Enter the current password, add the displayed setup key manually to a standard
+authenticator app, then confirm its current code. The same native API supports
+custom frontends:
+
+| Method and path | Body | Result |
+| --- | --- | --- |
+| `POST /auth/tfa/enroll` | `{ "password": "…" }` | `secret`, `otpauth_uri`, `expires_in: 600` |
+| `POST /auth/tfa/confirm` | `{ "password": "…", "code": "123456" }` | `enabled: true`, eight `recovery_codes`, replacement `session` |
+| `DELETE /auth/tfa/enroll` | None | Cancels unconfirmed enrollment |
+| `POST /auth/tfa/recovery-codes` | Password and a current factor | Eight replacement `recovery_codes` and replacement `session` |
+| `POST /auth/tfa/disable` | Password and a current factor | `enabled: false` and replacement `session` |
+
+For a current factor send exactly one of `code` or `recovery_code`. Management
+always targets the session user; user-management permissions do not grant access
+to another account's factor. It requires a current local password, including for
+accounts first created through SSO. Such users can establish a password through
+the existing self password-change endpoint before enrollment.
+
+A pending setup expires after ten minutes and does not enable two-factor
+protection. Starting setup again replaces the pending seed. Confirming setup,
+disabling protection or regenerating recovery codes revokes **all** old sessions
+and pending login challenges atomically. Replace client session state with the
+returned `session` (the normal `{ user, access_token, refresh_token, … }` shape).
+Recovery codes appear only in the successful confirm/regenerate response; Studio
+drops them when dismissed or reloaded. Save them privately. Each code works once;
+regeneration invalidates every earlier code. Using a recovery code to sign in does
+not automatically disable the authenticator.
+
+The database stores authenticated, user-bound AES-256-GCM seed ciphertext and
+SHA-256 hashes of random 128-bit recovery codes. Native mutation/audit hooks never
+receive passwords, OTPs, seeds or plaintext recovery codes. All auth responses
+use `Cache-Control: no-store`. Use HTTPS for remote clients; TOTP remains
+susceptible to real-time phishing and is not a phishing-resistant authenticator.
+
+### Login challenge
+
+For unenrolled accounts the existing login response is unchanged. After a correct
+password or a successful external-provider identity check, an enrolled account
+receives a challenge instead of a session:
+
+```json
+{
+  "data": {
+    "mfa_required": true,
+    "challenge_token": "ycm_…",
+    "expires_in": 300,
+    "methods": ["totp", "recovery_code"]
+  }
+}
+```
+
+No access/refresh credentials exist at this stage. Keep the challenge in temporary
+UI state, not persistent session storage, and complete it with:
+
+```text
+POST /auth/tfa/verify
+{ "challenge_token": "ycm_…", "code": "123456" }
+```
+
+Or send `recovery_code` instead of `code`. Success returns the ordinary session
+shape under `data`. The challenge itself cannot authenticate a Bearer request or
+refresh a session. A new primary login replaces the account's previous challenge.
+Challenges expire after five minutes and allow at most five failed attempts.
+They are single-use and bound to the factor revision and password fingerprint;
+password changes/resets, suspension and logout-all also invalidate pending
+challenges. Neither password reset nor email verification removes an enabled
+factor. Concurrent verification cannot spend a TOTP step/recovery code twice.
+
+The verifier permits one adjacent time step in either direction. A successfully
+used step cannot be reused or followed by an older step, including the step used
+to confirm enrollment. Ten failed account verification attempts lock further
+verification for five minutes; these counters survive restarts and new challenges.
+The existing auth-action IP limiter applies too. Wrong/expired login verification
+returns `401 INVALID_CREDENTIALS`; invalid management proof returns
+`400 INVALID_TFA_VERIFICATION`; a lock returns `429 RATE_LIMITED`. Missing or
+unusable encryption keys return `503 TFA_UNAVAILABLE` / `TFA_KEY_INVALID`.
+
+Local, LDAP and browser-provider login/handoff results all follow this challenge
+contract; client adapters must handle it before saving a session. Session refresh
+continues for an already completed session. Static API tokens remain separate
+non-interactive integration credentials, with their existing ownership, expiry,
+revocation and permission rules; enrollment does not silently remove them.
+
+Trusted server code uses `TotpService` with explicit accountability, database and
+`authConfig: config.auth`. Its methods mirror the operations above:
+`capabilities()`, `status()`, `beginEnrollment()`, `confirmEnrollment()`,
+`cancelEnrollment()`, `regenerateRecoveryCodes()`, `disable()` and
+`completeLogin()`. Primary identity verification remains the responsibility of
+`AuthService` / `ExternalAuthService`; the internal primary-login bridge rejects
+calls without native identity admission. Extensions should use those native login
+services rather than minting sessions. The native session creation guard rejects
+an enrolled account without an internally verified second factor.

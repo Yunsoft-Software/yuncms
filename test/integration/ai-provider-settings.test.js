@@ -24,7 +24,7 @@ test('real MySQL/native HTTP: provider settings upgrade preserves secrets, autho
   await database.query('UPDATE yuncms_ai_settings SET enabled=1, model=?, api_key_ciphertext=?, max_output_tokens=2048 WHERE id=1', ['legacy-model', encrypted]);
   await assert.rejects(database.query('SELECT provider FROM yuncms_ai_settings'), { code: 'ER_BAD_FIELD_ERROR' });
   const upgraded = await bootstrapDatabase(database);
-  assert.deepEqual(upgraded.newlyApplied, ['0025-ai-provider-routing', '0026-ai-output-constraints']);
+  assert.deepEqual(upgraded.newlyApplied, ['0025-ai-provider-routing', '0026-ai-output-constraints', '0027-native-totp']);
   const store = new AiSettingsStore({ database, key });
   assert.equal((await store.readAdmin()).provider, null); assert.equal((await store.readRuntime()).apiKey, originalSecret);
   const [[preserved]] = await database.query('SELECT api_key_ciphertext, model, enabled, max_output_tokens, provider FROM yuncms_ai_settings');

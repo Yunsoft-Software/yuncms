@@ -15,6 +15,7 @@ export class BaseService {
     storage = null,
     permissionCache = null,
     requestId = null,
+    authConfig = null,
   } = {}) {
     requireAccountability(accountability);
     if (!database) throw new Error('Database handle is required');
@@ -27,5 +28,6 @@ export class BaseService {
     this.storage = storage;
     this.permissionCache = permissionCache;
     this.requestId = requestId;
+    this.authConfig = authConfig;
   }
 }

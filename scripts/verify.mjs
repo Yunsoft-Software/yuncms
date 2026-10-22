@@ -65,6 +65,8 @@ const FAST_TESTS = [
   'packages/core/test/system-roles-access.test.js',
   'packages/core/test/studio-settings-service.test.js',
   'packages/core/test/auth.test.js',
+  'packages/core/test/totp.test.js',
+  'apps/studio/test/two-factor.test.js',
   'packages/core/test/auth-refresh-concurrency.test.js',
   'packages/core/test/authorization-actions.test.js',
   'packages/core/test/users-password-admission.test.js',

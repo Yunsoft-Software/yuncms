@@ -349,9 +349,9 @@ test('optional AI provider routing is an additive required migration after the r
 });
 
 test('output constraints migrate as nullable JSON without changing existing rule rows', () => {
-  const migration = CORE_MIGRATIONS.at(-1);
+  const migration = CORE_MIGRATIONS.find(entry => entry.id === '0026-ai-output-constraints');
   assert.equal(migration.id, '0026-ai-output-constraints');
-  assert.equal(CORE_MIGRATIONS.at(-2).id, '0025-ai-provider-routing');
+  assert.equal(CORE_MIGRATIONS[CORE_MIGRATIONS.indexOf(migration) - 1].id, '0025-ai-provider-routing');
   assert.deepEqual(migration.statements, ['ALTER TABLE yuncms_ai_automations ADD COLUMN output_constraints JSON NULL AFTER output_fields']);
 });
 

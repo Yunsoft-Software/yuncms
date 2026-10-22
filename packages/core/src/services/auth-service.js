@@ -4,6 +4,8 @@ import { hashToken, tokenType } from '../auth/tokens.js';
 import { readAuthenticationUserByEmail } from '../auth/users-repository.js';
 import { BaseService } from './base-service.js';
 import { SessionsService } from './sessions-service.js';
+import { TotpService } from './totp-service.js';
+import { PRIMARY_FACTOR_VERIFIED } from '../auth/totp.js';
 
 const DUMMY_PASSWORD_HASH = 'scrypt$N=65536,r=8,p=1,keyLength=64$AAAAAAAAAAAAAAAAAAAAAA$wPIB-ojIevW9SJ6ou99EIix5AukscH1McxhCNVsi1eVkhsxb5QzXquW0YeAFglU5Vh-NthiqKH90soC0JgEJPQ';
 
@@ -32,17 +34,6 @@ function normalizeLoginEmail(email) {
   return normalized;
 }
 
-function publicUser(user) {
-  return {
-    id: user.id,
-    email: user.email,
-    role: user.role ?? null,
-    role_name: user.role_name ?? null,
-    admin: Boolean(user.role_admin ?? user.admin),
-    status: user.status,
-    email_verified_at: user.email_verified_at ?? null,
-  };
-}
 
 export class AuthService extends BaseService {
   async action(event, payload, context = {}) {
@@ -119,16 +110,7 @@ export class AuthService extends BaseService {
       }
     }
 
-    const tokens = await this.createSessionsService().createForUser(user, { ip, userAgent });
-    await this.action('auth.login.success', {
-      method: 'local',
-      user: user.id,
-      role: user.role ?? null,
-    }, { ip });
-    return {
-      user: publicUser(user),
-      ...tokens,
-    };
+    return new TotpService({ ...this }).startLogin(user, { method: 'local', ip, userAgent, [PRIMARY_FACTOR_VERIFIED]: true });
   }
 
   async authenticateAccessToken(token) {

@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { createOpaqueToken, hashToken, tokenType } from '../auth/tokens.js';
 import { BaseService } from './base-service.js';
+import { SECOND_FACTOR_VERIFIED } from '../auth/totp.js';
+import { withTransaction } from '../transaction.js';
 
 const ACCESS_TTL_MS = 15 * 60 * 1000;
 const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -29,7 +31,19 @@ function identityFromRow(row) {
 }
 
 export class SessionsService extends BaseService {
-  async createForUser(user, {
+  async createForUser(user, options = {}) {
+    return withTransaction(this.database, async database => {
+      const [users] = await database.query('SELECT id, status FROM yuncms_users WHERE id = ? FOR UPDATE', [user.id]);
+      if (users[0]?.status !== 'active') throw invalidCredentials();
+      const [factors] = await database.query('SELECT enabled_at FROM yuncms_user_totp WHERE user = ?', [user.id]);
+      if (factors[0]?.enabled_at && options[SECOND_FACTOR_VERIFIED] !== user.id) {
+        throw Object.assign(new Error('Second factor verification is required'), { code: 'MFA_REQUIRED' });
+      }
+      return new SessionsService({ ...this, database }).#create(user, options);
+    });
+  }
+
+  async #create(user, {
     ip = null,
     userAgent = null,
     now = new Date(),
@@ -165,11 +179,12 @@ export class SessionsService extends BaseService {
       error.code = 'FORBIDDEN';
       throw error;
     }
-    const [result] = await this.database.query(
-      'DELETE FROM yuncms_sessions WHERE user = ?',
-      [userId],
-    );
-    return result.affectedRows;
+    return withTransaction(this.database, async database => {
+      await database.query('SELECT id FROM yuncms_users WHERE id = ? FOR UPDATE', [userId]);
+      const [result] = await database.query('DELETE FROM yuncms_sessions WHERE user = ?', [userId]);
+      await database.query('DELETE FROM yuncms_mfa_challenges WHERE user = ?', [userId]);
+      return result.affectedRows;
+    });
   }
 }
 

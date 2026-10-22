@@ -1,3 +1,5 @@
+import { authenticationResult } from './two-factor.js';
+
 const SAME_ORIGIN_API_URL = typeof window !== 'undefined'
   ? window.location.origin
   : 'http://127.0.0.1:3008';
@@ -172,7 +174,7 @@ export async function login(email, password) {
     body: { email, password },
   });
   if (!response.ok) throw errorFromResponse(response, body);
-  writeSession(body.data);
+  if (authenticationResult(body.data) === 'session') writeSession(body.data);
   return body.data;
 }
 
@@ -194,7 +196,7 @@ export async function loginWithProvider(providerId, username, password) {
     body: { username, password },
   });
   if (!response.ok) throw errorFromResponse(response, body);
-  writeSession(body.data);
+  if (authenticationResult(body.data) === 'session') writeSession(body.data);
   return body.data;
 }
 
@@ -204,6 +206,14 @@ export async function exchangeAuthCode(authCode) {
     body: { auth_code: authCode },
   });
   if (!response.ok) throw errorFromResponse(response, body);
+  if (authenticationResult(body.data) === 'session') writeSession(body.data);
+  return body.data;
+}
+
+export async function verifySecondFactor(challengeToken, verification) {
+  const { response, body } = await rawRequest('/auth/tfa/verify', { method: 'POST', body: { challenge_token: challengeToken, ...verification } });
+  if (!response.ok) throw errorFromResponse(response, body);
+  if (authenticationResult(body.data) !== 'session') throw new Error('Invalid authentication response');
   writeSession(body.data);
   return body.data;
 }

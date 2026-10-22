@@ -130,6 +130,28 @@ export function createAuthRouter({
 
   router.use(noStore);
 
+  router.get('/capabilities', (req, res) => {
+    res.json({ data: { totp: service(req, 'TotpService').capabilities() } });
+  });
+  router.get('/tfa', async (req, res) => {
+    requireSessionAuthentication(req);
+    res.json({ data: await service(req, 'TotpService').status() });
+  });
+  router.post('/tfa/verify', actionLimit, async (req, res) => {
+    const result = await service(req, 'TotpService').completeLogin(req.body, { ip: req.ip ?? null, userAgent: req.get('user-agent') ?? null });
+    res.json({ data: result });
+  });
+  for (const [path, method] of [['enroll', 'beginEnrollment'], ['confirm', 'confirmEnrollment'], ['disable', 'disable'], ['recovery-codes', 'regenerateRecoveryCodes']]) {
+    router.post('/tfa/' + path, actionLimit, async (req, res) => {
+      requireSessionAuthentication(req);
+      res.json({ data: await service(req, 'TotpService')[method](req.body) });
+    });
+  }
+  router.delete('/tfa/enroll', actionLimit, async (req, res) => {
+    requireSessionAuthentication(req);
+    res.json({ data: await service(req, 'TotpService').cancelEnrollment() });
+  });
+
   router.get('/providers', (req, res) => {
     res.json({ data: externalAuthRegistry?.publicProviders?.() ?? [] });
   });

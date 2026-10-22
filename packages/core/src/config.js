@@ -1,4 +1,5 @@
 import { loadEnvFile } from 'node:process';
+import { totpKey } from './auth/totp.js';
 
 export const DEFAULT_SERVER_PORT = 3008;
 
@@ -49,6 +50,8 @@ export function loadEnvFileIfPresent(path = '.env') {
 }
 
 export function loadConfig(env = process.env) {
+  const configuredTotpKey = readString(env.AUTH_TOTP_KEY, '') || null;
+  totpKey(configuredTotpKey);
   const serverPort = readInteger(env.PORT, DEFAULT_SERVER_PORT, 'PORT', { min: 1, max: 65535 });
   const studioOrigin = readString(env.STUDIO_ORIGIN, `http://localhost:${serverPort}`);
   const cacheStore = readStore(env.CACHE_STORE, 'memory', 'CACHE_STORE');
@@ -144,6 +147,7 @@ export function loadConfig(env = process.env) {
       from: readString(env.SMTP_FROM, '') || null,
     },
     auth: {
+      totpKey: configuredTotpKey,
       publicUrl: readString(env.AUTH_PUBLIC_URL, studioOrigin).replace(/\/$/, ''),
       rateLimit: {
         store: authRateLimitStore,

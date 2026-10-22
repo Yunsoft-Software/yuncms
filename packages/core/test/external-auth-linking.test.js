@@ -16,6 +16,7 @@ test('external auth defaults do not allow unlinked identities', async () => {
 
 test('external login exposes administrator state in the Studio session', async () => {
   const database = {
+    async beginTransaction() {}, async commit() {}, async rollback() {},
     async query(sql) {
       const normalized = sql.replace(/\s+/g, ' ').trim();
       if (normalized.includes('FROM yuncms_auth_identities i')) {
@@ -36,6 +37,9 @@ test('external login exposes administrator state in the Studio session', async (
       }
       if (normalized.startsWith('UPDATE yuncms_auth_identities')) return [{ affectedRows: 1 }, []];
       if (normalized.startsWith('INSERT INTO yuncms_sessions')) return [{ affectedRows: 1 }, []];
+      if (normalized.includes('FROM yuncms_user_totp')) return [[], []];
+      if (normalized.startsWith('SELECT id, status FROM yuncms_users')) return [[{ id: 'admin-1', status: 'active' }], []];
+      if (normalized.startsWith('SELECT u.id, u.email, u.password_hash')) return [[{ id: 'admin-1', email: 'admin@example.test', role: 'admin-role', role_name: 'Administrator', role_admin: 1, status: 'active' }], []];
       throw new Error(`unexpected query: ${normalized}`);
     },
   };
