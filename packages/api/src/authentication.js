@@ -39,6 +39,7 @@ export function createAuthenticationMiddleware({
         logger,
         emitter,
         storage,
+        authConfig: config?.auth ?? null,
       });
 
       const token = bearerToken(req.get('authorization'));

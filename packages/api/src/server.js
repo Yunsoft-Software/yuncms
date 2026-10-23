@@ -147,6 +147,7 @@ async function start() {
     storage,
     logger,
     env: process.env,
+    authConfig: config.auth,
   });
 
   const app = createApp({

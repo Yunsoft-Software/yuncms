@@ -4,10 +4,12 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { HookEmitter } from '@yunsoft/yuncms-core';
+import { randomBytes } from 'node:crypto';
+import { createCoreServiceRegistry, createPublicAccountability, HookEmitter, loadConfig } from '@yunsoft/yuncms-core';
 import { discoverExtensions } from '../src/extensions/discovery.js';
 import { validateExtensionManifest } from '../src/extensions/manifest.js';
 import { loadExtensionRuntime } from '../src/extensions/runtime.js';
+import { serviceOptionsFromRequest } from '../src/service-options.js';
 
 async function createLocalExtension(root, name, yuncms, source = 'export default {};\n') {
   const packageRoot = join(root, 'extensions', name);
@@ -156,11 +158,68 @@ test('runtime accepts SDK marker and exposes services directly to hooks', async 
   });
 });
 
-test('API server passes the process environment to the extension runtime', async () => {
+test('API server passes the process environment and validated authConfig to the extension runtime', async () => {
   const source = await readFile(resolve(import.meta.dirname, '../src/server.js'), 'utf8');
 
   assert.match(
     source,
-    /loadExtensionRuntime\(\{[\s\S]*?env:\s*process\.env,[\s\S]*?\}\)/u,
+    /loadExtensionRuntime\(\{[\s\S]*?env:\s*process\.env,[\s\S]*?authConfig:\s*config\.auth,[\s\S]*?\}\)/u,
   );
+});
+
+test('endpoint extension serviceOptions propagates authConfig matching native request options', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'yuncms-ext-authconfig-'));
+  t.after(() => {
+    delete globalThis.__yuncmsEndpointContextProbe;
+    return rm(root, { recursive: true, force: true });
+  });
+
+  await createLocalExtension(
+    root,
+    'auth-probe',
+    { id: 'auth-probe', type: 'endpoint', entry: './src/index.js' },
+    `export default {
+      __yuncms_extension__: true,
+      type: 'endpoint',
+      register(_router, context) {
+        globalThis.__yuncmsEndpointContextProbe = context;
+      }
+    };\n`,
+  );
+
+  const totpKey = randomBytes(32).toString('hex');
+  const config = loadConfig({ AUTH_TOTP_KEY: totpKey });
+  const services = createCoreServiceRegistry().toObject();
+  const database = { query: async () => [[], []] };
+  await loadExtensionRuntime({
+    rootDir: root,
+    includeDependencies: false,
+    services,
+    database,
+    schemaCache: { get: async () => ({ version: 1, collections: {} }) },
+    emitter: new HookEmitter(),
+    logger: { info() {} },
+    env: { AUTH_TOTP_KEY: totpKey },
+    authConfig: config.auth,
+  });
+
+  const context = globalThis.__yuncmsEndpointContextProbe;
+  const req = {
+    id: 'req-auth-probe',
+    accountability: createPublicAccountability(),
+    context: {
+      database,
+      schema: { version: 1, collections: {} },
+      env: config,
+      permissionCache: new Map(),
+    },
+  };
+  const nativeOptions = serviceOptionsFromRequest(req);
+  const extensionOptions = await context.serviceOptions(req);
+  assert.deepEqual(extensionOptions.authConfig, nativeOptions.authConfig);
+  assert.equal(new services.TotpService(extensionOptions).capabilities().available, true);
+
+  const fallbackOptions = await context.serviceOptions({ id: 'req-no-context', accountability: createPublicAccountability() });
+  assert.deepEqual(fallbackOptions.authConfig, config.auth);
+  assert.equal(new services.TotpService(fallbackOptions).capabilities().available, true);
 });

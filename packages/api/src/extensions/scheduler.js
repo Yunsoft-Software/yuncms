@@ -2,12 +2,26 @@ import { parseCronExpression, cronMatches } from '@yunsoft/yuncms-core';
 import { createHash } from 'node:crypto';
 import {
   createSystemAccountability,
+  loadConfig,
   withAdvisoryLock,
 } from '@yunsoft/yuncms-core';
 
 const JOB_ID_PATTERN = /^[A-Za-z0-9._:-]{1,100}$/;
 function scheduleError(message) { return Object.assign(new Error(message), { code: 'INVALID_EXTENSION_SCHEDULE' }); }
 export { parseCronExpression, cronMatches } from '@yunsoft/yuncms-core';
+
+export function resolveExtensionAuthConfig(authConfig, env) {
+  if (authConfig !== undefined) return authConfig;
+  if (env?.auth && typeof env.auth === 'object') return env.auth;
+  if (env && typeof env === 'object') {
+    try {
+      return loadConfig(env).auth;
+    } catch {
+      return env.AUTH_TOTP_KEY ? { totpKey: String(env.AUTH_TOTP_KEY) } : null;
+    }
+  }
+  return null;
+}
 
 function normalizeJobOptions(options = {}) {
   const id = String(options.id ?? '').trim();
@@ -45,6 +59,7 @@ export class ExtensionScheduler {
     storage = null,
     logger = console,
     env,
+    authConfig,
     now = () => new Date(),
     lockRunner = withAdvisoryLock,
   } = {}) {
@@ -58,6 +73,7 @@ export class ExtensionScheduler {
     this.storage = storage;
     this.logger = logger;
     this.env = env;
+    this.authConfig = resolveExtensionAuthConfig(authConfig, env);
     this.now = now;
     this.lockRunner = lockRunner;
     this.jobs = new Map();
@@ -98,6 +114,7 @@ export class ExtensionScheduler {
       storage: this.storage,
       accountability,
       requestId: `schedule:${job.identity}:${date.toISOString()}`,
+      authConfig: this.authConfig,
       getSchema: () => this.schemaCache.get(this.database),
       serviceOptions: async () => ({
         accountability,
@@ -108,6 +125,7 @@ export class ExtensionScheduler {
         storage: this.storage,
         permissionCache: null,
         requestId: `schedule:${job.identity}:${date.toISOString()}`,
+        authConfig: this.authConfig,
       }),
       schedule: Object.freeze({
         id: job.options.id,

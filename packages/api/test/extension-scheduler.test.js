@@ -85,6 +85,7 @@ test('singleton jobs use a bounded zero-wait advisory lock and receive explicit 
   const options = await context.serviceOptions();
   assert.equal(options.accountability.system, true);
   assert.match(options.requestId, /^schedule:demo:singleton-job:/);
+  assert.equal(options.authConfig?.totpKey, null);
 });
 
 test('scheduler lock names stay bounded even for maximum extension and job identities', () => {

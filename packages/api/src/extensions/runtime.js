@@ -2,7 +2,7 @@ import { pathToFileURL } from 'node:url';
 import express from 'express';
 
 import { discoverExtensions } from './discovery.js';
-import { ExtensionScheduler } from './scheduler.js';
+import { ExtensionScheduler, resolveExtensionAuthConfig } from './scheduler.js';
 
 function extensionError(code, message) {
   const error = new Error(message);
@@ -32,25 +32,28 @@ async function importExtension(manifest) {
   return assertDefinition(imported.default, manifest);
 }
 
-function createBaseContext({ services, database, schemaCache, emitter, storage, logger, env }) {
+function createBaseContext({ services, database, schemaCache, emitter, storage, logger, env, authConfig }) {
+  const resolvedAuthConfig = resolveExtensionAuthConfig(authConfig, env);
   return Object.freeze({
     services,
     database,
     logger,
     env,
+    authConfig: resolvedAuthConfig,
     emitter,
     storage,
     getSchema: () => schemaCache.get(database),
     getAccountability: (req) => req?.accountability ?? null,
     serviceOptions: async (req) => ({
       accountability: req?.accountability,
-      database,
-      schema: req?.context?.schema ?? await schemaCache.get(database),
+      database: req?.context?.database ?? database,
+      schema: req?.context?.schema ?? await schemaCache.get(req?.context?.database ?? database),
       logger,
       emitter,
       storage,
       permissionCache: req?.context?.permissionCache ?? new Map(),
       requestId: req?.id ?? null,
+      authConfig: req?.context?.env?.auth ?? resolvedAuthConfig,
     }),
   });
 }
@@ -103,13 +106,14 @@ export async function loadExtensionRuntime({
   storage = null,
   logger = console,
   env,
+  authConfig,
 } = {}) {
   if (!services || !database || !schemaCache || !emitter) {
     throw new Error('Extension runtime requires services, database, schemaCache and emitter');
   }
 
   const manifests = await discoverExtensions({ rootDir, localDirectory, includeDependencies });
-  const baseContext = createBaseContext({ services, database, schemaCache, emitter, storage, logger, env });
+  const baseContext = createBaseContext({ services, database, schemaCache, emitter, storage, logger, env, authConfig });
   const scheduler = new ExtensionScheduler({
     database,
     services,
@@ -118,6 +122,7 @@ export async function loadExtensionRuntime({
     storage,
     logger,
     env,
+    authConfig: baseContext.authConfig,
   });
   const endpointExtensions = [];
 

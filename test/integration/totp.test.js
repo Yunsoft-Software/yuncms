@@ -1,19 +1,28 @@
-import assert from 'node:assert/strict';import test from 'node:test';import{randomBytes,randomUUID}from'node:crypto';import mysql from'mysql2/promise';
+import assert from 'node:assert/strict';import test from 'node:test';import{randomBytes,randomUUID}from'node:crypto';import{mkdir,mkdtemp,rm,writeFile}from'node:fs/promises';import{tmpdir}from'node:os';import{join}from'node:path';import mysql from'mysql2/promise';
 import{AuthService,AuthTokensService,ApiTokensService,bootstrapDatabase,closeDatabasePool,createAccountability,createDatabasePool,createPublicAccountability,createSystemAccountability,ExternalAuthService,HookEmitter,loadConfig,SchemaCache,TotpService,UsersService}from'@yunsoft/yuncms-core';
-import{createApp}from'../../packages/api/src/app.js';import{registerInternalAudit}from'../../packages/api/src/audit-hooks.js';import{createCoreServiceRegistry}from'@yunsoft/yuncms-core';
+import{createApp}from'../../packages/api/src/app.js';import{registerInternalAudit}from'../../packages/api/src/audit-hooks.js';import{loadExtensionRuntime}from'../../packages/api/src/extensions/runtime.js';import{createCoreServiceRegistry}from'@yunsoft/yuncms-core';
 import{authenticatorCode,incorrectAuthenticatorCode,nextAuthenticatorPeriod}from'../helpers/totp.js';
 
 test('native TOTP: real HTTP/MySQL enrollment, challenge, replay, recovery, persistence and authorization', {skip:process.env.YUNCMS_TEST_MYSQL!=='1',timeout:180000}, async t=>{
  assert.equal(process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE,'1');const database='yuncms_test_totp_'+randomBytes(5).toString('hex'),key=randomBytes(32).toString('hex'),password='Owned-totp-'+randomUUID()+'!';
  const config=loadConfig({...process.env,DB_DATABASE:database,AUTH_TOTP_KEY:key,AUTH_LOGIN_RATE_MAX:'1000',AUTH_ACTION_RATE_MAX:'1000',AUTH_RATE_LIMIT_STORE:'memory',API_RATE_LIMIT_ENABLED:'false'});
- const root=await mysql.createConnection({host:config.database.host,port:config.database.port,user:config.database.user,password:config.database.password});let pool,server;
+ const root=await mysql.createConnection({host:config.database.host,port:config.database.port,user:config.database.user,password:config.database.password});let pool,server,extRoot;
  try{
   await root.query('CREATE DATABASE ??',[database]);pool=createDatabasePool(config.database);await bootstrapDatabase(pool);
+  const services=createCoreServiceRegistry().toObject();
   const emitter=new HookEmitter({logger:{error(){}}}),options={database:pool,accountability:createSystemAccountability(),emitter,authConfig:config.auth};
-  registerInternalAudit({emitter,services:createCoreServiceRegistry().toObject(),database:pool,logger:console});
+  registerInternalAudit({emitter,services,database:pool,logger:console});
+  extRoot=await mkdtemp(join(tmpdir(),'yuncms-totp-ext-'));
+  const probeDir=join(extRoot,'extensions','totp-probe');await mkdir(probeDir,{recursive:true});
+  await writeFile(join(probeDir,'package.json'),JSON.stringify({name:'totp-probe',type:'module',yuncms:{id:'totp-probe',type:'endpoint',entry:'./index.js'}}));
+  await writeFile(join(probeDir,'index.js'),`export default{__yuncms_extension__:true,type:'endpoint',register(router,context){
+   router.get('/capabilities',async(req,res)=>{const opts=await context.serviceOptions(req);res.json({data:{totp:new context.services.TotpService(opts).capabilities()}});});
+   router.get('/tfa',async(req,res)=>{const opts=await context.serviceOptions(req);res.json({data:await new context.services.TotpService(opts).status()});});
+   router.post('/login',async(req,res)=>{const opts=await context.serviceOptions(req);res.json({data:await new context.services.AuthService(opts).login({email:req.body?.email,password:req.body?.password,ip:req.ip??null,userAgent:req.get('user-agent')??null})});});
+  }};\n`);
   const users=new UsersService(options),user=await users.createOne({email:'totp-'+randomUUID()+'@example.test',password}),other=await users.createOne({email:'other-'+randomUUID()+'@example.test',password});
   let base,session,recovery,secret;
-  const start=async(c=config)=>{const app=createApp({pool,config:c,schemaCache:new SchemaCache(),emitter});server=await new Promise(r=>{const s=app.listen(0,'127.0.0.1',()=>r(s));});base='http://127.0.0.1:'+server.address().port;};await start();
+  const start=async(c=config)=>{const schemaCache=new SchemaCache();const ext=await loadExtensionRuntime({rootDir:extRoot,includeDependencies:false,services,database:pool,schemaCache,emitter,logger:{info(){}},env:{AUTH_TOTP_KEY:c.auth?.totpKey??''},authConfig:c.auth});const app=createApp({pool,config:c,schemaCache,emitter,endpointExtensions:ext.endpointExtensions});server=await new Promise(r=>{const s=app.listen(0,'127.0.0.1',()=>r(s));});base='http://127.0.0.1:'+server.address().port;};await start();
   const request=async(path,body,token,method=body===undefined?'GET':'POST')=>{const r=await fetch(base+path,{method,headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});return{status:r.status,headers:r.headers,body:r.status===204?null:await r.json()};};
   const login=async(email=user.email)=>{const r=await request('/auth/login',{email,password});assert.equal(r.status,200);return r.body.data;};
   const state=async()=>{const[[row]]=await pool.query('SELECT * FROM yuncms_user_totp WHERE user=?',[user.id]);return row;};
@@ -41,6 +50,9 @@ test('native TOTP: real HTTP/MySQL enrollment, challenge, replay, recovery, pers
    const[audits]=await pool.query("SELECT payload FROM yuncms_audit_log WHERE action='auth.tfa.enabled' AND item_key=?",[user.id]);assert.equal(audits.length,1);assert.equal(JSON.stringify(audits).includes(secret),false);assert.equal(JSON.stringify(audits).includes(password),false);
   });
   await t.test('correct primary credentials issue only a short-lived challenge; bearer and refresh cannot use it',async()=>{
+   const extCap=await request('/extensions/totp-probe/capabilities');assert.equal(extCap.status,200);assert.equal(extCap.body.data.totp.available,true);
+   const extStatus=await request('/extensions/totp-probe/tfa',undefined,session.access_token);assert.equal(extStatus.status,200);assert.equal(extStatus.body.data.available,true);assert.equal(extStatus.body.data.enabled,true);
+   const extLogin=await request('/extensions/totp-probe/login',{email:user.email,password});assert.equal(extLogin.status,200);assert.equal(extLogin.body.data.mfa_required,true);assert.match(extLogin.body.data.challenge_token,/^ycm_/);
    const r=await login();assert.equal(r.mfa_required,true);assert.equal(r.access_token,undefined);assert.equal(r.refresh_token,undefined);assert.match(r.challenge_token,/^ycm_/);
    assert.equal((await request('/users/'+user.id,undefined,r.challenge_token)).status,401);assert.equal((await request('/auth/refresh',{refresh_token:r.challenge_token})).status,401);
    const[[stored]]=await pool.query('SELECT * FROM yuncms_mfa_challenges WHERE user=?',[user.id]);assert.equal(JSON.stringify(stored).includes(r.challenge_token),false);
@@ -95,7 +107,7 @@ test('native TOTP: real HTTP/MySQL enrollment, challenge, replay, recovery, pers
    const disabled=await request('/auth/tfa/disable',{password,recovery_code:fresh[0]},session.access_token);assert.equal(disabled.status,200);assert.equal(disabled.body.data.enabled,false);session=disabled.body.data.session;const row=await state();assert.equal(row.secret_ciphertext,null);assert.equal(row.recovery_hashes,null);assert.equal(row.enabled_at,null);
    const ordinary=await login();assert.ok(ordinary.access_token);assert.equal(ordinary.mfa_required,undefined);
   });
- }finally{if(server)await new Promise(r=>server.close(r));if(pool)await closeDatabasePool(pool);assert.match(database,/^yuncms_test_totp_[a-f0-9]{10}$/);await root.query('DROP DATABASE IF EXISTS ??',[database]);await root.end();}
+ }finally{if(server)await new Promise(r=>server.close(r));if(pool)await closeDatabasePool(pool);if(extRoot)await rm(extRoot,{recursive:true,force:true});assert.match(database,/^yuncms_test_totp_[a-f0-9]{10}$/);await root.query('DROP DATABASE IF EXISTS ??',[database]);await root.end();}
 });
 
 test('0027 upgrades a pre-TOTP database without revoking existing users, passwords or sessions', {skip:process.env.YUNCMS_TEST_MYSQL!=='1',timeout:60000},async()=>{

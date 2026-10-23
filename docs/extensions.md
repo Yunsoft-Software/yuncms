@@ -139,11 +139,12 @@ The context includes:
 - `database` — current database pool/connection context;
 - `logger` — structured logger;
 - `env` — the unfiltered process environment, including extension-specific variables (not the parsed YunCMS core configuration);
+- `authConfig` — validated authentication configuration (`config.auth`, including `totpKey`, `publicUrl` and `rateLimit`);
 - `emitter` — lifecycle event bus;
 - `storage` — registered Files storage context when available;
 - `getSchema()` — current schema snapshot;
 - `getAccountability(req)` — accountability from a request;
-- `serviceOptions(req)` — service constructor options preserving request scope.
+- `serviceOptions(req)` — service constructor options preserving request scope (including `accountability`, `database`, `schema`, `logger`, `emitter`, `storage`, `permissionCache`, `requestId` and `authConfig`).
 
 ## Use services, not self-HTTP
 
@@ -171,7 +172,7 @@ export default defineEndpoint((router, context) => {
 });
 ```
 
-This preserves request accountability, permission-cache scope, schema snapshot, hooks and audit behavior without forwarding bearer credentials back to the same process.
+This preserves request accountability, permission-cache scope, schema snapshot, authentication configuration (`authConfig`), hooks and audit behavior without forwarding bearer credentials back to the same process. Endpoint and hook extensions instantiating `TotpService`, `AuthService` or `ExternalAuthService` with `await context.serviceOptions(req)` observe the same TOTP capability and primary-login challenge contract as the native `/auth` router.
 
 Do not replace `serviceOptions(req)` with an Administrator/system context just to make an extension request pass. If the endpoint is acting for the current caller, retain that caller's accountability.
 

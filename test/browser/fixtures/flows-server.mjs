@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createWriteStream } from 'node:fs';
@@ -10,6 +10,7 @@ import {
   PermissionsService, RolesService, SchemaCache, UsersService, SmtpMailer, createJsonLogger,
 } from '@yunsoft/yuncms-core';
 import { createApp } from '../../../packages/api/src/app.js';
+import { loadExtensionRuntime } from '../../../packages/api/src/extensions/runtime.js';
 import { FlowRuntime } from '../../../packages/api/src/flows/runtime.js';
 import { startFlowNetwork } from '../../helpers/flow-network.mjs';
 import { randomBytes } from 'node:crypto';
@@ -24,7 +25,7 @@ import { createMcpRouter } from '../../../packages/api/src/mcp.js';
 import { McpSettingsStore } from '../../../packages/api/src/mcp/settings-store.js';
 
 if (process.env.YUNCMS_TEST_MYSQL !== '1' || process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE !== '1') throw Error('Browser acceptance requires an explicitly authorized disposable MySQL database');
-const config = loadConfig({ ...process.env, API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', AUTH_ACTION_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
+const config = loadConfig({ ...process.env, AUTH_TOTP_KEY: process.env.AUTH_TOTP_KEY || randomBytes(32).toString('hex'), API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', AUTH_ACTION_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
 if (!/(test|ci|dev)/i.test(config.database.database)) throw Error('Browser fixture requires a disposable test/ci/dev database');
 const pool = createDatabasePool({ ...config.database, connectionLimit: 5 }), accountability = createSystemAccountability();
 const root = await mkdtemp(join(tmpdir(), 'yuncms-flows-browser-'));
@@ -114,10 +115,32 @@ try {
     await new Promise(resolve => logStream.write('', resolve));
     res.json({ data: (await readFile(logPath, 'utf8')).split('\n').filter(Boolean).map(line => JSON.parse(line)) });
   });
+  const totpProbeDir = join(root, 'extensions', 'totp-probe');
+  await mkdir(totpProbeDir, { recursive: true });
+  await writeFile(join(totpProbeDir, 'package.json'), JSON.stringify({
+    name: 'totp-probe', type: 'module', yuncms: { id: 'totp-probe', type: 'endpoint', entry: './index.js' },
+  }));
+  await writeFile(join(totpProbeDir, 'index.js'), `export default {
+    __yuncms_extension__: true, type: 'endpoint',
+    register(router, context) {
+      router.get('/tfa', async (req, res) => {
+        const opts = await context.serviceOptions(req);
+        res.json({ data: await new context.services.TotpService(opts).status() });
+      });
+      router.post('/login', async (req, res) => {
+        const opts = await context.serviceOptions(req);
+        res.json({ data: await new context.services.AuthService(opts).login({ email: req.body?.email, password: req.body?.password, ip: req.ip ?? null, userAgent: req.get('user-agent') ?? null }) });
+      });
+    },
+  };\n`);
+  const extensionRuntime = await loadExtensionRuntime({
+    rootDir: root, includeDependencies: false, services, database: pool, schemaCache: cache, emitter, storage, logger,
+    env: process.env, authConfig: config.auth,
+  });
   const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger, mailer, flowsOptions,
     mcpRouter: createMcpRouter({ settingsStore: new McpSettingsStore({ database: pool }), logger }),
     aiRouter: createAiRouter({ assistant, settingsStore }), automationsRouter: createAutomationsRouter(automationOptions),
-    endpointExtensions: [{ id: 'flow-fixture', router: fixture }] });
+    endpointExtensions: [...extensionRuntime.endpointExtensions, { id: 'flow-fixture', router: fixture }] });
   server = await new Promise(resolve => { const instance = app.listen(Number(process.env.YUNCMS_BROWSER_PORT ?? 34074), '127.0.0.1', () => resolve(instance)); });
   runtime.start();
   automationWorker.start();

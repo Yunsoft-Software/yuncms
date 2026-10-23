@@ -426,7 +426,9 @@ non-interactive integration credentials, with their existing ownership, expiry,
 revocation and permission rules; enrollment does not silently remove them.
 
 Trusted server code uses `TotpService` with explicit accountability, database and
-`authConfig: config.auth`. Its methods mirror the operations above:
+`authConfig: config.auth` (or `await context.serviceOptions(req)` inside endpoint,
+hook and scheduled extensions, which propagates the validated `authConfig`
+automatically). Its methods mirror the operations above:
 `capabilities()`, `status()`, `beginEnrollment()`, `confirmEnrollment()`,
 `cancelEnrollment()`, `regenerateRecoveryCodes()`, `disable()` and
 `completeLogin()`. Primary identity verification remains the responsibility of
