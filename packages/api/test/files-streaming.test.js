@@ -57,6 +57,10 @@ function createMockFilesService(tracked = {}) {
       tracked.readContentStreamCalled = true;
       tracked.lastStreamRange = { start, end };
 
+      if (typeof tracked.beforeStreamOpen === 'function') {
+        await tracked.beforeStreamOpen();
+      }
+
       if (tracked.streamError) {
         const err = new Error(tracked.streamError.message || 'Stream acquisition failed');
         err.code = tracked.streamError.code || 'FILE_NOT_FOUND';
@@ -70,6 +74,7 @@ function createMockFilesService(tracked = {}) {
           },
           destroy(err, cb) {
             tracked.streamDestroyed = true;
+            tracked.onStreamDestroyed?.();
             cb(err);
           },
         });
@@ -91,17 +96,29 @@ function createMockFilesService(tracked = {}) {
         : (typeof start === 'number' ? FILE_CONTENT.subarray(start) : FILE_CONTENT);
 
       let chunkIndex = 0;
+      let slowTimer = null;
       const chunks = [slice.subarray(0, Math.ceil(slice.length / 2)), slice.subarray(Math.ceil(slice.length / 2))];
       const stream = new Readable({
         read() {
           if (tracked.slowStream) {
-            setTimeout(() => {
-              if (chunkIndex < chunks.length) {
-                this.push(chunks[chunkIndex++]);
-              } else {
-                this.push(null);
-              }
-            }, 50);
+            if (chunkIndex === 0) {
+              slowTimer = setTimeout(() => {
+                slowTimer = null;
+                if (!this.destroyed) {
+                  this.push(chunks[chunkIndex++]);
+                }
+              }, 20);
+            } else {
+              slowTimer = setTimeout(() => {
+                slowTimer = null;
+                if (!this.destroyed) {
+                  if (chunkIndex < chunks.length) {
+                    this.push(chunks[chunkIndex++]);
+                  }
+                  this.push(null);
+                }
+              }, 5_000);
+            }
           } else {
             if (chunkIndex < chunks.length) {
               this.push(chunks[chunkIndex++]);
@@ -111,7 +128,12 @@ function createMockFilesService(tracked = {}) {
           }
         },
         destroy(err, cb) {
+          if (slowTimer) {
+            clearTimeout(slowTimer);
+            slowTimer = null;
+          }
           tracked.streamDestroyed = true;
+          tracked.onStreamDestroyed?.();
           cb(err);
         },
       });
@@ -430,11 +452,18 @@ test('HTTP GET /files/:id/content enforces authorization before range parsing or
 });
 
 test('HTTP GET /files/:id/content destroys upstream stream when client disconnects prematurely', async () => {
-  const tracked = { slowStream: true };
+  let resolveDestroyed;
+  const destroyedPromise = new Promise((resolve) => {
+    resolveDestroyed = resolve;
+  });
+  const tracked = {
+    slowStream: true,
+    onStreamDestroyed: () => resolveDestroyed(),
+  };
   await withTestServer(tracked, async (origin) => {
     const url = new URL(`${origin}/files/test-file/content`);
 
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve) => {
       const req = http.request(
         {
           hostname: url.hostname,
@@ -444,10 +473,10 @@ test('HTTP GET /files/:id/content destroys upstream stream when client disconnec
           headers: { Authorization: 'Bearer admin-token' },
         },
         (res) => {
-          res.on('data', () => {
+          res.once('data', () => {
             // Abort client request mid-transfer
             req.destroy();
-            setTimeout(resolve, 60);
+            resolve();
           });
         },
       );
@@ -456,6 +485,60 @@ test('HTTP GET /files/:id/content destroys upstream stream when client disconnec
       });
       req.end();
     });
+
+    await Promise.race([
+      destroyedPromise,
+      new Promise((resolve) => setTimeout(resolve, 2_000)),
+    ]);
+
+    assert.equal(tracked.streamDestroyed, true);
+  });
+});
+
+test('HTTP GET /files/:id/content destroys upstream stream if client disconnects while stream is opening', async () => {
+  let notifyStreamOpening;
+  const streamOpeningPromise = new Promise((resolve) => {
+    notifyStreamOpening = resolve;
+  });
+  let releaseStreamOpen;
+  const releaseStreamOpenPromise = new Promise((resolve) => {
+    releaseStreamOpen = resolve;
+  });
+  let resolveDestroyed;
+  const destroyedPromise = new Promise((resolve) => {
+    resolveDestroyed = resolve;
+  });
+
+  const tracked = {
+    slowStream: true,
+    async beforeStreamOpen() {
+      notifyStreamOpening();
+      await releaseStreamOpenPromise;
+    },
+    onStreamDestroyed: () => resolveDestroyed(),
+  };
+
+  await withTestServer(tracked, async (origin) => {
+    const url = new URL(`${origin}/files/test-file/content`);
+    const req = http.request({
+      hostname: url.hostname,
+      port: url.port,
+      path: url.pathname,
+      method: 'GET',
+      headers: { Authorization: 'Bearer admin-token' },
+    });
+    req.on('error', () => {});
+    req.end();
+
+    await streamOpeningPromise;
+    req.destroy();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    releaseStreamOpen();
+
+    await Promise.race([
+      destroyedPromise,
+      new Promise((resolve) => setTimeout(resolve, 2_000)),
+    ]);
 
     assert.equal(tracked.streamDestroyed, true);
   });

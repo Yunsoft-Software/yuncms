@@ -38,7 +38,7 @@ function attachmentHeader(filename) {
   return `attachment; filename="${safe.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(safe)}`;
 }
 
-async function pipeStreamToResponse(stream, res) {
+async function pipeStreamToResponse(stream, res, req = null) {
   let upstreamDestroyed = false;
   const destroyUpstream = () => {
     if (upstreamDestroyed) return;
@@ -50,13 +50,19 @@ async function pipeStreamToResponse(stream, res) {
     }
   };
 
+  if (res.destroyed || res.closed || req?.destroyed || req?.aborted) {
+    destroyUpstream();
+    return;
+  }
+
   const onClose = () => {
-    if (!res.writableEnded) {
+    if (!res.writableFinished) {
       destroyUpstream();
     }
   };
 
   res.on('close', onClose);
+  req?.on?.('aborted', destroyUpstream);
 
   try {
     await pipeline(stream, res);
@@ -68,9 +74,8 @@ async function pipeStreamToResponse(stream, res) {
     throw error;
   } finally {
     res.off('close', onClose);
-    if (!res.writableEnded) {
-      destroyUpstream();
-    }
+    req?.off?.('aborted', destroyUpstream);
+    destroyUpstream();
   }
 }
 
@@ -202,12 +207,12 @@ export function createFilesRouter({ maxUploadBytes = 25 * 1024 * 1024 } = {}) {
       res.status(206);
       res.set('content-range', evaluation.contentRange);
       res.set('content-length', String(evaluation.contentLength));
-      return pipeStreamToResponse(streamResult.stream, res);
+      return pipeStreamToResponse(streamResult.stream, res, req);
     }
 
     res.status(200);
     res.set('content-length', String(info.size));
-    return pipeStreamToResponse(streamResult.stream, res);
+    return pipeStreamToResponse(streamResult.stream, res, req);
   });
 
   router.patch('/:id', async (req, res) => {
