@@ -1,5 +1,23 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { registerTransactionCleanup } from './transaction.js';
+
+const advisoryLockStorage = new AsyncLocalStorage();
+
+function connectionPoolIdentity(connection) {
+  return connection?.connection?._pool ?? connection?._pool ?? null;
+}
+
+export function activeAdvisoryLockConnection(database) {
+  if (!database || typeof database.getConnection !== 'function') return database;
+  const store = advisoryLockStorage.getStore();
+  if (!store?.active || !store?.connection) return database;
+  if (store.pool === database) return store.connection;
+  const poolIdentity = database.pool ?? null;
+  const connPool = connectionPoolIdentity(store.connection);
+  if (poolIdentity && connPool && poolIdentity === connPool) return store.connection;
+  return database;
+}
 
 export function databaseAdvisoryLockName(databaseName, lockName) {
   if (typeof databaseName !== 'string' || !databaseName || typeof lockName !== 'string' || !lockName) throw new TypeError('Database and advisory lock names are required');
@@ -18,6 +36,7 @@ export async function withAdvisoryLock(pool, lockName, operation, { timeoutSecon
   const databaseName = connection.connection?.config?.database || pool.pool?.config?.connectionConfig?.database;
   if (databaseName) lockName = databaseAdvisoryLockName(databaseName, lockName);
   let acquired = false;
+  const lockScope = borrowed ? { pool, connection, active: false } : null;
 
   try {
     const [rows] = await connection.query('SELECT GET_LOCK(?, ?) AS acquired', [lockName, timeoutSeconds]);
@@ -29,8 +48,13 @@ export async function withAdvisoryLock(pool, lockName, operation, { timeoutSecon
       throw error;
     }
 
+    if (lockScope) {
+      lockScope.active = true;
+      return await advisoryLockStorage.run(lockScope, () => operation(connection));
+    }
     return await operation(connection);
   } finally {
+    if (lockScope) lockScope.active = false;
     const releaseLock = async () => {
       if (acquired) {
         try { await connection.query('SELECT RELEASE_LOCK(?) AS released', [lockName]); }

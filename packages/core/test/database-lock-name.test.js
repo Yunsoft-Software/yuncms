@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { databaseAdvisoryLockName, withAdvisoryLock } from '../src/advisory-lock.js';
+import { activeAdvisoryLockConnection, databaseAdvisoryLockName, withAdvisoryLock } from '../src/advisory-lock.js';
 import { withTransaction } from '../src/transaction.js';
 
 test('database lock names isolate databases and purposes while staying within MySQL limits', () => {
@@ -28,7 +28,22 @@ test('connection-owned advisory locks last until outer commit or rollback withou
 
 test('native pool lock acquisition and release use the same configured database scope', async () => {
   const calls = [], connection = { connection: { config: { database: 'project_test' } }, release() { calls.push('release'); }, async query(sql, values) { calls.push({ sql, values }); return [[{ acquired: 1 }]]; } };
-  await withAdvisoryLock({ getConnection: async () => connection }, 'yuncms:schema', async db => { assert.equal(db, connection); });
+  const pool = { getConnection: async () => connection };
+  assert.equal(activeAdvisoryLockConnection(pool), pool);
+  let releaseDetached;
+  const gate = new Promise((resolve) => { releaseDetached = resolve; });
+  let detachedTask;
+  await withAdvisoryLock(pool, 'yuncms:schema', async db => {
+    assert.equal(db, connection);
+    assert.equal(activeAdvisoryLockConnection(pool), connection);
+    detachedTask = (async () => {
+      await gate;
+      return activeAdvisoryLockConnection(pool);
+    })();
+  });
+  assert.equal(activeAdvisoryLockConnection(pool), pool);
+  releaseDetached();
+  assert.equal(await detachedTask, pool, 'detached async work must not reuse a released advisory lock connection');
   const expected = databaseAdvisoryLockName('project_test', 'yuncms:schema');
   assert.equal(calls[0].values[0], expected); assert.equal(calls[1].values[0], expected); assert.equal(calls[2], 'release');
 });

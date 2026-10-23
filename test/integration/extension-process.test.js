@@ -7,6 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { verifyInstalledRuntime } from '../../packages/cli/src/runtime-probe.js';
+import { scheduleLockName } from '../../packages/api/src/extensions/scheduler.js';
 
 import {
   ApiTokensService,
@@ -15,6 +16,8 @@ import {
   createDatabasePool,
   createSystemAccountability,
   CollectionsService,
+  databaseAdvisoryLockName,
+  FieldsService,
   loadConfig,
   quoteIdentifier,
   RolesService,
@@ -638,6 +641,156 @@ export default {
       if (processInfo.child.exitCode == null) processInfo.child.kill('SIGKILL');
     }
     await pool.query(`DROP TABLE IF EXISTS ${quotedRuns}`).catch(() => {});
+    await closeDatabasePool(pool).catch(() => {});
+    if (projectRoot) await rm(projectRoot, { recursive: true, force: true });
+    await rm(storageRoot, { recursive: true, force: true });
+  }
+});
+
+test('bounded DB_CONNECTION_LIMIT=3 process runs concurrent singleton schedules, advisory-lock HTTP delivery and readiness without pool starvation', {
+  skip: !ENABLED,
+  timeout: 60_000,
+}, async () => {
+  const config = loadConfig(process.env);
+  requireDisposableDatabase(config);
+  const pool = createDatabasePool(config.database);
+  const runId = suffix();
+  const collection = safeName('it_sched_pool', runId);
+  const quotedCollection = quoteIdentifier(collection, 'integration bounded pool collection');
+  const storageRoot = await mkdtemp(join(tmpdir(), 'yuncms-bounded-pool-storage-'));
+  let projectRoot;
+  let processInfo;
+
+  try {
+    await bootstrapDatabase(pool);
+    const system = { database: pool, accountability: createSystemAccountability() };
+    await new CollectionsService(system).createOne({ collection });
+    await new FieldsService(system).createOne(collection, { field: 'event_kind', type: 'string', required: true });
+
+    const port = await availablePort();
+    const coreEntry = pathToFileURL(join(ROOT, 'packages/core/src/index.js')).href;
+    projectRoot = await createExtensionProject(`bounded-sched-${runId}`, `
+import { createSystemAccountability, withAdvisoryLock } from ${JSON.stringify(coreEntry)};
+
+export default {
+  __yuncms_extension__: true,
+  type: 'hook',
+  register({ schedule }) {
+    schedule('* * * * *', async ({ services, serviceOptions, database, pool: runtimePool }) => {
+      const options = await serviceOptions();
+      if (options.database !== database || database === runtimePool) {
+        throw new Error('singleton schedule must bind serviceOptions to its advisory lock connection');
+      }
+      const items = new services.ItemsService('${collection}', options);
+      await items.createOne({ event_kind: 'dispatch-started' });
+      const callbackRes = await fetch('http://127.0.0.1:${port}/extensions/bounded-delivery-${runId}/deliver', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ step: 'webhook-callback' }),
+      });
+      if (callbackRes.status !== 200) {
+        throw new Error('callback failed with status ' + callbackRes.status);
+      }
+      await items.createOne({ event_kind: 'dispatch-completed' });
+    }, { id: 'dispatch-due-deliveries', mode: 'singleton', overlap: 'skip', accountability: 'system' });
+
+    schedule('* * * * *', async ({ services, serviceOptions, database, pool: runtimePool }) => {
+      const options = await serviceOptions();
+      if (options.database !== database || database === runtimePool) {
+        throw new Error('singleton schedule must bind serviceOptions to its advisory lock connection');
+      }
+      const items = new services.ItemsService('${collection}', options);
+      await items.createOne({ event_kind: 'retention-completed' });
+    }, { id: 'retention-sweep', mode: 'singleton', overlap: 'skip', accountability: 'system' });
+  },
+};
+`);
+    const endpointDir = join(projectRoot, 'extensions', `bounded-delivery-${runId}`);
+    await mkdir(endpointDir, { recursive: true });
+    await writeFile(join(endpointDir, 'package.json'), `${JSON.stringify({
+      name: `yuncms-extension-bounded-delivery-${runId}`,
+      version: '1.0.0',
+      type: 'module',
+      yuncms: { id: `bounded-delivery-${runId}`, type: 'endpoint', entry: './index.js' },
+    }, null, 2)}\n`);
+    await writeFile(join(endpointDir, 'index.js'), `
+import { createSystemAccountability, withAdvisoryLock } from ${JSON.stringify(coreEntry)};
+
+export default {
+  __yuncms_extension__: true,
+  type: 'endpoint',
+  register(router, context) {
+    router.post('/deliver', async (req, res, next) => {
+      try {
+        await withAdvisoryLock(context.database, 'delivery-lock-${runId}', async (connection) => {
+          const options = await context.serviceOptions(req, { accountability: createSystemAccountability() });
+          if (options.database !== connection) {
+            throw new Error('endpoint serviceOptions inside withAdvisoryLock must reuse the lock connection');
+          }
+          const readyResponse = await fetch('http://127.0.0.1:${port}/ready', {
+            signal: AbortSignal.timeout(2_000),
+          });
+          if (readyResponse.status !== 200) {
+            throw new Error('readiness check starved while singleton schedule and endpoint advisory lock were active');
+          }
+          const items = new context.services.ItemsService('${collection}', options);
+          await items.createOne({ event_kind: 'callback-delivered' });
+        });
+        res.json({ ok: true });
+      } catch (error) {
+        next(error);
+      }
+    });
+  },
+};
+`);
+
+    processInfo = startApi(projectRoot, port, {
+      ...serverEnv(config, storageRoot),
+      DB_CONNECTION_LIMIT: '3',
+      STUDIO_ORIGIN: `http://127.0.0.1:${port}`,
+    });
+    await waitForReady(processInfo);
+
+    const deadline = Date.now() + 15_000;
+    let kinds = [];
+    while (Date.now() < deadline) {
+      const [rows] = await pool.query(`SELECT event_kind FROM ${quotedCollection} ORDER BY id`);
+      kinds = rows.map((row) => row.event_kind);
+      if (
+        kinds.includes('dispatch-started')
+        && kinds.includes('callback-delivered')
+        && kinds.includes('dispatch-completed')
+        && kinds.includes('retention-completed')
+      ) {
+        break;
+      }
+      await wait(100);
+    }
+
+    assert.deepEqual(
+      new Set(kinds),
+      new Set(['dispatch-started', 'callback-delivered', 'dispatch-completed', 'retention-completed']),
+      `expected all singleton schedules and advisory-lock callback to complete on DB_CONNECTION_LIMIT=3, got: ${JSON.stringify(kinds)}\n${processInfo.output.join('')}`,
+    );
+
+    const readyCheck = await fetch(`http://127.0.0.1:${port}/ready`, { signal: AbortSignal.timeout(2_000) });
+    assert.equal(readyCheck.status, 200);
+
+    for (const logicalLock of [
+      scheduleLockName(`bounded-sched-${runId}:dispatch-due-deliveries`),
+      scheduleLockName(`bounded-sched-${runId}:retention-sweep`),
+      `delivery-lock-${runId}`,
+    ]) {
+      const physicalLock = databaseAdvisoryLockName(config.database.database, logicalLock);
+      const [lockRows] = await pool.query('SELECT IS_FREE_LOCK(?) AS free', [physicalLock]);
+      assert.equal(Number(lockRows[0].free), 1, `advisory lock must be released after completion: ${logicalLock}`);
+    }
+  } finally {
+    await stopApi(processInfo);
+    try {
+      await new CollectionsService({ database: pool, accountability: createSystemAccountability() }).deleteOne(collection, { destructive: true });
+    } catch {}
     await closeDatabasePool(pool).catch(() => {});
     if (projectRoot) await rm(projectRoot, { recursive: true, force: true });
     await rm(storageRoot, { recursive: true, force: true });

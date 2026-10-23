@@ -1,10 +1,12 @@
 import { parseCronExpression, cronMatches } from '@yunsoft/yuncms-core';
 import { createHash } from 'node:crypto';
 import {
+  activeAdvisoryLockConnection,
   createSystemAccountability,
   loadConfig,
   withAdvisoryLock,
 } from '@yunsoft/yuncms-core';
+import { resolveServiceOptionsInput } from '../service-options.js';
 
 const JOB_ID_PATTERN = /^[A-Za-z0-9._:-]{1,100}$/;
 function scheduleError(message) { return Object.assign(new Error(message), { code: 'INVALID_EXTENSION_SCHEDULE' }); }
@@ -21,6 +23,19 @@ export function resolveExtensionAuthConfig(authConfig, env) {
     }
   }
   return null;
+}
+
+export function resolveSchedulerConcurrency(database, env, configured) {
+  if (Number.isInteger(configured) && configured >= 1) return configured;
+  const rawLimit = Number(
+    database?.pool?.config?.connectionLimit
+      ?? env?.DB_CONNECTION_LIMIT
+      ?? env?.database?.connectionLimit,
+  );
+  if (Number.isInteger(rawLimit) && rawLimit >= 1) {
+    return Math.max(1, Math.floor((rawLimit - 1) / 2));
+  }
+  return 1;
 }
 
 function normalizeJobOptions(options = {}) {
@@ -60,6 +75,7 @@ export class ExtensionScheduler {
     logger = console,
     env,
     authConfig,
+    maxConcurrentSingletons,
     now = () => new Date(),
     lockRunner = withAdvisoryLock,
   } = {}) {
@@ -74,12 +90,30 @@ export class ExtensionScheduler {
     this.logger = logger;
     this.env = env;
     this.authConfig = resolveExtensionAuthConfig(authConfig, env);
+    this.maxConcurrentSingletons = resolveSchedulerConcurrency(database, env, maxConcurrentSingletons);
+    this.activeSingletons = 0;
+    this.singletonQueue = [];
     this.now = now;
     this.lockRunner = lockRunner;
     this.jobs = new Map();
     this.timer = null;
     this.stopping = false;
     this.runningPromises = new Set();
+  }
+
+  async #acquireSingletonSlot() {
+    while (!this.stopping && this.activeSingletons >= this.maxConcurrentSingletons) {
+      await new Promise((resolve) => this.singletonQueue.push(resolve));
+    }
+    if (this.stopping) return false;
+    this.activeSingletons += 1;
+    return true;
+  }
+
+  #releaseSingletonSlot() {
+    this.activeSingletons = Math.max(0, this.activeSingletons - 1);
+    const next = this.singletonQueue.shift();
+    if (next) next();
   }
 
   register(extensionId, expression, handler, options = {}) {
@@ -102,31 +136,49 @@ export class ExtensionScheduler {
     return () => this.jobs.delete(identity);
   }
 
-  async #context(job, date) {
+  async #context(job, date, scope = { active: true, connection: this.database }) {
+    const resolveActiveDb = () => (scope.active ? (scope.connection ?? this.database) : this.database);
+    const initialDatabase = resolveActiveDb();
     const accountability = createSystemAccountability();
-    const schema = await this.schemaCache.get(this.database);
-    return Object.freeze({
+    const requestId = `schedule:${job.identity}:${date.toISOString()}`;
+    const schema = await this.schemaCache.get(initialDatabase);
+    const context = {
       services: this.services,
-      database: this.database,
+      pool: this.database,
       logger: this.logger,
       env: this.env,
       emitter: this.emitter,
       storage: this.storage,
       accountability,
-      requestId: `schedule:${job.identity}:${date.toISOString()}`,
+      requestId,
       authConfig: this.authConfig,
-      getSchema: () => this.schemaCache.get(this.database),
-      serviceOptions: async () => ({
-        accountability,
-        database: this.database,
-        schema,
-        logger: this.logger,
-        emitter: this.emitter,
-        storage: this.storage,
-        permissionCache: null,
-        requestId: `schedule:${job.identity}:${date.toISOString()}`,
-        authConfig: this.authConfig,
-      }),
+      getSchema: (db) => {
+        const currentDb = resolveActiveDb();
+        return this.schemaCache.get(db ?? activeAdvisoryLockConnection(currentDb));
+      },
+      serviceOptions: async (first = null, second = null) => {
+        const currentDb = resolveActiveDb();
+        const { req, overrides: extra } = resolveServiceOptionsInput(first, second);
+        const resolvedDatabase = extra.database
+          ?? activeAdvisoryLockConnection(req?.context?.database ?? currentDb);
+        const resolvedSchema = extra.schema
+          ?? req?.context?.schema
+          ?? (resolvedDatabase === initialDatabase ? schema : await this.schemaCache.get(resolvedDatabase));
+        return {
+          accountability: req?.accountability ?? accountability,
+          database: resolvedDatabase,
+          schema: resolvedSchema,
+          logger: this.logger,
+          emitter: this.emitter,
+          storage: this.storage,
+          permissionCache: req?.context?.permissionCache ?? null,
+          requestId: req?.id ?? requestId,
+          authConfig: req?.context?.env?.auth ?? this.authConfig,
+          ...extra,
+          database: resolvedDatabase,
+          schema: resolvedSchema,
+        };
+      },
       schedule: Object.freeze({
         id: job.options.id,
         extensionId: job.extensionId,
@@ -134,7 +186,12 @@ export class ExtensionScheduler {
         mode: job.options.mode,
         scheduledAt: date,
       }),
+    };
+    Object.defineProperty(context, 'database', {
+      enumerable: true,
+      get: resolveActiveDb,
     });
+    return Object.freeze(context);
   }
 
   async #execute(job, date) {
@@ -146,13 +203,24 @@ export class ExtensionScheduler {
     const startedAt = Date.now();
     this.logger?.info?.('Starting YunCMS extension job', { job: job.identity, mode: job.options.mode });
     try {
-      const run = async () => job.handler(await this.#context(job, date));
+      const scope = { active: true, connection: this.database };
+      const run = async (jobDatabase = this.database) => {
+        scope.connection = jobDatabase ?? this.database;
+        try {
+          return await job.handler(await this.#context(job, date, scope));
+        } finally {
+          scope.active = false;
+          scope.connection = this.database;
+        }
+      };
       if (job.options.mode === 'singleton') {
+        const acquiredSlot = await this.#acquireSingletonSlot();
+        if (!acquiredSlot) return false;
         try {
           await this.lockRunner(
             this.database,
             scheduleLockName(job.identity),
-            run,
+            (lockConnection) => run(lockConnection ?? this.database),
             { timeoutSeconds: 0 },
           );
         } catch (error) {
@@ -161,9 +229,11 @@ export class ExtensionScheduler {
             return false;
           }
           throw error;
+        } finally {
+          this.#releaseSingletonSlot();
         }
       } else {
-        await run();
+        await run(this.database);
       }
       this.logger?.info?.('Completed YunCMS extension job', {
         job: job.identity,
@@ -212,6 +282,10 @@ export class ExtensionScheduler {
     this.stopping = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    while (this.singletonQueue.length > 0) {
+      const wake = this.singletonQueue.shift();
+      wake?.();
+    }
     const running = [...this.runningPromises];
     if (running.length === 0) return true;
     let timeout;

@@ -136,7 +136,8 @@ Extension routers run after YunCMS authentication middleware, so request account
 The context includes:
 
 - `services` — service-class registry;
-- `database` — current database pool/connection context;
+- `database` — current database pool or active advisory-lock/transaction connection;
+- `pool` — underlying MySQL connection pool;
 - `logger` — structured logger;
 - `env` — the unfiltered process environment, including extension-specific variables (not the parsed YunCMS core configuration);
 - `authConfig` — validated authentication configuration (`config.auth`, including `totpKey`, `publicUrl` and `rateLimit`);
@@ -144,7 +145,7 @@ The context includes:
 - `storage` — registered Files storage context when available;
 - `getSchema()` — current schema snapshot;
 - `getAccountability(req)` — accountability from a request;
-- `serviceOptions(req)` — service constructor options preserving request scope (including `accountability`, `database`, `schema`, `logger`, `emitter`, `storage`, `permissionCache`, `requestId` and `authConfig`).
+- `serviceOptions(req, overrides)` — service constructor options preserving request scope (including `accountability`, `database`, `schema`, `logger`, `emitter`, `storage`, `permissionCache`, `requestId` and `authConfig`), automatically binding `database` to an active `withAdvisoryLock` connection on the same pool or accepting explicit `{ database: connection }` overrides.
 
 ## Use services, not self-HTTP
 
@@ -325,6 +326,8 @@ schedule('0 2 * * *', handler, {
 
 `singleton` uses a MySQL advisory lock so only one replica executes the matching scheduled job at a time. This is the preferred mode for a cluster-wide maintenance/integration task.
 
+During a `singleton` execution, YunCMS reuses the borrowed advisory-lock connection across `context.database`, `context.getSchema()` and `await context.serviceOptions()` (while exposing the underlying pool on `context.pool`) so schema reads, SQL queries and service mutations inside the handler do not borrow a second connection from the pool while the schedule lock is held. Concurrent `singleton` schedule reservations in one process are also bounded against `DB_CONNECTION_LIMIT` (`Math.max(1, Math.floor((DB_CONNECTION_LIMIT - 1) / 2))`) so due singleton jobs do not exhaust a small pool and starve `/ready` or concurrent HTTP/advisory-lock work. When singleton schedules overlap with additional pool-level advisory locks or outbound webhook callbacks, size `DB_CONNECTION_LIMIT` to at least `3` (the default is `10`).
+
 ### Overlap
 
 The supported overlap behavior is `skip`. If the previous invocation is still running, YunCMS skips the overlapping execution rather than starting another copy.
@@ -427,7 +430,7 @@ identity and permissions.
 
 Business ledgers, reservations, expiry and failure recovery belong to extensions. Hooks alone do not provide a durable event queue or guarantee exact provider billing; preserve pending reservations and reconciliation evidence across crashes.
 
-Native mysql2 advisory locks are namespaced by the selected database. Independent instances on one MySQL server do not share schema/singleton locks. `databaseAdvisoryLockName(databaseName, logicalName)` returns the same bounded name for code that must coordinate with a native lock directly. Two processes using the same database still serialize. `withAdvisoryLock` accepts a pool or caller-owned mysql2 connection; locks acquired inside a managed outer transaction stay held until commit/rollback and are released before a borrowed connection returns to its pool. Caller-owned connections are not released by the lock helper. Keep one database per instance and restart all processes together when upgrading from global lock names. Custom query adapters without a mysql2 database identity retain explicit lock names.
+Native mysql2 advisory locks are namespaced by the selected database. Independent instances on one MySQL server do not share schema/singleton locks. `databaseAdvisoryLockName(databaseName, logicalName)` returns the same bounded name for code that must coordinate with a native lock directly. Two processes using the same database still serialize. `withAdvisoryLock` accepts a pool or caller-owned mysql2 connection; while a pool-borrowed advisory lock is active, `activeAdvisoryLockConnection(pool)`, `serviceOptionsFromRequest(req)` and `context.serviceOptions(req)` automatically bind inner service work to that lock connection (or accept an explicit `{ database: connection }` override) so callers do not consume a second pool connection inside the lock. Locks acquired inside a managed outer transaction stay held until commit/rollback and are released before a borrowed connection returns to its pool. Caller-owned connections are not released by the lock helper. Keep one database per instance and restart all processes together when upgrading from global lock names. Custom query adapters without a mysql2 database identity retain explicit lock names.
 
 Provider failure actions include `provider_completed` and `usage`. If a completion hook fails after the provider returned, consumers must retain or charge the reported usage; only a provider request that did not complete can release its entire reservation. Unknown usage after interruption requires conservative reconciliation.
 ## Provider observations

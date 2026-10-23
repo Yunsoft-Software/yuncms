@@ -118,7 +118,7 @@ export {
   compileSearch,
   compileAggregate,
 } from './query.js';
-export { withAdvisoryLock, databaseAdvisoryLockName } from './advisory-lock.js';
+export { activeAdvisoryLockConnection, withAdvisoryLock, databaseAdvisoryLockName } from './advisory-lock.js';
 export {
   ensureMigrationJournal,
   readAppliedMigrations,

@@ -222,4 +222,31 @@ test('endpoint extension serviceOptions propagates authConfig matching native re
   const fallbackOptions = await context.serviceOptions({ id: 'req-no-context', accountability: createPublicAccountability() });
   assert.deepEqual(fallbackOptions.authConfig, config.auth);
   assert.equal(new services.TotpService(fallbackOptions).capabilities().available, true);
+
+  const lockConn = {
+    connection: { config: { database: 'yuncms_test' } },
+    release() {},
+    async query() { return [[{ acquired: 1 }]]; },
+  };
+  const poolWithLock = {
+    getConnection: async () => lockConn,
+    query: async () => [[], []],
+  };
+  const reqOnPool = {
+    id: 'req-lock-probe',
+    accountability: createPublicAccountability(),
+    context: {
+      database: poolWithLock,
+      schema: { version: 1, collections: {} },
+      env: config,
+      permissionCache: new Map(),
+    },
+  };
+  const { withAdvisoryLock } = await import('@yunsoft/yuncms-core');
+  await withAdvisoryLock(poolWithLock, 'ext-endpoint-lock', async (conn) => {
+    const insideLockReqOpts = await context.serviceOptions(reqOnPool);
+    const insideLockNativeOpts = serviceOptionsFromRequest(reqOnPool);
+    assert.equal(insideLockReqOpts.database, conn);
+    assert.equal(insideLockNativeOpts.database, conn);
+  });
 });

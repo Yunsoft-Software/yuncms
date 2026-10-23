@@ -7,7 +7,7 @@ import express from 'express';
 import {
   bootstrapDatabase, CollectionsService, createCoreServiceRegistry, createDatabasePool, createStorageRegistry,
   createSystemAccountability, FieldsService, HookEmitter, ItemsService, loadConfig, LocalStorageDriver,
-  PermissionsService, RolesService, SchemaCache, UsersService, SmtpMailer, createJsonLogger,
+  PermissionsService, RolesService, SchemaCache, UsersService, SmtpMailer, createJsonLogger, withAdvisoryLock,
 } from '@yunsoft/yuncms-core';
 import { createApp } from '../../../packages/api/src/app.js';
 import { loadExtensionRuntime } from '../../../packages/api/src/extensions/runtime.js';
@@ -35,10 +35,11 @@ const emitter = new HookEmitter({ logger }), services = createCoreServiceRegistr
 const storage = createStorageRegistry({ local: new LocalStorageDriver({ root }) });
 const basic = { database: pool, accountability }, roleIds = [], userIds = [];
 const collection = 'browser_flow_records';
-let server, runtime, network, automationWorker;
+let server, runtime, network, automationWorker, extensionRuntime;
 const aiAdmissionEvents = [];
 let allowAiGeneration = false;
 async function close() {
+  await extensionRuntime?.stopSchedules();
   await automationWorker?.stop();
   await runtime?.stop();
   if (server) await new Promise(resolve => server.close(resolve));
@@ -120,12 +121,18 @@ try {
   await writeFile(join(totpProbeDir, 'package.json'), JSON.stringify({
     name: 'totp-probe', type: 'module', yuncms: { id: 'totp-probe', type: 'endpoint', entry: './index.js' },
   }));
-  await writeFile(join(totpProbeDir, 'index.js'), `export default {
+  const coreEntryUrl = new URL('../../../packages/core/src/index.js', import.meta.url).href;
+  await writeFile(join(totpProbeDir, 'index.js'), `import { withAdvisoryLock } from ${JSON.stringify(coreEntryUrl)};
+  export default {
     __yuncms_extension__: true, type: 'endpoint',
     register(router, context) {
       router.get('/tfa', async (req, res) => {
-        const opts = await context.serviceOptions(req);
-        res.json({ data: await new context.services.TotpService(opts).status() });
+        const data = await withAdvisoryLock(context.database, 'browser-totp-probe-lock', async (conn) => {
+          const opts = await context.serviceOptions(req);
+          const status = await new context.services.TotpService(opts).status();
+          return { ...status, reusedLockConnection: opts.database === conn };
+        });
+        res.json({ data });
       });
       router.post('/login', async (req, res) => {
         const opts = await context.serviceOptions(req);
@@ -133,7 +140,24 @@ try {
       });
     },
   };\n`);
-  const extensionRuntime = await loadExtensionRuntime({
+  const schedProbeDir = join(root, 'extensions', 'sched-probe');
+  await mkdir(schedProbeDir, { recursive: true });
+  await writeFile(join(schedProbeDir, 'package.json'), JSON.stringify({
+    name: 'sched-probe', type: 'module', yuncms: { id: 'sched-probe', type: 'hook', entry: './index.js' },
+  }));
+  await writeFile(join(schedProbeDir, 'index.js'), `export default {
+    __yuncms_extension__: true, type: 'hook',
+    register({ schedule }) {
+      for (const id of ['browser-singleton-a', 'browser-singleton-b']) {
+        schedule('* * * * *', async ({ serviceOptions, database, pool }) => {
+          const opts = await serviceOptions();
+          if (opts.database !== database || database === pool) throw new Error('singleton schedule must reuse lock connection');
+          await opts.database.query('SELECT 1');
+        }, { id, mode: 'singleton', overlap: 'skip', accountability: 'system' });
+      }
+    },
+  };\n`);
+  extensionRuntime = await loadExtensionRuntime({
     rootDir: root, includeDependencies: false, services, database: pool, schemaCache: cache, emitter, storage, logger,
     env: process.env, authConfig: config.auth,
   });
@@ -142,6 +166,7 @@ try {
     aiRouter: createAiRouter({ assistant, settingsStore }), automationsRouter: createAutomationsRouter(automationOptions),
     endpointExtensions: [...extensionRuntime.endpointExtensions, { id: 'flow-fixture', router: fixture }] });
   server = await new Promise(resolve => { const instance = app.listen(Number(process.env.YUNCMS_BROWSER_PORT ?? 34074), '127.0.0.1', () => resolve(instance)); });
+  extensionRuntime.startSchedules();
   runtime.start();
   automationWorker.start();
   process.stdout.write('Disposable native Flow browser server ready.\n');

@@ -1,8 +1,10 @@
 import { pathToFileURL } from 'node:url';
 import express from 'express';
+import { activeAdvisoryLockConnection } from '@yunsoft/yuncms-core';
 
 import { discoverExtensions } from './discovery.js';
 import { ExtensionScheduler, resolveExtensionAuthConfig } from './scheduler.js';
+import { resolveServiceOptionsInput } from '../service-options.js';
 
 function extensionError(code, message) {
   const error = new Error(message);
@@ -32,33 +34,86 @@ async function importExtension(manifest) {
   return assertDefinition(imported.default, manifest);
 }
 
+function buildServiceOptionsResolver({
+  defaultDatabase,
+  schemaCache,
+  logger,
+  emitter,
+  storage,
+  resolvedAuthConfig,
+  defaultAccountability = undefined,
+  defaultRequestId = null,
+}) {
+  return async (first = null, second = null) => {
+    const { req, overrides: extra } = resolveServiceOptionsInput(first, second);
+    const resolvedDatabase = extra.database
+      ?? activeAdvisoryLockConnection(req?.context?.database ?? defaultDatabase);
+    const resolvedSchema = extra.schema
+      ?? req?.context?.schema
+      ?? await schemaCache.get(resolvedDatabase);
+    return {
+      accountability: req?.accountability ?? defaultAccountability,
+      database: resolvedDatabase,
+      schema: resolvedSchema,
+      logger,
+      emitter,
+      storage,
+      permissionCache: req?.context?.permissionCache ?? new Map(),
+      requestId: req?.id ?? defaultRequestId,
+      authConfig: req?.context?.env?.auth ?? resolvedAuthConfig,
+      ...extra,
+      database: resolvedDatabase,
+      schema: resolvedSchema,
+    };
+  };
+}
+
 function createBaseContext({ services, database, schemaCache, emitter, storage, logger, env, authConfig }) {
   const resolvedAuthConfig = resolveExtensionAuthConfig(authConfig, env);
   return Object.freeze({
     services,
     database,
+    pool: database,
     logger,
     env,
     authConfig: resolvedAuthConfig,
     emitter,
     storage,
-    getSchema: () => schemaCache.get(database),
+    getSchema: (db) => schemaCache.get(db ?? activeAdvisoryLockConnection(database)),
     getAccountability: (req) => req?.accountability ?? null,
-    serviceOptions: async (req) => ({
-      accountability: req?.accountability,
-      database: req?.context?.database ?? database,
-      schema: req?.context?.schema ?? await schemaCache.get(req?.context?.database ?? database),
+    serviceOptions: buildServiceOptionsResolver({
+      defaultDatabase: database,
+      schemaCache,
       logger,
       emitter,
       storage,
-      permissionCache: req?.context?.permissionCache ?? new Map(),
-      requestId: req?.id ?? null,
-      authConfig: req?.context?.env?.auth ?? resolvedAuthConfig,
+      resolvedAuthConfig,
     }),
   });
 }
 
-function hookRegistrationApi(emitter, baseContext, manifest, scheduler) {
+function createHookEventContext(baseContext, eventContext, schemaCache) {
+  const activeDatabase = eventContext?.database ?? baseContext.database;
+  return {
+    ...baseContext,
+    ...eventContext,
+    database: activeDatabase,
+    pool: baseContext.pool ?? baseContext.database,
+    getSchema: (db) => schemaCache.get(db ?? activeAdvisoryLockConnection(activeDatabase)),
+    serviceOptions: buildServiceOptionsResolver({
+      defaultDatabase: activeDatabase,
+      schemaCache,
+      logger: baseContext.logger,
+      emitter: baseContext.emitter,
+      storage: baseContext.storage,
+      resolvedAuthConfig: baseContext.authConfig,
+      defaultAccountability: eventContext?.accountability,
+      defaultRequestId: eventContext?.requestId ?? null,
+    }),
+  };
+}
+
+function hookRegistrationApi(emitter, baseContext, manifest, scheduler, schemaCache) {
   const registration = Object.freeze({
     extensionId: manifest.id,
     priority: Number.isInteger(manifest.priority) ? manifest.priority : 0,
@@ -67,7 +122,7 @@ function hookRegistrationApi(emitter, baseContext, manifest, scheduler) {
   return Object.freeze({
     filter(event, handler, options = {}) {
       return emitter.registerFilter(event, (payload, eventContext) =>
-        handler(payload, { ...baseContext, ...eventContext }), {
+        handler(payload, createHookEventContext(baseContext, eventContext, schemaCache)), {
         ...registration,
         ...options,
         extensionId: manifest.id,
@@ -75,7 +130,7 @@ function hookRegistrationApi(emitter, baseContext, manifest, scheduler) {
     },
     action(event, handler, options = {}) {
       return emitter.registerAction(event, (payload, eventContext) =>
-        handler(payload, { ...baseContext, ...eventContext }), {
+        handler(payload, createHookEventContext(baseContext, eventContext, schemaCache)), {
         ...registration,
         ...options,
         extensionId: manifest.id,
@@ -83,7 +138,7 @@ function hookRegistrationApi(emitter, baseContext, manifest, scheduler) {
     },
     init(event, handler, options = {}) {
       return emitter.registerInit(event, (eventContext) =>
-        handler({ ...baseContext, ...eventContext }), {
+        handler(createHookEventContext(baseContext, eventContext, schemaCache)), {
         ...registration,
         ...options,
         extensionId: manifest.id,
@@ -130,7 +185,7 @@ export async function loadExtensionRuntime({
     const definition = await importExtension(manifest);
 
     if (manifest.type === 'hook') {
-      await definition.register(hookRegistrationApi(emitter, baseContext, manifest, scheduler), baseContext);
+      await definition.register(hookRegistrationApi(emitter, baseContext, manifest, scheduler, schemaCache), baseContext);
       logger.info?.(`Loaded YunCMS hook extension: ${manifest.id}`);
       continue;
     }

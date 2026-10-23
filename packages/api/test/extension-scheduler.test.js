@@ -5,6 +5,7 @@ import {
   cronMatches,
   ExtensionScheduler,
   parseCronExpression,
+  resolveSchedulerConcurrency,
   scheduleLockName,
 } from '../src/extensions/scheduler.js';
 
@@ -92,4 +93,109 @@ test('scheduler lock names stay bounded even for maximum extension and job ident
   const name = scheduleLockName(`${'extension'.repeat(20)}:${'j'.repeat(100)}`);
   assert.ok(Buffer.byteLength(name, 'utf8') <= 64);
   assert.equal(name, scheduleLockName(`${'extension'.repeat(20)}:${'j'.repeat(100)}`));
+});
+
+test('singleton jobs reuse the borrowed advisory-lock connection for schemaCache, context.database and serviceOptions', async () => {
+  const pool = { id: 'pool', pool: { config: { connectionLimit: 3 } } };
+  const lockConnection = { id: 'lock-connection', query: async () => [[], []] };
+  const schemaHandles = [];
+  let capturedContext = null;
+
+  const scheduler = new ExtensionScheduler(runtimeOptions({
+    database: pool,
+    schemaCache: {
+      async get(db) {
+        schemaHandles.push(db);
+        return { collections: {}, boundTo: db.id };
+      },
+    },
+    lockRunner: async (database, _name, operation) => {
+      assert.equal(database, pool);
+      return operation(lockConnection);
+    },
+  }));
+
+  scheduler.register('demo', '* * * * *', async (ctx) => {
+    capturedContext = ctx;
+    assert.equal(ctx.database, lockConnection);
+    assert.equal((await ctx.serviceOptions()).database, lockConnection);
+  }, {
+    id: 'singleton-conn-reuse',
+    mode: 'singleton',
+    accountability: 'system',
+  });
+
+  await scheduler.runDue(new Date(2026, 9, 23, 12, 0, 0));
+  assert.equal(capturedContext.database, pool, 'after singleton schedule finishes, context.database must fall back to pool');
+  assert.equal(capturedContext.pool, pool);
+  assert.deepEqual(schemaHandles, [lockConnection]);
+
+  const postReleaseOpts = await capturedContext.serviceOptions();
+  assert.equal(postReleaseOpts.database, pool, 'after singleton schedule finishes, serviceOptions() must fall back to pool');
+
+  const customConn = { id: 'custom-conn', query: async () => [[], []] };
+  const overridden = await capturedContext.serviceOptions({ database: customConn });
+  assert.equal(overridden.database, customConn);
+  assert.equal(overridden.schema.boundTo, 'custom-conn');
+});
+
+test('bounded pool admission serializes concurrent singleton schedules so pool connections remain available', async () => {
+  assert.equal(resolveSchedulerConcurrency({ pool: { config: { connectionLimit: 3 } } }, {}), 1);
+  assert.equal(resolveSchedulerConcurrency({ pool: { config: { connectionLimit: 5 } } }, {}), 2);
+  assert.equal(resolveSchedulerConcurrency({ pool: { config: { connectionLimit: 10 } } }, {}), 4);
+
+  let activeLocks = 0;
+  let maxActiveLocks = 0;
+  let releaseFirstJob;
+  const firstJobStarted = new Promise((resolve) => {
+    releaseFirstJob = resolve;
+  });
+  let unblockFirstJob;
+  const firstJobGate = new Promise((resolve) => {
+    unblockFirstJob = resolve;
+  });
+
+  const pool = { pool: { config: { connectionLimit: 3 } } };
+  const scheduler = new ExtensionScheduler(runtimeOptions({
+    database: pool,
+    lockRunner: async (_db, name, operation) => {
+      activeLocks += 1;
+      maxActiveLocks = Math.max(maxActiveLocks, activeLocks);
+      try {
+        return await operation({ lockName: name, query: async () => [[], []] });
+      } finally {
+        activeLocks -= 1;
+      }
+    },
+  }));
+
+  const order = [];
+  scheduler.register('ops', '* * * * *', async (ctx) => {
+    order.push(`start:${ctx.schedule.id}`);
+    releaseFirstJob();
+    await firstJobGate;
+    order.push(`end:${ctx.schedule.id}`);
+  }, { id: 'dispatch-due-deliveries', mode: 'singleton', accountability: 'system' });
+
+  scheduler.register('ops', '* * * * *', async (ctx) => {
+    order.push(`start:${ctx.schedule.id}`);
+    order.push(`end:${ctx.schedule.id}`);
+  }, { id: 'retention-sweep', mode: 'singleton', accountability: 'system' });
+
+  const duePromise = scheduler.runDue(new Date(2026, 9, 23, 12, 5, 0));
+  await firstJobStarted;
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(activeLocks, 1, 'second singleton job must not borrow a second lock connection while pool limit is 3');
+  assert.deepEqual(order, ['start:dispatch-due-deliveries']);
+
+  unblockFirstJob();
+  const results = await duePromise;
+  assert.deepEqual(results, [true, true]);
+  assert.equal(maxActiveLocks, 1);
+  assert.deepEqual(order, [
+    'start:dispatch-due-deliveries',
+    'end:dispatch-due-deliveries',
+    'start:retention-sweep',
+    'end:retention-sweep',
+  ]);
 });

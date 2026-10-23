@@ -34,7 +34,7 @@ DB_SSL=false
 
 YunCMS supports MySQL for its application database. Give the runtime database user the privileges required by your chosen schema-management workflow. Studio/schema administration performs real DDL, so a deployment that uses those features needs the corresponding MySQL privileges.
 
-`DB_CONNECTION_LIMIT` controls the mysql2 pool size for a process. Size this together with the number of application replicas and the MySQL server's connection budget.
+`DB_CONNECTION_LIMIT` controls the mysql2 pool size for a process (default `10`). Size this together with the number of application replicas and the MySQL server's connection budget. Singleton scheduled jobs reuse their advisory-lock connection for inner schema/service work and bound concurrent singleton lock reservations to `Math.max(1, Math.floor((DB_CONNECTION_LIMIT - 1) / 2))`; when a deployment runs singleton schedules alongside additional pool-level advisory locks or webhook callbacks, keep `DB_CONNECTION_LIMIT` at `3` or higher so readiness and request traffic always retain pool capacity.
 
 ### Timezone handling
 
