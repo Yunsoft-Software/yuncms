@@ -34,8 +34,11 @@ test('runtime and Studio dependencies stay above audited security baselines', as
     readFile(resolve(PACKAGES_ROOT, '../apps/studio/package.json'), 'utf8').then(JSON.parse),
   ]);
 
-  assert.equal(coreManifest.dependencies.nodemailer, '10.0.13');
-  assert.equal(lockfile.packages['node_modules/nodemailer'].version, '10.0.13');
+  assert.equal(coreManifest.dependencies.nodemailer, '10.1.4');
+  assert.equal(lockfile.packages['node_modules/nodemailer'].version, '10.1.4');
+  assert.equal(apiManifest.dependencies.zod, '4.6.6');
+  assert.equal(lockfile.packages['node_modules/zod'].version, '4.6.6');
+  assert.equal(lockfile.packages['node_modules/body-parser'].version, '2.4.0');
   assert.equal(lockfile.packages['node_modules/hono'].version, '4.13.13');
   assert.equal(apiManifest.dependencies['proxy-addr'], '2.0.8');
   assert.equal(lockfile.packages['node_modules/proxy-addr'].version, '2.0.8');
