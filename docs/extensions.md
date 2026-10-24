@@ -469,3 +469,44 @@ recorded by the native audit listener. They do not expose passwords, seeds,
 OTP values, recovery codes or token secrets. Successful second-factor completion
 emits the normal `auth.login.success` only after a complete session exists, with
 `second_factor: true`; merely issuing a challenge does not emit login success.
+
+## Cross-origin endpoint requests
+
+A browser embedded on a separate website needs the endpoint's CORS policy,
+including an OPTIONS preflight before a JSON POST. An endpoint manifest can opt
+into `"customCors": true` so its router receives OPTIONS requests under its own
+`/extensions/:id` prefix. Hooks cannot use this option. It is disabled by default;
+the ordinary Studio-origin policy and native Items/auth routes remain unchanged.
+
+The option grants no origin, method, header, credential or data permission. Your
+trusted extension must validate its exact allowed origins and return the required
+headers on both preflight and actual responses. Unhandled routes remain denied.
+Keep native request accountability and service permissions when reading data.
+For example, an endpoint registered as `public-form` can use:
+
+```js
+export default defineEndpoint((router) => {
+  const origins = new Set(['https://www.example.com']);
+  router.use((req, res, next) => {
+    const origin = req.get('origin');
+    if (!origins.has(origin)) return res.sendStatus(403);
+    res.set('Access-Control-Allow-Origin', origin);
+    res.vary('Origin');
+    next();
+  });
+  router.options('/submit', (_req, res) => {
+    res.set('Access-Control-Allow-Methods', 'POST,OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(204);
+  });
+  router.post('/submit', async (req, res) => {
+    // Validate the submitted data and use native services with caller permissions.
+    res.json({ received: true });
+  });
+});
+```
+
+Declare `customCors: true` beside `id`, `type: 'endpoint'` and `entry` in the
+package's `yuncms` manifest. A configured Studio origin does not replace an
+endpoint's origin checks. This opt-in does not enable CORS on other extensions
+or native APIs and does not bypass authentication, body limits or rate limits.

@@ -18,6 +18,8 @@ TRUST_PROXY_HOPS=0
 - `PORT` — HTTP port.
 - `LOG_LEVEL` — application log verbosity.
 - `STUDIO_ORIGIN` — canonical Studio origin. Studio is normally served by the API on the same origin. When it is served separately, YunCMS accepts CORS requests from exactly this origin and permits `GET`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTIONS` preflights.
+Endpoint extensions that deliberately serve another website may own their scoped preflight policy with [`customCors`](extensions.md#cross-origin-endpoint-requests); this does not broaden the native Studio-origin policy.
+
 - `TRUST_PROXY_HOPS` — exact number of trusted reverse-proxy hops. Keep `0` when the API receives client traffic directly. Do not enable broad proxy trust just to make client IPs appear correct.
 
 ## MySQL

@@ -44,8 +44,14 @@ function securityHeaders(req, res, next) {
   next();
 }
 
-function studioCors(config) {
+function studioCors(config, customCorsPrefixes = []) {
   return (req, res, next) => {
+    // Trusted opt-in endpoints own their preflight policy. Do not consume their
+    // OPTIONS requests or infer public CORS permission for other API routes.
+    if (req.method === 'OPTIONS' && customCorsPrefixes.some(prefix => {
+      const path = req.path.toLowerCase();
+      return path === prefix || path.startsWith(`${prefix}/`);
+    })) return next();
     const origin = req.get('origin');
     const allowedOrigin = config?.server?.studioOrigin;
     if (origin && allowedOrigin && origin === allowedOrigin) {
@@ -145,7 +151,9 @@ export function createApp({
   app.disable('x-powered-by');
   if (config.server?.trustProxyHops > 0) app.set('trust proxy', config.server.trustProxyHops);
   app.use(securityHeaders);
-  app.use(studioCors(config));
+  const customCorsPrefixes = endpointExtensions.filter(extension => extension.manifest?.customCors === true)
+    .map(extension => `/extensions/${encodeURIComponent(extension.id)}`.toLowerCase());
+  app.use(studioCors(config, customCorsPrefixes));
   app.use(requestIdentity);
   const rawBodyPrefixes = endpointExtensions.filter(extension => extension.manifest?.rawBody === true)
     .map(extension => `/extensions/${encodeURIComponent(extension.id)}`.toLowerCase());

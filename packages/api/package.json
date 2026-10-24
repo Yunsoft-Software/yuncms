@@ -1,6 +1,6 @@
 {
   "name": "@yunsoft/yuncms-api",
-  "version": "0.1.45",
+  "version": "0.1.46",
   "description": "Express API runtime and bundled Studio server for YunCMS.",
   "license": "MIT",
   "type": "module",
@@ -35,8 +35,8 @@
     "@modelcontextprotocol/node": "2.1.1",
     "@modelcontextprotocol/server": "2.3.1",
     "@node-saml/node-saml": "5.1.0",
-    "@yunsoft/yuncms-core": "0.1.45",
-    "@yunsoft/yuncms-extensions-sdk": "0.1.45",
+    "@yunsoft/yuncms-core": "0.1.46",
+    "@yunsoft/yuncms-extensions-sdk": "0.1.46",
     "express": "5.2.1",
     "ldapts": "9.0.0",
     "openid-client": "6.8.7",

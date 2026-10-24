@@ -95,6 +95,7 @@ const FAST_TESTS = [
   'packages/api/test/extensions.test.js',
   'packages/api/test/extension-scheduler.test.js',
   'packages/api/test/extension-raw-body.test.js',
+  'packages/api/test/extension-cors.test.js',
   'packages/api/test/local-extension-symlinks.test.js',
   'packages/api/test/external-auth-response.test.js',
   'packages/api/test/files-cors.test.js',

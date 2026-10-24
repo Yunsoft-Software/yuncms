@@ -26,6 +26,9 @@ export function validateExtensionManifest(packageJson, packageRoot) {
   if (manifest.rawBody !== undefined && (typeof manifest.rawBody !== 'boolean' || manifest.type !== 'endpoint')) {
     throw extensionError('INVALID_EXTENSION_MANIFEST', 'rawBody must be a boolean on an endpoint extension');
   }
+  if (manifest.customCors !== undefined && (typeof manifest.customCors !== 'boolean' || manifest.type !== 'endpoint')) {
+    throw extensionError('INVALID_EXTENSION_MANIFEST', 'customCors must be a boolean on an endpoint extension');
+  }
   const type = manifest.type;
   if (!TYPES.has(type)) {
     throw extensionError(
@@ -65,5 +68,6 @@ export function validateExtensionManifest(packageJson, packageRoot) {
     packageName: packageJson.name ?? id,
     packageRoot: root,
     ...(manifest.rawBody === true ? { rawBody: true } : {}),
+    ...(manifest.customCors === true ? { customCors: true } : {}),
   });
 }
