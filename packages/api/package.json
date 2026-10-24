@@ -41,7 +41,7 @@
     "ldapts": "9.0.0",
     "openid-client": "6.8.7",
     "proxy-addr": "2.0.8",
-    "zod": "4.4.3"
+    "zod": "4.6.6"
   },
   "funding": {
     "type": "github",

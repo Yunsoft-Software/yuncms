@@ -33,6 +33,7 @@ const FAST_TESTS = [
   'packages/core/test/accountability-collection-scope.test.js',
   'packages/api/test/ai-collection-policy.test.js',
   'packages/core/test/core.test.js',
+  'packages/core/test/mail-address-security.test.js',
   'packages/core/test/bootstrap.test.js',
   'packages/core/test/database-pool.test.js',
   'packages/core/test/files-service.test.js',
@@ -84,6 +85,7 @@ const FAST_TESTS = [
   'packages/core/test/relation-expansion.test.js',
 
   'packages/api/test/authentication.test.js',
+  'packages/api/test/validation-array-security.test.js',
   'packages/api/test/ai-secret-key.test.js',
   'packages/api/test/ai-service.test.js',
   'packages/api/test/ai-generation-admission.test.js',
