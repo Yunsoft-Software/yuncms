@@ -132,7 +132,18 @@ try {
           const status = await new context.services.TotpService(opts).status();
           return { ...status, reusedLockConnection: opts.database === conn };
         });
-        res.json({ data });
+        let released = 0, destroyed = 0;
+        await withAdvisoryLock({
+          async getConnection() {
+            return {
+              connection: { config: { database: 'browser_probe_test' } },
+              release() { released += 1; },
+              destroy() { destroyed += 1; },
+              async query(sql) { return [[String(sql).includes('RELEASE_LOCK') ? { released: 0 } : { acquired: 1 }]]; },
+            };
+          },
+        }, 'browser-totp-unlock-failure', async () => {});
+        res.json({ data: { ...data, unlockFailureDestroyed: released === 0 && destroyed === 1 } });
       });
       router.post('/login', async (req, res) => {
         const opts = await context.serviceOptions(req);

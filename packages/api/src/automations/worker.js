@@ -83,12 +83,18 @@ export class AiAutomationWorker {
   async tick() {
     const { database } = this.service;
     const connection = await database.getConnection();
-    let locked = false;
+    let locked = false, acquisitionUncertain = false;
     try {
       // A connection-scoped, database-specific lock serializes workers across replicas.
       // Crash releases the lock; the next worker recovers the interrupted running job.
-      const [locks] = await connection.query("SELECT GET_LOCK(CONCAT('yuncms:ai:', LEFT(SHA2(DATABASE(), 256), 32)), 0) AS acquired");
-      locked = Number(locks[0].acquired) === 1;
+      let locks;
+      try {
+        [locks] = await connection.query("SELECT GET_LOCK(CONCAT('yuncms:ai:', LEFT(SHA2(DATABASE(), 256), 32)), 0) AS acquired");
+      } catch (error) {
+        acquisitionUncertain = true;
+        throw error;
+      }
+      locked = Number(locks?.[0]?.acquired) === 1;
       if (!locked) return false;
       const [rows] = await connection.query(
         "SELECT * FROM yuncms_ai_automation_runs WHERE status = 'running' OR (status = 'pending' AND available_at <= CURRENT_TIMESTAMP(3)) ORDER BY created_at, id LIMIT 1",
@@ -116,8 +122,15 @@ export class AiAutomationWorker {
       await connection.query("DELETE FROM yuncms_ai_automation_runs WHERE status IN ('succeeded', 'failed', 'skipped') AND finished_at < DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 30 DAY)");
       return true;
     } finally {
-      if (locked) await connection.query("SELECT RELEASE_LOCK(CONCAT('yuncms:ai:', LEFT(SHA2(DATABASE(), 256), 32)))").catch(() => {});
-      connection.release();
+      if (acquisitionUncertain) {
+        connection.destroy?.() ?? connection.connection?.destroy?.();
+      } else if (locked) {
+        const [rows] = await connection.query("SELECT RELEASE_LOCK(CONCAT('yuncms:ai:', LEFT(SHA2(DATABASE(), 256), 32))) AS released").catch(() => [[]]);
+        if (Number(rows?.[0]?.released) === 1) connection.release();
+        else connection.destroy?.() ?? connection.connection?.destroy?.();
+      } else {
+        connection.release();
+      }
     }
   }
 }

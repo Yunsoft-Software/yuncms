@@ -1,8 +1,23 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
-import { registerTransactionCleanup } from './transaction.js';
+import { markConnectionDestroyed, registerTransactionCleanup } from './transaction.js';
 
 const advisoryLockStorage = new AsyncLocalStorage();
+
+function destroyLockConnection(connection) {
+  markConnectionDestroyed(connection);
+  try {
+    if (typeof connection?.destroy === 'function') {
+      connection.destroy();
+    } else if (typeof connection?.connection?.destroy === 'function') {
+      connection.connection.destroy();
+    } else if (typeof connection?.connection?.stream?.destroy === 'function') {
+      connection.connection.stream.destroy();
+    }
+  } catch {
+    // Ignore destroy failures when discarding an uncertain lock connection.
+  }
+}
 
 function connectionPoolIdentity(connection) {
   return connection?.connection?._pool ?? connection?._pool ?? null;
@@ -36,10 +51,18 @@ export async function withAdvisoryLock(pool, lockName, operation, { timeoutSecon
   const databaseName = connection.connection?.config?.database || pool.pool?.config?.connectionConfig?.database;
   if (databaseName) lockName = databaseAdvisoryLockName(databaseName, lockName);
   let acquired = false;
+  let acquisitionUncertain = false;
+  let unlocked = false;
   const lockScope = borrowed ? { pool, connection, active: false } : null;
 
   try {
-    const [rows] = await connection.query('SELECT GET_LOCK(?, ?) AS acquired', [lockName, timeoutSeconds]);
+    let rows;
+    try {
+      [rows] = await connection.query('SELECT GET_LOCK(?, ?) AS acquired', [lockName, timeoutSeconds]);
+    } catch (error) {
+      acquisitionUncertain = true;
+      throw error;
+    }
     acquired = Number(rows?.[0]?.acquired) === 1;
 
     if (!acquired) {
@@ -57,15 +80,28 @@ export async function withAdvisoryLock(pool, lockName, operation, { timeoutSecon
     if (lockScope) lockScope.active = false;
     const releaseLock = async () => {
       if (acquired) {
-        try { await connection.query('SELECT RELEASE_LOCK(?) AS released', [lockName]); }
-        catch { connection.destroy?.(); } // Destroy, rather than return a connection still holding a lock.
+        try {
+          const [rows] = await connection.query('SELECT RELEASE_LOCK(?) AS released', [lockName]);
+          unlocked = Number(rows?.[0]?.released) === 1;
+        } catch {
+          unlocked = false;
+        }
+        if (!unlocked) {
+          // Destroy, rather than return a connection still holding a lock.
+          destroyLockConnection(connection);
+        }
       }
     };
-    // An outer mutation must retain singleton serialization until commit/rollback.
-    // Transaction cleanup runs before borrowed connections return to their pool.
-    if (!acquired || !registerTransactionCleanup(connection, releaseLock)) await releaseLock();
-    if (borrowed) {
-      connection.release();
+    if (acquisitionUncertain) {
+      destroyLockConnection(connection);
+    } else {
+      // An outer mutation must retain singleton serialization until commit/rollback.
+      // Transaction cleanup runs before borrowed connections return to their pool.
+      const deferredToTransaction = acquired && registerTransactionCleanup(connection, releaseLock);
+      if (!deferredToTransaction) await releaseLock();
+      if (borrowed && (deferredToTransaction || !acquired || unlocked)) {
+        connection.release();
+      }
     }
   }
 }

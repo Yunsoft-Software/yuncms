@@ -84,6 +84,7 @@ test('worker recovers interrupted work, limits attempts and releases the connect
   const statements = [];
   const connection = { async query(sql, params) { statements.push({ sql, params });
     if (sql.includes('GET_LOCK')) return [[{ acquired: 1 }]];
+    if (sql.includes('RELEASE_LOCK')) return [[{ released: 1 }]];
     if (sql.startsWith('SELECT *')) return [[{ id: 'job', status: 'running', attempts: 3 }]];
     return [{ affectedRows: 1 }]; }, release() { statements.push({ sql: 'released' }); } };
   const worker = new AiAutomationWorker({ database: { async getConnection() { return connection; } } });
@@ -91,6 +92,20 @@ test('worker recovers interrupted work, limits attempts and releases the connect
   assert.ok(statements.some(({ sql }) => sql.includes('RUN_INTERRUPTED')));
   assert.ok(statements.some(({ sql }) => sql.includes('RELEASE_LOCK')));
   assert.equal(statements.at(-1).sql, 'released');
+
+  let released = 0, destroyed = 0;
+  const badUnlockConn = {
+    async query(sql) {
+      if (sql.includes('GET_LOCK')) return [[{ acquired: 1 }]];
+      if (sql.includes('RELEASE_LOCK')) return [[{ released: 0 }]];
+      return [[]];
+    },
+    release() { released += 1; },
+    destroy() { destroyed += 1; },
+  };
+  await new AiAutomationWorker({ database: { async getConnection() { return badUnlockConn; } } }).tick();
+  assert.equal(released, 0);
+  assert.equal(destroyed, 1);
 });
 
 test('MCP exposes automation management only to authenticated admins and honors read-only mode', () => {

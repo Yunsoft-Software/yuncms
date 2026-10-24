@@ -6,6 +6,17 @@ const ISOLATION_LEVELS = new Set([
 ]);
 
 const transactions = new WeakMap();
+const destroyedConnections = new WeakSet();
+
+export function markConnectionDestroyed(connection) {
+  if (connection && typeof connection === 'object') {
+    destroyedConnections.add(connection);
+  }
+}
+
+export function isConnectionDestroyed(connection) {
+  return Boolean(connection && typeof connection === 'object' && destroyedConnections.has(connection));
+}
 
 export function transactionContext(database) {
   return transactions.has(database) ? Object.freeze({ managed: true, state: 'active' }) : null;
@@ -106,7 +117,9 @@ export async function withTransaction(pool, operation, options = {}) {
   try {
     committed = await executeTransaction(connection, operation, options);
   } finally {
-    connection.release();
+    if (!isConnectionDestroyed(connection)) {
+      connection.release();
+    }
   }
   // Return the borrowed connection before hooks acquire connections from the pool.
   return finishActions(committed, pool);

@@ -226,7 +226,7 @@ test('endpoint extension serviceOptions propagates authConfig matching native re
   const lockConn = {
     connection: { config: { database: 'yuncms_test' } },
     release() {},
-    async query() { return [[{ acquired: 1 }]]; },
+    async query(sql) { return [[sql.includes('RELEASE_LOCK') ? { released: 1 } : { acquired: 1 }]]; },
   };
   const poolWithLock = {
     getConnection: async () => lockConn,
