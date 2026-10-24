@@ -57,7 +57,11 @@ export async function startFlowNetwork() {
         } else if (/^(EHLO|HELO) /i.test(line)) socket.write('250-localhost\r\n250 PIPELINING\r\n');
         else if (/^MAIL FROM:/i.test(line)) { from = line.slice(10); to = []; socket.write('250 sender accepted\r\n'); }
         else if (/^RCPT TO:/i.test(line)) { if (line.includes('blocked@example.test')) socket.write('550 recipient denied\r\n'); else { to.push(line.slice(8)); socket.write('250 recipient accepted\r\n'); } }
-        else if (line === 'DATA') { data = true; socket.write('354 send message\r\n'); }
+        else if (line === 'DATA') {
+          if (!to.length) socket.write('554 no valid recipients\r\n');
+          else { data = true; socket.write('354 send message\r\n'); }
+        }
+        else if (line === 'RSET') { data = false; raw = ''; from = ''; to = []; socket.write('250 reset\r\n'); }
         else if (line === 'QUIT') { socket.end('221 goodbye\r\n'); }
         else { socket.write('250 OK\r\n'); }
       }

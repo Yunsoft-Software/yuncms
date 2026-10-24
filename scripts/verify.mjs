@@ -86,6 +86,7 @@ const FAST_TESTS = [
 
   'packages/api/test/authentication.test.js',
   'packages/api/test/validation-array-security.test.js',
+  'packages/api/test/flow-network-smtp.test.js',
   'packages/api/test/ai-secret-key.test.js',
   'packages/api/test/ai-service.test.js',
   'packages/api/test/ai-generation-admission.test.js',
