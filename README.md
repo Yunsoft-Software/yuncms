@@ -15,6 +15,7 @@
 <p align="center">
   <a href="https://hub.docker.com/r/yunsoftofficial/yuncms"><img alt="Docker image version" src="https://img.shields.io/docker/v/yunsoftofficial/yuncms?sort=semver&label=Docker&logo=docker"></a>
   <a href="https://www.npmjs.com/package/@yunsoft/yuncms"><img alt="npm package version" src="https://img.shields.io/npm/v/%40yunsoft%2Fyuncms?logo=npm"></a>
+  <a href="https://t.me/yunsoftofficial"><img alt="Telegram community" src="https://img.shields.io/badge/Community-Telegram-26A5E4?logo=telegram&logoColor=white"></a>
   <img alt="Node.js 24 LTS" src="https://img.shields.io/badge/Node.js-24_LTS-5FA04E?logo=nodedotjs&logoColor=white">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/Yunsoft-Software/yuncms"></a>
 </p>
@@ -26,6 +27,12 @@ Website: [https://yunsoft.com](https://yunsoft.com)
 **Building with YunCMS?** [Yunsoft can help with your project, integration or migration](https://yunsoft.com/contact?utm_source=github&utm_medium=yuncms&utm_campaign=yuncms-services). If YunCMS helps you, [give the repository a star](https://github.com/Yunsoft-Software/yuncms) or [sponsor YunCMS](https://github.com/sponsors/Yunsoft-Software).
 
 > YunCMS is currently in the `0.1.x` pre-stable line. Use the managed backup/update flow and verify your own database, storage, proxy and authentication configuration before exposing a production installation.
+
+## Community
+
+**[Join the Yunsoft Community on Telegram → t.me/yunsoftofficial](https://t.me/yunsoftofficial)**
+
+Ask questions, discuss releases and share what you build with YunCMS. English and Türkçe are welcome. For reproducible bugs and feature requests, use [GitHub Issues](https://github.com/Yunsoft-Software/yuncms/issues) so reports stay searchable and actionable.
 
 ## See YunCMS in action
 

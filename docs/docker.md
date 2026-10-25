@@ -2,11 +2,13 @@
 
 AI automations run in the same container and persist their rules/queue in MySQL. See [AI Automations](ai-automations.md) for setup through Studio or MCP.
 
+**Community: [Join Yunsoft on Telegram → t.me/yunsoftofficial](https://t.me/yunsoftofficial)** for questions, release discussions and projects built with YunCMS. English and Türkçe are welcome.
+
 Need help deploying, integrating or migrating? [Contact Yunsoft](https://yunsoft.com/contact?utm_source=docker-docs&utm_medium=yuncms&utm_campaign=yuncms-services), [star YunCMS on GitHub](https://github.com/Yunsoft-Software/yuncms), or [sponsor YunCMS](https://github.com/sponsors/Yunsoft-Software).
 
 YunCMS publishes a Linux container image at [`yunsoftofficial/yuncms`](https://hub.docker.com/r/yunsoftofficial/yuncms). The image contains the YunCMS CLI, the built React Studio and official native MySQL 8.4 client binaries (`mysql` and `mysqldump` copied from `mysql:8.4` for the target architecture, rather than Debian's `default-mysql-client` / MariaDB package). This ensures verified generated columns, check constraints, and UTF-8 characters during `backup` and `restore`.
 
-The supported architectures are `linux/amd64` and `linux/arm64`. Use a version tag such as `0.1.38` for a controlled deployment. `latest` follows the newest published YunCMS release and is convenient for evaluation, but production deployments should not update implicitly.
+The supported architectures are `linux/amd64` and `linux/arm64`. Use a version tag such as `0.1.46` for a controlled deployment. `latest` follows the newest published YunCMS release and is convenient for evaluation, but production deployments should not update implicitly.
 
 ## Requirements
 
@@ -139,7 +141,7 @@ Container deployments update by replacing the image, not by running `yuncms upda
 ```bash
 docker compose stop yuncms
 docker compose run --rm yuncms backup
-# Edit YUNCMS_IMAGE in .env, for example yunsoftofficial/yuncms:0.1.38
+# Edit YUNCMS_IMAGE in .env, for example yunsoftofficial/yuncms:0.1.46
 docker compose pull yuncms
 docker compose run --rm yuncms bootstrap
 docker compose up -d yuncms
