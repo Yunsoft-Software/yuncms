@@ -152,7 +152,7 @@ For direct many-to-one relations, Studio chooses a readable label from the targe
 4. another visible string/text field;
 5. target key/id.
 
-Relation fields use a searchable picker rather than relying on a long native select list. The picker reads target data through the normal Items API, so target collection/row/field permissions are still enforced.
+Relation fields use a searchable picker rather than relying on a long native select list. The picker reads project collection targets through the normal Items API and native reference targets (`yuncms_users` and `yuncms_files`) through their dedicated `/users` and `/files` endpoints, so target collection/row/field permissions are still enforced.
 
 For the full relation model, including reverse and M2M querying, see [Data model](data-model.md) and [Items query language](api-query-language.md).
 

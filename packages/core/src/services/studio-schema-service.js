@@ -2,6 +2,7 @@ import { BaseService } from './base-service.js';
 import { PermissionsService } from './permissions-service.js';
 import { SchemaCache } from '../schema.js';
 import { ItemsService } from './items-service.js';
+import { NATIVE_REFERENCE_TARGETS } from '../native-reference.js';
 import { compileFilter } from '../query.js';
 import { quoteIdentifier } from '../identifier.js';
 
@@ -75,6 +76,15 @@ export class StudioSchemaService extends BaseService {
     const schema = await this.#snapshot();
     const visible = await this.readCollections(), fields = new Map();
     for (const collection of visible) fields.set(collection.collection, new Set((await this.readFields(collection.collection)).map(field => field.field)));
+    for (const target of NATIVE_REFERENCE_TARGETS) {
+      if (!schema.collections?.[target]) continue;
+      try {
+        const permission = await this.#permission(target);
+        if (!permission.fields || permission.fields.includes('id')) fields.set(target, new Set(['id']));
+      } catch (error) {
+        if (error.code !== 'FORBIDDEN') throw error;
+      }
+    }
     return schema.relations.filter(relation => fields.get(relation.many_collection)?.has(relation.many_field) && fields.has(relation.one_collection)
       && (!relation.one_field || fields.get(relation.one_collection).has(relation.one_field)));
   }

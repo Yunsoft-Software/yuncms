@@ -12,7 +12,14 @@ import {
   useConfirmDialog,
 } from '../components/index.js';
 import { formatDateFieldValue } from '../date-format.js';
-import { canWriteContent, contentRecordValuesKey, contentWritableFields } from '../content-access.js';
+import {
+  canWriteContent,
+  contentRecordValuesKey,
+  contentWritableFields,
+  loadRelationLookup,
+  normalizeRecordPrimaryKey,
+  primaryKeyFieldForFields,
+} from '../content-access.js';
 import { contentEmptyState } from '../content-empty-state.js';
 import { contentTableFields, defaultContentColumnKeys, isFileField, isImageField, isReadOnlyField } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
@@ -90,16 +97,6 @@ function relationKind(relation) {
   } catch {
     return 'm2o';
   }
-}
-
-function pickDisplayField(fields, keyField = 'id') {
-  const visible = fields.filter((field) => !field.hidden);
-  for (const preferred of ['name', 'title', 'label']) {
-    const match = visible.find((field) => field.field === preferred);
-    if (match) return match.field;
-  }
-  const textual = visible.find((field) => ['string', 'text'].includes(field.type) && field.field !== keyField);
-  return textual?.field ?? keyField;
 }
 
 function lookupLabel(lookup, value) {
@@ -371,21 +368,10 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
       && !relation.junction_collection
       && relationKind(relation) !== 'm2m');
 
-    const entries = await Promise.all(directRelations.map(async (relation) => {
-      const targetCollection = relation.one_collection;
-      const keyField = relation.one_field || 'id';
-      const [fieldResponse, itemResponse] = await Promise.all([
-        apiRequest(`${readSession()?.user?.admin ? '/schema' : '/studio-navigation'}/collections/${encodeURIComponent(targetCollection)}/fields`),
-        apiRequest(`/items/${encodeURIComponent(targetCollection)}?limit=200`),
-      ]);
-      const targetFields = fieldResponse?.data ?? [];
-      return [relation.many_field, {
-        targetCollection,
-        keyField,
-        labelField: pickDisplayField(targetFields, keyField),
-        items: itemResponse?.data ?? [],
-      }];
-    }));
+    const isAdmin = Boolean(readSession()?.user?.admin);
+    const entries = await Promise.all(
+      directRelations.map((relation) => loadRelationLookup(relation, { isAdmin, request: apiRequest })),
+    );
 
     return Object.fromEntries(entries);
   }
@@ -417,7 +403,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
       const loadedRelations = relationResponse?.data ?? [];
       const [lookups, fileResponse] = await Promise.all([
         buildRelationLookups(target, loadedRelations),
-        loadedFields.some(isFileField) ? apiRequest('/files') : Promise.resolve({ data: [] }),
+        loadedFields.some(isFileField) ? apiRequest('/files').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
       ]);
       if (version !== requestVersion.current) return;
       setFields(loadedFields);
@@ -441,6 +427,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     setItemsLoading(true);
     setError('');
     try {
+      const primaryKey = primaryKeyFieldForFields(targetFields);
       const path = buildItemsPath({
         collection: target,
         fields: targetFields,
@@ -453,8 +440,9 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
       });
       const response = await apiRequest(path);
       if (version !== requestVersion.current) return;
-      const nextItems = response?.data ?? [];
-      const access = await apiRequest(`/studio-navigation/collections/${encodeURIComponent(target)}/capabilities?ids=${encodeURIComponent(JSON.stringify(nextItems.map(item => item.id)))}`);
+      const nextItems = (response?.data ?? []).map((item) => normalizeRecordPrimaryKey(item, primaryKey));
+      const capabilityIds = nextItems.map((item) => item.id).filter((id) => id != null && id !== '');
+      const access = await apiRequest(`/studio-navigation/collections/${encodeURIComponent(target)}/capabilities?ids=${encodeURIComponent(JSON.stringify(capabilityIds))}`);
       if (version !== requestVersion.current) return;
       setCapabilities(current => ({ ...access.data, records: { ...current?.records, ...access.data.records } }));
       setItems(nextItems);
@@ -505,7 +493,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     let cancelled = false;
     setError('');
     apiRequest(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(route.recordId)}`)
-      .then((response) => { if (!cancelled) setEditingRecord(response?.data ?? null); })
+      .then((response) => { if (!cancelled) setEditingRecord(response?.data ? { id: route.recordId, ...response.data } : null); })
       .catch((requestError) => {
         if (!cancelled) {
           setEditingRecord(null);
@@ -753,7 +741,11 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
           }}
         />
         {editing && <ManualFlowActions collection={collection} keys={[editing.id]} onComplete={async () => {
-          try { setEditingRecord((await apiRequest(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(editing.id)}`)).data); await loadItems(); }
+          try {
+            const refreshed = (await apiRequest(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(editing.id)}`)).data;
+            setEditingRecord(refreshed ? { id: editing.id, ...refreshed } : null);
+            await loadItems();
+          }
           catch (failure) { if (failure.status === 404) onNavigate?.(studioPath.content(collection)); else throw failure; }
         }} />}
       </div>

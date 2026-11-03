@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAccountability, createPublicAccountability, createSystemAccountability } from '../src/accountability.js';
 import { RelationsService } from '../src/services/relations-service.js';
+import { StudioSchemaService } from '../src/services/studio-schema-service.js';
 import { UsersService } from '../src/services/users-service.js';
 import { FilesService } from '../src/services/files-service.js';
 import { validateNativeReferenceWrites } from '../src/native-reference-access.js';
@@ -71,4 +72,61 @@ test('native reference writes deny missing grants, hidden targets and malformed 
   assert.equal(o.calls.length, 0);
   await validateNativeReferenceWrites({ ...o, collection: 'tasks' }, [['owner', id]]);
   await validateNativeReferenceWrites({ ...o, collection: 'tasks' }, [['owner', null]]);
+});
+test('StudioSchemaService.readRelations includes native reference relations when caller can read target identity', async () => {
+  const studioSchema = {
+    collections: {
+      tasks: {
+        collection: 'tasks',
+        name: 'Tasks',
+        primary_key: 'id',
+        hidden: false,
+        singleton: false,
+        system: false,
+        fields: {
+          id: { field: 'id', type: 'uuid' },
+          owner: { field: 'owner', type: 'uuid' },
+        },
+      },
+      yuncms_users: users,
+      yuncms_files: files,
+    },
+    relations: [
+      { many_collection: 'tasks', many_field: 'owner', one_collection: 'yuncms_users', one_field: 'id', metadata: { nativeReference: true } },
+    ],
+  };
+  const grantedDb = {
+    async query(sql, params) {
+      if (sql.includes('yuncms_permissions')) {
+        const collection = params[1];
+        if (collection === 'tasks' || collection === 'yuncms_users') {
+          return [[{ fields: null, filter: null, validation: null }]];
+        }
+      }
+      return [[]];
+    },
+  };
+  const deniedUsersDb = {
+    async query(sql, params) {
+      if (sql.includes('yuncms_permissions') && params[1] === 'tasks') {
+        return [[{ fields: null, filter: null, validation: null }]];
+      }
+      return [[]];
+    },
+  };
+
+  const grantedRelations = await new StudioSchemaService({
+    database: grantedDb,
+    schema: studioSchema,
+    accountability,
+  }).readRelations();
+  assert.equal(grantedRelations.length, 1);
+  assert.equal(grantedRelations[0].one_collection, 'yuncms_users');
+
+  const deniedRelations = await new StudioSchemaService({
+    database: deniedUsersDb,
+    schema: studioSchema,
+    accountability,
+  }).readRelations();
+  assert.deepEqual(deniedRelations, []);
 });
