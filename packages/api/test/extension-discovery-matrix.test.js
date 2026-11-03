@@ -8,6 +8,30 @@ import test from 'node:test';
 
 import { discoverExtensions } from '../src/extensions/discovery.js';
 
+test('production discovery tolerates omitted dev dependencies without relaxing required runtime dependencies', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'yuncms-omitted-dev-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const name = '@fixture/omitted-dev';
+  await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: { [name]: '1.0.0' } }));
+  assert.deepEqual(await discoverExtensions({ rootDir: root }), []);
+  await writeFile(join(root, 'package.json'), JSON.stringify({ dependencies: { [name]: '1.0.0' }, devDependencies: { [name]: '1.0.0' } }));
+  await assert.rejects(discoverExtensions({ rootDir: root }), { code: 'EXTENSION_PACKAGE_NOT_RESOLVED' });
+});
+
+test('installed development extensions are discovered and invalid manifests still reject', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'yuncms-installed-dev-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const name = '@fixture/development-hook', packageRoot = join(root, 'node_modules', '@fixture', 'development-hook');
+  await mkdir(packageRoot, { recursive: true });
+  await writeFile(join(root, 'package.json'), JSON.stringify({ devDependencies: { [name]: '1.0.0' } }));
+  const manifest = { name, yuncms: { id: 'development-hook', type: 'hook', entry: './index.js' } };
+  await writeFile(join(packageRoot, 'package.json'), JSON.stringify(manifest));
+  await writeFile(join(packageRoot, 'index.js'), 'export default {};');
+  assert.equal((await discoverExtensions({ rootDir: root }))[0].id, 'development-hook');
+  await writeFile(join(packageRoot, 'package.json'), JSON.stringify({ ...manifest, yuncms: { ...manifest.yuncms, entry: '../outside.js' } }));
+  await assert.rejects(discoverExtensions({ rootDir: root }), { code: 'INVALID_EXTENSION_MANIFEST' });
+});
+
 test('direct consumer/node_modules normal scoped package with only ./feature exports returns empty list', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'yuncms-disc-direct-normal-'));
   t.after(() => rm(root, { recursive: true, force: true }));

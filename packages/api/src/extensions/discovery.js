@@ -141,7 +141,9 @@ async function discoverDependencyExtensions(rootDir) {
     try {
       packageRoot = await resolveDependencyPackageRoot(rootDir, packageName);
     } catch (error) {
-      if (rootPackage.optionalDependencies?.[packageName]) continue;
+      const requiredAtRuntime = Object.hasOwn(rootPackage.dependencies ?? {}, packageName)
+        && !Object.hasOwn(rootPackage.optionalDependencies ?? {}, packageName);
+      if (!requiredAtRuntime && error.code === 'EXTENSION_PACKAGE_NOT_RESOLVED') continue;
       throw error;
     }
 

@@ -1,5 +1,10 @@
 # Extensions
 
+Dependency discovery supports production installs with `npm ci --omit=dev`:
+absent development-only and optional dependencies are skipped. Missing required
+runtime dependencies still prevent startup. Installed development extensions
+are discovered normally, and invalid installed extension manifests remain errors.
+
 YunCMS extensions are trusted server-side JavaScript packages. Use them to add HTTP endpoints, react to data lifecycle events or run scheduled server jobs without modifying the YunCMS core packages.
 
 Extensions execute inside the API process and can receive service/database context. Install only code you trust.

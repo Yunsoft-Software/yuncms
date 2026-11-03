@@ -115,7 +115,7 @@ async function createExtensionProject(extensionId, source) {
   const projectRoot = await mkdtemp(join(tmpdir(), 'yuncms-extension-process-'));
   const extensionRoot = join(projectRoot, 'extensions', extensionId);
   await mkdir(extensionRoot, { recursive: true });
-  await writeFile(join(projectRoot, 'package.json'), `${JSON.stringify({ private: true, type: 'module' }, null, 2)}\n`);
+  await writeFile(join(projectRoot, 'package.json'), `${JSON.stringify({ private: true, type: 'module', devDependencies: { 'omitted-production-dev-tool': '1.0.0' } }, null, 2)}\n`);
   await writeFile(join(extensionRoot, 'package.json'), `${JSON.stringify({
     name: `yuncms-extension-${extensionId}`,
     version: '1.0.0',
