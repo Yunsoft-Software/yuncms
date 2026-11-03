@@ -1,6 +1,12 @@
 const TOP_LEVEL_SECTIONS = new Set(['ai', 'automations', 'appearance', 'files', 'mcp', 'roles', 'users', 'security']);
 export const STUDIO_CONTENT_FOCUS_EVENT = 'yuncms:studio-content-focus';
 
+export function studioDestinationForRoute(route) {
+  if (['users', 'roles'].includes(route.section)) return 'access';
+  if (['appearance', 'mcp', 'security', 'automations', 'flows'].includes(route.section)) return 'settings';
+  return route.section;
+}
+
 function decode(value = '') {
   try {
     return decodeURIComponent(value);

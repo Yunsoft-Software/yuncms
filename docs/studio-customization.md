@@ -110,7 +110,11 @@ The Data Model follows the same overall principle for collection/field labels: h
 
 # Accent and theme
 
-The accent is a validated six-digit hex color. Studio maps it to shared CSS variables used for project-specific selection, focus states and lightweight badges. YunCMS' coral–magenta–teal product spectrum remains reserved for identity, navigation and live feedback, while primary actions may use a neutral ink/paper treatment for stronger contrast.
+The accent is a validated six-digit hex color. Studio uses it consistently for
+primary actions, navigation selection, focus states and lightweight badges.
+Light mode uses cool neutral surfaces; dark mode uses layered slate surfaces
+and a brighter accent text treatment. Collection and model headings remain
+compact, and everyday work surfaces do not use animated decorative gradients.
 
 Theme values:
 

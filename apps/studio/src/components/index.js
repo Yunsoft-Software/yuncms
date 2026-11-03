@@ -39,3 +39,4 @@ export { ManualFlowActions } from './ManualFlowActions.jsx';
 export { FlowList } from './FlowList.jsx';
 export { RichTextEditor } from './RichTextEditor.jsx';
 export { NestedRelationsEditor, NestedRelationCell } from './NestedRelationsEditor.jsx';
+export { TableCellText } from './TableCellText.jsx';

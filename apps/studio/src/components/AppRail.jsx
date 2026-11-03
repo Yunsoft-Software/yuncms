@@ -8,15 +8,14 @@ import {
   navigateStudio,
   readStudioRoute,
   studioPath,
+  studioDestinationForRoute,
 } from '../studio-route.js';
 import { CommandPalette } from './CommandPalette.jsx';
 import { SidebarIcon } from './SidebarIcon.jsx';
 import { StudioBrand } from './StudioBrand.jsx';
 
 function currentDestination(id, route) {
-  if (id === 'access') return route.section === 'users' || route.section === 'roles';
-  if (id === 'settings') return route.section === 'appearance' || route.section === 'mcp';
-  return route.section === id;
+  return studioDestinationForRoute(route) === id;
 }
 
 function isEditableTarget(target) {

@@ -125,7 +125,7 @@
 }
 
 .richtext-visual-surface:focus {
-  box-shadow: inset 0 0 0 2px rgba(79, 70, 229, 0.22);
+  box-shadow: inset 0 0 0 2px var(--ui-accent-soft);
 }
 
 .richtext-visual-surface h1,
@@ -277,8 +277,8 @@
 }
 
 .nested-language-tab.active {
-  border-color: var(--ui-accent, #4f46e5);
-  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.16);
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-accent-soft);
 }
 
 .nested-lang-code,
@@ -290,8 +290,8 @@
   height: 20px;
   padding: 0 6px;
   border-radius: 6px;
-  background: rgba(79, 70, 229, 0.12);
-  color: var(--ui-accent, #4f46e5);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -302,7 +302,7 @@
 }
 
 .nested-lang-status.filled {
-  color: #10b981;
+  color: var(--ui-success);
 }
 
 .nested-lang-status.empty {
@@ -379,9 +379,9 @@
 }
 
 .nested-m2m-option.active {
-  background: rgba(79, 70, 229, 0.12);
-  border-color: var(--ui-accent, #4f46e5);
-  color: var(--ui-accent, #4f46e5);
+  background: var(--ui-accent-soft);
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
   font-weight: 600;
 }
 
@@ -391,64 +391,27 @@
   align-items: center;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(79, 70, 229, 0.1);
-  color: var(--ui-accent, #4f46e5);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
   font-size: 0.76rem;
   font-weight: 600;
 }
 
-/* Table cell relational summaries */
-
-.nested-cell-translations {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-width: 240px;
-}
-
-.nested-cell-translation-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.nested-cell-translation-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.nested-translation-title {
-  font-size: 0.88rem;
-  font-weight: 600;
-  max-width: 340px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nested-translation-slug {
-  font-size: 0.74rem;
-  color: var(--ui-muted, #64748b);
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nested-cell-chips,
-.nested-cell-files {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  align-items: center;
-}
-
-@media (max-width: 860px) {
-  .richtext-split-grid {
-    grid-template-columns: 1fr;
-  }
-}
+/* Bounded list summaries; record forms retain every relation and full value. */
+.nested-cell-translations { display: flex; align-items: flex-start; gap: 12px; min-width: 0; max-width: 100%; }
+.nested-cell-thumb { flex: 0 0 42px; width: 42px; }
+.nested-cell-thumb .file-value-preview { display: block; }
+.nested-cell-thumb .file-value-preview > span { display: none; }
+.nested-cell-thumb .file-value-thumb { width: 42px; height: 48px; border-radius: 7px; }
+.nested-cell-translation-list { display: grid; gap: 7px; min-width: 0; flex: 1; }
+.nested-cell-translation-row { display: grid; grid-template-columns: 27px minmax(0, 1fr); gap: 2px 8px; min-width: 0; align-items: start; }
+.nested-cell-translation-row .nested-lang-badge { grid-row: 1 / span 2; margin-top: 1px; }
+.nested-translation-title { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; line-height: 1.5; }
+.nested-translation-slug { grid-column: 2; display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--ui-text-tertiary); line-height: 1.4; }
+.nested-cell-chips { display: grid; justify-items: start; gap: 5px; min-width: 0; }
+.nested-cell-chips .nested-m2m-chip { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-radius: 6px; font-size: 11px; }
+.nested-cell-files { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; align-items: center; }
+.nested-cell-files .file-value-preview { max-width: 160px; min-width: 0; }
+.nested-count-badge { width: fit-content; max-width: 100%; }
+.nested-languages-grid.is-split { grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+@media (max-width: 860px) { .richtext-split-grid { grid-template-columns: 1fr; } }

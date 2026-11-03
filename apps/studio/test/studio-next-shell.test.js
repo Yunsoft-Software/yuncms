@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { studioDestinationForRoute } from '../src/studio-route.js';
 
 const SRC = resolve(import.meta.dirname, '../src');
 const mainSource = readFileSync(resolve(SRC, 'main.jsx'), 'utf8');
@@ -25,9 +26,14 @@ test('application rail exposes stable top-level Studio destinations', () => {
   assert.match(railSource, /id: 'access'/);
   assert.match(railSource, /id: 'settings'/);
   assert.match(railSource, /studioPath\.content\(route\.section === 'content' \? route\.collection : ''\)/);
-  assert.match(railSource, /route\.section === 'users' \|\| route\.section === 'roles'/);
-  assert.match(railSource, /route\.section === 'appearance' \|\| route\.section === 'mcp'/);
+  assert.match(railSource, /studioDestinationForRoute\(route\) === id/);
   assert.match(railSource, /aria-current=\{active \? 'page' : undefined\}/);
+});
+
+test('every settings and access route keeps its owning application destination active', () => {
+  for (const section of ['appearance', 'mcp', 'security', 'automations', 'flows']) assert.equal(studioDestinationForRoute({ section }), 'settings');
+  for (const section of ['users', 'roles']) assert.equal(studioDestinationForRoute({ section }), 'access');
+  for (const section of ['content', 'files', 'data-model', 'ai']) assert.equal(studioDestinationForRoute({ section }), section);
 });
 
 test('workbench frame exposes route and authentication state without relying on relational selectors', () => {

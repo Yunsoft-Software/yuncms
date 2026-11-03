@@ -118,7 +118,7 @@ function renderControlForField({
           required={required}
           onChange={(event) => onChange(event.target.value)}
         >
-          {!required && <option value="">{t('common.none')}</option>}
+          <option value="">{required ? t('content.select') : t('common.none')}</option>
           {value && !choices.some((choice) => String(choice.value) === String(value)) && (
             <option value={value}>{String(value)}</option>
           )}
@@ -414,7 +414,7 @@ function O2MSection({
   function addItem() {
     if (disabled) return;
     const defaultValues = Object.fromEntries(
-      relation.editableFields.map((field) => [field.field, field.type === 'boolean' ? false : '']),
+      relation.editableFields.map((field) => [field.field, inputValueForField(field, undefined)]),
     );
     onChangeItems([
       ...items,
@@ -581,6 +581,7 @@ export function NestedRelationCell({ relation, rows = [], files = [], t }) {
     });
     const imageField = (relation.editableFields ?? []).find((f) => isFileField(f));
     const firstWithImage = imageField ? sorted.find((r) => r[imageField.field]) : null;
+    const preview = relationPreview(sorted);
 
     return (
       <div className="nested-cell-translations">
@@ -590,7 +591,7 @@ export function NestedRelationCell({ relation, rows = [], files = [], t }) {
           </div>
         )}
         <div className="nested-cell-translation-list">
-          {sorted.map((row) => {
+          {preview.visible.map((row) => {
             const langCode = row[relation.languageField] || '';
             const primaryText = row.title || row.name || row.url || row.slug || `#${row.id}`;
             const secondaryText = row.slug || (row.url && row.url !== primaryText ? row.url : '');
@@ -601,11 +602,12 @@ export function NestedRelationCell({ relation, rows = [], files = [], t }) {
                   {String(primaryText)}
                 </strong>
                 {secondaryText && (
-                  <code className="nested-translation-slug">{String(secondaryText)}</code>
+                  <code className="nested-translation-slug" title={String(secondaryText)}>{String(secondaryText)}</code>
                 )}
               </div>
             );
           })}
+          {preview.remaining > 0 && <span className="nested-count-badge" title={t('relations.linkedCount', { count: rows.length })}>+{preview.remaining}</span>}
         </div>
       </div>
     );
@@ -616,18 +618,20 @@ export function NestedRelationCell({ relation, rows = [], files = [], t }) {
     const items = relation.lookup?.items ?? [];
     const keyField = relation.lookup?.keyField || 'id';
     const labelField = relation.lookup?.labelField || keyField;
+    const preview = relationPreview(rows);
     return (
       <div className="nested-cell-chips">
-        {rows.map((row) => {
+        {preview.visible.map((row) => {
           const targetId = row[relation.targetJunctionField];
           const matched = items.find((entry) => String(entry?.[keyField]) === String(targetId));
           const label = matched?.[labelField] ?? targetId;
           return (
-            <span className="nested-m2m-chip" key={String(row.id ?? targetId)}>
+            <span className="nested-m2m-chip" title={String(label)} key={String(row.id ?? targetId)}>
               {String(label)}
             </span>
           );
         })}
+        {preview.remaining > 0 && <span className="nested-count-badge" title={t('relations.linkedCount', { count: rows.length })}>+{preview.remaining}</span>}
       </div>
     );
   }
@@ -662,3 +666,5 @@ export function NestedRelationCell({ relation, rows = [], files = [], t }) {
 
   return <span className="content-value-empty">—</span>;
 }
+import { inputValueForField } from '../content-field-values.js';
+import { relationPreview } from '../content-presentation.js';

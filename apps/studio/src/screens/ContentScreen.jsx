@@ -12,8 +12,11 @@ import {
   Pagination,
   RelationPicker,
   RichTextEditor,
+  TableCellText,
   useConfirmDialog,
 } from '../components/index.js';
+import { inputValueForField, outputValueForField } from '../content-field-values.js';
+import { contentColumnKind } from '../content-presentation.js';
 import { formatDateFieldValue } from '../date-format.js';
 import {
   canWriteContent,
@@ -88,36 +91,6 @@ function fieldLabel(field) {
   return displaySchemaName(field, 'field');
 }
 
-function inputValueForField(field, value) {
-  if (value == null) {
-    if (field.type === 'boolean') return false;
-    if (isSelectDropdownField(field) && field.required) {
-      const choices = selectChoicesForField(field);
-      if (choices.length > 0) return String(choices[0].value);
-    }
-    return '';
-  }
-  if (field.type === 'json') return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-  if (field.type === 'boolean') return Boolean(value);
-  if (field.type === 'datetime' || field.type === 'timestamp') {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? String(value) : date.toISOString().slice(0, 16);
-  }
-  return String(value);
-}
-
-function outputValueForField(field, value) {
-  if (value === '' && !field.required) return null;
-  if (field.type === 'boolean') return Boolean(value);
-  if (field.type === 'integer' || field.type === 'bigint') return Number.parseInt(value, 10);
-  if (field.type === 'decimal') return Number(value);
-  if (field.type === 'json') {
-    if (value === '') return null;
-    return JSON.parse(value);
-  }
-  return value;
-}
-
 function relationKind(relation) {
   if (!relation?.metadata) return 'm2o';
   if (typeof relation.metadata === 'object') return relation.metadata.kind || 'm2o';
@@ -140,7 +113,7 @@ function lookupLabel(lookup, value) {
 function renderValue(field, record, relationLookups, t, locale) {
   const value = record[field.field];
   const lookup = relationLookups[field.field];
-  if (lookup) return lookupLabel(lookup, value);
+  if (lookup) return <TableCellText>{lookupLabel(lookup, value)}</TableCellText>;
   if (value == null || value === '') return <span className="content-value-empty">—</span>;
   if (field.type === 'boolean') {
     return (
@@ -161,10 +134,10 @@ function renderValue(field, record, relationLookups, t, locale) {
   }
   if (isRichTextField(field) && typeof value === 'string') {
     const plain = value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-    return plain ? (plain.length > 140 ? `${plain.slice(0, 140)}…` : plain) : <span className="content-value-empty">—</span>;
+    return plain ? <TableCellText multiline>{plain}</TableCellText> : <span className="content-value-empty">—</span>;
   }
-  if (typeof value === 'object') return <code className="content-value-json">{JSON.stringify(value)}</code>;
-  return String(value);
+  if (typeof value === 'object') return <TableCellText code>{JSON.stringify(value)}</TableCellText>;
+  return <TableCellText code={contentColumnKind(field) === 'identity'} multiline={field.type === 'text'}>{String(value)}</TableCellText>;
 }
 
 function operatorsForField(field, relationLookup) {
@@ -385,7 +358,7 @@ function RecordForm({
                     onChange={(event) => changeValue(field.field, event.currentTarget.value)}
                     required={Boolean(field.required)}
                   >
-                    {!field.required && <option value="">{t('common.none')}</option>}
+                    <option value="">{field.required ? t('content.select') : t('common.none')}</option>
                     {selectChoicesForField(field).map((choice) => (
                       <option key={choice.value} value={choice.value}>{choice.label}</option>
                     ))}
@@ -956,9 +929,6 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
   return (
     <div className="screen-stack">
       <section className="panel toolbar-panel content-toolbar">
-        <div className="content-hero-grid" aria-hidden="true" />
-        <div className="content-hero-orbit content-hero-orbit-large" aria-hidden="true" />
-        <div className="content-hero-orbit content-hero-orbit-small" aria-hidden="true" />
         <div className="content-hero-copy">
           <p className="eyebrow">{t('visibility.collection')}</p>
           <h2>{visibleCollectionName}</h2>
@@ -1179,6 +1149,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                   {visibleTableFields.map((field) => (
                     <th
                       key={field.field}
+                      className={`content-column-${contentColumnKind(field)}`}
                       aria-sort={sortField === field.field ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                       title={field.field}
                     >
@@ -1194,7 +1165,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                       )}
                     </th>
                   ))}
-                  <th aria-label={t('common.actions')} />
+                  <th className="content-actions-column" aria-label={t('common.actions')} />
                 </tr>
               </thead>
               <tbody>
@@ -1218,7 +1189,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                         />
                       </td>
                       {visibleTableFields.map((field) => (
-                        <td key={field.field}>
+                        <td className={`content-column-${contentColumnKind(field)}`} key={field.field}>
                           {renderFieldCell(field, record)}
                         </td>
                       ))}

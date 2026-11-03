@@ -55,6 +55,13 @@ Shared components should use the semantic Studio tokens rather than introducing 
 
 Motion should explain state changes and respect `prefers-reduced-motion`.
 
+The shared visual theme lives in `studio-theme.css`, loaded by `studio.css`.
+Use `TableCellText` for bounded list text while preserving complete values and
+native tooltips. Relation list summaries use the common `relationPreview`
+limit; forms must continue to expose all related records. Sticky table columns
+must be explicitly identified as action columns, never inferred from being the
+last column. See the [Studio interface guide](studio-interface.md).
+
 ## Adding a new reusable component
 
 When adding a component that is useful in more than one screen:

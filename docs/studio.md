@@ -112,6 +112,14 @@ The **View** control lets you choose which table columns are visible and switch 
 
 Column sorting is applied through the normal Items API query behavior. These presentation controls do not change collection schema or stored records.
 
+Long text and identifiers use bounded previews in lists. Hover over a clipped
+value to read its complete text, or open the record inspector/full editor. Text
+fields use at most two lines; identifiers remain on one line. Translation and
+many-to-many summaries show at most two entries with a `+N` count for the
+remaining entries. This keeps large language/category relations from creating
+page-sized table rows. All values and related records remain available in the
+editor; list clipping never truncates stored content.
+
 ## Create a record
 
 1. Open the collection under **Content**.
@@ -121,6 +129,13 @@ Column sorting is applied through the normal Items API query behavior. These pre
 5. Save.
 
 Required fields and write-field restrictions are validated by the API. System fields such as creation/update timestamps and users are filled automatically when configured for the collection.
+
+New record and nested relation forms initialize explicit schema defaults,
+including `draft`, boolean `true`/`false` and numeric `0`. A required select
+without an explicit default starts with a selection prompt; the first option
+is never implicitly treated as a publication decision. Editing a stored value,
+including an explicit empty/null value, does not replace it with a new-record
+default.
 
 On mobile, records become readable cards rather than forcing the desktop table into a narrow viewport:
 

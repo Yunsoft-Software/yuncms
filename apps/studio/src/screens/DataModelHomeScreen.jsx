@@ -447,8 +447,6 @@ export function DataModelHomeScreen({ onNavigate, onCollectionsChanged }) {
   return (
     <section className="navigation-model-screen">
       <section className="navigation-model-hero">
-        <div className="navigation-model-hero-grid" aria-hidden="true" />
-        <div className="navigation-model-hero-orbit" aria-hidden="true" />
         <div className="navigation-model-hero-copy">
           <p className="eyebrow">{t('nav.dataModel')}</p>
           <h1>{t('section.dataModelTitle')}</h1>

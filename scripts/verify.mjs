@@ -164,6 +164,8 @@ const FAST_TESTS = [
   'apps/studio/test/permission-resource-ui.test.js',
   'apps/studio/test/users-access-ui.test.js',
   'apps/studio/test/content-values.test.js',
+  'apps/studio/test/content-field-values.test.js',
+  'apps/studio/test/studio-theme.test.js',
   'apps/studio/test/date-format.test.js',
 ];
 

@@ -589,7 +589,7 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
           </div>
         </aside>
 
-        <main className="data-model-workspace">
+        <section className="data-model-workspace">
           {showGraph ? (
             <SchemaGraph
               collections={collections}
@@ -822,7 +822,7 @@ export function DataModelV2Screen({ onCollectionsChanged, route = {}, onNavigate
               )}
             </section>
           )}
-        </main>
+        </section>
       </div>
       {loading && <p className="muted-line">{t('dataModel.loadingSchema')}</p>}
     </div>

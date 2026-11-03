@@ -1,3 +1,4 @@
+import { inputValueForField as defaultInputValueForField, outputValueForField as defaultOutputValueForField } from './content-field-values.js';
 import { loadRelationLookup, primaryKeyFieldForFields } from './content-access.js';
 import { isFileField, isReadOnlyField, isSystemManagedField } from './field-ui.js';
 
@@ -31,29 +32,6 @@ export function slugifyText(value = '', { preserveLeadingSlash = false } = {}) {
     .replace(/^-+|-+$/g, '');
   if (!mapped) return '';
   return hasLeadingSlash ? `/${mapped}` : mapped;
-}
-
-function defaultInputValueForField(field, value) {
-  if (value == null) return field?.type === 'boolean' ? false : '';
-  if (field?.type === 'json') return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-  if (field?.type === 'boolean') return Boolean(value);
-  if (field?.type === 'datetime' || field?.type === 'timestamp') {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? String(value) : date.toISOString().slice(0, 16);
-  }
-  return String(value);
-}
-
-function defaultOutputValueForField(field, value) {
-  if (value === '' && !field?.required) return null;
-  if (field?.type === 'boolean') return Boolean(value);
-  if (field?.type === 'integer' || field?.type === 'bigint') return Number.parseInt(value, 10);
-  if (field?.type === 'decimal') return Number(value);
-  if (field?.type === 'json') {
-    if (value === '') return null;
-    return typeof value === 'string' ? JSON.parse(value) : value;
-  }
-  return value;
 }
 
 export function parseRelationMeta(relation) {
