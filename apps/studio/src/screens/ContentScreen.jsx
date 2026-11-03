@@ -89,7 +89,14 @@ function fieldLabel(field) {
 }
 
 function inputValueForField(field, value) {
-  if (value == null) return field.type === 'boolean' ? false : '';
+  if (value == null) {
+    if (field.type === 'boolean') return false;
+    if (isSelectDropdownField(field) && field.required) {
+      const choices = selectChoicesForField(field);
+      if (choices.length > 0) return String(choices[0].value);
+    }
+    return '';
+  }
   if (field.type === 'json') return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
   if (field.type === 'boolean') return Boolean(value);
   if (field.type === 'datetime' || field.type === 'timestamp') {
@@ -345,6 +352,7 @@ function RecordForm({
             return (
               <FieldTag
                 className={`field-label ${isFileField(field) ? 'file-field-label' : ''} ${richText ? 'rich-text-field-label' : ''}`}
+                data-field={field.field}
                 key={field.field}
               >
                 <span>{label}{field.required ? ' *' : ''}</span>

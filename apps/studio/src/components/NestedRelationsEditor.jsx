@@ -61,6 +61,7 @@ function renderControlForField({
   return (
     <FieldTag
       className={`field-label ${isFileField(field) ? 'file-field-label' : ''} ${isRich ? 'richtext-field-label' : ''}`}
+      data-field={field.field}
       key={field.field}
     >
       <span className="nested-field-label-row">
@@ -69,6 +70,7 @@ function renderControlForField({
           <button
             type="button"
             className="text-button slug-generate-btn"
+            data-testid={`generate-slug-${field.field}`}
             onClick={onGenerateSlug}
           >
             ✨ {t('relations.generateSlug')}
