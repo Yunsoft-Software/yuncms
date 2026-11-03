@@ -1,6 +1,7 @@
 const ICONS = Object.freeze({
   string: <><path d="M5 6h14M9 6v12M15 6v12M6 18h6M12 18h6" /></>,
   text: <><path d="M5 6h14M5 10h14M5 14h10M5 18h8" /></>,
+  richtext: <><path d="M4 6h8M8 6v12M14 10h6M14 14h6M14 18h4" /></>,
   integer: <><path d="M7 8l2-2v12M14 7h4l-4 5h4l-4 5" /></>,
   bigint: <><path d="M5 8c0-2 2-3 4-3s4 1 4 3-2 3-4 3-4 1-4 3 2 4 4 4 4-2 4-4M15 7h4M17 5v4" /></>,
   decimal: <><path d="M6 8l2-2v12M12 17h.01M15 7h4l-4 5h4l-4 5" /></>,

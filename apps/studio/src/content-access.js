@@ -87,11 +87,45 @@ export async function loadRelationLookup(relation, { isAdmin = false, request } 
       request(`/items/${encodeURIComponent(targetCollection)}?limit=200`),
     ]);
     const targetFields = fieldResponse?.data ?? [];
+    let labelField = pickDisplayField(targetFields, keyField);
+    let items = itemResponse?.data ?? [];
+
+    if ((labelField === keyField || labelField === 'status') && !String(targetCollection).endsWith('_translations')) {
+      try {
+        const transCollection = `${targetCollection}_translations`;
+        const transResponse = await request(`/items/${encodeURIComponent(transCollection)}?limit=500`);
+        const transRows = transResponse?.data ?? [];
+        const fkField = `${targetCollection}_id`;
+        if (transRows.length > 0 && transRows.some((row) => Object.hasOwn(row, fkField))) {
+          const byParent = new Map();
+          for (const row of transRows) {
+            const parentKey = String(row[fkField] ?? '');
+            if (!parentKey) continue;
+            const list = byParent.get(parentKey) ?? [];
+            list.push(row);
+            byParent.set(parentKey, list);
+          }
+          items = items.map((item) => {
+            const rows = byParent.get(String(item?.[keyField])) ?? [];
+            rows.sort((a, b) => String(b.languages_code || '').localeCompare(String(a.languages_code || '')));
+            const labels = [...new Set(rows.map((r) => r.title || r.name || r.url || r.slug).filter(Boolean))];
+            return {
+              ...item,
+              _translated_label: labels.length > 0 ? labels.join(' · ') : String(item?.[keyField] ?? ''),
+            };
+          });
+          labelField = '_translated_label';
+        }
+      } catch {
+        // Fallback to default labelField if no translations collection exists
+      }
+    }
+
     return [relation.many_field, {
       targetCollection,
       keyField,
-      labelField: pickDisplayField(targetFields, keyField),
-      items: itemResponse?.data ?? [],
+      labelField,
+      items,
     }];
   } catch {
     return [relation.many_field, {

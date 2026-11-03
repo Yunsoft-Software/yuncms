@@ -7,8 +7,11 @@ import {
   FileValuePreview,
   Inspector,
   ManualFlowActions,
+  NestedRelationCell,
+  NestedRelationsEditor,
   Pagination,
   RelationPicker,
+  RichTextEditor,
   useConfirmDialog,
 } from '../components/index.js';
 import { formatDateFieldValue } from '../date-format.js';
@@ -21,7 +24,26 @@ import {
   primaryKeyFieldForFields,
 } from '../content-access.js';
 import { contentEmptyState } from '../content-empty-state.js';
-import { contentTableFields, defaultContentColumnKeys, isFileField, isImageField, isReadOnlyField } from '../field-ui.js';
+import {
+  buildInitialNestedDraft,
+  discoverNestedRelations,
+  loadNestedRecordRows,
+  loadNestedSummariesForItems,
+  nestedRelationsHaveFiles,
+  saveNestedRelations,
+  searchNestedParentIds,
+  virtualRelationColumns,
+} from '../content-relations.js';
+import {
+  contentTableFields,
+  defaultContentColumnKeys,
+  isFileField,
+  isImageField,
+  isReadOnlyField,
+  isRichTextField,
+  isSelectDropdownField,
+  selectChoicesForField,
+} from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
 import { studioPath } from '../studio-route.js';
@@ -130,6 +152,10 @@ function renderValue(field, record, relationLookups, t, locale) {
   if (field.field === 'status' || field.field.endsWith('_status')) {
     return <span className="content-value-status">{String(value)}</span>;
   }
+  if (isRichTextField(field) && typeof value === 'string') {
+    const plain = value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    return plain ? (plain.length > 140 ? `${plain.slice(0, 140)}…` : plain) : <span className="content-value-empty">—</span>;
+  }
   if (typeof value === 'object') return <code className="content-value-json">{JSON.stringify(value)}</code>;
   return String(value);
 }
@@ -157,15 +183,23 @@ function fieldInputType(field) {
   return 'text';
 }
 
-function buildItemsPath({ collection, fields, search, filters, sortField, sortDirection, limit, offset }) {
+function buildItemsPath({ collection, fields, search, matchedParentIds = null, filters, sortField, sortDirection, limit, offset }) {
   const clauses = filters.map((entry) => ({
     [entry.field]: { [entry.operator]: entry.value },
   }));
   const searchFields = fields.filter((field) => !field.hidden && ['string', 'text'].includes(field.type));
-  if (search && searchFields.length > 0) {
-    clauses.push({
-      _or: searchFields.map((field) => ({ [field.field]: { _contains: search } })),
-    });
+  if (search) {
+    const orClauses = searchFields.map((field) => ({ [field.field]: { _contains: search } }));
+    if (Array.isArray(matchedParentIds)) {
+      if (matchedParentIds.length > 0) {
+        orClauses.push({ id: { _in: matchedParentIds } });
+      } else if (orClauses.length === 0) {
+        orClauses.push({ id: { _eq: '__no_nested_match__' } });
+      }
+    }
+    if (orClauses.length > 0) {
+      clauses.push({ _or: orClauses });
+    }
   }
 
   const params = new URLSearchParams();
@@ -182,6 +216,7 @@ function RecordForm({
   collectionLabel,
   fields,
   relationLookups,
+  nestedRelations = [],
   files,
   record,
   onFileUploaded,
@@ -199,6 +234,9 @@ function RecordForm({
   const recordValuesKey = contentRecordValuesKey(record, editable);
   const initialValues = () => Object.fromEntries(editable.map(field => [field.field, inputValueForField(field, record?.[field.field])]));
   const [values, setValues] = useState(initialValues);
+  const [existingNestedRows, setExistingNestedRows] = useState({});
+  const [nestedDraft, setNestedDraft] = useState(() => buildInitialNestedDraft(nestedRelations, {}));
+  const [nestedLoading, setNestedLoading] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -206,6 +244,38 @@ function RecordForm({
     setValues(initialValues());
     setError('');
   }, [recordValuesKey]);
+
+  useEffect(() => {
+    let active = true;
+    if (!nestedRelations || nestedRelations.length === 0) {
+      setExistingNestedRows({});
+      setNestedDraft({});
+      setNestedLoading(false);
+      return () => { active = false; };
+    }
+    if (!record?.id) {
+      setExistingNestedRows({});
+      setNestedDraft(buildInitialNestedDraft(nestedRelations, {}));
+      setNestedLoading(false);
+      return () => { active = false; };
+    }
+    setNestedLoading(true);
+    loadNestedRecordRows(nestedRelations, record.id, { request: apiRequest })
+      .then((loaded) => {
+        if (!active) return;
+        setExistingNestedRows(loaded);
+        setNestedDraft(buildInitialNestedDraft(nestedRelations, loaded, inputValueForField));
+      })
+      .catch(() => {
+        if (!active) return;
+        setExistingNestedRows({});
+        setNestedDraft(buildInitialNestedDraft(nestedRelations, {}, inputValueForField));
+      })
+      .finally(() => {
+        if (active) setNestedLoading(false);
+      });
+    return () => { active = false; };
+  }, [record?.id, nestedRelations]);
 
   function changeValue(field, value) {
     setValues(current => ({ ...current, [field]: value }));
@@ -221,14 +291,29 @@ function RecordForm({
         field.field,
         outputValueForField(field, values[field.field]),
       ]));
-      const path = record?.id
-        ? `/items/${encodeURIComponent(collection)}/${encodeURIComponent(record.id)}`
-        : `/items/${encodeURIComponent(collection)}`;
-      const result = await apiRequest(path, {
-        method: record?.id ? 'PATCH' : 'POST',
-        body: payload,
-      });
-      await onSaved(result?.data ?? null);
+      let savedRecord = record ?? null;
+      if (!record?.id || Object.keys(payload).length > 0) {
+        const path = record?.id
+          ? `/items/${encodeURIComponent(collection)}/${encodeURIComponent(record.id)}`
+          : `/items/${encodeURIComponent(collection)}`;
+        const result = await apiRequest(path, {
+          method: record?.id ? 'PATCH' : 'POST',
+          body: payload,
+        });
+        savedRecord = result?.data ?? savedRecord;
+      }
+      const parentId = savedRecord?.id ?? record?.id;
+      if (parentId != null && nestedRelations.length > 0 && !nestedLoading) {
+        await saveNestedRelations({
+          parentId,
+          nestedRelations,
+          draftState: nestedDraft,
+          existingRowsByKey: existingNestedRows,
+          request: apiRequest,
+          outputValueForField,
+        });
+      }
+      await onSaved(savedRecord);
     } catch (requestError) {
       setError(requestError.message || t('content.saveError'));
     } finally {
@@ -248,70 +333,108 @@ function RecordForm({
         <button className="text-button" type="button" onClick={onCancel}>{t('common.cancel')}</button>
       </div>
 
-      <fieldset className="form-grid record-form-grid" disabled={!canSave || saving}>
-        {editable.map((field) => {
-          const relationLookup = relationLookups[field.field];
-          const currentValue = values[field.field] ?? '';
-          const label = fieldLabel(field);
+      {editable.length > 0 && (
+        <fieldset className="form-grid record-form-grid" disabled={!canSave || saving}>
+          {editable.map((field) => {
+            const relationLookup = relationLookups[field.field];
+            const currentValue = values[field.field] ?? '';
+            const label = fieldLabel(field);
+            const richText = isRichTextField(field);
+            const FieldTag = richText ? 'div' : 'label';
 
-          return (
-            <label className={`field-label ${isFileField(field) ? 'file-field-label' : ''}`} key={field.field}>
-              <span>{label}{field.required ? ' *' : ''}</span>
-              {label !== field.field && <small className="field-api-key">{field.field}</small>}
-              {isFileField(field) ? (
-                <FileFieldControl
-                  field={field}
-                  value={currentValue}
-                  files={files}
-                  t={t}
-                  onFileUploaded={onFileUploaded}
-                  onChange={(value) => changeValue(field.field, value)}
-                />
-              ) : relationLookup ? (
-                <RelationPicker
-                  value={currentValue}
-                  items={relationLookup.items}
-                  keyField={relationLookup.keyField}
-                  labelField={relationLookup.labelField}
-                  required={Boolean(field.required)}
-                  placeholder={field.required ? t('content.select') : t('common.none')}
-                  searchPlaceholder={t('content.relationSearch')}
-                  emptyLabel={t('content.relationEmpty')}
-                  noneLabel={t('common.none')}
-                  onChange={(value) => changeValue(field.field, value)}
-                />
-              ) : field.type === 'boolean' ? (
-                <input
-                  type="checkbox"
-                  checked={Boolean(values[field.field])}
-                  onChange={(event) => changeValue(field.field, event.currentTarget.checked)}
-                />
-              ) : field.type === 'text' || field.type === 'json' ? (
-                <textarea
-                  rows={field.type === 'json' ? 6 : 4}
-                  value={values[field.field] ?? ''}
-                  onChange={(event) => changeValue(field.field, event.currentTarget.value)}
-                  required={Boolean(field.required)}
-                />
-              ) : (
-                <input
-                  type={fieldInputType(field)}
-                  step={field.type === 'decimal' ? 'any' : undefined}
-                  value={values[field.field] ?? ''}
-                  onChange={(event) => changeValue(field.field, event.currentTarget.value)}
-                  required={Boolean(field.required)}
-                />
-              )}
-              {relationLookup && (
-                <small>{t('content.relationHint', {
-                  collection: relationLookup.targetCollection,
-                  field: relationLookup.labelField,
-                })}</small>
-              )}
-            </label>
-          );
-        })}
-      </fieldset>
+            return (
+              <FieldTag
+                className={`field-label ${isFileField(field) ? 'file-field-label' : ''} ${richText ? 'rich-text-field-label' : ''}`}
+                key={field.field}
+              >
+                <span>{label}{field.required ? ' *' : ''}</span>
+                {label !== field.field && <small className="field-api-key">{field.field}</small>}
+                {isFileField(field) ? (
+                  <FileFieldControl
+                    field={field}
+                    value={currentValue}
+                    files={files}
+                    t={t}
+                    onFileUploaded={onFileUploaded}
+                    onChange={(value) => changeValue(field.field, value)}
+                  />
+                ) : relationLookup ? (
+                  <RelationPicker
+                    value={currentValue}
+                    items={relationLookup.items}
+                    keyField={relationLookup.keyField}
+                    labelField={relationLookup.labelField}
+                    required={Boolean(field.required)}
+                    placeholder={field.required ? t('content.select') : t('common.none')}
+                    searchPlaceholder={t('content.relationSearch')}
+                    emptyLabel={t('content.relationEmpty')}
+                    noneLabel={t('common.none')}
+                    onChange={(value) => changeValue(field.field, value)}
+                  />
+                ) : isSelectDropdownField(field) ? (
+                  <select
+                    value={values[field.field] ?? ''}
+                    onChange={(event) => changeValue(field.field, event.currentTarget.value)}
+                    required={Boolean(field.required)}
+                  >
+                    {!field.required && <option value="">{t('common.none')}</option>}
+                    {selectChoicesForField(field).map((choice) => (
+                      <option key={choice.value} value={choice.value}>{choice.label}</option>
+                    ))}
+                  </select>
+                ) : richText ? (
+                  <RichTextEditor
+                    value={values[field.field] ?? ''}
+                    onChange={(nextValue) => changeValue(field.field, nextValue)}
+                    disabled={!canSave || saving}
+                    files={files}
+                    onFileUploaded={onFileUploaded}
+                  />
+                ) : field.type === 'boolean' ? (
+                  <input
+                    type="checkbox"
+                    checked={Boolean(values[field.field])}
+                    onChange={(event) => changeValue(field.field, event.currentTarget.checked)}
+                  />
+                ) : field.type === 'text' || field.type === 'json' ? (
+                  <textarea
+                    rows={field.type === 'json' ? 6 : 4}
+                    value={values[field.field] ?? ''}
+                    onChange={(event) => changeValue(field.field, event.currentTarget.value)}
+                    required={Boolean(field.required)}
+                  />
+                ) : (
+                  <input
+                    type={fieldInputType(field)}
+                    step={field.type === 'decimal' ? 'any' : undefined}
+                    value={values[field.field] ?? ''}
+                    onChange={(event) => changeValue(field.field, event.currentTarget.value)}
+                    required={Boolean(field.required)}
+                  />
+                )}
+                {relationLookup && (
+                  <small>{t('content.relationHint', {
+                    collection: relationLookup.targetCollection,
+                    field: relationLookup.labelField,
+                  })}</small>
+                )}
+              </FieldTag>
+            );
+          })}
+        </fieldset>
+      )}
+
+      {nestedRelations.length > 0 && (
+        <NestedRelationsEditor
+          nestedRelations={nestedRelations}
+          draftState={nestedDraft}
+          setDraftState={setNestedDraft}
+          files={files}
+          onFileUploaded={onFileUploaded}
+          disabled={!canSave || saving || nestedLoading}
+          compact={compact}
+        />
+      )}
 
       {error && <div className="error-banner" role="alert">{error}</div>}
       <div className="form-actions">
@@ -320,7 +443,7 @@ function RecordForm({
             {t('content.openFullEditor')}
           </button>
         )}
-        {canSave && <button className="primary-button" type="submit" disabled={saving}>
+        {canSave && <button className="primary-button" type="submit" disabled={!canSave || saving || nestedLoading}>
           {saving ? t('common.saving') : t('content.saveRecord')}
         </button>}
       </div>
@@ -336,6 +459,8 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
   const [fields, setFields] = useState([]);
   const [capabilities, setCapabilities] = useState(null);
   const [relationLookups, setRelationLookups] = useState({});
+  const [nestedRelations, setNestedRelations] = useState([]);
+  const [nestedSummaries, setNestedSummaries] = useState({});
   const [files, setFiles] = useState([]);
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState(null);
@@ -382,6 +507,8 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     setFields([]);
     setCapabilities(null);
     setRelationLookups({});
+    setNestedRelations([]);
+    setNestedSummaries({});
     setFiles([]);
     setItems([]);
     setMeta(null);
@@ -394,21 +521,27 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     setSchemaLoading(true);
     setError('');
     try {
+      const isAdmin = Boolean(readSession()?.user?.admin);
       const [fieldResponse, relationResponse, capabilityResponse] = await Promise.all([
-        apiRequest(`${readSession()?.user?.admin ? '/schema' : '/studio-navigation'}/collections/${encodeURIComponent(target)}/fields`),
-        readSession()?.user?.admin ? apiRequest('/schema/relations') : apiRequest('/studio-navigation/relations'),
+        apiRequest(`${isAdmin ? '/schema' : '/studio-navigation'}/collections/${encodeURIComponent(target)}/fields`),
+        isAdmin ? apiRequest('/schema/relations') : apiRequest('/studio-navigation/relations'),
         apiRequest(`/studio-navigation/collections/${encodeURIComponent(target)}/capabilities`),
       ]);
       const loadedFields = fieldResponse?.data ?? [];
       const loadedRelations = relationResponse?.data ?? [];
-      const [lookups, fileResponse] = await Promise.all([
+      const [lookups, discoveredNested] = await Promise.all([
         buildRelationLookups(target, loadedRelations),
-        loadedFields.some(isFileField) ? apiRequest('/files').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        discoverNestedRelations(target, loadedRelations, { isAdmin, request: apiRequest }),
       ]);
+      const needsFiles = loadedFields.some(isFileField) || nestedRelationsHaveFiles(discoveredNested);
+      const fileResponse = needsFiles
+        ? await apiRequest('/files').catch(() => ({ data: [] }))
+        : { data: [] };
       if (version !== requestVersion.current) return;
       setFields(loadedFields);
       setCapabilities(capabilityResponse.data);
       setRelationLookups(lookups);
+      setNestedRelations(discoveredNested);
       setFiles(fileResponse?.data ?? []);
     } catch (requestError) {
       if (version !== requestVersion.current) return;
@@ -421,17 +554,23 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     }
   }
 
-  async function loadItems(target = collection, targetFields = fields) {
+  async function loadItems(target = collection, targetFields = fields, targetNestedRelations = nestedRelations) {
     if (!target || targetFields.length === 0) return;
     const version = ++requestVersion.current;
     setItemsLoading(true);
     setError('');
     try {
       const primaryKey = primaryKeyFieldForFields(targetFields);
+      let matchedParentIds = null;
+      if (search && targetNestedRelations.length > 0) {
+        matchedParentIds = await searchNestedParentIds(targetNestedRelations, search, { request: apiRequest });
+        if (version !== requestVersion.current) return;
+      }
       const path = buildItemsPath({
         collection: target,
         fields: targetFields,
         search,
+        matchedParentIds,
         filters,
         sortField,
         sortDirection,
@@ -442,10 +581,16 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
       if (version !== requestVersion.current) return;
       const nextItems = (response?.data ?? []).map((item) => normalizeRecordPrimaryKey(item, primaryKey));
       const capabilityIds = nextItems.map((item) => item.id).filter((id) => id != null && id !== '');
-      const access = await apiRequest(`/studio-navigation/collections/${encodeURIComponent(target)}/capabilities?ids=${encodeURIComponent(JSON.stringify(capabilityIds))}`);
+      const [access, summaries] = await Promise.all([
+        apiRequest(`/studio-navigation/collections/${encodeURIComponent(target)}/capabilities?ids=${encodeURIComponent(JSON.stringify(capabilityIds))}`),
+        targetNestedRelations.length > 0
+          ? loadNestedSummariesForItems(targetNestedRelations, nextItems, { request: apiRequest })
+          : Promise.resolve({}),
+      ]);
       if (version !== requestVersion.current) return;
       setCapabilities(current => ({ ...access.data, records: { ...current?.records, ...access.data.records } }));
       setItems(nextItems);
+      setNestedSummaries(summaries);
       setMeta(response?.meta ?? null);
       setSelectedRecordIds(new Set());
       setInspectedRecord((current) => {
@@ -581,7 +726,18 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     }
   }
 
-  const tableFields = useMemo(() => contentTableFields(fields), [fields]);
+  const physicalTableFields = useMemo(() => contentTableFields(fields), [fields]);
+  const virtualColumns = useMemo(() => virtualRelationColumns(nestedRelations, t), [nestedRelations, t]);
+  const tableFields = useMemo(() => {
+    if (virtualColumns.length === 0) return physicalTableFields;
+    const idIndex = physicalTableFields.findIndex((field) => field.field === 'id');
+    if (idIndex === -1) return [...virtualColumns, ...physicalTableFields];
+    return [
+      ...physicalTableFields.slice(0, idIndex + 1),
+      ...virtualColumns,
+      ...physicalTableFields.slice(idIndex + 1),
+    ];
+  }, [physicalTableFields, virtualColumns]);
   useEffect(() => {
     setVisibleColumnKeys(defaultContentColumnKeys(tableFields));
   }, [tableFields]);
@@ -596,7 +752,8 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
   const filterableFields = useMemo(() => fields.filter((field) => !field.hidden && field.type !== 'json'), [fields]);
   const selectedFilterField = filterableFields.find((field) => field.field === filterDraft.field) ?? null;
   const filterOperators = operatorsForField(selectedFilterField, relationLookups[filterDraft.field]);
-  const hasTextSearch = fields.some((field) => !field.hidden && ['string', 'text'].includes(field.type));
+  const hasTextSearch = fields.some((field) => !field.hidden && ['string', 'text'].includes(field.type))
+    || nestedRelations.length > 0;
   const totalCount = Number(meta?.total_count ?? 0);
   const currentPage = Math.floor(offset / pageSize) + 1;
   const hasActiveControls = Boolean(search || filters.length > 0 || sortField);
@@ -705,6 +862,25 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     setFiles((current) => [file, ...current.filter((entry) => entry.id !== file.id)]);
   }
 
+  function renderFieldCell(field, record) {
+    if (field?.virtualRelation) {
+      const rel = field.virtualRelation;
+      const rows = nestedSummaries?.[rel.key]?.[String(record.id)] ?? [];
+      return (
+        <NestedRelationCell
+          relation={rel}
+          rows={rows}
+          files={files}
+          t={t}
+        />
+      );
+    }
+    if (isFileField(field)) {
+      return <FileValuePreview field={field} value={record[field.field]} files={files} t={t} />;
+    }
+    return renderValue(field, record, relationLookups, t, locale);
+  }
+
   const visibleCollectionName = collectionLabel || collection;
 
   if (route.view === 'record' && loadedRecordKey !== routeRecordKey) {
@@ -731,6 +907,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
           fields={fields}
           capabilities={capabilities}
           relationLookups={relationLookups}
+          nestedRelations={nestedRelations}
           files={files}
           record={editing}
           onFileUploaded={registerUploadedFile}
@@ -997,12 +1174,16 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                       aria-sort={sortField === field.field ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                       title={field.field}
                     >
-                      <button className="sort-header-button" type="button" onClick={() => toggleColumnSort(field.field)}>
+                      {field.virtualRelation ? (
                         <span>{fieldLabel(field)}</span>
-                        <span className="sort-indicator" aria-hidden="true">
-                          {sortField === field.field ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
-                        </span>
-                      </button>
+                      ) : (
+                        <button className="sort-header-button" type="button" onClick={() => toggleColumnSort(field.field)}>
+                          <span>{fieldLabel(field)}</span>
+                          <span className="sort-indicator" aria-hidden="true">
+                            {sortField === field.field ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+                          </span>
+                        </button>
+                      )}
                     </th>
                   ))}
                   <th aria-label={t('common.actions')} />
@@ -1030,9 +1211,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                       </td>
                       {visibleTableFields.map((field) => (
                         <td key={field.field}>
-                          {isFileField(field) ? (
-                            <FileValuePreview field={field} value={record[field.field]} files={files} t={t} />
-                          ) : renderValue(field, record, relationLookups, t, locale)}
+                          {renderFieldCell(field, record)}
                         </td>
                       ))}
                       <td className="row-actions">
@@ -1054,7 +1233,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                   <header>
                     <div>
                       <small>{primaryField ? fieldLabel(primaryField) : t('content.records')}</small>
-                      <strong>{primaryField ? renderValue(primaryField, record, relationLookups, t, locale) : record.id}</strong>
+                      <strong>{primaryField ? renderFieldCell(primaryField, record) : record.id}</strong>
                     </div>
                     <code>{record.id}</code>
                   </header>
@@ -1062,7 +1241,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                     {mobileRecordFields.slice(1).map((field) => (
                       <div key={field.field}>
                         <dt>{fieldLabel(field)}</dt>
-                        <dd>{isFileField(field) ? <FileValuePreview field={field} value={record[field.field]} files={files} t={t} /> : renderValue(field, record, relationLookups, t, locale)}</dd>
+                        <dd>{renderFieldCell(field, record)}</dd>
                       </div>
                     ))}
                   </dl>
@@ -1106,6 +1285,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
             fields={fields}
             capabilities={capabilities}
             relationLookups={relationLookups}
+            nestedRelations={nestedRelations}
             files={files}
             record={inspectedRecord}
             onFileUploaded={registerUploadedFile}
