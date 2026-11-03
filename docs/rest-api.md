@@ -435,7 +435,7 @@ PATCH  /users/:id
 DELETE /users/:id
 ```
 
-Management-created accounts are treated as verified management users. Delegated user-management permissions still enforce protected Administrator/Public role invariants.
+Management-created accounts are treated as verified management users. `PATCH /users/:id` updates `email`, `role`, `status` and writable custom `yuncms_users` system extension fields. Delegated user-management permissions still enforce protected Administrator/Public role invariants.
 
 ### Query parameters (`GET /users`)
 

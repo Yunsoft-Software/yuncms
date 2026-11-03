@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { readNativeReferenceRows } from '../native-reference.js';
 
 import { assertPasswordInput, hashPassword } from '../auth/password.js';
@@ -14,6 +15,56 @@ import { resolveSystemResourceAccess } from './system-resource-access.js';
 const USER_STATUSES = new Set(['active', 'suspended', 'disabled']);
 const USER_UPDATE_KEYS = new Set(['email', 'role', 'status']);
 const PUBLIC_REGISTRATION_KEYS = new Set(['email', 'password']);
+const PROTECTED_USER_COLUMNS = new Set([
+  ...USER_SAFE_SELECT_COLUMNS,
+  'password_hash',
+]);
+
+function parseFieldMetadata(value) {
+  if (value == null || typeof value === 'object') return value ?? {};
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
+export function getCustomUserFields(schema) {
+  const fields = schema?.collections?.yuncms_users?.fields;
+  if (!fields || typeof fields !== 'object') return [];
+  return Object.values(fields).filter((field) => {
+    if (!field?.field || PROTECTED_USER_COLUMNS.has(field.field)) return false;
+    return parseFieldMetadata(field.schema_metadata).systemExtension === true;
+  });
+}
+
+function serializeCustomUserValue(fieldSchema, value) {
+  if (value == null) return null;
+  const type = fieldSchema.type;
+  if (type === 'boolean') {
+    return typeof value === 'boolean' ? (value ? 1 : 0) : value;
+  }
+  if (type === 'json') {
+    if (typeof value === 'string') {
+      try {
+        JSON.parse(value);
+        return value;
+      } catch {
+        return JSON.stringify(value);
+      }
+    }
+    return JSON.stringify(value);
+  }
+  if (
+    (type === 'datetime' || type === 'timestamp')
+    && typeof value === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(value)
+  ) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  return value;
+}
 
 function normalizeEmail(email) {
   if (typeof email !== 'string') {
@@ -120,9 +171,33 @@ export class UsersService extends BaseService {
     }));
   }
 
+  #customFields() {
+    return getCustomUserFields(this.schema);
+  }
+
+  #selectColumnList() {
+    const custom = this.#customFields();
+    if (custom.length === 0) return USER_SAFE_SELECT_COLUMNS;
+    return [
+      ...USER_SAFE_SELECT_COLUMNS,
+      ...custom.map((field) => assertIdentifier(field.field, 'field name')),
+    ];
+  }
+
+  #selectColumnsSql() {
+    const custom = this.#customFields();
+    if (custom.length === 0) {
+      return 'id, email, role, status, email_verified_at, last_access, created_at, updated_at';
+    }
+    return [
+      ...USER_SAFE_SELECT_COLUMNS,
+      ...custom.map((field) => quoteIdentifier(field.field, 'field name')),
+    ].join(', ');
+  }
+
   async #readOneUnsafe(id, lock = false) {
     const [rows] = await this.database.query(
-      `SELECT id, email, role, status, email_verified_at, last_access, created_at, updated_at
+      `SELECT ${this.#selectColumnsSql()}
        FROM yuncms_users
        WHERE id = ?
        LIMIT 1${lock ? ' FOR UPDATE' : ''}`,
@@ -135,7 +210,7 @@ export class UsersService extends BaseService {
     await resolveSystemResourceAccess(this, 'read', 'yuncms_users');
     const { sql, params } = buildSystemListQuery(query, {
       table: 'yuncms_users',
-      columns: USER_SAFE_SELECT_COLUMNS,
+      columns: this.#selectColumnList(),
       orderBy: 'email ASC, id ASC',
       searchSchema: USER_SYSTEM_SEARCH_SCHEMA,
     });
@@ -161,11 +236,29 @@ export class UsersService extends BaseService {
     const status = assertStatus(input.status ?? 'active');
     await assertRoleAssignable(this.database, input.role ?? null, this.accountability);
 
+    const customFieldMap = new Map(this.#customFields().map((field) => [field.field, field]));
+    const customColumns = [];
+    const customParams = [];
+    for (const [key, value] of Object.entries(input)) {
+      if (!customFieldMap.has(key)) continue;
+      const fieldSchema = customFieldMap.get(key);
+      if (fieldSchema.readonly) {
+        const error = new Error(`Field is read-only: ${key}`);
+        error.code = 'FIELD_READ_ONLY';
+        error.path = key;
+        throw error;
+      }
+      customColumns.push(quoteIdentifier(fieldSchema.field, 'field name'));
+      customParams.push(serializeCustomUserValue(fieldSchema, value));
+    }
+
     const passwordHash = await hashPassword(input.password);
     const verifiedAt = new Date();
+    const columnSql = ['id', 'email', 'password_hash', 'role', 'status', 'email_verified_at', ...customColumns].join(', ');
+    const placeholdersSql = ['?', '?', '?', '?', '?', '?', ...customColumns.map(() => '?')].join(', ');
     await this.database.query(
-      `INSERT INTO yuncms_users (id, email, password_hash, role, status, email_verified_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO yuncms_users (${columnSql})
+       VALUES (${placeholdersSql})`,
       [
         id,
         email,
@@ -173,6 +266,7 @@ export class UsersService extends BaseService {
         input.role ?? null,
         status,
         verifiedAt,
+        ...customParams,
       ],
     );
 
@@ -259,8 +353,24 @@ export class UsersService extends BaseService {
       error.code = 'INVALID_PAYLOAD';
       throw error;
     }
+    const customFieldMap = new Map(this.#customFields().map((field) => [field.field, field]));
     const keys = Object.keys(patch);
-    if (keys.length === 0 || keys.some((key) => !USER_UPDATE_KEYS.has(key))) {
+    if (keys.length === 0) {
+      const error = new Error('User update supports email, role and status only');
+      error.code = 'INVALID_PAYLOAD';
+      throw error;
+    }
+    for (const key of keys) {
+      if (USER_UPDATE_KEYS.has(key)) continue;
+      if (customFieldMap.has(key)) {
+        if (customFieldMap.get(key).readonly) {
+          const error = new Error(`Field is read-only: ${key}`);
+          error.code = 'FIELD_READ_ONLY';
+          error.path = key;
+          throw error;
+        }
+        continue;
+      }
       const error = new Error('User update supports email, role and status only');
       error.code = 'INVALID_PAYLOAD';
       throw error;
@@ -278,6 +388,7 @@ export class UsersService extends BaseService {
       await assertRoleAssignable(this.database, patch.role, this.accountability);
     }
 
+    const selectColumnsSql = this.#selectColumnsSql();
     const user = await withTransaction(this.database, async (connection) => {
       const assignments = [];
       const params = [];
@@ -293,6 +404,11 @@ export class UsersService extends BaseService {
       if (Object.hasOwn(patch, 'status')) {
         assignments.push('status = ?');
         params.push(patch.status);
+      }
+      for (const [key, fieldSchema] of customFieldMap.entries()) {
+        if (!Object.hasOwn(patch, key)) continue;
+        assignments.push(`${quoteIdentifier(fieldSchema.field, 'field name')} = ?`);
+        params.push(serializeCustomUserValue(fieldSchema, patch[key]));
       }
 
       params.push(id);
@@ -312,7 +428,7 @@ export class UsersService extends BaseService {
       }
 
       const [rows] = await connection.query(
-        `SELECT id, email, role, status, email_verified_at, last_access, created_at, updated_at
+        `SELECT ${selectColumnsSql}
          FROM yuncms_users WHERE id = ? LIMIT 1`,
         [id],
       );

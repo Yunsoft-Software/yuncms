@@ -263,8 +263,8 @@ Supported administration includes:
 
 - list users;
 - create users;
-- assign/update allowed roles;
-- change account status;
+- update user email, allowed roles, account status and custom `yuncms_users` extension fields;
+- set a new password for your own account or (as an Administrator) for another user;
 - inspect email-verification state;
 - send verification mail when SMTP is configured;
 - delete permitted users.

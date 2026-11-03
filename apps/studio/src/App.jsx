@@ -274,7 +274,7 @@ export function App() {
 
   const activeScreen = useMemo(() => {
     if (section === 'data-model') return <DataModelScreen route={route} onNavigate={navigateStudio} onCollectionsChanged={loadNavigationCollections} />;
-    if (section === 'users') return <UsersScreen route={route} onNavigate={navigateStudio} currentUserId={session?.user?.id} />;
+    if (section === 'users') return <UsersScreen route={route} onNavigate={navigateStudio} currentUserId={session?.user?.id} currentUserAdmin={session?.user?.admin === true} />;
     if (section === 'roles') return <RolesPermissionsScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'files') return <FilesScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'ai') return <AiScreen />;

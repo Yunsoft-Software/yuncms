@@ -135,7 +135,7 @@ test('self password change remains available and revokes existing sessions', asy
   const passwordCall = calls.find((entry) => entry?.type === 'password');
   const sessionsCall = calls.find((entry) => entry?.type === 'sessions');
   assert.equal(passwordCall.user, 'user-self');
-  assert.match(passwordCall.hash, /^scrypt\$/);
+  assert.match(passwordCall.hash, /^argon2id\$/);
   assert.equal(sessionsCall.user, 'user-self');
   assert.equal(calls.find(entry => entry?.type === 'challenges').user, 'user-self');
   assert.equal(calls.includes('commit'), true);
@@ -232,4 +232,87 @@ test('delegated manager cannot modify an existing administrator account', async 
     (error) => error.code === 'FORBIDDEN',
   );
   assert.equal(updateCalled, false);
+});
+
+test('UsersService reads, creates and updates custom system extension fields while rejecting read-only extensions', async () => {
+  const extendedSchema = {
+    version: 8,
+    collections: {
+      yuncms_users: {
+        ...schema.collections.yuncms_users,
+        fields: {
+          ...schema.collections.yuncms_users.fields,
+          full_name: {
+            field: 'full_name',
+            type: 'string',
+            readonly: false,
+            schema_metadata: { systemExtension: true },
+          },
+          badge_code: {
+            field: 'badge_code',
+            type: 'string',
+            readonly: true,
+            schema_metadata: { systemExtension: true },
+          },
+        },
+      },
+    },
+  };
+
+  const executed = [];
+  const database = {
+    async beginTransaction() {},
+    async commit() {},
+    async rollback() {},
+    async query(sql, params = []) {
+      const normalized = sql.replace(/\s+/g, ' ').trim();
+      executed.push({ sql: normalized, params });
+      if (normalized.startsWith('INSERT INTO yuncms_users')) {
+        return [{ affectedRows: 1 }, []];
+      }
+      if (normalized.startsWith('UPDATE yuncms_users SET')) {
+        return [{ affectedRows: 1 }, []];
+      }
+      if (normalized.startsWith('SELECT id, email, role, status')) {
+        return [[{
+          id: 'user-ext-1',
+          email: 'ext@example.com',
+          role: null,
+          status: 'active',
+          full_name: 'Ada Lovelace',
+          badge_code: 'B-1',
+        }], []];
+      }
+      throw new Error(`Unexpected query: ${normalized}`);
+    },
+  };
+
+  const service = new UsersService({
+    database,
+    schema: extendedSchema,
+    accountability: createSystemAccountability(),
+  });
+
+  const created = await service.createOne({
+    email: 'ext@example.com',
+    password: 'long-enough-password',
+    full_name: 'Ada Lovelace',
+  });
+  assert.equal(created.full_name, 'Ada Lovelace');
+  assert.match(executed[0].sql, /INSERT INTO yuncms_users \(id, email, password_hash, role, status, email_verified_at, `full_name`\)/);
+
+  const updated = await service.updateOne('user-ext-1', {
+    email: 'ada@example.com',
+    full_name: 'Countess of Lovelace',
+  });
+  assert.equal(updated.full_name, 'Ada Lovelace');
+  const updateQuery = executed.find((entry) => entry.sql.startsWith('UPDATE yuncms_users SET'));
+  assert.ok(updateQuery);
+  assert.match(updateQuery.sql, /email = \?, `full_name` = \? WHERE id = \?/);
+  assert.deepEqual(updateQuery.params, ['ada@example.com', 'Countess of Lovelace', 'user-ext-1']);
+
+  await assert.rejects(
+    service.updateOne('user-ext-1', { badge_code: 'B-2' }),
+    (error) => error.code === 'FIELD_READ_ONLY',
+  );
 });

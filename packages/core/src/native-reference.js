@@ -14,12 +14,21 @@ export function assertNativeReferenceTarget(collection, onDelete = 'RESTRICT') {
   if (!['RESTRICT', 'SET NULL'].includes(onDelete)) throw nativeReferenceError('INVALID_ON_DELETE', 'Native identities support RESTRICT or SET NULL only');
 }
 
+function userSafeFields(fullSchema) {
+  const custom = Object.values(fullSchema.fields ?? {}).filter((field) => {
+    if (!field?.field || USER_SAFE_SELECT_COLUMNS.includes(field.field) || field.field === 'password_hash') return false;
+    const meta = typeof field.schema_metadata === 'string' ? JSON.parse(field.schema_metadata) : (field.schema_metadata ?? {});
+    return meta?.systemExtension === true;
+  }).map((field) => field.field);
+  return [...USER_SAFE_SELECT_COLUMNS, ...custom];
+}
+
 export async function readNativeReferenceRows(service, collection, permission, { fields = ['*'], lookupField = 'id', values = [] } = {}) {
   if (lookupField !== 'id') throw nativeReferenceError('UNSUPPORTED_RELATION_TARGET', 'Native reference lookup requires id');
   if (!Array.isArray(values) || values.length > 2_000 || values.some(value => typeof value !== 'string')) throw nativeReferenceError('INVALID_QUERY', 'Native reference values must be a bounded string array');
   const fullSchema = service.schema?.collections?.[collection];
   if (!fullSchema) throw nativeReferenceError('SYSTEM_SCHEMA_REQUIRED', 'Native relation reads require system schema metadata');
-  const safeFields = collection === 'yuncms_users' ? USER_SAFE_SELECT_COLUMNS : FILE_REFERENCE_FIELDS;
+  const safeFields = collection === 'yuncms_users' ? userSafeFields(fullSchema) : FILE_REFERENCE_FIELDS;
   const allowed = safeFields.filter(field => fullSchema.fields[field] && (!permission.fields || permission.fields.includes(field)));
   if (!allowed.includes('id')) throw nativeReferenceError('FORBIDDEN_FIELD', 'Native relation primary key is not readable');
   const safeSchema = { ...fullSchema, fields: Object.fromEntries(allowed.map(field => [field, fullSchema.fields[field]])) };

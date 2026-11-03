@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { apiRequest } from '../api.js';
+import { apiRequest, clearSession, readSession, writeSession } from '../api.js';
 import { Pagination, paginateClientItems, useConfirmDialog } from '../components/index.js';
 import { useI18n } from '../i18n.js';
+import { displaySchemaName } from '../schema-name.js';
 import { studioPath } from '../studio-route.js';
 
 const USER_SORT_OPTIONS = [
@@ -14,6 +15,26 @@ const USER_SORT_OPTIONS = [
 ];
 
 const USER_PAGE_SIZES = [10, 25, 50, 100];
+const NATIVE_USER_KEYS = new Set([
+  'id',
+  'email',
+  'role',
+  'status',
+  'email_verified_at',
+  'last_access',
+  'created_at',
+  'updated_at',
+  'password_hash',
+]);
+
+function parseFieldMetadata(value) {
+  if (value == null || typeof value === 'object') return value ?? {};
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
 
 function compareUsers(left, right, sort) {
   if (sort === 'recent' || sort === 'oldest') {
@@ -33,11 +54,12 @@ function statusLabel(status, t) {
   return t(`users.${status === 'disabled' ? 'disabled' : status}`);
 }
 
-export function UsersScreen({ currentUserId, route = {}, onNavigate }) {
+export function UsersScreen({ currentUserId, currentUserAdmin = false, route = {}, onNavigate }) {
   const { locale, t } = useI18n();
   const requestConfirmation = useConfirmDialog();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [customFields, setCustomFields] = useState([]);
   const [rolesAvailable, setRolesAvailable] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -49,14 +71,17 @@ export function UsersScreen({ currentUserId, route = {}, onNavigate }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [form, setForm] = useState({ email: '', password: '', role: '', status: 'active' });
+  const [editForm, setEditForm] = useState({ email: '', role: '', status: 'active', custom: {} });
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirmPassword: '' });
 
   async function load() {
     setLoading(true);
     setError('');
     try {
-      const [usersResult, rolesResult] = await Promise.allSettled([
+      const [usersResult, rolesResult, fieldsResult] = await Promise.allSettled([
         apiRequest('/users'),
         apiRequest('/roles'),
+        apiRequest('/schema/collections/yuncms_users/fields'),
       ]);
       if (usersResult.status === 'rejected') throw usersResult.reason;
 
@@ -70,6 +95,14 @@ export function UsersScreen({ currentUserId, route = {}, onNavigate }) {
         setRoleFilter((current) => (current === 'all' || current === 'none' ? current : 'all'));
         setForm((current) => ({ ...current, role: '' }));
       }
+      if (fieldsResult.status === 'fulfilled') {
+        const rows = fieldsResult.value?.data ?? [];
+        setCustomFields(rows.filter((field) => (
+          field?.field
+          && !NATIVE_USER_KEYS.has(field.field)
+          && parseFieldMetadata(field.schema_metadata).systemExtension === true
+        )));
+      }
     } catch (requestError) {
       setError(requestError.message || t('users.loadError'));
     } finally {
@@ -82,6 +115,7 @@ export function UsersScreen({ currentUserId, route = {}, onNavigate }) {
   }, []);
 
   const roleIndex = useMemo(() => new Map(roles.map((role) => [role.id, role])), [roles]);
+  const assignableRoles = useMemo(() => roles.filter((role) => !role.public), [roles]);
   const visibleUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
     return users
@@ -134,12 +168,71 @@ export function UsersScreen({ currentUserId, route = {}, onNavigate }) {
     setError('');
     setNotice('');
     try {
-      await apiRequest(`/users/${encodeURIComponent(user.id)}`, {
+      const response = await apiRequest(`/users/${encodeURIComponent(user.id)}`, {
         method: 'PATCH',
         body: patch,
       });
-      setNotice(t('users.updatedNotice', { email: user.email }));
+      const updatedEmail = response?.data?.email || patch?.email || user.email;
+      const currentSession = readSession();
+      if (currentSession?.user && String(currentSession.user.id) === String(user.id) && updatedEmail) {
+        writeSession({
+          ...currentSession,
+          user: { ...currentSession.user, email: updatedEmail },
+        });
+      }
+      setNotice(t('users.updatedNotice', { email: updatedEmail }));
       await load();
+    } catch (requestError) {
+      setError(requestError.message || t('users.updateError'));
+    }
+  }
+
+  async function saveUserDetails(event, user, resolvedCustomFields) {
+    event.preventDefault();
+    if (!user) return;
+    const patch = {
+      email: editForm.email,
+    };
+    if (rolesAvailable) {
+      patch.role = editForm.role || null;
+    }
+    if (user.id !== currentUserId) {
+      patch.status = editForm.status;
+    }
+    for (const field of resolvedCustomFields) {
+      if (field.readonly) continue;
+      const rawValue = editForm.custom?.[field.field];
+      if (field.type === 'boolean') {
+        patch[field.field] = Boolean(rawValue);
+      } else if (field.type === 'integer' || field.type === 'bigint' || field.type === 'decimal') {
+        patch[field.field] = rawValue === '' || rawValue == null ? null : Number(rawValue);
+      } else {
+        patch[field.field] = rawValue === '' || rawValue == null ? null : rawValue;
+      }
+    }
+    await updateUser(user, patch);
+  }
+
+  async function changeUserPassword(event, user) {
+    event.preventDefault();
+    if (!user) return;
+    setError('');
+    setNotice('');
+    if (passwordForm.password !== passwordForm.confirmPassword) {
+      setError(t('auth.passwordMismatch'));
+      return;
+    }
+    try {
+      await apiRequest(`/users/${encodeURIComponent(user.id)}/password`, {
+        method: 'PATCH',
+        body: { password: passwordForm.password },
+      });
+      setPasswordForm({ password: '', confirmPassword: '' });
+      if (String(user.id) === String(currentUserId)) {
+        clearSession();
+        return;
+      }
+      setNotice(t('auth.passwordChanged'));
     } catch (requestError) {
       setError(requestError.message || t('users.updateError'));
     }
@@ -189,23 +282,78 @@ export function UsersScreen({ currentUserId, route = {}, onNavigate }) {
 
   const dateLocale = locale === 'tr' ? 'tr-TR' : 'en-US';
   const routedUser = users.find((user) => String(user.id) === String(route.userId)) ?? null;
+  const resolvedCustomFields = useMemo(() => {
+    if (customFields.length > 0) return customFields;
+    if (!routedUser) return [];
+    return Object.keys(routedUser)
+      .filter((key) => !NATIVE_USER_KEYS.has(key))
+      .map((key) => ({ field: key, name: key, type: typeof routedUser[key] === 'boolean' ? 'boolean' : 'string', readonly: false }));
+  }, [customFields, routedUser]);
+
+  useEffect(() => {
+    if (!routedUser) return;
+    const customValues = {};
+    for (const field of resolvedCustomFields) {
+      const value = routedUser[field.field];
+      if (field.type === 'boolean') {
+        customValues[field.field] = Boolean(value);
+      } else if (field.type === 'json' && value != null && typeof value === 'object') {
+        customValues[field.field] = JSON.stringify(value);
+      } else {
+        customValues[field.field] = value == null ? '' : String(value);
+      }
+    }
+    setEditForm({
+      email: routedUser.email ?? '',
+      role: routedUser.role ?? '',
+      status: routedUser.status ?? 'active',
+      custom: customValues,
+    });
+    setPasswordForm({ password: '', confirmPassword: '' });
+  }, [routedUser, resolvedCustomFields]);
 
   if (route.view === 'new') {
     return (
       <div className="screen-stack routed-form-page">
         <nav className="page-breadcrumbs" aria-label={t('nav.users')}><button type="button" onClick={() => onNavigate?.(studioPath.users())}>{t('nav.users')}</button><span aria-hidden="true">/</span><strong>{t('users.newUser')}</strong></nav>
         {error && <div className="error-banner" role="alert">{error}</div>}
-        <section className="panel form-panel create-user-panel"><div className="panel-heading"><div><p className="eyebrow">{t('users.newUser')}</p><h2>{t('users.createUser')}</h2><p>{t('users.createDescription')}</p></div><button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.users())}>{t('common.cancel')}</button></div><form className="form-grid inline-form" onSubmit={createUser}><label className="field-label"><span>{t('auth.email')}</span><input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} required autoFocus /></label><label className="field-label"><span>{t('auth.password')}</span><input type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>{rolesAvailable ? <label className="field-label"><span>{t('users.role')}</span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}><option value="">{t('app.noRole')}</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label> : <div className="inline-info">{t('users.roleUnavailableForCreate')}</div>}<label className="field-label"><span>{t('common.status')}</span><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}><option value="active">{t('users.active')}</option><option value="suspended">{t('users.suspended')}</option><option value="disabled">{t('users.disabled')}</option></select></label><button className="primary-button" type="submit">{t('users.createUser')}</button></form></section>
+        <section className="panel form-panel create-user-panel"><div className="panel-heading"><div><p className="eyebrow">{t('users.newUser')}</p><h2>{t('users.createUser')}</h2><p>{t('users.createDescription')}</p></div><button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.users())}>{t('common.cancel')}</button></div><form className="form-grid inline-form" onSubmit={createUser}><label className="field-label"><span>{t('auth.email')}</span><input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} required autoFocus /></label><label className="field-label"><span>{t('auth.password')}</span><input type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>{rolesAvailable ? <label className="field-label"><span>{t('users.role')}</span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}><option value="">{t('app.noRole')}</option>{assignableRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label> : <div className="inline-info">{t('users.roleUnavailableForCreate')}</div>}<label className="field-label"><span>{t('common.status')}</span><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}><option value="active">{t('users.active')}</option><option value="suspended">{t('users.suspended')}</option><option value="disabled">{t('users.disabled')}</option></select></label><button className="primary-button" type="submit">{t('users.createUser')}</button></form></section>
       </div>
     );
   }
 
   if (route.view === 'detail') {
+    const canChangePassword = Boolean(routedUser && (currentUserAdmin || String(routedUser.id) === String(currentUserId)));
     return (
       <div className="screen-stack routed-form-page">
         <nav className="page-breadcrumbs" aria-label={t('nav.users')}><button type="button" onClick={() => onNavigate?.(studioPath.users())}>{t('nav.users')}</button><span aria-hidden="true">/</span><strong>{routedUser?.email || t('users.userDetails')}</strong></nav>
         {error && <div className="error-banner" role="alert">{error}</div>}{notice && <div className="notice-banner" role="status">{notice}</div>}
-        {!routedUser ? <section className="panel empty-state"><div><h2>{loading ? t('users.loading') : t('users.userNotFound')}</h2></div></section> : <section className="panel user-detail-page"><header className="workspace-section-heading"><div><p className="eyebrow">{t('users.userDetails')}</p><h2>{routedUser.email}</h2><p>{routedUser.id}</p></div><span className={`status-pill user-status-pill ${routedUser.status}`}>{statusLabel(routedUser.status, t)}</span></header><div className="field-detail-grid"><article><small>{t('users.role')}</small><strong>{roleIndex.get(routedUser.role)?.name || t('app.noRole')}</strong></article><article><small>{t('users.verification')}</small><strong>{routedUser.email_verified_at ? t('users.verified') : t('users.unverified')}</strong></article><article><small>{t('users.lastAccess')}</small><strong>{routedUser.last_access ? new Date(routedUser.last_access).toLocaleString(dateLocale) : t('users.never')}</strong></article><article><small>{t('common.status')}</small><strong>{statusLabel(routedUser.status, t)}</strong></article></div><div className="user-detail-controls">{rolesAvailable && <label className="field-label"><span>{t('users.role')}</span><select value={routedUser.role ?? ''} onChange={(event) => updateUser(routedUser, { role: event.target.value || null })}><option value="">{t('app.noRole')}</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>}<label className="field-label"><span>{t('common.status')}</span><select value={routedUser.status} disabled={routedUser.id === currentUserId} onChange={(event) => updateUser(routedUser, { status: event.target.value })}><option value="active">{t('users.active')}</option><option value="suspended">{t('users.suspended')}</option><option value="disabled">{t('users.disabled')}</option></select></label></div><div className="page-danger-zone"><div><strong>{t('users.userActions')}</strong><p>{t('users.userActionsHint')}</p></div><div>{!routedUser.email_verified_at && <button className="secondary-button" type="button" onClick={() => sendVerification(routedUser)}>{t('users.sendVerification')}</button>}<button className="danger-button" type="button" disabled={routedUser.id === currentUserId} onClick={() => deleteUser(routedUser)}>{t('common.delete')}</button></div></div></section>}
+        {!routedUser ? <section className="panel empty-state"><div><h2>{loading ? t('users.loading') : t('users.userNotFound')}</h2></div></section> : <section className="panel user-detail-page"><header className="workspace-section-heading"><div><p className="eyebrow">{t('users.userDetails')}</p><h2>{routedUser.email}</h2><p>{routedUser.id}</p></div><span className={`status-pill user-status-pill ${routedUser.status}`}>{statusLabel(routedUser.status, t)}</span></header><div className="field-detail-grid"><article><small>{t('users.role')}</small><strong>{roleIndex.get(routedUser.role)?.name || t('app.noRole')}</strong></article><article><small>{t('users.verification')}</small><strong>{routedUser.email_verified_at ? t('users.verified') : t('users.unverified')}</strong></article><article><small>{t('users.lastAccess')}</small><strong>{routedUser.last_access ? new Date(routedUser.last_access).toLocaleString(dateLocale) : t('users.never')}</strong></article><article><small>{t('common.status')}</small><strong>{statusLabel(routedUser.status, t)}</strong></article></div><form className="user-detail-form" onSubmit={(event) => saveUserDetails(event, routedUser, resolvedCustomFields)}><div className="user-detail-controls"><label className="field-label"><span>{t('auth.email')}</span><input type="email" value={editForm.email} onChange={(event) => setEditForm((current) => ({ ...current, email: event.target.value }))} required /></label>{rolesAvailable && <label className="field-label"><span>{t('users.role')}</span><select value={editForm.role} onChange={(event) => { const nextRole = event.target.value; setEditForm((current) => ({ ...current, role: nextRole })); updateUser(routedUser, { role: nextRole || null }); }}><option value="">{t('app.noRole')}</option>{assignableRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>}<label className="field-label"><span>{t('common.status')}</span><select value={editForm.status} disabled={routedUser.id === currentUserId} onChange={(event) => { const nextStatus = event.target.value; setEditForm((current) => ({ ...current, status: nextStatus })); updateUser(routedUser, { status: nextStatus }); }}><option value="active">{t('users.active')}</option><option value="suspended">{t('users.suspended')}</option><option value="disabled">{t('users.disabled')}</option></select></label>{resolvedCustomFields.map((field) => (
+          <label className="field-label" key={field.field}>
+            <span>{displaySchemaName(field, 'field')}</span>
+            {field.type === 'boolean' ? (
+              <input
+                type="checkbox"
+                checked={Boolean(editForm.custom?.[field.field])}
+                disabled={Boolean(field.readonly)}
+                onChange={(event) => setEditForm((current) => ({
+                  ...current,
+                  custom: { ...current.custom, [field.field]: event.target.checked },
+                }))}
+              />
+            ) : (
+              <input
+                type={field.type === 'integer' || field.type === 'bigint' || field.type === 'decimal' ? 'number' : 'text'}
+                value={editForm.custom?.[field.field] ?? ''}
+                disabled={Boolean(field.readonly)}
+                onChange={(event) => setEditForm((current) => ({
+                  ...current,
+                  custom: { ...current.custom, [field.field]: event.target.value },
+                }))}
+              />
+            )}
+          </label>
+        ))}</div><div className="form-actions user-detail-actions"><button className="primary-button" type="submit">{t('common.save')}</button></div></form>{canChangePassword && <form className="user-password-form" onSubmit={(event) => changeUserPassword(event, routedUser)}><div className="user-detail-controls"><label className="field-label"><span>{t('auth.newPassword')}</span><input type="password" value={passwordForm.password} onChange={(event) => setPasswordForm((current) => ({ ...current, password: event.target.value }))} minLength={8} required /></label><label className="field-label"><span>{t('auth.confirmPassword')}</span><input type="password" value={passwordForm.confirmPassword} onChange={(event) => setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))} minLength={8} required /></label></div><div className="form-actions user-detail-actions"><button className="secondary-button" type="submit">{t('auth.setNewPassword')}</button></div></form>}<div className="page-danger-zone"><div><strong>{t('users.userActions')}</strong><p>{t('users.userActionsHint')}</p></div><div>{!routedUser.email_verified_at && <button className="secondary-button" type="button" onClick={() => sendVerification(routedUser)}>{t('users.sendVerification')}</button>}<button className="danger-button" type="button" disabled={routedUser.id === currentUserId} onClick={() => deleteUser(routedUser)}>{t('common.delete')}</button></div></div></section>}
       </div>
     );
   }

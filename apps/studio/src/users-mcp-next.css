@@ -194,6 +194,18 @@
   font-size: 12px;
 }
 
+.user-detail-form,
+.user-password-form {
+  display: grid;
+  gap: 10px;
+}
+
+.user-password-form {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-border);
+}
+
 .user-detail-controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -206,6 +218,12 @@
   border: 1px solid var(--ui-border);
   border-radius: 9px;
   background: var(--ui-surface);
+}
+
+.user-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .page-danger-zone {
