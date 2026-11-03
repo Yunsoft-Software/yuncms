@@ -28,7 +28,7 @@ curl 'http://localhost:3008/auth/login' \
   -d '{"email":"user@example.com","password":"your-password"}'
 ```
 
-Passwords use Node.js `crypto.scrypt` with a random per-password salt and encoded bounded cost parameters.
+Passwords use Node.js `crypto.argon2` (`argon2id`) with a random per-password salt and encoded bounded cost parameters, while preserving backward-compatible verification for existing `scrypt` password hashes.
 
 Unknown user, wrong password and inactive-user attempts intentionally produce the same public invalid-credentials behavior. The unknown-user path still performs password work to reduce trivial account-existence timing differences.
 

@@ -7,7 +7,7 @@ import { SessionsService } from './sessions-service.js';
 import { TotpService } from './totp-service.js';
 import { PRIMARY_FACTOR_VERIFIED } from '../auth/totp.js';
 
-const DUMMY_PASSWORD_HASH = 'scrypt$N=65536,r=8,p=1,keyLength=64$AAAAAAAAAAAAAAAAAAAAAA$wPIB-ojIevW9SJ6ou99EIix5AukscH1McxhCNVsi1eVkhsxb5QzXquW0YeAFglU5Vh-NthiqKH90soC0JgEJPQ';
+const DUMMY_PASSWORD_HASH = 'argon2id$m=65536,t=3,p=1,keyLength=64$AAAAAAAAAAAAAAAAAAAAAA$Ymxap8bnO3txKOt3Jo9jD3tpsml4kAZLp7TmLHypN0PLEGwlApDU6YAVEoSIoQ9wEJ4HrB94lSsaRJ8ZvZiZSQ';
 
 function invalidLogin() {
   const error = new Error('Invalid email or password');

@@ -7,7 +7,22 @@ import { createOpaqueToken, hashToken, tokenType } from '../src/auth/tokens.js';
 import { AuthService } from '../src/services/auth-service.js';
 import { SessionsService } from '../src/services/sessions-service.js';
 
-test('scrypt password hashes verify without storing the password', async () => {
+test('argon2id password hashes verify by default without storing the password', async () => {
+  const encoded = await hashPassword('correct horse battery', {
+    memory: 4096,
+    passes: 2,
+    parallelism: 1,
+    keyLength: 32,
+  });
+
+  assert.match(encoded, /^argon2id\$/);
+  assert.equal(encoded.includes('correct horse battery'), false);
+  assert.equal(await verifyPassword('correct horse battery', encoded), true);
+  assert.equal(await verifyPassword('wrong password', encoded), false);
+  assert.equal(await verifyPassword('anything', 'malformed'), false);
+});
+
+test('scrypt password hashes remain verifiable for backward compatibility', async () => {
   const encoded = await hashPassword('correct horse battery', {
     N: 1024,
     r: 8,

@@ -60,7 +60,7 @@ Collection/field/M2M destructive deletion requires explicit intent.
 
 ## Authentication
 
-- passwords use Node `crypto.scrypt` with random salts;
+- passwords use Node `crypto.argon2` (`argon2id`) with random salts and backward-compatible `scrypt` verification;
 - opaque credentials are stored as hashes;
 - refresh credentials rotate;
 - password changes/reset revoke sessions;
