@@ -7,6 +7,7 @@ import {
   Inspector,
   Pagination,
   UploadQueue,
+  TableRowActions,
   paginateClientItems,
   useConfirmDialog,
 } from '../components/index.js';
@@ -519,18 +520,23 @@ export function FilesScreen({ route = {}, onNavigate }) {
         </section>
       ) : (
         <section className="table-panel">
-          <div className="table-scroll">
-            <table>
+          <div className="table-scroll file-table-container">
+            <table className="file-table">
               <thead><tr><th>{t('common.name')}</th><th>{t('common.type')}</th><th>{t('files.size')}</th><th>{t('files.storage')}</th><th>{t('files.uploaded')}</th><th /></tr></thead>
               <tbody>
                 {pageFiles.map((file) => (
                   <tr key={file.id}>
                     <td><div className="file-list-name"><button className="file-list-thumb file-preview-open-button" type="button" onClick={() => setInspectedFile(file)} aria-label={t('files.openPreview', { file: fileDisplayName(file, t) })}><FilePreview file={file} label={fileTypeLabel(file, t)} /></button><span><strong>{fileDisplayName(file, t)}</strong><small>{file.filename_download}</small></span></div></td>
                     <td>{file.mimetype || fileTypeLabel(file, t)}</td>
-                    <td>{formatBytes(file.filesize)}</td>
+                    <td data-label={t('files.size')}>{formatBytes(file.filesize)}</td>
                     <td>{file.storage}</td>
-                    <td>{file.uploaded_at ? new Date(file.uploaded_at).toLocaleString(dateLocale) : '—'}</td>
-                    <td className="row-actions"><button className="text-button" type="button" onClick={() => setInspectedFile(file)}>{t('files.preview')}</button><button className="text-button" type="button" onClick={() => download(file)}>{t('files.download')}</button><button className="text-button" type="button" onClick={() => { beginEdit(file); onNavigate?.(studioPath.file(file.id)); }}>{t('common.edit')}</button><button className="danger-button" type="button" onClick={() => remove(file)}>{t('common.delete')}</button></td>
+                    <td data-label={t('files.uploaded')}>{file.uploaded_at ? new Date(file.uploaded_at).toLocaleString(dateLocale) : '—'}</td>
+                    <td className="row-actions row-actions-wide"><TableRowActions actions={[
+                      { label: t('files.preview'), icon: 'inspect', onClick: () => setInspectedFile(file) },
+                      { label: t('files.download'), icon: 'download', onClick: () => download(file) },
+                      { label: t('common.edit'), icon: 'edit', onClick: () => { beginEdit(file); onNavigate?.(studioPath.file(file.id)); } },
+                      { label: t('common.delete'), icon: 'delete', danger: true, onClick: () => remove(file) },
+                    ]} /></td>
                   </tr>
                 ))}
               </tbody>

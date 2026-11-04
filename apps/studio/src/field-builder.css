@@ -112,7 +112,7 @@
 
 .field-type-card.active .field-type-card-icon {
   border-color: var(--studio-accent-border);
-  color: var(--studio-accent);
+  color: var(--ui-accent-ink, var(--studio-accent));
 }
 
 .field-type-card-copy {
@@ -131,7 +131,7 @@
 }
 
 .field-type-card-check {
-  color: var(--studio-accent);
+  color: var(--ui-accent-ink, var(--studio-accent));
   font-weight: 900;
 }
 
@@ -159,7 +159,7 @@
   padding: 0 9px;
   border-radius: 999px;
   background: var(--studio-accent-soft);
-  color: var(--studio-accent);
+  color: var(--ui-accent-ink, var(--studio-accent));
   font-size: 0.76rem;
   font-weight: 800;
 }
@@ -256,7 +256,7 @@
   padding: 3px 7px;
   border-radius: 999px;
   background: var(--studio-accent-soft);
-  color: var(--studio-accent);
+  color: var(--ui-accent-ink, var(--studio-accent));
   font-weight: 800;
 }
 
@@ -294,7 +294,7 @@
 
 .accountability-option code {
   width: fit-content;
-  color: var(--studio-accent);
+  color: var(--ui-accent-ink, var(--studio-accent));
   font-size: 0.72rem;
 }
 
@@ -315,7 +315,7 @@
 .system-resource-pill {
   border-color: var(--studio-accent-border);
   background: var(--studio-accent-soft);
-  color: var(--studio-accent);
+  color: var(--ui-accent-ink, var(--studio-accent));
 }
 
 .permission-collection-name {

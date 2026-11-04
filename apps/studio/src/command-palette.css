@@ -151,7 +151,7 @@
 
 .studio-command-item.active svg,
 .studio-command-item:focus-visible svg {
-  color: var(--ui-accent);
+  color: var(--ui-accent-ink, var(--ui-accent));
 }
 
 .studio-command-item span {
@@ -202,7 +202,7 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .studio-app-rail-command {
     display: none;
   }

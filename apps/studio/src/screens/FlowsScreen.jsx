@@ -10,7 +10,7 @@ export function FlowsScreen({ route }) {
   const [listState, setListState] = useState({ page: 1, pageSize: 10, search: '', status: '', trigger: '' });
   const [initialDraft, setInitialDraft] = useState(null), [launchImport, setLaunchImport] = useState(false), [draftKey, setDraftKey] = useState(0);
   const create = (draft = null, importing = false) => { setInitialDraft(draft); setLaunchImport(importing); setDraftKey(value => value + 1); navigateStudio(studioPath.newFlow()); };
-  if (route.view === 'list') return <FlowList state={listState} onStateChange={setListState} onNew={() => create()} onImport={() => create(null, true)} />;
+  if (route.view === 'list') return <FlowList showLegacy={route.legacy} state={listState} onStateChange={setListState} onNew={() => create()} onImport={() => create(null, true)} />;
   return <FlowEditor key={route.flowId || `new-${draftKey}`} route={route} initialDraft={initialDraft} launchImport={launchImport}
     onLaunchHandled={() => { setInitialDraft(null); setLaunchImport(false); }} onCreateDraft={create} />;
 }
@@ -65,7 +65,7 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
     });
   }
   function addOperation() {
-    try { const next = addFlowOperation(draft, paletteType); change(next); setSelected(next.operations.at(-1).id); setInvalid(false); }
+    try { const next = addFlowOperation(draft, paletteType); next.operations.at(-1).name = t(`flow.operation.${paletteType}`); change(next); setSelected(next.operations.at(-1).id); setInvalid(false); }
     catch (failure) { setError(failure.message); }
   }
   async function exportDefinition() {
@@ -88,7 +88,7 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
     });
   }
   if (!configuration || !ready) return <section className="flows-workspace">{error ? <div className="error-banner" role="alert">{error}</div> : <p role="status">{t('common.loading')}</p>}</section>;
-  return <section className="flows-workspace" aria-label={t('flow.title')}>
+  return <section className="flows-workspace flow-editor" aria-label={t('flow.title')}>
     <header className="flow-heading"><div><button type="button" className="text-button flow-back" disabled={busy} onClick={() => navigate(studioPath.flows())}>← {t('flow.back')}</button><h1>{draft.name || t('flow.new')}</h1><p>{t('flow.subtitle')}</p></div>
       <div className="flow-toolbar-actions">{access.manage && <><button className="secondary-button" type="button" disabled={busy} onClick={() => navigate(studioPath.newFlow())}>{t('flow.new')}</button>
         <button className="secondary-button" type="button" disabled={busy} onClick={() => { setImportText(''); setImportError(''); setImportReading(false); setImportOpen(true); }}>{t('flow.import')}</button></>}
@@ -98,10 +98,13 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
     {!access.manage && <p className="notice-banner">{t('flow.readOnly')}</p>}
     {error && <div className="error-banner" role="alert">{error}</div>}{saved && <p className="success-banner" role="status">{t('common.saved')}</p>}
     <div className={`flow-layout ${inspectorOpen ? '' : 'flow-layout-expanded'}`}>
-      <div className="flow-workbench"><div className="flow-palette">{access.manage && <><label className="field-label"><span>{t('flow.operations')}</span><select aria-label={t('flow.operations')} value={paletteType} disabled={busy} onChange={event => setPaletteType(event.target.value)}>
+      <div className="flow-workbench"><div className="flow-palette">{access.manage && <div className="flow-palette-tool"><label className="field-label"><span>{t('flow.operations')}</span><select aria-label={t('flow.operations')} value={paletteType} disabled={busy} onChange={event => setPaletteType(event.target.value)}>
         {configuration.operations.map(type => <option value={type} key={type}>{t(`flow.operation.${type}`)}</option>)}</select></label>
-        <button type="button" className="secondary-button" disabled={busy || draft.operations.length >= 100} onClick={addOperation}>{t('flow.addOperation')}</button></>}
+        <button type="button" className="secondary-button" disabled={busy || draft.operations.length >= 100} onClick={addOperation}>{t('flow.addOperation')}</button></div>}
+        <div className="flow-palette-tool">
+        {draft.operations.length > 0 && <label className="field-label"><span>{t('flow.selected')}</span><select aria-label={t('flow.selected')} value={selected} disabled={busy} onChange={event => { setSelected(event.target.value); setInvalid(false); setInspectorOpen(true); }}><option value="trigger">{t('flow.triggerLabel')}</option>{draft.operations.map(node => <option value={node.id} key={node.id}>{node.name || node.key}</option>)}</select></label>}
         <button type="button" className="secondary-button" aria-expanded={inspectorOpen} onClick={() => setInspectorOpen(value => !value)}>{t(inspectorOpen ? 'flow.hideSettings' : 'flow.showSettings')}</button>
+        </div>
         <span className="flow-draft-status">{dirty ? t('flow.unsaved') : ''}</span></div>
         <p className="flow-canvas-hint">{t('flow.connectionsHint')}</p>
         <FlowCanvas flow={draft} selected={selected} disabled={busy || !access.manage} onSelect={id => { setSelected(id); setInvalid(false); setInspectorOpen(true); }} onChange={change} onError={failure => setError(failure.message)} trace={run?.trace ?? []} />
@@ -111,7 +114,7 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
             <button type="button" className="danger-button" disabled={busy} onClick={remove}>{t('common.delete')}</button></>}
         </div>
       </div>
-      {inspectorOpen && <FlowInspector key={selected} flow={draft} selected={selected} configuration={configuration} onChange={change} disabled={busy || !access.manage} onValidityChange={valid => setInvalid(!valid)} onRemove={id => { change(removeFlowOperation(draft, id)); setSelected('trigger'); setInvalid(false); }} />}
+      {inspectorOpen && <FlowInspector key={selected} flow={draft} selected={selected} configuration={configuration} onError={failure => setError(failure.message)} onChange={change} disabled={busy || !access.manage} onValidityChange={valid => setInvalid(!valid)} onRemove={id => { change(removeFlowOperation(draft, id)); setSelected('trigger'); setInvalid(false); }} />}
     </div>
     {draft.id && <FlowRunHistory flowId={draft.id} open={historyOpen} onClose={() => setHistoryOpen(false)} onSelect={setRun} refreshKey={historyRefresh} returnFocusRef={historyTriggerRef} />}
     <Modal open={importOpen && access.manage} title={t('flow.import')} description={t('flow.importHint')} onClose={() => setImportOpen(false)} actions={<><button type="button" className="text-button" onClick={() => setImportOpen(false)}>{t('common.cancel')}</button><button type="button" className="primary-button" disabled={importReading || Boolean(importError)} onClick={async () => {

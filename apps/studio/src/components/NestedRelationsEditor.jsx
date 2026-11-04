@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { tabTargetIndex } from '../tab-navigation.js';
 
 import { slugifyText } from '../content-relations.js';
 import {
@@ -9,6 +10,7 @@ import {
 } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
+import { BooleanFieldControl } from './BooleanFieldControl.jsx';
 import { FileFieldControl, FileValuePreview } from './FileFieldControl.jsx';
 import { RelationPicker } from './RelationPicker.jsx';
 import { RichTextEditor } from './RichTextEditor.jsx';
@@ -129,12 +131,7 @@ function renderControlForField({
           ))}
         </select>
       ) : field.type === 'boolean' ? (
-        <input
-          type="checkbox"
-          checked={Boolean(value)}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.checked)}
-        />
+        <BooleanFieldControl label={label} value={value} disabled={disabled} onChange={onChange} />
       ) : field.type === 'text' || field.type === 'json' ? (
         <textarea
           rows={field.type === 'json' ? 6 : 4}
@@ -170,10 +167,29 @@ function TranslationsSection({
   const languages = relation.languages ?? [];
   const [activeLang, setActiveLang] = useState(() => languages[0]?.code || 'tr-TR');
   const [viewMode, setViewMode] = useState('tabs');
+  const selectedLang = languages.some(language => language.code === activeLang) ? activeLang : languages[0]?.code;
+  const languageKeys = languages.map(language => language.code).join('|');
+  const tabsRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const tabs = tabsRef.current;
+    if (!tabs) return undefined;
+    const revealSelected = () => {
+      const selected = tabs.querySelector('[aria-selected="true"]');
+      if (!selected) return;
+      const bounds = tabs.getBoundingClientRect(), target = selected.getBoundingClientRect();
+      const left = target.left < bounds.left ? target.left - bounds.left : target.right > bounds.right ? target.right - bounds.right : 0;
+      if (left) tabs.scrollBy({ left, behavior: 'instant' });
+    };
+    const observer = new ResizeObserver(revealSelected);
+    observer.observe(tabs);
+    revealSelected();
+    return () => observer.disconnect();
+  }, [selectedLang, languageKeys, viewMode]);
 
   const visibleLanguages = viewMode === 'split' && !compact
     ? languages
-    : languages.filter((lang) => lang.code === activeLang);
+    : languages.filter((lang) => lang.code === selectedLang);
   const effectiveLanguages = visibleLanguages.length > 0 ? visibleLanguages : languages.slice(0, 1);
 
   function updateField(langCode, fieldName, nextValue) {
@@ -246,19 +262,30 @@ function TranslationsSection({
       </div>
 
       {viewMode === 'tabs' && (
-        <div className="nested-language-tabs" role="tablist" aria-label={t('relations.translationsTitle')}>
-          {languages.map((lang) => {
+        <div ref={tabsRef} className="nested-language-tabs" role="tablist" aria-label={t('relations.translationsTitle')}>
+          {languages.map((lang, index) => {
             const entry = draft[lang.code];
             const filled = !entry?.cleared && hasFilledTranslation(entry?.values);
-            const isActive = lang.code === activeLang;
+            const isActive = lang.code === selectedLang;
             return (
               <button
                 key={lang.code}
                 type="button"
                 role="tab"
+                id={`${relation.key}-${lang.code}-tab`}
                 aria-selected={isActive}
+                aria-controls={`${relation.key}-${lang.code}-panel`}
+                tabIndex={isActive ? 0 : -1}
                 className={`nested-language-tab ${isActive ? 'active' : ''} ${filled ? 'is-filled' : 'is-empty'}`}
                 onClick={() => setActiveLang(lang.code)}
+                onKeyDown={(event) => {
+                  if (event.altKey || event.ctrlKey || event.metaKey) return;
+                  const target = tabTargetIndex(event.key, index, languages.length);
+                  if (target === null) return;
+                  event.preventDefault();
+                  setActiveLang(languages[target].code);
+                  event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[target]?.focus();
+                }}
               >
                 <span className="nested-lang-code">{shortLanguageBadge(lang.code)}</span>
                 <span className="nested-lang-name">{lang.name || lang.code}</span>
@@ -276,7 +303,7 @@ function TranslationsSection({
           const entry = draft[lang.code] ?? { id: null, languageCode: lang.code, cleared: false, values: {} };
           const filled = !entry.cleared && hasFilledTranslation(entry.values);
           return (
-            <div className="nested-language-card" key={lang.code} data-lang={lang.code}>
+            <div className="nested-language-card" key={lang.code} id={`${relation.key}-${lang.code}-panel`} data-lang={lang.code} dir={lang.direction === 'rtl' ? 'rtl' : undefined} role={viewMode === 'tabs' ? 'tabpanel' : undefined} aria-labelledby={viewMode === 'tabs' ? `${relation.key}-${lang.code}-tab` : undefined}>
               <div className="nested-language-card-header">
                 <div>
                   <span className="nested-lang-code">{shortLanguageBadge(lang.code)}</span>
@@ -388,7 +415,7 @@ function M2MSection({
               onClick={() => toggleItem(itemId)}
             >
               <span className="nested-m2m-check" aria-hidden="true">{active ? '✓' : '+'}</span>
-              <span className="nested-m2m-label">{String(itemLabel)}</span>
+              <span className="nested-m2m-label" title={String(itemLabel)}>{String(itemLabel)}</span>
             </button>
           );
         })}
@@ -627,7 +654,7 @@ export function NestedRelationCell({ relation, rows = [], files = [], t }) {
           const label = matched?.[labelField] ?? targetId;
           return (
             <span className="nested-m2m-chip" title={String(label)} key={String(row.id ?? targetId)}>
-              {String(label)}
+              <span className="nested-chip-label">{String(label)}</span>
             </span>
           );
         })}

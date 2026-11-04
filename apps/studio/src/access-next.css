@@ -504,7 +504,7 @@
 
 .permission-action-row:hover .permission-configure,
 .permission-action-row:focus-within .permission-configure {
-  color: var(--ui-accent);
+  color: var(--ui-accent-ink, var(--ui-accent));
 }
 
 .protected-permission {
@@ -641,7 +641,7 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .permissions-layout {
     grid-template-columns: 1fr;
     border: 0;

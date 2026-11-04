@@ -415,10 +415,10 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
           <div className="panel-heading role-sidebar-heading">
             <div>
               <p className="eyebrow">{t('roles.access')}</p>
-              <h2>{t('roles.roles')}</h2>
+              <h2>{t(showCreateRole ? 'roles.createRole' : 'roles.roles')}</h2>
               <p>{t('roles.summary', { count: roles.length })}</p>
             </div>
-            <button className="primary-button" type="button" onClick={() => onNavigate?.(showCreateRole ? studioPath.roles() : studioPath.newRole())}>
+            <button className={showCreateRole ? 'text-button' : 'primary-button'} type="button" onClick={() => onNavigate?.(showCreateRole ? studioPath.roles() : studioPath.newRole())}>
               {showCreateRole ? t('common.cancel') : t('common.create')}
             </button>
           </div>

@@ -6,7 +6,7 @@
   display: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   html,
   body,
   #root {
@@ -97,7 +97,7 @@
     border: 1px solid color-mix(in srgb, var(--ui-accent) 20%, var(--studio-border));
     border-radius: 12px;
     background: color-mix(in srgb, var(--ui-accent) 7%, var(--studio-surface));
-    color: var(--ui-accent);
+    color: var(--ui-accent-ink, var(--ui-accent));
   }
 
   .sidebar .sidebar-collapse-button .sidebar-icon {

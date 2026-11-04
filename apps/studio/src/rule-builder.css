@@ -51,7 +51,7 @@
 }
 
 .rule-builder-value-control.dynamic input {
-  color: var(--ui-accent);
+  color: var(--ui-accent-ink, var(--ui-accent));
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 10.5px;
   font-weight: 700;

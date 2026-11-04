@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openAiFlowEditor } from './fixtures/ai-flow-editor.js';
 
 const password = 'Browser-flow-fixture-123!';
 async function setup(request) {
@@ -20,17 +21,7 @@ async function setup(request) {
 
 test('Studio automation preview displays admission denial and preserves the record', async ({ page, request }) => {
   const { session, headers, actor, record } = await setup(request);
-  await page.addInitScript(session => {
-    sessionStorage.setItem('yuncms.studio.session', JSON.stringify(session));
-    localStorage.setItem('yuncms.studio.locale', 'en');
-  }, session);
-  await page.goto('/#/automations');
-  await page.getByLabel('Name', { exact: true }).fill('Denied browser preview');
-  await page.getByRole('combobox', { name: 'Collection', exact: true }).selectOption('browser_flow_records');
-  await page.getByRole('combobox', { name: /^Run as/ }).selectOption(actor.id);
-  await page.getByRole('group', { name: 'Input fields', exact: true }).locator('label').filter({ hasText: 'title' }).getByRole('checkbox').check();
-  await page.getByRole('group', { name: 'Output fields', exact: true }).locator('label').filter({ hasText: 'status' }).getByRole('checkbox').check();
-  await page.getByLabel('AI instruction', { exact: true }).fill('Copy title to status.');
+  await openAiFlowEditor(page, session, actor, 'Denied browser preview');
   await page.getByLabel('Sample record key', { exact: true }).fill(String(record.id));
   const preview = page.waitForResponse(response => response.url().endsWith('/automations/preview') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Test on a record', exact: true }).click();
@@ -73,23 +64,14 @@ test('Studio previews real-provider JSON output and leaves the source record unc
   const marker = `json-mode-${Date.now()}`;
   expect((await request.post('/extensions/flow-fixture/ai/allow', { headers })).status()).toBe(204);
   try {
-    await page.addInitScript(session => {
-      sessionStorage.setItem('yuncms.studio.session', JSON.stringify(session));
-      localStorage.setItem('yuncms.studio.locale', 'en');
-    }, session);
-    await page.goto('/#/automations');
-    await page.getByLabel('Name', { exact: true }).fill('Real JSON preview');
-    await page.getByRole('combobox', { name: 'Collection', exact: true }).selectOption('browser_flow_records');
-    await page.getByRole('combobox', { name: /^Run as/ }).selectOption(actor.id);
-    await page.getByRole('group', { name: 'Input fields', exact: true }).locator('label').filter({ hasText: 'title' }).getByRole('checkbox').check();
-    await page.getByRole('group', { name: 'Output fields', exact: true }).locator('label').filter({ hasText: 'status' }).getByRole('checkbox').check();
-    await page.getByLabel('AI instruction', { exact: true }).fill(`Return only a JSON object with status set to the exact string ${marker}.`);
+    await openAiFlowEditor(page, session, actor, 'Real JSON preview');
+    await page.getByRole('textbox', { name: 'AI instruction', exact: true }).fill(`Return only a JSON object with status set to the exact string ${marker}.`);
     await page.getByLabel('Sample record key', { exact: true }).fill(String(record.id));
     const response = page.waitForResponse(response => response.url().endsWith('/automations/preview') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Test on a record', exact: true }).click();
     const preview = await response;
     expect(preview.status(), JSON.stringify(await preview.json())).toBe(200);
-    await expect(page.locator('.automation-preview pre').last()).toContainText(marker);
+    await expect(page.locator('.flow-ai-preview-result pre').last()).toContainText(marker);
     const readback = await request.get(`/items/browser_flow_records/${record.id}`, { headers });
     expect((await readback.json()).data.status).toBe('original');
   } finally {

@@ -11,6 +11,7 @@ import {
 } from '@yunsoft/yuncms-core';
 import { createApp } from '../../../packages/api/src/app.js';
 import { loadExtensionRuntime } from '../../../packages/api/src/extensions/runtime.js';
+import { createAiFlowOperation } from '../../../packages/api/src/flows/ai-operation.js';
 import { FlowRuntime } from '../../../packages/api/src/flows/runtime.js';
 import { startFlowNetwork } from '../../helpers/flow-network.mjs';
 import { randomBytes } from 'node:crypto';
@@ -25,7 +26,7 @@ import { createMcpRouter } from '../../../packages/api/src/mcp.js';
 import { McpSettingsStore } from '../../../packages/api/src/mcp/settings-store.js';
 
 if (process.env.YUNCMS_TEST_MYSQL !== '1' || process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE !== '1') throw Error('Browser acceptance requires an explicitly authorized disposable MySQL database');
-const config = loadConfig({ ...process.env, AUTH_TOTP_KEY: process.env.AUTH_TOTP_KEY || randomBytes(32).toString('hex'), API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', AUTH_ACTION_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
+const config = loadConfig({ ...process.env, AUTH_PUBLIC_URL: `http://127.0.0.1:${Number(process.env.YUNCMS_BROWSER_PORT ?? 34074)}`, AUTH_TOTP_KEY: process.env.AUTH_TOTP_KEY || randomBytes(32).toString('hex'), API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', AUTH_ACTION_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
 if (!/(test|ci|dev)/i.test(config.database.database)) throw Error('Browser fixture requires a disposable test/ci/dev database');
 const pool = createDatabasePool({ ...config.database, connectionLimit: 5 }), accountability = createSystemAccountability();
 const root = await mkdtemp(join(tmpdir(), 'yuncms-flows-browser-'));
@@ -93,7 +94,7 @@ try {
   await new ItemsService(collection, { ...basic, schema }).createOne({ title: 'Documentation article', status: 'draft' });
   network = await startFlowNetwork();
   const mailer = new SmtpMailer({ host: '127.0.0.1', port: network.smtpPort, from: 'flows@example.test', emitter });
-  const flowsOptions = { scripts: config.flows.scripts, requestHosts: ['localhost'], flowEnv: { TEST_PUBLIC_VALUE: 'visible' } };
+  const flowsOptions = { operations: new Map([['ai', createAiFlowOperation(automationOptions)]]), scripts: config.flows.scripts, requestHosts: ['localhost'], flowEnv: { TEST_PUBLIC_VALUE: 'visible' } };
   runtime = new FlowRuntime({ database: pool, schemaCache: cache, services, emitter, storage, logger, mailer, ...flowsOptions }).registerHooks();
   const fixture = express.Router();
   fixture.use((req, _res, next) => { if (!req.accountability.admin) throw Object.assign(new Error('Fixture management requires administrator access'), { code: 'FORBIDDEN' }); next(); });
@@ -122,7 +123,7 @@ try {
     name: 'totp-probe', type: 'module', yuncms: { id: 'totp-probe', type: 'endpoint', entry: './index.js' },
   }));
   const coreEntryUrl = new URL('../../../packages/core/src/index.js', import.meta.url).href;
-  await writeFile(join(totpProbeDir, 'index.js'), `import { withAdvisoryLock } from ${JSON.stringify(coreEntryUrl)};
+  await writeFile(join(totpProbeDir, 'index.js'), `import { withAdvisoryLock, databaseAdvisoryLockName } from ${JSON.stringify(coreEntryUrl)};
   export default {
     __yuncms_extension__: true, type: 'endpoint',
     register(router, context) {
@@ -132,18 +133,16 @@ try {
           const status = await new context.services.TotpService(opts).status();
           return { ...status, reusedLockConnection: opts.database === conn };
         });
-        let released = 0, destroyed = 0;
-        await withAdvisoryLock({
-          async getConnection() {
-            return {
-              connection: { config: { database: 'browser_probe_test' } },
-              release() { released += 1; },
-              destroy() { destroyed += 1; },
-              async query(sql) { return [[String(sql).includes('RELEASE_LOCK') ? { released: 0 } : { acquired: 1 }]]; },
-            };
-          },
-        }, 'browser-totp-unlock-failure', async () => {});
-        res.json({ data: { ...data, unlockFailureDestroyed: released === 0 && destroyed === 1 } });
+        let lostConnection;
+        await withAdvisoryLock(context.database, 'browser-totp-unlock-failure', async conn => {
+          lostConnection = conn;
+          const name = databaseAdvisoryLockName(conn.connection.config.database, 'browser-totp-unlock-failure');
+          // Real ownership loss: release in MySQL before the lock helper performs its cleanup.
+          await conn.query('SELECT RELEASE_LOCK(?)', [name]);
+        });
+        let unlockFailureDestroyed = false;
+        try { await lostConnection.query('SELECT 1'); } catch { unlockFailureDestroyed = true; }
+        res.json({ data: { ...data, unlockFailureDestroyed } });
       });
       router.post('/login', async (req, res) => {
         const opts = await context.serviceOptions(req);
@@ -174,7 +173,7 @@ try {
   });
   const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger, mailer, flowsOptions,
     mcpRouter: createMcpRouter({ settingsStore: new McpSettingsStore({ database: pool }), logger }),
-    aiRouter: createAiRouter({ assistant, settingsStore }), automationsRouter: createAutomationsRouter(automationOptions),
+    aiRouter: createAiRouter({ assistant, settingsStore }), automationsRouter: createAutomationsRouter({ ...automationOptions, flowOptions: flowsOptions }),
     endpointExtensions: [...extensionRuntime.endpointExtensions, { id: 'flow-fixture', router: fixture }] });
   server = await new Promise(resolve => { const instance = app.listen(Number(process.env.YUNCMS_BROWSER_PORT ?? 34074), '127.0.0.1', () => resolve(instance)); });
   extensionRuntime.startSchedules();

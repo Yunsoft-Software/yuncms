@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest, clearSession, readSession, writeSession } from '../api.js';
-import { Pagination, paginateClientItems, useConfirmDialog } from '../components/index.js';
+import { outputValueForField } from '../content-field-values.js';
+import { Pagination, TableRowActions, paginateClientItems, useConfirmDialog } from '../components/index.js';
 import { useI18n } from '../i18n.js';
 import { displaySchemaName } from '../schema-name.js';
 import { studioPath } from '../studio-route.js';
@@ -205,7 +206,7 @@ export function UsersScreen({ currentUserId, currentUserAdmin = false, route = {
       if (field.type === 'boolean') {
         patch[field.field] = Boolean(rawValue);
       } else if (field.type === 'integer' || field.type === 'bigint' || field.type === 'decimal') {
-        patch[field.field] = rawValue === '' || rawValue == null ? null : Number(rawValue);
+        patch[field.field] = rawValue === '' || rawValue == null ? null : outputValueForField(field, rawValue);
       } else {
         patch[field.field] = rawValue === '' || rawValue == null ? null : rawValue;
       }
@@ -461,7 +462,7 @@ export function UsersScreen({ currentUserId, currentUserAdmin = false, route = {
                     </td>
                     <td>{user.last_access ? new Date(user.last_access).toLocaleString(dateLocale) : t('users.never')}</td>
                     <td className="row-actions">
-                      <button className="secondary-button" type="button" onClick={() => onNavigate?.(studioPath.user(user.id))}>{t('users.openUser')}</button>
+                      <TableRowActions actions={[{ label: t('users.openUser'), icon: 'edit', onClick: () => onNavigate?.(studioPath.user(user.id)) }]} />
                     </td>
                   </tr>
                 ))}

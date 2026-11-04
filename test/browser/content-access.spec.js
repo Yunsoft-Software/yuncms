@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const collection = 'browser_flow_records';
+const recordRow = (page, id) => page.locator('tbody tr').filter({ has: page.getByRole('checkbox', { name: `Select record ${id}`, exact: true }) });
 async function session(request, email) {
   const response = await request.post('/auth/login', { data: { email, password: 'Browser-flow-fixture-123!' } }); expect(response.status()).toBe(200);
   return (await response.json()).data;
@@ -49,7 +50,7 @@ test('native row filters hide mutation actions per record and the editor exposes
   const allowed = await create(request, headers, 'Allowed action row'), locked = await create(request, headers, 'Locked action row', 'locked');
   try {
     const staffHeaders = await open(page, request, 'content-filtered@example.test');
-    const allowedRow = page.locator('tbody tr').filter({ hasText: allowed.id }), lockedRow = page.locator('tbody tr').filter({ hasText: locked.id });
+    const allowedRow = recordRow(page, allowed.id), lockedRow = recordRow(page, locked.id);
     await expect(allowedRow.getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
     await expect(lockedRow.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
     await expect(lockedRow.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
@@ -74,7 +75,7 @@ test('ordinary CRUD grants retain native create, quick update, confirmed row del
     await page.getByRole('button', { name: 'Save record', exact: true }).click();
     const created = await creating; expect(created.status()).toBe(201); const item = (await created.json()).data; records.push(item);
     await page.getByRole('searchbox', { name: 'Search', exact: true }).fill(key);
-    const row = page.locator('tbody tr').filter({ hasText: item.id }); await expect(row).toBeVisible();
+    const row = recordRow(page, item.id); await expect(row).toBeVisible();
     await row.getByRole('button', { name: 'Quick edit', exact: true }).click();
     const status = page.getByRole('dialog').getByLabel('status', { exact: true }); await status.fill('review'); await expect(status).toHaveValue('review');
     const saving = page.waitForResponse(response => response.url().endsWith(`/items/${collection}/${item.id}`) && response.request().method() === 'PATCH');
@@ -95,10 +96,10 @@ test('ordinary CRUD grants retain native create, quick update, confirmed row del
     await page.getByRole('searchbox', { name: 'Search', exact: true }).fill(key);
     expect((await searched).status()).toBe(200);
     await expect(page.locator('section.table-panel')).toHaveAttribute('aria-busy', 'false');
-    for (const record of bulk) await page.locator('tbody tr').filter({ hasText: record.id }).locator('input[type="checkbox"]').check();
+    for (const record of bulk) await recordRow(page, record.id).locator('input[type="checkbox"]').check();
     await page.getByRole('button', { name: 'Delete selected', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete selected', exact: true }).click();
-    for (const record of bulk) await expect(page.locator('tbody tr').filter({ hasText: record.id })).toHaveCount(0);
+    for (const record of bulk) await expect(recordRow(page, record.id)).toHaveCount(0);
   } finally {
     for (const record of records) expect([204, 404]).toContain((await request.delete(`/items/${collection}/${record.id}`, { headers })).status());
   }
@@ -109,7 +110,7 @@ test('opening the inspector preserves immediate field focus and typed values acr
   const title = `Rapid inspector focus ${crypto.randomUUID()}`, record = await create(request, headers, title);
   try {
     await open(page, request, 'content-writer@example.test'); await page.getByRole('searchbox', { name: 'Search', exact: true }).fill(title);
-    const row = page.locator('tbody tr').filter({ hasText: record.id });
+    const row = recordRow(page, record.id);
     for (let index = 0; index < 5; index++) {
       await row.getByRole('button', { name: 'Quick edit', exact: true }).click();
       const field = page.getByRole('dialog').getByLabel('status', { exact: true }), value = `review-${index}`;
@@ -132,7 +133,7 @@ test('closing an inspector during a real blocking Flow update keeps it closed wh
   expect(response.status()).toBe(201); const flow = (await response.json()).data;
   try {
     await open(page, request, 'content-writer@example.test');
-    const row = page.locator('tbody tr').filter({ hasText: record.id }); await row.getByRole('button', { name: 'Quick edit', exact: true }).click();
+    const row = recordRow(page, record.id); await row.getByRole('button', { name: 'Quick edit', exact: true }).click();
     await page.getByRole('dialog').getByLabel('status', { exact: true }).fill('review');
     const saving = page.waitForResponse(result => result.url().endsWith(`/items/${collection}/${record.id}`) && result.request().method() === 'PATCH');
     await page.getByRole('dialog').getByRole('button', { name: 'Save record', exact: true }).click();

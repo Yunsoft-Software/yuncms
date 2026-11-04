@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { ReactFlow, Background, Controls, Handle, Position, MarkerType, useNodesState } from '@xyflow/react';
 import { connectFlowOperation, disconnectFlowOperation, flowGraphEdges, reconcileFlowCanvasNodes } from '../flow-graph.js';
 import { useI18n } from '../i18n.js';
@@ -16,6 +16,16 @@ const NODE_TYPES = { flow: FlowNode };
 
 export function FlowCanvas({ flow, selected, onSelect, onChange, onError, trace = [], disabled = false }) {
   const { t } = useI18n();
+  const canvasRef = useRef(null), instanceRef = useRef(null);
+  useLayoutEffect(() => {
+    let frame;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => instanceRef.current?.fitView({ padding: 0.2, maxZoom: 1, duration: 0 }));
+    });
+    observer.observe(canvasRef.current);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+  }, []);
   const traceStatusKey = JSON.stringify(trace.map(step => [step.id, step.status]));
   const statuses = useMemo(() => new Map(JSON.parse(traceStatusKey)), [traceStatusKey]);
   const modelNodes = useMemo(() => {
@@ -31,8 +41,9 @@ export function FlowCanvas({ flow, selected, onSelect, onChange, onError, trace 
   const edges = useMemo(() => flowGraphEdges(flow).map(edge => ({ ...edge, targetHandle: 'input', className: `flow-edge-${edge.data.branch}`,
     markerEnd: { type: MarkerType.ArrowClosed }, label: t(`flow.${edge.data.branch}`), type: 'smoothstep' })), [flow, t]);
   function connect(connection) { try { onChange(connectFlowOperation(flow, connection)); } catch (error) { onError(error); } }
-  return <div className="flow-canvas" data-testid="flow-canvas" aria-label={t('flow.canvas')}>
-    <ReactFlow key={`${flow.id ?? 'new'}:${flow.operations.length}`} nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} fitView proOptions={{ hideAttribution: true }} minZoom={0.2} maxZoom={1.6} deleteKeyCode={null}
+  return <div ref={canvasRef} className="flow-canvas" data-testid="flow-canvas" aria-label={t('flow.canvas')}>
+    <ReactFlow key={`${flow.id ?? 'new'}:${flow.operations.length}`} nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} fitView fitViewOptions={{ padding: 0.2, maxZoom: 1 }} proOptions={{ hideAttribution: true }} minZoom={0.2} maxZoom={1.6} deleteKeyCode={null}
+      onInit={instance => { instanceRef.current = instance; }}
       nodesDraggable={!disabled} nodesConnectable={!disabled} edgesReconnectable={false}
       ariaLabelConfig={{ 'controls.ariaLabel': t('flow.controls'), 'controls.zoomIn.ariaLabel': t('flow.zoomIn'), 'controls.zoomOut.ariaLabel': t('flow.zoomOut'),
         'controls.fitView.ariaLabel': t('flow.fitView'), 'controls.interactive.ariaLabel': t('flow.toggleInteraction'),

@@ -1,14 +1,24 @@
-import { FLOW_OPERATION_DEFAULTS, triggerDefaults } from '../flow-graph.js';
+import { FLOW_OPERATION_DEFAULTS, connectFlowOperation, disconnectFlowOperation, triggerDefaults } from '../flow-graph.js';
 import { useI18n } from '../i18n.js';
+import { ChoiceChecklist } from './ChoiceChecklist.jsx';
 import { JsonField } from './JsonField.jsx';
+import { FlowAiOperation } from './FlowAiOperation.jsx';
 import { CodeField } from './CodeField.jsx';
 
-export function FlowInspector({ flow, selected, configuration, onChange, onRemove, onValidityChange, disabled }) {
+export function FlowInspector({ flow, selected, configuration, onChange, onRemove, onValidityChange, onError, disabled }) {
   const { t } = useI18n();
   const node = flow.operations.find(item => item.id === selected);
   const patch = update => onChange({ ...flow, ...update });
   const options = update => patch({ options: { ...flow.options, ...update } });
   const patchNode = update => patch({ operations: flow.operations.map(item => item.id === selected ? { ...item, ...update } : item) });
+  const connect = (source, branch, target) => {
+    try {
+      onChange(target ? connectFlowOperation(flow, { source, sourceHandle: branch, target }) : disconnectFlowOperation(flow, source, branch));
+      onValidityChange?.(true);
+    } catch (error) { onError?.(error); }
+  };
+  const connectionField = (source, branch, value, label) => <label className="field-label"><span>{label}</span><select value={value ?? ''} onChange={event => connect(source, branch, event.target.value)}><option value="">{t('common.none')}</option>
+    {flow.operations.filter(item => item.id !== source).map(item => <option key={item.id} value={item.id}>{item.name || item.key}</option>)}</select></label>;
   const selectCollection = (value, onSelect) => <select value={value ?? ''} onChange={event => onSelect(event.target.value)}><option value="">{t('common.none')}</option>
     {configuration.collections.map(collection => <option value={collection.collection} key={collection.collection}>{collection.name}</option>)}</select>;
   if (selected !== 'trigger' && !node) return <aside className="flow-inspector"><p>{t('flow.noSelection')}</p></aside>;
@@ -16,8 +26,8 @@ export function FlowInspector({ flow, selected, configuration, onChange, onRemov
     <fieldset disabled={disabled}>
       {selected === 'trigger' ? <>
         <h2>{t('flow.triggerLabel')}</h2>
-        <label className="field-label"><span>{t('common.name')}</span><input required maxLength={120} value={flow.name} onChange={event => patch({ name: event.target.value })} /></label>
-        <label className="field-label"><span>{t('flow.description')}</span><textarea maxLength={2000} rows={2} value={flow.description} onChange={event => patch({ description: event.target.value })} /></label>
+        <label className="field-label flow-wide"><span>{t('common.name')}</span><input required maxLength={120} value={flow.name} onChange={event => patch({ name: event.target.value })} /></label>
+        <label className="field-label flow-wide"><span>{t('flow.description')}</span><textarea maxLength={2000} rows={2} value={flow.description} onChange={event => patch({ description: event.target.value })} /></label>
         <label className="field-label"><span>{t('flow.status')}</span><select aria-label={t('flow.status')} value={flow.status} onChange={event => patch({ status: event.target.value })}>
           <option value="inactive">{t('flow.inactive')}</option><option value="active">{t('flow.active')}</option></select></label>
         <label className="field-label"><span>{t('flow.triggerLabel')}</span><select value={flow.trigger} onChange={event => patch({ trigger: event.target.value, options: triggerDefaults(event.target.value), ...(event.target.value === 'schedule' && flow.accountability === 'trigger' ? { accountability: 'public' } : {}) })}>
@@ -28,16 +38,14 @@ export function FlowInspector({ flow, selected, configuration, onChange, onRemov
           {configuration.users.map(user => <option key={user.id} value={user.id}>{user.email}</option>)}</select></label>}
         {flow.trigger === 'manual' && <>
           <label className="field-label"><span>{t('flow.collection')}</span>{selectCollection(flow.options.collections?.[0], value => options({ collections: value ? [value] : [] }))}</label>
-          <label className="field-label"><span>{t('flow.allowedRoles')}</span><select multiple value={flow.options.allowed_roles ?? []} onChange={event => options({ allowed_roles: Array.from(event.target.selectedOptions, option => option.value) })}>
-            {configuration.roles.filter(role => !role.public).map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
-          <label className="checkbox-label"><input type="checkbox" checked={flow.options.require_selection === true} onChange={event => options({ require_selection: event.target.checked })} />{t('flow.requireSelection')}</label>
-          <label className="checkbox-label"><input type="checkbox" checked={flow.options.require_confirmation === true} onChange={event => options({ require_confirmation: event.target.checked })} />{t('flow.requireConfirmation')}</label>
+          <ChoiceChecklist label={t('flow.allowedRoles')} choices={configuration.roles.filter(role => !role.public).map(role => ({ value: role.id, label: role.name }))} value={flow.options.allowed_roles ?? []} onChange={allowed_roles => options({ allowed_roles })} />
+          <div className="flow-checks"><label className="checkbox-label"><input type="checkbox" checked={flow.options.require_selection === true} onChange={event => options({ require_selection: event.target.checked })} />{t('flow.requireSelection')}</label>
+          <label className="checkbox-label"><input type="checkbox" checked={flow.options.require_confirmation === true} onChange={event => options({ require_confirmation: event.target.checked })} />{t('flow.requireConfirmation')}</label></div>
         </>}
         {flow.trigger === 'event' && <>
           <label className="field-label"><span>{t('flow.eventMode')}</span><select value={flow.options.mode} onChange={event => options({ mode: event.target.value, events: ['items.create'] })}><option value="action">{t('flow.action')}</option><option value="filter">{t('flow.filter')}</option></select></label>
-          <label className="field-label"><span>{t('flow.event')}</span><select value={flow.options.events?.[0] ?? 'items.create'} onChange={event => options({ events: [event.target.value] })}>
-            {(flow.options.mode === 'filter' ? configuration.filter_events : configuration.action_events).map(event => <option key={event}>{event}</option>)}</select></label>
-          <label className="field-label"><span>{t('flow.collection')}</span>{selectCollection(flow.options.collections?.[0], value => options({ collections: value ? [value] : [] }))}</label>
+          <ChoiceChecklist label={t('flow.event')} choices={(flow.options.mode === 'filter' ? configuration.filter_events : configuration.action_events).map(event => ({ value: event, label: event }))} value={flow.options.events ?? []} onChange={events => options({ events })} />
+          <ChoiceChecklist label={t('flow.collection')} choices={configuration.collections.map(collection => ({ value: collection.collection, label: collection.name }))} value={flow.options.collections ?? []} onChange={collections => options({ collections })} />
         </>}
         {flow.trigger === 'schedule' && <label className="field-label"><span>{t('flow.cron')}</span><input value={flow.options.cron ?? ''} onChange={event => options({ cron: event.target.value })} /><small>{t('flow.cronHint')}</small></label>}
         {flow.trigger === 'webhook' && <>
@@ -45,7 +53,8 @@ export function FlowInspector({ flow, selected, configuration, onChange, onRemov
           <label className="checkbox-label"><input type="checkbox" checked={flow.options.public === true} onChange={event => options({ public: event.target.checked })} />{t('flow.publicWebhook')}</label>
           {flow.id && <label className="field-label"><span>{t('flow.webhookUrl')}</span><input readOnly value={`${window.location.origin}/flows/trigger/${flow.id}`} /></label>}
         </>}
-        <label className="field-label"><span>{t('flow.response')}</span><input value={flow.options.response ?? ''} onChange={event => options({ response: event.target.value })} /><small>{t('flow.responseHint')}</small></label>
+        <div className="flow-connections">{connectionField('trigger', 'resolve', flow.entry, t('flow.firstOperation'))}</div>
+        <label className="field-label flow-wide"><span>{t('flow.response')}</span><input value={flow.options.response ?? ''} onChange={event => options({ response: event.target.value })} /><small>{t('flow.responseHint')}</small></label>
         <details className="flow-advanced"><summary>{t('flow.triggerOptions')}</summary><JsonField objectOnly key={flow.trigger} label={t('flow.triggerOptions')} value={flow.options} onChange={value => patch({ options: value })} onValidityChange={onValidityChange} errorLabel={t('flow.invalidJson')} /></details>
       </> : <>
         <h2>{t('flow.selected')}</h2>
@@ -54,11 +63,12 @@ export function FlowInspector({ flow, selected, configuration, onChange, onRemov
         <label className="field-label"><span>{t('flow.type')}</span><select value={node.type} onChange={event => patchNode({ type: event.target.value, options: structuredClone(FLOW_OPERATION_DEFAULTS[event.target.value] ?? {}) })}>
           {configuration.operations.map(type => <option key={type} value={type}>{t(`flow.operation.${type}`)}</option>)}</select></label>
         {['read', 'create', 'update', 'delete'].includes(node.type) && <label className="field-label"><span>{t('flow.collection')}</span>{selectCollection(node.options.collection, collection => patchNode({ options: { ...node.options, collection } }))}</label>}
-        {node.type === 'script' ? <>
+        {node.type === 'ai' && configuration.access.manage ? <FlowAiOperation options={node.options} flow={flow} onChange={options => patchNode({ options })} onValidityChange={onValidityChange} /> : node.type === 'script' ? <>
           {!configuration.scripts?.enabled && <p className="notice-banner" role="status">{t('flow.scriptDisabled')}</p>}
           <label className="field-label"><span>{t('flow.scriptFormat')}</span><select aria-label={t('flow.scriptFormat')} value={node.options.format ?? 'module'} onChange={event => patchNode({ options: { ...node.options, format: event.target.value } })}><option value="module">{t('flow.scriptModule')}</option><option value="commonjs">{t('flow.scriptCommonjs')}</option></select></label>
           <CodeField label={t('flow.scriptCode')} value={node.options.code ?? ''} onChange={code => { patchNode({ options: { ...node.options, code } }); onValidityChange?.(Boolean(code.trim()) && new TextEncoder().encode(code).length <= 65536); }} hint={t('flow.scriptHint')} />
         </> : <JsonField objectOnly key={`${node.id}:${node.type}`} label={t('flow.options')} value={node.options} onChange={value => patchNode({ options: value })} onValidityChange={onValidityChange} hint={t('flow.jsonHint')} errorLabel={t('flow.invalidJson')} rows={10} />}
+        <div className="flow-connections">{connectionField(node.id, 'resolve', node.resolve, t('flow.onSuccess'))}{connectionField(node.id, 'reject', node.reject, t('flow.onFailure'))}</div>
         <button type="button" className="danger-button" onClick={() => onRemove(node.id)}>{t('flow.removeOperation')}</button>
       </>}
     </fieldset>

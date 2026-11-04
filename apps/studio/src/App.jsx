@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { API_URL, apiRequest, health, logout, navigationGroups, readSession, subscribeSession } from './api.js';
 import { collectionUi, sortContentCollections } from './collection-ui.js';
@@ -21,7 +21,6 @@ import {
   studioPath,
 } from './studio-route.js';
 import { AiScreen } from './screens/AiScreen.jsx';
-import { AutomationsScreen } from './screens/AutomationsScreen.jsx';
 import { FlowsScreen } from './screens/FlowsScreen.jsx';
 import { AppearanceScreen } from './screens/AppearanceScreen.jsx';
 import { AuthActionScreen } from './screens/AuthActionScreen.jsx';
@@ -40,7 +39,6 @@ const settingsSections = [
   { id: 'users', labelKey: 'nav.users', icon: 'users' },
   { id: 'roles', labelKey: 'nav.roles', icon: 'roles' },
   { id: 'mcp', labelKey: 'nav.mcp', icon: 'mcp', adminOnly: true },
-  { id: 'automations', labelKey: 'automation.title', icon: 'ai', adminOnly: true },
   { id: 'flows', labelKey: 'flow.title', icon: 'flows', capability: 'flows' },
   { id: 'appearance', labelKey: 'nav.appearance', icon: 'appearance' },
 ];
@@ -153,7 +151,9 @@ export function App() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [mobileLayout, setMobileLayout] = useState(() => window.matchMedia('(max-width: 900px)').matches);
+  const navigationRef = useRef(null);
+  const menuButtonRef = useRef(null);
+  const [mobileLayout, setMobileLayout] = useState(() => window.matchMedia('(max-width: 1100px)').matches);
   const [groups, setGroups] = useState({ settings: true });
   const [contentNavFocused, setContentNavFocused] = useState(() => readStudioRoute().section === 'content');
 
@@ -187,7 +187,25 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 900px)');
+    if (!mobileLayout || !mobileNavOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    navigationRef.current?.querySelector('.sidebar-collapse-button')?.focus();
+    return () => { document.body.style.overflow = previousOverflow; menuButtonRef.current?.focus(); };
+  }, [mobileLayout, mobileNavOpen]);
+
+  function handleNavigationKey(event) {
+    if (!mobileLayout || !mobileNavOpen) return;
+    if (event.key === 'Escape') { event.preventDefault(); setMobileNavOpen(false); return; }
+    if (event.key !== 'Tab') return;
+    const controls = [...navigationRef.current.querySelectorAll('button:not(:disabled), a[href], input, select')].filter(item => item.getClientRects().length);
+    const first = controls[0], last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1100px)');
     const updateLayout = () => setMobileLayout(media.matches);
     media.addEventListener('change', updateLayout);
     return () => media.removeEventListener('change', updateLayout);
@@ -278,8 +296,6 @@ export function App() {
     if (section === 'roles') return <RolesPermissionsScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'files') return <FilesScreen route={route} onNavigate={navigateStudio} />;
     if (section === 'ai') return <AiScreen />;
-    if (section === 'automations') return session?.user?.admin
-      ? <AutomationsScreen /> : <div className="error-banner" role="alert">{t('automation.adminOnly')}</div>;
     if (section === 'flows') return flowAccess.read
       ? <FlowsScreen key={`${session?.user?.id}:${session?.user?.role}:${session?.user?.admin}`} route={route} /> : <div className="error-banner" role="alert">{t('flow.accessDenied')}</div>;
     if (section === 'mcp') return session?.user?.admin
@@ -292,6 +308,7 @@ export function App() {
         collection={contentCollection}
         collectionLabel={contentTitle}
         collectionMeta={activeContentCollection}
+        collections={contentCollections}
         visibleCollectionCount={contentCollections.filter((entry) => !entry.hidden).length}
         route={route}
         onNavigate={navigateStudio}
@@ -362,10 +379,12 @@ export function App() {
 
   return (
     <div className={`studio-shell ${navigationCollapsed ? 'sidebar-collapsed' : ''}`}>
-      <aside className={`sidebar ${mobileNavOpen ? 'mobile-nav-open' : ''}`}>
+      {mobileLayout && mobileNavOpen && <button type="button" className="mobile-navigation-scrim" aria-label={t('nav.closeMenu')} tabIndex={-1} onClick={() => setMobileNavOpen(false)} />}
+      <aside ref={navigationRef} className={`sidebar ${mobileNavOpen ? 'mobile-nav-open' : ''}`} role={mobileLayout && mobileNavOpen ? 'dialog' : undefined} aria-modal={mobileLayout && mobileNavOpen ? true : undefined} aria-label={mobileLayout && mobileNavOpen ? t('nav.studioSections') : undefined} onKeyDown={handleNavigationKey}>
         <div className="sidebar-brand-row">
           <StudioBrand compact={navigationCollapsed} />
           <button
+            ref={menuButtonRef}
             className="sidebar-collapse-button"
             type="button"
             aria-label={mobileLayout ? (mobileNavOpen ? t('nav.closeMenu') : t('nav.openMenu')) : (sidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar'))}

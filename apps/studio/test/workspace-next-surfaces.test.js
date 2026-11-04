@@ -22,7 +22,7 @@ test('Files presents an asset grid and a metadata-oriented detail workspace', ()
   assert.match(filesCss, /\.file-card-actions[\s\S]*opacity:\s*0/);
   assert.match(filesCss, /\.file-card:focus-within[\s\S]*--ui-focus-ring/);
   assert.match(filesCss, /\.file-detail-page[\s\S]*grid-template-areas/);
-  assert.match(filesCss, /@media \(max-width: 900px\)/);
+  assert.match(filesCss, /@media \(max-width: 1100px\)/);
   assert.match(shellCss, /\.studio-next-app \.workspace-toolbar\s*\{[\s\S]*justify-content:\s*stretch/);
 });
 

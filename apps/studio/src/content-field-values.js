@@ -20,7 +20,8 @@ export function inputValueForField(field, value) {
 export function outputValueForField(field, value) {
   if (value === '' && !field?.required) return null;
   if (field?.type === 'boolean') return Boolean(value);
-  if (field?.type === 'integer' || field?.type === 'bigint') return Number.parseInt(value, 10);
+  if (field?.type === 'bigint') return String(value);
+  if (field?.type === 'integer') return Number.parseInt(value, 10);
   if (field?.type === 'decimal') return Number(value);
   if (field?.type === 'json') return value === '' ? null : typeof value === 'string' ? JSON.parse(value) : value;
   return value;

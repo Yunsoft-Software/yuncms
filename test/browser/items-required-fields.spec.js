@@ -35,7 +35,7 @@ test('ordinary Studio writers get safe required-null errors through actual brows
       return { status: response.status, body: await response.json() };
     }, { collection, token: writer.access_token, valid });
     expect(result.status).toBe(201); const id = result.body.data.id;
-    await page.reload(); await expect(page.locator('tbody tr').filter({ hasText: id })).toContainText(valid.title);
+    await page.reload(); await expect(page.locator('tbody tr').filter({ has: page.getByRole('checkbox', { name: `Select record ${id}`, exact: true }) })).toContainText(valid.title);
     for (const method of ['POST', 'PATCH']) for (const field of ['title', 'quantity', 'active']) {
       const response = await page.evaluate(async ({ collection, token, id, method, payload }) => {
         const result = await fetch(`/items/${collection}${method === 'PATCH' ? '/' + id : ''}`, {
@@ -57,7 +57,7 @@ test('ordinary Studio writers get safe required-null errors through actual brows
     // Native MySQL boolean readback remains the existing TINYINT 0 contract.
     expect(rows).toHaveLength(1); expect(rows[0]).toMatchObject({ id, title: valid.title, quantity: 0, active: 0 });
     await page.reload(); await expect(page.locator('tbody tr')).toHaveCount(1);
-    await expect(page.locator('tbody tr').filter({ hasText: id })).toContainText(valid.title);
+    await expect(page.locator('tbody tr').filter({ has: page.getByRole('checkbox', { name: `Select record ${id}`, exact: true }) })).toContainText(valid.title);
   } finally {
     for (const id of permissionIds) expect((await request.delete(`/permissions/${id}`, { headers: adminHeaders })).status()).toBe(204);
     expect((await request.delete(`/schema/collections/${collection}?destructive=true`, { headers: adminHeaders })).status()).toBe(204);

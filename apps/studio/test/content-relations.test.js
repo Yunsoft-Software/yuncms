@@ -236,8 +236,9 @@ test('loadRelationLookup resolves translated labels when target collection only 
 
   assert.equal(lookup.labelField, '_translated_label');
   const first = lookup.items.find((item) => item.id === 'cat-1');
-  assert.ok(first._translated_label.includes('Sağlık Teknolojileri'));
-  assert.ok(first._translated_label.includes('HealthTech'));
+  assert.equal(first._translated_label, 'HealthTech');
+  const [, turkish] = await loadRelationLookup({ many_field: 'blog_categories_id', one_collection: 'blog_categories', one_field: 'id' }, { isAdmin: true, request, locale: 'tr' });
+  assert.equal(turkish.items.find((item) => item.id === 'cat-1')._translated_label, 'Sağlık Teknolojileri');
 });
 
 test('discoverNestedRelations discovers translations, m2m, and o2m relations and builds summaries', async () => {
@@ -256,6 +257,10 @@ test('discoverNestedRelations discovers translations, m2m, and o2m relations and
   const columns = virtualRelationColumns(nested, (key) => key);
   assert.equal(columns.length, 2);
   assert.equal(columns[0].virtualRelation.kind, 'translations');
+  const relation = nested.find((entry) => entry.kind === 'm2m');
+  const labels = [{ collection: 'blog_categories', name: 'Kategoriler' }];
+  assert.equal(virtualRelationColumns([{ ...relation, alias: 'blog_categories' }], null, labels)[0].name, 'Kategoriler');
+  assert.equal(virtualRelationColumns([relation], null, labels)[0].name, 'categories');
 
   const summaries = await loadNestedSummariesForItems(nested, [{ id: 'blog-1' }], { request });
   assert.equal(summaries[nested[0].key]['blog-1'].length, 2);

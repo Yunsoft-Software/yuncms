@@ -132,8 +132,10 @@ export function contentTableFields(fields = [], limit = 8) {
   return [...primary, ...content, ...managed].slice(0, limit);
 }
 
-export function defaultContentColumnKeys(fields = [], limit = 6) {
-  return fields.slice(0, limit).map((field) => field.field);
+export function defaultContentColumnKeys(fields = [], limit = 6, relationLookups = {}) {
+  const hasReadableIdentity = fields.some(field => ['name', 'title', 'email'].includes(field.field) || field.virtualRelation?.kind === 'translations' || Boolean(relationLookups[field.field]));
+  const useful = hasReadableIdentity ? fields.filter(field => field.field !== 'id') : fields;
+  return useful.slice(0, limit).map((field) => field.field);
 }
 
 export function fieldDisplayType(field) {

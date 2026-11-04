@@ -77,7 +77,6 @@
 }
 
 .data-controls-panel .mobile-filter-toggle {
-  grid-column: 2;
   align-self: end;
   justify-self: end;
   width: auto;
@@ -179,7 +178,7 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .content-toolbar {
     align-items: stretch;
     padding: 11px 12px;
@@ -204,7 +203,6 @@
   }
 
   .content-data-controls-main,
-  .data-controls-panel .mobile-filter-toggle,
   .data-controls-panel .filter-builder,
   .data-controls-panel .active-controls-row {
     grid-column: 1;

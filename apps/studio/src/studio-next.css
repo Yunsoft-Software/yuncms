@@ -114,7 +114,7 @@
 
 .studio-app-rail-button.active {
   background: var(--ui-accent-soft);
-  color: var(--ui-accent);
+  color: var(--ui-accent-ink, var(--ui-accent));
 }
 
 .studio-app-rail-button.active::before {
@@ -474,7 +474,7 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .studio-next-frame {
     grid-template-columns: minmax(0, 1fr);
     padding-bottom: 58px;

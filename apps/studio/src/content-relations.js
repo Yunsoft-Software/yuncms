@@ -1,5 +1,6 @@
 import { inputValueForField as defaultInputValueForField, outputValueForField as defaultOutputValueForField } from './content-field-values.js';
 import { loadRelationLookup, primaryKeyFieldForFields } from './content-access.js';
+import { readAllStudioPages } from './paged-data.js';
 import { isFileField, isReadOnlyField, isSystemManagedField } from './field-ui.js';
 
 const TURKISH_CHAR_MAP = Object.freeze({
@@ -61,7 +62,7 @@ function sortLanguages(languages = []) {
   ));
 }
 
-export async function discoverNestedRelations(collection, relations = [], { isAdmin = false, request } = {}) {
+export async function discoverNestedRelations(collection, relations = [], { isAdmin = false, request, locale = 'en' } = {}) {
   if (!collection || !Array.isArray(relations) || typeof request !== 'function') return [];
 
   const reverseRelations = relations.filter((rel) => rel.one_collection === collection);
@@ -93,7 +94,7 @@ export async function discoverNestedRelations(collection, relations = [], { isAd
           one_collection: companion.one_collection,
           one_field: companion.one_field || 'id',
         },
-        { isAdmin, request },
+        { isAdmin, request, locale },
       );
 
       descriptors.push({
@@ -155,7 +156,7 @@ export async function discoverNestedRelations(collection, relations = [], { isAd
         && candidate.many_field !== languageFieldObj?.field
       ));
       const childLookupEntries = await Promise.all(
-        childDirectRelations.map((candidate) => loadRelationLookup(candidate, { isAdmin, request })),
+        childDirectRelations.map((candidate) => loadRelationLookup(candidate, { isAdmin, request, locale })),
       );
       const childRelationLookups = Object.fromEntries(childLookupEntries);
 
@@ -165,11 +166,12 @@ export async function discoverNestedRelations(collection, relations = [], { isAd
           { code: 'en-US', name: 'English', direction: 'ltr' },
         ];
         try {
-          const langRes = await request('/items/languages?limit=100');
-          if (Array.isArray(langRes?.data) && langRes.data.length > 0) {
-            languages = sortLanguages(langRes.data);
+          const languageRows = await readAllStudioPages('/items/languages', { request, limit: 100 });
+          if (languageRows.length > 0) {
+            languages = sortLanguages(languageRows);
           }
-        } catch {
+        } catch (error) {
+          if (error.code === 'STUDIO_PAGINATION_CHANGED') throw error;
           // keep fallback languages
         }
 
@@ -218,7 +220,8 @@ export async function discoverNestedRelations(collection, relations = [], { isAd
           relationLookups: childRelationLookups,
         });
       }
-    } catch {
+    } catch (error) {
+      if (error.code === 'STUDIO_PAGINATION_CHANGED') throw error;
       // Child collection not readable by current role; skip inline descriptor
     }
   }
@@ -233,7 +236,7 @@ export function nestedRelationsHaveFiles(nestedRelations = []) {
   ));
 }
 
-export function virtualRelationColumns(nestedRelations = [], t) {
+export function virtualRelationColumns(nestedRelations = [], t, collections = []) {
   return nestedRelations.map((rel) => {
     if (rel.kind === 'translations') {
       return {
@@ -245,7 +248,7 @@ export function virtualRelationColumns(nestedRelations = [], t) {
     }
     return {
       field: `__rel_${rel.key}`,
-      name: rel.alias,
+      name: collections.find((entry) => entry.collection === (rel.targetCollection || rel.childCollection) && rel.alias === entry.collection)?.name || rel.alias,
       type: 'relation-virtual',
       virtualRelation: rel,
     };
@@ -262,9 +265,9 @@ export async function loadNestedSummariesForItems(nestedRelations = [], items = 
       try {
         if (rel.kind === 'm2m') {
           const filter = JSON.stringify({ [rel.sourceJunctionField]: { _in: parentIds } });
-          const res = await request(`/items/${encodeURIComponent(rel.junctionCollection)}?filter=${encodeURIComponent(filter)}&limit=500`);
+          const rows = await readAllStudioPages(`/items/${encodeURIComponent(rel.junctionCollection)}?filter=${encodeURIComponent(filter)}`, { request });
           const grouped = {};
-          for (const row of res?.data ?? []) {
+          for (const row of rows) {
             const parentKey = String(row[rel.sourceJunctionField] ?? '');
             if (!parentKey) continue;
             grouped[parentKey] ??= [];
@@ -274,16 +277,17 @@ export async function loadNestedSummariesForItems(nestedRelations = [], items = 
         }
 
         const filter = JSON.stringify({ [rel.foreignKeyField]: { _in: parentIds } });
-        const res = await request(`/items/${encodeURIComponent(rel.childCollection)}?filter=${encodeURIComponent(filter)}&limit=500`);
+        const rows = await readAllStudioPages(`/items/${encodeURIComponent(rel.childCollection)}?filter=${encodeURIComponent(filter)}`, { request });
         const grouped = {};
-        for (const row of res?.data ?? []) {
+        for (const row of rows) {
           const parentKey = String(row[rel.foreignKeyField] ?? '');
           if (!parentKey) continue;
           grouped[parentKey] ??= [];
           grouped[parentKey].push(row);
         }
         return [rel.key, grouped];
-      } catch {
+      } catch (error) {
+        if (error.code === 'STUDIO_PAGINATION_CHANGED') throw error;
         return [rel.key, {}];
       }
     }),
@@ -310,12 +314,13 @@ export async function searchNestedParentIds(nestedRelations = [], search = '', {
         _or: textFields.map((f) => ({ [f.field]: { _contains: query } })),
       });
       try {
-        const res = await request(`/items/${encodeURIComponent(rel.childCollection)}?filter=${encodeURIComponent(filter)}&limit=200`);
-        for (const row of res?.data ?? []) {
+        const rows = await readAllStudioPages(`/items/${encodeURIComponent(rel.childCollection)}?filter=${encodeURIComponent(filter)}`, { request });
+        for (const row of rows) {
           const parentId = row?.[rel.foreignKeyField];
           if (parentId != null && parentId !== '') matchedIds.add(String(parentId));
         }
-      } catch {
+      } catch (error) {
+        if (error.code === 'STUDIO_PAGINATION_CHANGED') throw error;
         // ignore child search error
       }
     }),
@@ -329,18 +334,14 @@ export async function loadNestedRecordRows(nestedRelations = [], recordId = null
 
   const entries = await Promise.all(
     nestedRelations.map(async (rel) => {
-      try {
-        if (rel.kind === 'm2m') {
-          const filter = JSON.stringify({ [rel.sourceJunctionField]: { _eq: recordId } });
-          const res = await request(`/items/${encodeURIComponent(rel.junctionCollection)}?filter=${encodeURIComponent(filter)}&limit=500`);
-          return [rel.key, res?.data ?? []];
-        }
-        const filter = JSON.stringify({ [rel.foreignKeyField]: { _eq: recordId } });
-        const res = await request(`/items/${encodeURIComponent(rel.childCollection)}?filter=${encodeURIComponent(filter)}&limit=500`);
-        return [rel.key, res?.data ?? []];
-      } catch {
-        return [rel.key, []];
+      if (rel.kind === 'm2m') {
+        const filter = JSON.stringify({ [rel.sourceJunctionField]: { _eq: recordId } });
+        const rows = await readAllStudioPages(`/items/${encodeURIComponent(rel.junctionCollection)}?filter=${encodeURIComponent(filter)}`, { request });
+        return [rel.key, rows];
       }
+      const filter = JSON.stringify({ [rel.foreignKeyField]: { _eq: recordId } });
+      const rows = await readAllStudioPages(`/items/${encodeURIComponent(rel.childCollection)}?filter=${encodeURIComponent(filter)}`, { request });
+      return [rel.key, rows];
     }),
   );
 

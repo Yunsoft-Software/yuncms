@@ -21,7 +21,7 @@
 .content-data-controls-main + .mobile-filter-toggle[aria-expanded="true"] {
   border-color: var(--ui-border-accent);
   background: var(--ui-accent-soft);
-  color: var(--ui-accent);
+  color: var(--ui-accent-ink, var(--ui-accent));
 }
 
 .data-controls-panel {
@@ -50,7 +50,7 @@
   align-self: end;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .content-data-controls-main + .mobile-filter-toggle {
     width: 100%;
     justify-self: stretch;

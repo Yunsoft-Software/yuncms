@@ -1,4 +1,8 @@
 const PATHS = {
+  download: <><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></>,
+  inspect: <><path d="M2.5 12s3.2-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.2 5.5-9.5 5.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.5"/></>,
+  edit: <><path d="m14.5 5.5 4 4M4 20l4.5-1L20 7.5 16.5 4 5 15.5z"/><path d="M12 20h8"/></>,
+  delete: <><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7"/></>,
   flows: <><rect x="2" y="8" width="6" height="7" rx="1"/><rect x="16" y="2" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M8 11.5h4V5h4M12 11.5V19h4"/></>,
   content: <><path d="M4 5.5h16v13H4z"/><path d="M8 9h8M8 13h8"/></>,
   files: <><path d="M3.5 7h6l2-2h9v14h-17z"/><path d="M7 12h10"/></>,

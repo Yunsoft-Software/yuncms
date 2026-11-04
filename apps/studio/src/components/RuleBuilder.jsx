@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { useI18n } from '../i18n.js';
+import { DYNAMIC_VALUES, normalizeRuleValue } from '../rule-values.js';
 
 const OPERATORS = Object.freeze([
   '_eq',
@@ -14,14 +15,6 @@ const OPERATORS = Object.freeze([
   '_lte',
   '_null',
   '_nnull',
-]);
-
-const DYNAMIC_VALUES = Object.freeze([
-  '$CURRENT_USER',
-  '$CURRENT_ROLE',
-  '$NOW',
-  '$NOW(-1 day)',
-  '$NOW(+1 day)',
 ]);
 
 function simpleClauseFromObject(value) {
@@ -62,23 +55,6 @@ export function parseSimpleRules(jsonValue) {
 
 function fieldType(fields, fieldName) {
   return fields.find((field) => field.field === fieldName)?.type || 'string';
-}
-
-function normalizeRuleValue(type, operator, value) {
-  if (operator === '_null' || operator === '_nnull') return true;
-  if (typeof value === 'string' && DYNAMIC_VALUES.some((entry) => value.startsWith(entry.replace(/\(.+$/, '')))) {
-    return value;
-  }
-  if (type === 'boolean') return value === true || value === 'true';
-  if (['integer', 'bigint'].includes(type)) {
-    const parsed = Number.parseInt(value, 10);
-    return Number.isNaN(parsed) ? value : parsed;
-  }
-  if (type === 'decimal') {
-    const parsed = Number(value);
-    return Number.isNaN(parsed) ? value : parsed;
-  }
-  return value;
 }
 
 export function rulesToFilter(rules, fields = []) {

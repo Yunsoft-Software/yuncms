@@ -1,3 +1,4 @@
+import { captureStudio } from '../helpers/studio-screenshot.mjs';
 import { FLOW_LOCALES } from '../../apps/studio/src/locales/flows.js';
 import { translate } from '../../apps/studio/src/localization.js';
 import { test, expect } from '@playwright/test';
@@ -57,7 +58,7 @@ test('create, drag, connect, save, reload and run a manual Flow against the nati
   await page.getByRole('dialog').getByRole('button', { name: 'Run saved flow', exact: true }).click();
   await expect(page.getByTestId('flow-run-output')).toContainText('Hello YunCMS');
   await page.getByRole('dialog', { name: 'Run history', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
-  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-editor-desktop.png`, fullPage: true });
+  await captureStudio(page, page, { path: `.yuncms/flows-tests/${test.info().project.name}/flow-editor-desktop.png`, fullPage: true });
 });
 
 test('condition success/failure connections merge into a shared node and survive persistence', async ({ page, request }) => {
@@ -111,6 +112,50 @@ test('a saved graph retains visible nodes and connections across repeated real p
   } finally { await request.delete(`/flows/${flow.id}?revision=${flow.revision}`, { headers: { authorization: `Bearer ${session.access_token}` } }); }
 });
 
+test('resizing and changing the inspector width keep every graph node inside the canvas', async ({ page, request }) => {
+  const session = await authenticate(page, request), flow = await createFlow(request, session, 'Responsive canvas regression');
+  await page.setViewportSize({ width: 1680, height: 1050 });
+  await page.goto(`/#/flows/${flow.id}`);
+  await expect(page.locator('.react-flow__node')).toHaveCount(2);
+  const fitted = () => page.getByTestId('flow-canvas').evaluate(canvas => {
+    const bounds = canvas.getBoundingClientRect();
+    return [...canvas.querySelectorAll('.react-flow__node')].every(node => {
+      const rect = node.getBoundingClientRect();
+      return rect.width > 0 && rect.left >= bounds.left && rect.right <= bounds.right
+        && rect.top >= bounds.top && rect.bottom <= bounds.bottom;
+    });
+  });
+  for (const width of [390, 820, 1024, 1680]) {
+    await page.setViewportSize({ width, height: 1050 });
+    await expect.poll(fitted).toBe(true);
+  }
+  await page.getByRole('button', { name: 'Hide settings', exact: true }).click();
+  await expect.poll(fitted).toBe(true);
+  await page.getByRole('button', { name: 'Show settings', exact: true }).click();
+  await expect.poll(fitted).toBe(true);
+});
+
+test('connection selectors and event checklists persist multiple selections through the native API', async ({ page, request }) => {
+  const session = await authenticate(page, request), flow = await createFlow(request, session, 'Accessible event configuration', { status: 'inactive' });
+  await page.goto(`/#/flows/${flow.id}`);
+  await page.locator('.flow-inspector').getByRole('combobox', { name: 'Trigger', exact: true }).selectOption('event');
+  const events = page.getByRole('group', { name: 'Event', exact: true });
+  await events.getByRole('checkbox', { name: 'items.update', exact: true }).check();
+  await page.getByRole('group', { name: 'Collection', exact: true }).getByRole('checkbox', { name: 'browser_flow_records', exact: true }).check();
+  await page.locator('.flow-inspector').getByRole('combobox', { name: 'First operation', exact: true }).selectOption('');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(0);
+  await page.locator('.flow-inspector').getByRole('combobox', { name: 'First operation', exact: true }).selectOption('output');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await page.getByRole('combobox', { name: 'Selected operation', exact: true }).selectOption('output');
+  await expect(page.locator('.flow-inspector').getByLabel('Operation key', { exact: true })).toHaveValue('output');
+  const saved = page.waitForResponse(response => response.url().endsWith(`/flows/${flow.id}`) && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  const response = await saved; expect(response.status()).toBe(200);
+  expect((await response.json()).data.options.events).toEqual(['items.create', 'items.update']);
+  await page.reload(); await expect(events.getByRole('checkbox', { name: 'items.create', exact: true })).toBeChecked();
+  await expect(events.getByRole('checkbox', { name: 'items.update', exact: true })).toBeChecked();
+});
+
 test('invalid JSON blocks saving and deleting a node clears dangling trigger connections', async ({ page, request }) => {
   const session = await authenticate(page, request); const flow = await createFlow(request, session, 'Node deletion flow');
   await page.goto(`/#/flows/${flow.id}`); await page.locator('.react-flow__node[data-id="output"]').click();
@@ -147,7 +192,7 @@ test('downloaded JSON files import as independent inactive flows and preserve ex
   await page.getByRole('button', { name: 'Import', exact: true }).click();
   const dialog = page.getByRole('dialog'); await dialog.getByLabel('Choose a JSON file', { exact: true }).setInputFiles(path);
   await expect(dialog.getByRole('textbox', { name: 'Flow definition (JSON)', exact: true })).toHaveValue(JSON.stringify(portable, null, 2));
-  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-json-import.png`, fullPage: true });
+  await captureStudio(page, page, { path: `.yuncms/flows-tests/${test.info().project.name}/flow-json-import.png`, fullPage: true });
   await dialog.getByRole('button', { name: 'Import', exact: true }).click();
   await expect(page.locator('.flow-inspector').getByLabel('Status', { exact: true })).toHaveValue('inactive');
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
@@ -192,12 +237,23 @@ test('staff cannot open the Flow manager and can run only explicitly granted col
 
 test('mobile and dark Flow layouts use central tokens without horizontal page overflow', async ({ page, request }) => {
   const session = await authenticate(page, request); const flow = await createFlow(request, session, 'Responsive flow');
-  await page.setViewportSize({ width: 390, height: 844 }); await page.goto(`/#/flows/${flow.id}`); await expect(page.getByTestId('flow-canvas')).toBeVisible();
-  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
-  const surface = await page.evaluate(() => { const probe = document.createElement('span'); probe.style.backgroundColor = 'var(--studio-surface)'; document.body.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; });
-  await expect(page.locator('.flow-graph-node').first()).toHaveCSS('background-color', surface);
-  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-editor-mobile-dark.png`, fullPage: true });
+  const headers = { authorization: `Bearer ${session.access_token}` };
+  const original = await request.get('/studio-settings', { headers }); expect(original.status()).toBe(200);
+  const { theme } = (await original.json()).data;
+  try {
+    expect((await request.patch('/studio-settings', { headers, data: { theme: 'dark' } })).status()).toBe(200);
+    await page.setViewportSize({ width: 390, height: 844 }); await page.goto(`/#/flows/${flow.id}`);
+    await expect(page.getByTestId('flow-canvas')).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    // The light artwork is the white wordmark used on a dark surface.
+    await expect(page.locator('.sidebar-brand-row .studio-brand-logo')).toHaveAttribute('src', 'https://yunsoft.com/light-logo.png');
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+    const surface = await page.evaluate(() => { const probe = document.createElement('span'); probe.style.backgroundColor = 'var(--studio-surface)'; document.body.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; });
+    await expect(page.locator('.flow-graph-node').first()).toHaveCSS('background-color', surface);
+    await captureStudio(page, page, { path: `.yuncms/flows-tests/${test.info().project.name}/flow-editor-mobile-dark.png`, fullPage: true });
+  } finally {
+    expect((await request.patch('/studio-settings', { headers, data: { theme } })).status()).toBe(200);
+  }
 });
 
 test('flow deletion uses the shared confirmation dialog and removes the saved graph', async ({ page, request }) => {
@@ -235,10 +291,10 @@ test('server-paginated flow catalogue opens a separate wide editor and preserves
   await expect(page.locator('.react-flow__minimap, .react-flow__attribution')).toHaveCount(0);
   await page.getByRole('button', { name: 'Hide settings', exact: true }).click(); await expect(page.locator('.flow-inspector')).toHaveCount(0);
   const canvas = await page.getByTestId('flow-canvas').boundingBox(), workspace = await page.locator('.flows-workspace').boundingBox(); expect(canvas.width).toBeGreaterThan(workspace.width * .95);
-  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-editor-expanded.png`, fullPage: true });
+  await captureStudio(page, page, { path: `.yuncms/flows-tests/${test.info().project.name}/flow-editor-expanded.png`, fullPage: true });
   await page.getByRole('button', { name: 'Back to flows', exact: false }).click(); await expect(page.locator('.pagination-summary')).toContainText('21–31'); await expect(page.getByRole('combobox', { name: 'Per page', exact: true })).toHaveValue('20');
   await expect(page.getByLabel('Search flows', { exact: true })).toHaveValue(prefix);
-  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-catalogue.png`, fullPage: true });
+  await captureStudio(page, page, { path: `.yuncms/flows-tests/${test.info().project.name}/flow-catalogue.png`, fullPage: true });
   await page.getByRole('button', { name: 'New flow', exact: true }).click(); await expect(page).toHaveURL(/#\/flows\/new$/); await expect(page.locator('.flow-catalogue')).toHaveCount(0);
   await page.locator('.flow-inspector').getByLabel('Name', { exact: true }).fill('Keep this new draft'); await page.getByRole('button', { name: 'Back to flows', exact: false }).click();
   const confirmation = page.getByRole('dialog'); await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click(); await expect(page.locator('.flow-inspector').getByLabel('Name', { exact: true })).toHaveValue('Keep this new draft');
@@ -259,7 +315,7 @@ test('native run history loads bounded summaries and separate details inside a p
   await dialog.getByRole('button', { name: 'Next page', exact: true }).click(); await expect(dialog.locator('.flow-history-entry')).toHaveCount(3); await expect(dialog.locator('.pagination-summary')).toContainText('21–23');
   const selectedId = await dialog.locator('.flow-history-entry').last().getAttribute('data-run-id'); await dialog.locator('.flow-history-entry').last().click();
   const detail = await (await request.get(`/flows/${flow.id}/runs/${selectedId}`, { headers })).json(); await expect(dialog.getByTestId('flow-run-output')).toHaveText(JSON.stringify(detail.data.output, null, 2));
-  await dialog.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-history-pagination.png` });
+  await captureStudio(page, dialog, { path: `.yuncms/flows-tests/${test.info().project.name}/flow-history-pagination.png` });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeVisible();

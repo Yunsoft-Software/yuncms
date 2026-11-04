@@ -1,3 +1,4 @@
+import { captureStudio } from '../helpers/studio-screenshot.mjs';
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 
@@ -76,7 +77,7 @@ export default async (data, context) => {
   expect(output.digest).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   expect((await records(request))[0].id).toBe(output.id); await expect(page.getByTestId('flow-run-output')).toContainText(output.id);
   await page.getByRole('dialog', { name: 'Run history', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
-  await page.screenshot({ path: `.yuncms/flows-tests/${test.info().project.name}/flow-script-editor.png`, fullPage: true });
+  await captureStudio(page, page, { path: `.yuncms/flows-tests/${test.info().project.name}/flow-script-editor.png`, fullPage: true });
 });
 
 test('CommonJS require works in a saved script and typed input remains JSON', async ({ page, request }) => {

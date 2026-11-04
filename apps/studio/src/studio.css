@@ -2,6 +2,7 @@
  * Keep import order stable while legacy surfaces move into the semantic Studio system.
  */
 
+@import '@fontsource-variable/inter';
 @import '@xyflow/react/dist/style.css';
 
 @import './styles.css';
@@ -49,13 +50,13 @@
 @import './auth-settings-next.css';
 @import './users-mcp-next.css';
 
-/* Shared visual language across every Studio workspace. */
-@import './studio-theme.css';
-
 /* Explicit fallbacks for shell state in browsers without :has(). */
 @import './studio-compat.css';
 @import './automations.css';
 @import './flows.css';
+
+/* Final shared visual and typography system for every workspace. */
+@import './studio-theme.css';
 
 
 .record-form-grid { border: 0; padding: 0; margin: 0; min-width: 0; }

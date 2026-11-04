@@ -1,3 +1,9 @@
+import { readAllStudioPages } from './paged-data.js';
+
+export function directContentRelations(collection, relations = []) {
+  return relations.filter(relation => relation.many_collection === collection && relation.one_collection && relation.many_field);
+}
+
 export function canWriteContent(capabilities, action, recordId = null) {
   if (capabilities?.[action]?.allowed !== true) return false;
   return action === 'create' || (recordId !== null && Object.hasOwn(capabilities.records ?? {}, String(recordId)) && capabilities.records[String(recordId)][action] === true);
@@ -39,22 +45,28 @@ export function normalizeRecordPrimaryKey(record, primaryKey = 'id') {
   return { ...record, id: record[primaryKey] };
 }
 
-export async function loadRelationLookup(relation, { isAdmin = false, request } = {}) {
+export function translatedRelationLabel(rows = [], locale = 'en', fallback = '') {
+  const language = String(locale).toLowerCase().split('-')[0];
+  const label = row => row?.title || row?.name || row?.url || row?.slug || '';
+  const matching = rows.find(row => String(row.languages_code || row.language_code || '').toLowerCase().split('-')[0] === language && label(row));
+  return label(matching) || label(rows.find(row => label(row))) || fallback;
+}
+
+export async function loadRelationLookup(relation, { isAdmin = false, request, locale = 'en' } = {}) {
   const targetCollection = relation.one_collection;
   const keyField = relation.one_field || 'id';
   try {
     if (targetCollection === 'yuncms_users') {
-      const itemResponse = await request('/users?limit=200');
+      const items = await readAllStudioPages('/users', { request, keyField });
       return [relation.many_field, {
         targetCollection,
         keyField,
         labelField: 'email',
-        items: itemResponse?.data ?? [],
+        items,
       }];
     }
     if (targetCollection === 'yuncms_files') {
-      const itemResponse = await request('/files?limit=200');
-      const items = (itemResponse?.data ?? []).map((item) => ({
+      const items = (await readAllStudioPages('/files', { request, keyField })).map((item) => ({
         ...item,
         title: item?.title || item?.filename_download || item?.[keyField],
       }));
@@ -66,12 +78,12 @@ export async function loadRelationLookup(relation, { isAdmin = false, request } 
       }];
     }
     if (targetCollection === 'yuncms_roles') {
-      const itemResponse = await request('/roles?limit=200');
+      const items = await readAllStudioPages('/roles', { request, keyField });
       return [relation.many_field, {
         targetCollection,
         keyField,
         labelField: 'name',
-        items: itemResponse?.data ?? [],
+        items,
       }];
     }
     if (String(targetCollection).startsWith('yuncms_')) {
@@ -82,19 +94,18 @@ export async function loadRelationLookup(relation, { isAdmin = false, request } 
         items: [],
       }];
     }
-    const [fieldResponse, itemResponse] = await Promise.all([
+    const [fieldResponse, itemRows] = await Promise.all([
       request(`${isAdmin ? '/schema' : '/studio-navigation'}/collections/${encodeURIComponent(targetCollection)}/fields`),
-      request(`/items/${encodeURIComponent(targetCollection)}?limit=200`),
+      readAllStudioPages(`/items/${encodeURIComponent(targetCollection)}`, { request, keyField }),
     ]);
     const targetFields = fieldResponse?.data ?? [];
     let labelField = pickDisplayField(targetFields, keyField);
-    let items = itemResponse?.data ?? [];
+    let items = itemRows;
 
     if ((labelField === keyField || labelField === 'status') && !String(targetCollection).endsWith('_translations')) {
       try {
         const transCollection = `${targetCollection}_translations`;
-        const transResponse = await request(`/items/${encodeURIComponent(transCollection)}?limit=500`);
-        const transRows = transResponse?.data ?? [];
+        const transRows = await readAllStudioPages(`/items/${encodeURIComponent(transCollection)}`, { request });
         const fkField = `${targetCollection}_id`;
         if (transRows.length > 0 && transRows.some((row) => Object.hasOwn(row, fkField))) {
           const byParent = new Map();
@@ -107,16 +118,15 @@ export async function loadRelationLookup(relation, { isAdmin = false, request } 
           }
           items = items.map((item) => {
             const rows = byParent.get(String(item?.[keyField])) ?? [];
-            rows.sort((a, b) => String(b.languages_code || '').localeCompare(String(a.languages_code || '')));
-            const labels = [...new Set(rows.map((r) => r.title || r.name || r.url || r.slug).filter(Boolean))];
             return {
               ...item,
-              _translated_label: labels.length > 0 ? labels.join(' · ') : String(item?.[keyField] ?? ''),
+              _translated_label: translatedRelationLabel(rows, locale, String(item?.[keyField] ?? '')),
             };
           });
           labelField = '_translated_label';
         }
-      } catch {
+      } catch (error) {
+        if (error.code === 'STUDIO_PAGINATION_CHANGED') throw error;
         // Fallback to default labelField if no translations collection exists
       }
     }
@@ -127,7 +137,8 @@ export async function loadRelationLookup(relation, { isAdmin = false, request } 
       labelField,
       items,
     }];
-  } catch {
+  } catch (error) {
+    if (error.code === 'STUDIO_PAGINATION_CHANGED') throw error;
     return [relation.many_field, {
       targetCollection,
       keyField,

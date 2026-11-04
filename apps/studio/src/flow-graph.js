@@ -1,4 +1,5 @@
 export const FLOW_OPERATION_DEFAULTS = Object.freeze({
+  ai: { collection: '', ids: '{{ $trigger.keys }}', input_fields: [], output_fields: [], output_constraints: {}, instruction: '' },
   script: { format: 'module', code: 'export default async function (data, context) {\n  return { value: data.$trigger.body?.value ?? null };\n}\n' },
   transform: { value: { message: 'Hello {{ $trigger.body.name }}' } },
   condition: { rules: { '$trigger.body.approved': { _eq: true } } },
@@ -40,7 +41,7 @@ export function addFlowOperation(flow, type, id = crypto.randomUUID()) {
   const node = { id, key: `${type}_${index}`, name: '', type, options: structuredClone(FLOW_OPERATION_DEFAULTS[type]),
     position: { x: 380 + Math.floor(flow.operations.length / 4) * 330, y: 80 + (flow.operations.length % 4) * 180 }, resolve: null, reject: null };
   node.name = node.key;
-  return { ...flow, operations: [...flow.operations, node] };
+  return { ...flow, entry: flow.operations.length === 0 ? id : flow.entry, operations: [...flow.operations, node] };
 }
 export function removeFlowOperation(flow, id) {
   return { ...flow, entry: flow.entry === id ? null : flow.entry, operations: flow.operations.filter(node => node.id !== id)

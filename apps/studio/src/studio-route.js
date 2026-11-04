@@ -66,6 +66,8 @@ export function readStudioRoute(hash = window.location.hash) {
     return { section, view: first === 'new' ? 'new' : first ? 'detail' : 'list', userId: first && first !== 'new' ? first : '' };
   }
 
+  if (section === 'automations') return { section: 'flows', view: 'list', flowId: '', legacy: true };
+
   if (section === 'flows') return { section, view: first === 'new' ? 'new' : first ? 'detail' : 'list', flowId: first && first !== 'new' ? first : '' };
 
   if (TOP_LEVEL_SECTIONS.has(section)) return { section, view: 'list' };

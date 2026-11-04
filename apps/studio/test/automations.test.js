@@ -28,16 +28,16 @@ test('explicit equality bindings round-trip and cannot disappear when their fiel
   assert.match(component, /must_equal_input/); assert.doesNotMatch(component, /style=|window\.(alert|prompt)/);
 });
 
-test('automation route, administrator boundaries, preview and reusable confirmation wiring are present', () => {
-  assert.equal(readStudioRoute(studioPath.automations()).section, 'automations');
+test('legacy route leads to Flows and AI forms retain read-only preview and guarded conversion', () => {
+  assert.equal(readStudioRoute(studioPath.automations()).section, 'flows');
   const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
-  assert.match(app, /id: 'automations'.*adminOnly: true/);
-  assert.match(app, /section === 'automations'\) return session\?\.user\?\.admin/);
-  assert.match(app, /<AutomationsScreen \/> : <div[^>]*>\{t\('automation.adminOnly'\)\}/);
-  const source = readFileSync(new URL('../src/screens/AutomationsScreen.jsx', import.meta.url), 'utf8');
-  assert.match(source, /useConfirmDialog/); assert.match(source, /\/automations\/preview/);
-  assert.match(source, /run.status === 'failed' && selectedRule\?\.enabled && run.revision === selectedRule.revision/);
-  assert.doesNotMatch(source, /window\.(alert|prompt|confirm)/);
+  assert.doesNotMatch(app, /id: 'automations'/);
+  const source = readFileSync(new URL('../src/components/FlowAiOperation.jsx', import.meta.url), 'utf8');
+  const legacy = readFileSync(new URL('../src/components/FlowLegacyAutomations.jsx', import.meta.url), 'utf8');
+  assert.match(source, /\/automations\/preview/);
+  assert.match(source, /Object.keys\(options.output_constraints/);
+  assert.match(legacy, /useConfirmDialog/); assert.match(legacy, /convert-to-flow/);
+  assert.doesNotMatch(source + legacy, /window\.(alert|prompt|confirm)/);
 });
 
 test('all eight languages cover automation statuses, instructions and support CTAs', () => {

@@ -100,7 +100,7 @@
   border: 1px solid var(--studio-accent-border);
   border-radius: 14px;
   background: var(--studio-accent-soft);
-  color: var(--studio-accent);
+  color: var(--ui-accent-ink, var(--studio-accent));
   font-size: 20px;
   font-weight: 800;
 }

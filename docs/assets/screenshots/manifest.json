@@ -1,7 +1,7 @@
 {
-  "yuncmsVersion": "0.1.46",
-  "capturedAt": "2026-09-30",
-  "source": "Documentation images captured on 0.1.24; workflows last revalidated on 0.1.27 on 2026-10-10 in authenticated desktop and mobile Studio environments. Original capture provenance is preserved; current release source-contract tests and production builds verify the documented wiring.",
+  "yuncmsVersion": "0.1.47",
+  "capturedAt": "2026-11-04",
+  "source": "Studio workspace screenshots captured from the current native Studio with synthetic data. Flow image provenance is recorded separately below.",
   "files": [
     "studio-content.png",
     "studio-data-model.png",
@@ -9,7 +9,6 @@
     "studio-permissions.png",
     "studio-mobile-content.png",
     "studio-mobile-menu.png",
-    "studio-automations.jpg",
     "studio-flows.png",
     "studio-mobile-flows-dark.png",
     "studio-flows-operation.png",
@@ -25,13 +24,16 @@
     "studio-flows-list.png",
     "studio-flows-import.png"
   ],
-  "verifiedAt": "2026-10-10",
+  "verifiedAt": "2026-11-04",
   "flowCaptures": {
-    "capturedAt": "2026-10-15",
-    "source": "Playwright Chromium against a built Studio and native MySQL/API with synthetic users and records; scenario paths are recorded per image.",
+    "capturedAt": "2026-11-04",
+    "source": "Playwright Chromium against the production Studio build and real disposable MySQL/API, with synthetic users and records. Captures wait for fonts and loaded images and finish native CSS animations.",
     "files": [
       "studio-flows.png",
       "studio-mobile-flows-dark.png",
+      "studio-flows-script.png",
+      "studio-flows-list.png",
+      "studio-flows-import.png",
       "studio-flows-operation.png",
       "studio-flows-run-dialog.png",
       "studio-flows-branches.png",
@@ -40,128 +42,171 @@
       "studio-flows-schedule.png",
       "studio-flows-content-action.png",
       "studio-flows-content-confirmation.png",
-      "studio-flows-event-filter.png",
-      "studio-flows-script.png",
-      "studio-flows-list.png",
-      "studio-flows-import.png"
+      "studio-flows-event-filter.png"
     ],
-    "runtimeRevision": "315a582e0bf9464fdcfbb5fbc71c14a8db6ad5de",
+    "studioAssetsSha256": {
+      "index-NiVUG2RY.js": "30d7d8decbb617763959283e9e55491c4414c09ea9b7017b375faf751e2c2e51",
+      "index-DORGRsqY.css": "c95a471b49ff161a7ec8343c8fecb655b41f161d991bfe8cdecdf2bdacb8f2cd"
+    },
     "captures": {
       "studio-flows.png": {
-        "capturedAt": "2026-10-15",
+        "capturedAt": "2026-11-04",
         "scenario": "test/browser/flows.spec.js",
         "engine": "Chromium",
-        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
-        "sha256": "c437948d80b385b822eca69ff596502ce5b24fc42f76f3824713518768362e35",
+        "sha256": "59d0cf107ba12930dedd987b1cc6edae9bc170fd9601af0eabce3d71f2457ac4",
         "width": 1536,
-        "height": 1000
+        "height": 1061
       },
       "studio-mobile-flows-dark.png": {
-        "capturedAt": "2026-10-15",
+        "capturedAt": "2026-11-04",
         "scenario": "test/browser/flows.spec.js",
         "engine": "Chromium",
-        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
-        "sha256": "3c277a7ebd556c26a602ff728792fcc1c22b598b3f69ea0dd9b7f98f6ab36543",
+        "sha256": "df50f235edc6425489d4735c0603fa6c8fcd231518be04d843ac1474b85bb4f1",
         "width": 390,
-        "height": 1823
-      },
-      "studio-flows-operation.png": {
-        "capturedAt": "2026-10-15",
-        "scenario": "test/browser/flow-docs.spec.js",
-        "sha256": "73aaa201515725472b1a729ad54e4683b982e506750e8a3847a2198b2f2a3d76",
-        "width": 300,
-        "height": 600
-      },
-      "studio-flows-run-dialog.png": {
-        "capturedAt": "2026-10-15",
-        "scenario": "test/browser/flow-docs.spec.js",
-        "sha256": "28604175fe55ebc0bc5f7a59d878857211bfa4b5559747d20801723d338c4f10",
-        "width": 480,
-        "height": 430
-      },
-      "studio-flows-branches.png": {
-        "capturedAt": "2026-10-15",
-        "scenario": "test/browser/flow-docs.spec.js",
-        "engine": "Chromium",
-        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
-        "sha256": "7651e8baf3bc74dbbd3092eda19178394bcd63afde3c636308c479512ad97e77",
-        "width": 1228,
-        "height": 1030
-      },
-      "studio-flows-history.png": {
-        "capturedAt": "2026-10-15",
-        "scenario": "test/browser/flow-docs.spec.js",
-        "engine": "Chromium",
-        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
-        "sha256": "374afe7028e919397b191918ff0abdf6ab6c27b31b749b9fb694e16bbdcc831d",
-        "width": 1240,
-        "height": 814
-      },
-      "studio-flows-webhook.png": {
-        "capturedAt": "2026-10-15",
-        "scenario": "test/browser/flow-docs.spec.js",
-        "sha256": "b53c8e35e449fa62a6fe9ff980ba48cf07d798ff6e1d8a2a3226de3f4d8ad07d",
-        "width": 300,
-        "height": 759
-      },
-      "studio-flows-schedule.png": {
-        "capturedAt": "2026-10-15",
-        "scenario": "test/browser/flow-docs.spec.js",
-        "sha256": "25df592194b4f1438c77a18ed18dee53f207fae0e97ed513c11665faba6b1ed1",
-        "width": 300,
-        "height": 767
-      },
-      "studio-flows-content-action.png": {
-        "capturedAt": "2026-10-15",
-        "scenario": "test/browser/flow-docs.spec.js",
-        "engine": "Chromium",
-        "runtimeRevision": "4ea601e67e258711f011aa30d9ef080b0ca4c877",
-        "sha256": "04135c35d3da36f586846d664b9de142d45011d3bc5056d7fa46935b95d7441d",
-        "width": 1440,
-        "height": 1000
-      },
-      "studio-flows-content-confirmation.png": {
-        "capturedAt": "2026-10-15",
-        "scenario": "test/browser/flow-docs.spec.js",
-        "engine": "Chromium",
-        "runtimeRevision": "4ea601e67e258711f011aa30d9ef080b0ca4c877",
-        "sha256": "9ec9d9a431347ec32317a4d499a393c1ad8383ccd0ca8ee150e99dcdfb718750",
-        "width": 1440,
-        "height": 1000
-      },
-      "studio-flows-event-filter.png": {
-        "capturedAt": "2026-10-15",
-        "scenario": "test/browser/flow-docs.spec.js",
-        "sha256": "1245f1ab00fcecc39c1bcc38d3691da2ff2ca0954b53543e2f1e8011cf7bc39e",
-        "width": 300,
-        "height": 801
+        "height": 2353
       },
       "studio-flows-script.png": {
-        "capturedAt": "2026-10-15",
+        "capturedAt": "2026-11-04",
         "scenario": "test/browser/flow-runtime.spec.js",
         "engine": "Chromium",
-        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
-        "sha256": "33aa991f85ccfdda2870fcee5e8dc1a0e69b9de1fa3ad62b26d7b68d3d4347c8",
+        "sha256": "37d875f098c63e6a27c6ffb8680f45861f419d3c335ddb40d1d1540534e49900",
         "width": 1536,
-        "height": 1000
+        "height": 1061
       },
       "studio-flows-list.png": {
-        "capturedAt": "2026-10-15",
+        "capturedAt": "2026-11-04",
         "scenario": "test/browser/flows.spec.js",
         "engine": "Chromium",
-        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
-        "sha256": "e2f7263676f2c28890801fe99807de984706ce986e7e148a3ce1c5fa2f425245",
+        "sha256": "146a6d9cd1fd2ef0a818df6bad74bd711c5fe1dc77291a579b04d1eb07bfea1c",
         "width": 1536,
         "height": 1000
       },
       "studio-flows-import.png": {
-        "capturedAt": "2026-10-15",
+        "capturedAt": "2026-11-04",
         "scenario": "test/browser/flows.spec.js",
         "engine": "Chromium",
-        "runtimeRevision": "09c328d21776e39a8503701bee396be267e845a2",
-        "sha256": "9641d11840270f2a41b6ab813524818e3b8a4537e2e1a0889144ef06c6995cf2",
+        "sha256": "b0111b10833c56e86d4f78d3197c298f85c6849e17de1b5274ed6c12477b44be",
         "width": 1536,
+        "height": 1061
+      },
+      "studio-flows-operation.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "engine": "Chromium",
+        "sha256": "80171195cadf55fc97973493808c3a4347cb7c2ea049403f3869c5913a50945c",
+        "width": 350,
+        "height": 803
+      },
+      "studio-flows-run-dialog.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "engine": "Chromium",
+        "sha256": "89b8454f5d6694606c33571108433de5f964ba3549b92d04f43d8e3169db4076",
+        "width": 480,
+        "height": 436
+      },
+      "studio-flows-branches.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "engine": "Chromium",
+        "sha256": "ba15c4f119cecfe80a981c6558e3b33a7049868b1c94e52a09dcd9e97a14b1fe",
+        "width": 1168,
+        "height": 905
+      },
+      "studio-flows-history.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "engine": "Chromium",
+        "sha256": "2b8cdad4b19cef13c5518a96f035539174eb72b35a9a3f61be8630806418ed6c",
+        "width": 1240,
+        "height": 902
+      },
+      "studio-flows-webhook.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "engine": "Chromium",
+        "sha256": "1f23ee8bc842f6dbdf1c039166b852f3edd94c123ba713c17555b567c587d08e",
+        "width": 350,
+        "height": 915
+      },
+      "studio-flows-schedule.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "engine": "Chromium",
+        "sha256": "edf7d619cedc7a31d7b09f0f1bed67c7cf138496f1f1e00e4d6489161641011c",
+        "width": 350,
+        "height": 919
+      },
+      "studio-flows-content-action.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "engine": "Chromium",
+        "sha256": "8e7f4b285e04da8e927d1785cb7bb6bb437df5638b04ef0d2c1eb3058a8a37dd",
+        "width": 1440,
         "height": 1000
+      },
+      "studio-flows-content-confirmation.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "engine": "Chromium",
+        "sha256": "655ba7e46d50ab4e7732af66408f777fff8993ca7e4957f33c3c66ebc68cf879",
+        "width": 1440,
+        "height": 1000
+      },
+      "studio-flows-event-filter.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "test/browser/flow-docs.spec.js",
+        "engine": "Chromium",
+        "sha256": "33a6149e5c5dc55ebcd4450bf675ab8ce7d5b683054d8cb43bd256dcdb248cc5",
+        "width": 350,
+        "height": 1011
+      }
+    }
+  },
+  "studioCaptures": {
+    "capturedAt": "2026-11-04",
+    "captures": {
+      "studio-content.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "width": 1680,
+        "height": 1050,
+        "sha256": "021b1af01ad2b2a541909a572aad4242758f4c4ccb913998e442b3290a280fd5"
+      },
+      "studio-data-model.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "width": 1680,
+        "height": 1050,
+        "sha256": "309e56f641989a00563c2d8c6f6eb02910b8319798ed8aee87095c104d269e77"
+      },
+      "studio-files.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "width": 1680,
+        "height": 1050,
+        "sha256": "86d8e76f3774b254805ed73f3f6c9c376ae3a83afb8e4ca1c6d956e119af3a65"
+      },
+      "studio-permissions.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "width": 1680,
+        "height": 1050,
+        "sha256": "49c48dcb24206360bd737efb7ca7350bc0520c1ff6a39e09376d1f8409e80517"
+      },
+      "studio-mobile-content.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "width": 390,
+        "height": 844,
+        "sha256": "5486f78733d3013d04891788ea68850928a7b8896a2d98d5becbdf1445d3060e"
+      },
+      "studio-mobile-menu.png": {
+        "capturedAt": "2026-11-04",
+        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "width": 390,
+        "height": 844,
+        "sha256": "459470198116eab441416bab50ba0418e296bca0705b9fb619ca7865f2a22665"
       }
     }
   }

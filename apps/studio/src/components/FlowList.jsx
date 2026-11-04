@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { apiRequest } from '../api.js';
 import { useI18n } from '../i18n.js';
 import { studioPath } from '../studio-route.js';
+import { FlowLegacyAutomations } from './FlowLegacyAutomations.jsx';
 import { Pagination } from './Pagination.jsx';
 
-export function FlowList({ state, onStateChange, onNew, onImport }) {
+export function FlowList({ state, onStateChange, onNew, onImport, showLegacy = false }) {
   const { t, locale } = useI18n();
   const [rows, setRows] = useState([]), [total, setTotal] = useState(0), [loading, setLoading] = useState(true), [error, setError] = useState(''), [canManage, setCanManage] = useState(false);
   const { page, pageSize, search, status, trigger } = state;
@@ -39,11 +40,13 @@ export function FlowList({ state, onStateChange, onNew, onImport }) {
     <div className="flow-catalogue" aria-busy={loading}>
       {loading && <p role="status">{t('common.loading')}</p>}
       {!loading && !rows.length && !error && <p>{search || status || trigger ? t('flow.noMatches') : t('flow.empty')}</p>}
-      {rows.length > 0 && <div className="table-scroll"><table className="data-table"><thead><tr><th>{t('common.name')}</th><th>{t('flow.triggerLabel')}</th><th>{t('flow.status')}</th><th>{t('flow.updatedAt')}</th></tr></thead><tbody>
+      {rows.length > 0 && <div className="table-scroll"><table className="data-table"><colgroup><col /><col className="flow-trigger-column" /><col className="flow-status-column" /><col className="flow-date-column" /></colgroup><thead><tr><th>{t('common.name')}</th><th>{t('flow.triggerLabel')}</th><th>{t('flow.status')}</th><th>{t('flow.updatedAt')}</th></tr></thead><tbody>
         {rows.map(flow => <tr key={flow.id}><td><a className="flow-name-link" href={studioPath.flow(flow.id)}>{flow.name}</a></td><td>{t(`flow.trigger.${flow.trigger}`)}</td><td><span className={`flow-status flow-status-${flow.status}`}>{t(`flow.${flow.status}`)}</span></td><td>{flow.updated_at ? new Date(flow.updated_at).toLocaleString(locale) : '—'}</td></tr>)}
       </tbody></table></div>}
+      <div className="flow-mobile-list">{rows.map(flow => <article key={flow.id}><a className="flow-name-link" href={studioPath.flow(flow.id)}>{flow.name}</a><dl><div><dt>{t('flow.triggerLabel')}</dt><dd>{t(`flow.trigger.${flow.trigger}`)}</dd></div><div><dt>{t('flow.status')}</dt><dd><span className={`flow-status flow-status-${flow.status}`}>{t(`flow.${flow.status}`)}</span></dd></div><div><dt>{t('flow.updatedAt')}</dt><dd>{flow.updated_at ? new Date(flow.updated_at).toLocaleString(locale) : '—'}</dd></div></dl></article>)}</div>
       <Pagination page={page} pageSize={pageSize} totalItems={total} loading={loading} itemLabel={t('flow.items')}
         pageSizeOptions={[10, 20]} onPageChange={next => update({ page: next })} onPageSizeChange={next => filter({ pageSize: next })} />
     </div>
+    {canManage && <FlowLegacyAutomations initiallyOpen={showLegacy} />}
   </section>;
 }

@@ -56,6 +56,7 @@ export function RelationPicker({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
+        title={selectedLabel ? String(selectedLabel) : undefined}
         onClick={() => setOpen((current) => !current)}
       >
         <span className={selectedLabel ? '' : 'placeholder'}>{selectedLabel || resolvedPlaceholder}</span>
@@ -96,8 +97,8 @@ export function RelationPicker({
                   key={String(itemValue)}
                   onClick={() => choose(String(itemValue))}
                 >
-                  <span>{String(itemLabel)}</span>
-                  {String(itemLabel) !== String(itemValue) && <small>{String(itemValue)}</small>}
+                  <span title={String(itemLabel)}>{String(itemLabel)}</span>
+                  {String(itemLabel) !== String(itemValue) && <small title={String(itemValue)}>{String(itemValue)}</small>}
                 </button>
               );
             })}

@@ -165,6 +165,10 @@ const FAST_TESTS = [
   'apps/studio/test/users-access-ui.test.js',
   'apps/studio/test/content-values.test.js',
   'apps/studio/test/content-field-values.test.js',
+  'apps/studio/test/paged-data.test.js',
+  'apps/studio/test/tab-navigation.test.js',
+  'apps/studio/test/rule-values.test.js',
+  'packages/api/test/flow-ai-operation.test.js',
   'apps/studio/test/studio-theme.test.js',
   'apps/studio/test/date-format.test.js',
 ];

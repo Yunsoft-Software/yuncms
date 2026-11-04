@@ -30,6 +30,18 @@ test('nested forms share typed defaults and preserve existing values', () => {
   assert.equal(draft.children[1].values.enabled, false);
 });
 
+test('BIGINT serialization preserves exact decimal strings across the entire signed MySQL range', () => {
+  const field = { type: 'bigint', required: true };
+  for (const value of ['0', '-1', '9007199254740993', '9223372036854775807', '-9223372036854775808']) {
+    assert.equal(outputValueForField(field, inputValueForField(field, value)), value);
+  }
+  assert.equal(outputValueForField({ type: 'bigint' }, ''), null);
+  const source = readFileSync(new URL('../src/screens/ContentScreen.jsx', import.meta.url), 'utf8');
+  assert.match(source, /return outputValueForField\(\{ \.\.\.field, required: true \}, value\)/);
+  const users = readFileSync(new URL('../src/screens/UsersScreen.jsx', import.meta.url), 'utf8');
+  assert.match(users, /outputValueForField\(field, rawValue\)/);
+});
+
 test('record and nested select controls expose an explicit empty choice', () => {
   for (const name of ['screens/ContentScreen.jsx', 'components/NestedRelationsEditor.jsx']) {
     const source = readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8');

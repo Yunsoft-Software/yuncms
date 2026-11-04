@@ -119,7 +119,7 @@ code {
   font-size: 13px;
 }
 
-nav {
+.sidebar-nav {
   margin-top: 34px;
   display: grid;
   gap: 6px;
@@ -953,7 +953,7 @@ td select {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .studio-shell {
     grid-template-columns: 1fr;
   }
@@ -965,7 +965,7 @@ td select {
     border-bottom: 1px solid #e1e6ef;
   }
 
-  nav {
+  .sidebar-nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

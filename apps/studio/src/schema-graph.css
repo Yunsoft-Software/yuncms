@@ -16,7 +16,7 @@
 .data-model-heading-actions .secondary-button[aria-current='page'] {
   border-color: color-mix(in srgb, var(--ui-accent) 28%, var(--ui-border));
   background: var(--ui-accent-soft);
-  color: var(--ui-accent);
+  color: var(--ui-accent-ink, var(--ui-accent));
 }
 
 .schema-graph-workspace {
@@ -302,7 +302,7 @@
 
 .schema-graph-relation-list span {
   grid-row: 1 / span 2;
-  color: var(--ui-accent);
+  color: var(--ui-accent-ink, var(--ui-accent));
   font-size: 8.5px;
   font-weight: 760;
 }

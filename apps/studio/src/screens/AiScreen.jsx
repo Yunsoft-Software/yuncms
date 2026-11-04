@@ -159,7 +159,7 @@ export function AiScreen() {
           </div>
         </div>
         <div className="ai-toolbar-actions">
-          {canManageSettings && <a className="secondary-button" href="#/automations">{t('automation.title')}</a>}
+          {canManageSettings && <a className="secondary-button" href="#/flows">{t('flow.title')}</a>}
           {canManageSettings && (
             <button
               className="secondary-button"

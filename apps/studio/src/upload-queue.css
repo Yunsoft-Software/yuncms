@@ -98,7 +98,7 @@
 
 .status-uploading .upload-queue-status {
   background: var(--ui-accent-soft);
-  color: var(--ui-accent);
+  color: var(--ui-accent-ink, var(--ui-accent));
 }
 
 .status-done .upload-queue-status {

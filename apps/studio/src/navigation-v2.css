@@ -137,7 +137,7 @@
 }
 
 .collection-nav-item.active .collection-icon {
-  color: var(--studio-accent);
+  color: var(--ui-accent-ink, var(--studio-accent));
 }
 
 .sidebar-collapsed .nav-item-root {
@@ -154,7 +154,7 @@
   min-height: 40px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .sidebar,
   .sidebar-collapsed .sidebar {
     position: sticky;

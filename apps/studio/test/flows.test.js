@@ -56,7 +56,7 @@ test('import/export preserves the diagram, omits server metadata and imports ina
 });
 
 test('palette, trigger defaults and deep links match the backend graph contract', () => {
-  assert.deepEqual(Object.keys(FLOW_OPERATION_DEFAULTS).sort(), [...FLOW_OPERATION_TYPES].sort());
+  assert.deepEqual(Object.keys(FLOW_OPERATION_DEFAULTS).sort(), [...FLOW_OPERATION_TYPES, 'ai'].sort());
   assert.equal(triggerDefaults('webhook').public, false); assert.equal(triggerDefaults('event').mode, 'action'); assert.equal(triggerDefaults('manual').require_confirmation, true);
   assert.deepEqual(readStudioRoute('#/flows/example'), { section: 'flows', view: 'detail', flowId: 'example' });
   assert.equal(studioPath.newFlow(), '#/flows/new'); assert.equal(studioPath.flow('example'), '#/flows/example');
@@ -98,15 +98,19 @@ test('Flow guide and tracked screenshots preserve their own capture provenance',
   const manifest = JSON.parse(source('../../../docs/assets/screenshots/manifest.json'));
   const guide = source('../../../docs/flows.md');
   assert.match(guide, /assets\/screenshots\/studio-flows\.png/);
-  assert.equal(manifest.capturedAt, '2026-09-30');
-  assert.equal(manifest.flowCaptures.capturedAt, '2026-10-15');
-  for (const file of manifest.flowCaptures.files) {
-    assert.ok(manifest.files.includes(file));
-    const bytes = readFileSync(new URL(`../../../docs/assets/screenshots/${file}`, import.meta.url));
-    assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
-    const capture = manifest.flowCaptures.captures[file];
-    assert.equal(createHash('sha256').update(bytes).digest('hex'), capture.sha256, file);
-    assert.equal(bytes.readUInt32BE(16), capture.width); assert.equal(bytes.readUInt32BE(20), capture.height);
+  assert.match(manifest.capturedAt, /^\d{4}-\d{2}-\d{2}$/);
+  for (const group of [manifest.studioCaptures, manifest.flowCaptures]) {
+    assert.match(group.capturedAt, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(group.capturedAt <= manifest.capturedAt);
+    for (const file of Object.keys(group.captures)) {
+      assert.ok(manifest.files.includes(file));
+      const bytes = readFileSync(new URL(`../../../docs/assets/screenshots/${file}`, import.meta.url));
+      assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+      const capture = group.captures[file];
+      assert.match(capture.capturedAt, /^\d{4}-\d{2}-\d{2}$/);
+      assert.equal(createHash('sha256').update(bytes).digest('hex'), capture.sha256, file);
+      assert.equal(bytes.readUInt32BE(16), capture.width); assert.equal(bytes.readUInt32BE(20), capture.height);
+    }
   }
 });
 
@@ -131,4 +135,36 @@ test('illustrated Flow guides link to existing images, importable examples and v
     }
   }
   for (const filename of manifest.flowCaptures.files) assert.ok(images.has(filename), `Unillustrated capture: ${filename}`);
+});
+
+
+test('Flow canvas starts at readable scale and connections can be configured without dragging', () => {
+  assert.match(source('../src/components/FlowCanvas.jsx'), /fitViewOptions=\{\{ padding: 0\.2, maxZoom: 1 \}\}/);
+  const inspector = source('../src/components/FlowInspector.jsx');
+  assert.match(inspector, /connectionField\('trigger', 'resolve', flow.entry/);
+  assert.match(inspector, /connectionField\(node.id, 'resolve', node.resolve/);
+  assert.match(inspector, /connectionField\(node.id, 'reject', node.reject/);
+  assert.deepEqual(readStudioRoute('#/automations'), { section: 'flows', view: 'list', flowId: '', legacy: true });
+  assert.doesNotMatch(source('../src/App.jsx'), /<AutomationsScreen|id: 'automations'/);
+  assert.match(source('../src/components/FlowInspector.jsx'), /<FlowAiOperation/);
+});
+
+test('canvas refits when its available space changes and releases its resize observer', () => {
+  const canvas = source('../src/components/FlowCanvas.jsx');
+  assert.match(canvas, /ref=\{canvasRef\}/);
+  assert.match(canvas, /new ResizeObserver/);
+  assert.match(canvas, /observer\.observe\(canvasRef\.current\)/);
+  assert.match(canvas, /instanceRef\.current\?\.fitView\(\{ padding: 0\.2, maxZoom: 1, duration: 0 \}\)/);
+  assert.match(canvas, /observer\.disconnect\(\); cancelAnimationFrame\(frame\)/);
+});
+
+
+test('event selections preserve every configured event and collection instead of replacing the first entry', () => {
+  const inspector = source('../src/components/FlowInspector.jsx');
+  assert.match(inspector, /value=\{flow.options.events \?\? \[\]\}/);
+  assert.match(inspector, /value=\{flow.options.collections \?\? \[\]\}/);
+  assert.match(inspector, /<ChoiceChecklist/);
+  assert.match(source('../src/screens/FlowsScreen.jsx'), /aria-label=\{t\('flow.selected'\)\}/);
+  assert.match(source('../src/components/FlowAiOperation.jsx'), /if \(!configuration\) return/);
+  assert.match(source('../src/components/FlowAiOperation.jsx'), /aria-busy=\{!error\}/);
 });

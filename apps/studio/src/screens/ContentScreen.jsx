@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { apiRequest, readSession } from '../api.js';
 import {
+  BooleanFieldControl,
   DataViewOptions,
   FileFieldControl,
   FileValuePreview,
@@ -13,13 +14,15 @@ import {
   RelationPicker,
   RichTextEditor,
   TableCellText,
+  TableRowActions,
   useConfirmDialog,
 } from '../components/index.js';
 import { inputValueForField, outputValueForField } from '../content-field-values.js';
-import { contentColumnKind } from '../content-presentation.js';
+import { contentColumnKind, flexibleContentColumnKey } from '../content-presentation.js';
 import { formatDateFieldValue } from '../date-format.js';
 import {
   canWriteContent,
+  directContentRelations,
   contentRecordValuesKey,
   contentWritableFields,
   loadRelationLookup,
@@ -130,7 +133,8 @@ function renderValue(field, record, relationLookups, t, locale) {
     }
   }
   if (field.field === 'status' || field.field.endsWith('_status')) {
-    return <span className="content-value-status">{String(value)}</span>;
+    const choice = selectChoicesForField(field).find((entry) => String(entry.value) === String(value));
+    return <span className="content-value-status" data-status={String(value)}>{choice?.label || String(value)}</span>;
   }
   if (isRichTextField(field) && typeof value === 'string') {
     const plain = value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -151,8 +155,7 @@ function operatorsForField(field, relationLookup) {
 function normalizeFilterValue(field, operator, value) {
   if (operator === '_null' || operator === '_nnull') return true;
   if (field?.type === 'boolean') return value === 'true';
-  if (field?.type === 'integer' || field?.type === 'bigint') return Number.parseInt(value, 10);
-  if (field?.type === 'decimal') return Number(value);
+  if (['integer', 'bigint', 'decimal'].includes(field?.type)) return outputValueForField({ ...field, required: true }, value);
   return value;
 }
 
@@ -216,7 +219,8 @@ function RecordForm({
   const [values, setValues] = useState(initialValues);
   const [existingNestedRows, setExistingNestedRows] = useState({});
   const [nestedDraft, setNestedDraft] = useState(() => buildInitialNestedDraft(nestedRelations, {}));
-  const [nestedLoading, setNestedLoading] = useState(false);
+  const [nestedLoading, setNestedLoading] = useState(() => Boolean(record?.id && nestedRelations?.length));
+  const [nestedFailed, setNestedFailed] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -227,6 +231,7 @@ function RecordForm({
 
   useEffect(() => {
     let active = true;
+    setNestedFailed(false);
     if (!nestedRelations || nestedRelations.length === 0) {
       setExistingNestedRows({});
       setNestedDraft({});
@@ -246,8 +251,10 @@ function RecordForm({
         setExistingNestedRows(loaded);
         setNestedDraft(buildInitialNestedDraft(nestedRelations, loaded, inputValueForField));
       })
-      .catch(() => {
+      .catch((failure) => {
         if (!active) return;
+        setNestedFailed(true);
+        setError(failure.message);
         setExistingNestedRows({});
         setNestedDraft(buildInitialNestedDraft(nestedRelations, {}, inputValueForField));
       })
@@ -263,7 +270,7 @@ function RecordForm({
 
   async function submit(event) {
     event.preventDefault();
-    if (!canSave) return;
+    if (!canSave || nestedLoading || nestedFailed) return;
     setSaving(true);
     setError('');
     try {
@@ -302,7 +309,7 @@ function RecordForm({
   }
 
   return (
-    <form className={`panel form-panel record-editor ${compact ? 'record-editor-compact' : ''}`} onSubmit={submit}>
+    <form className={`panel form-panel record-editor ${compact ? 'record-editor-compact' : ''}`} aria-busy={nestedLoading} onSubmit={submit}>
       <div className="panel-heading">
         <div>
           <p className="eyebrow">{record?.id ? t('content.editRecord') : t('content.newRecord')}</p>
@@ -324,7 +331,7 @@ function RecordForm({
 
             return (
               <FieldTag
-                className={`field-label ${isFileField(field) ? 'file-field-label' : ''} ${richText ? 'rich-text-field-label' : ''}`}
+                className={`field-label ${isFileField(field) ? 'file-field-label' : ''} ${richText ? 'richtext-field-label' : ''}`}
                 data-field={field.field}
                 key={field.field}
               >
@@ -372,11 +379,7 @@ function RecordForm({
                     onFileUploaded={onFileUploaded}
                   />
                 ) : field.type === 'boolean' ? (
-                  <input
-                    type="checkbox"
-                    checked={Boolean(values[field.field])}
-                    onChange={(event) => changeValue(field.field, event.currentTarget.checked)}
-                  />
+                  <BooleanFieldControl label={label} value={values[field.field]} onChange={value => changeValue(field.field, value)} />
                 ) : field.type === 'text' || field.type === 'json' ? (
                   <textarea
                     rows={field.type === 'json' ? 6 : 4}
@@ -393,12 +396,6 @@ function RecordForm({
                     required={Boolean(field.required)}
                   />
                 )}
-                {relationLookup && (
-                  <small>{t('content.relationHint', {
-                    collection: relationLookup.targetCollection,
-                    field: relationLookup.labelField,
-                  })}</small>
-                )}
               </FieldTag>
             );
           })}
@@ -412,7 +409,7 @@ function RecordForm({
           setDraftState={setNestedDraft}
           files={files}
           onFileUploaded={onFileUploaded}
-          disabled={!canSave || saving || nestedLoading}
+          disabled={!canSave || saving || nestedLoading || nestedFailed}
           compact={compact}
         />
       )}
@@ -424,7 +421,7 @@ function RecordForm({
             {t('content.openFullEditor')}
           </button>
         )}
-        {canSave && <button className="primary-button" type="submit" disabled={!canSave || saving || nestedLoading}>
+        {canSave && <button className="primary-button" type="submit" disabled={!canSave || saving || nestedLoading || nestedFailed}>
           {saving ? t('common.saving') : t('content.saveRecord')}
         </button>}
       </div>
@@ -432,9 +429,10 @@ function RecordForm({
   );
 }
 
-export function ContentScreen({ collection, collectionLabel = '', visibleCollectionCount = 0, onOpenDataModel, route = {}, onNavigate }) {
+export function ContentScreen({ collection, collectionLabel = '', collections = [], visibleCollectionCount = 0, onOpenDataModel, route = {}, onNavigate }) {
   const { locale, t } = useI18n();
   const requestConfirmation = useConfirmDialog();
+  const collectionLabelVersion = JSON.stringify(collections.map((entry) => [entry.collection, entry.name]));
   const requestVersion = useRef(0);
   const schemaLoadingRef = useRef(true);
   const [fields, setFields] = useState([]);
@@ -469,14 +467,11 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
   const routeRecordKey = route.view === 'record' ? `${collection}:${route.recordId}` : '';
 
   async function buildRelationLookups(target, relations) {
-    const directRelations = relations.filter((relation) =>
-      relation.many_collection === target
-      && !relation.junction_collection
-      && relationKind(relation) !== 'm2m');
+    const directRelations = directContentRelations(target, relations);
 
     const isAdmin = Boolean(readSession()?.user?.admin);
     const entries = await Promise.all(
-      directRelations.map((relation) => loadRelationLookup(relation, { isAdmin, request: apiRequest })),
+      directRelations.map((relation) => loadRelationLookup(relation, { isAdmin, request: apiRequest, locale })),
     );
 
     return Object.fromEntries(entries);
@@ -512,17 +507,23 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
       const loadedRelations = relationResponse?.data ?? [];
       const [lookups, discoveredNested] = await Promise.all([
         buildRelationLookups(target, loadedRelations),
-        discoverNestedRelations(target, loadedRelations, { isAdmin, request: apiRequest }),
+        discoverNestedRelations(target, loadedRelations, { isAdmin, request: apiRequest, locale }),
       ]);
       const needsFiles = loadedFields.some(isFileField) || nestedRelationsHaveFiles(discoveredNested);
       const fileResponse = needsFiles
         ? await apiRequest('/files').catch(() => ({ data: [] }))
         : { data: [] };
       if (version !== requestVersion.current) return;
-      setFields(loadedFields);
+      setFields(loadedFields.map((field) => {
+        const target = collections.find((entry) => entry.collection === lookups[field.field]?.targetCollection);
+        return target?.name && (!field.name || field.name === field.field) ? { ...field, name: target.name } : field;
+      }));
       setCapabilities(capabilityResponse.data);
       setRelationLookups(lookups);
-      setNestedRelations(discoveredNested);
+      setNestedRelations(discoveredNested.map((relation) => {
+        const target = collections.find((entry) => entry.collection === (relation.targetCollection || relation.childCollection));
+        return target?.name && relation.alias === target.collection ? { ...relation, alias: target.name } : relation;
+      }));
       setFiles(fileResponse?.data ?? []);
     } catch (requestError) {
       if (version !== requestVersion.current) return;
@@ -595,7 +596,6 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
   }, [searchInput]);
 
   useEffect(() => {
-    setEditingRecord(null);
     setInspectedRecord(null);
     setSelectedRecordIds(new Set());
     setVisibleColumnKeys([]);
@@ -609,7 +609,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     setOffset(0);
     setNotice('');
     loadCollectionSchema(collection);
-  }, [collection]);
+  }, [collection, locale, collectionLabelVersion]);
 
   useEffect(() => {
     if (route.view !== 'record' || !collection || !route.recordId) {
@@ -617,6 +617,8 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     }
     const requestKey = `${collection}:${route.recordId}`;
     let cancelled = false;
+    setEditingRecord(null);
+    setLoadedRecordKey('');
     setError('');
     apiRequest(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(route.recordId)}`)
       .then((response) => { if (!cancelled) setEditingRecord(response?.data ? { id: route.recordId, ...response.data } : null); })
@@ -708,7 +710,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
   }
 
   const physicalTableFields = useMemo(() => contentTableFields(fields), [fields]);
-  const virtualColumns = useMemo(() => virtualRelationColumns(nestedRelations, t), [nestedRelations, t]);
+  const virtualColumns = useMemo(() => virtualRelationColumns(nestedRelations, t, collections), [nestedRelations, t, collections]);
   const tableFields = useMemo(() => {
     if (virtualColumns.length === 0) return physicalTableFields;
     const idIndex = physicalTableFields.findIndex((field) => field.field === 'id');
@@ -720,12 +722,13 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
     ];
   }, [physicalTableFields, virtualColumns]);
   useEffect(() => {
-    setVisibleColumnKeys(defaultContentColumnKeys(tableFields));
-  }, [tableFields]);
+    setVisibleColumnKeys(defaultContentColumnKeys(tableFields, 6, relationLookups));
+  }, [tableFields, relationLookups]);
   const visibleTableFields = useMemo(
     () => tableFields.filter((field) => visibleColumnKeys.includes(field.field)),
     [tableFields, visibleColumnKeys],
   );
+  const flexibleColumnKey = flexibleContentColumnKey(visibleTableFields, relationLookups);
   const mobileRecordFields = useMemo(() => {
     const preferred = visibleTableFields.filter((field) => field.field !== 'id');
     return (preferred.length > 0 ? preferred : visibleTableFields).slice(0, 4);
@@ -1133,9 +1136,10 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
           <button className="text-button" type="button" onClick={clearControls}>{t('content.resetView')}</button>
         </section>
       ) : (
-        <section className={`table-panel content-table-density-${density} ${itemsLoading ? 'is-loading' : ''}`} aria-busy={itemsLoading}>
+        <section className={`table-panel content-table-density-${density} ${visibleTableFields.length <= 2 ? 'content-table-panel-short' : ''} ${itemsLoading ? 'is-loading' : ''}`} aria-busy={itemsLoading}>
           <div className="table-scroll">
-            <table>
+            <table className={visibleTableFields.length <= 2 ? 'content-table-short' : undefined}>
+              <colgroup><col className="content-selection-column" />{visibleTableFields.map(field => <col key={field.field} className={`content-column-${contentColumnKind(field, relationLookups[field.field])} ${field.field === flexibleColumnKey ? 'content-column-flex' : ''}`} />)}<col className="content-actions-column" /></colgroup>
               <thead>
                 <tr>
                   <th className="content-selection-column">
@@ -1149,7 +1153,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                   {visibleTableFields.map((field) => (
                     <th
                       key={field.field}
-                      className={`content-column-${contentColumnKind(field)}`}
+                      className={`content-column-${contentColumnKind(field, relationLookups[field.field])} ${field.field === flexibleColumnKey ? 'content-column-flex' : ''}`}
                       aria-sort={sortField === field.field ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                       title={field.field}
                     >
@@ -1165,7 +1169,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                       )}
                     </th>
                   ))}
-                  <th className="content-actions-column" aria-label={t('common.actions')} />
+                  <th className="content-actions-column">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1189,14 +1193,16 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
                         />
                       </td>
                       {visibleTableFields.map((field) => (
-                        <td className={`content-column-${contentColumnKind(field)}`} key={field.field}>
+                        <td className={`content-column-${contentColumnKind(field, relationLookups[field.field])} ${field.field === flexibleColumnKey ? 'content-column-flex' : ''}`} key={field.field}>
                           {renderFieldCell(field, record)}
                         </td>
                       ))}
                       <td className="row-actions">
-                        {canWriteContent(capabilities, 'update', record.id) && <button className="text-button" type="button" onClick={() => setInspectedRecord(record)}>{t('content.quickEdit')}</button>}
-                        {canWriteContent(capabilities, 'update', record.id) && <button className="text-button" type="button" onClick={() => onNavigate?.(studioPath.contentRecord(collection, record.id))}>{t('common.edit')}</button>}
-                        {canWriteContent(capabilities, 'delete', record.id) && <button className="danger-button" type="button" onClick={() => removeRecord(record)}>{t('common.delete')}</button>}
+                        <TableRowActions actions={[
+                          canWriteContent(capabilities, 'update', record.id) && { label: t('content.quickEdit'), icon: 'inspect', onClick: () => setInspectedRecord(record) },
+                          canWriteContent(capabilities, 'update', record.id) && { label: t('common.edit'), icon: 'edit', onClick: () => onNavigate?.(studioPath.contentRecord(collection, record.id)) },
+                          canWriteContent(capabilities, 'delete', record.id) && { label: t('common.delete'), icon: 'delete', danger: true, onClick: () => removeRecord(record) },
+                        ]} />
                       </td>
                     </tr>
                   );
@@ -1251,7 +1257,7 @@ export function ContentScreen({ collection, collectionLabel = '', visibleCollect
 
       <Inspector
         open={Boolean(inspectedRecord)}
-        title={inspectedRecord ? `${visibleCollectionName} · ${inspectedRecord.id}` : visibleCollectionName}
+        title={visibleCollectionName}
         description={t('content.quickEdit')}
         closeLabel={t('studio.inspectorClose')}
         onClose={() => setInspectedRecord(null)}

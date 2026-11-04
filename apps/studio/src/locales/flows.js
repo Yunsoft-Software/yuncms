@@ -5,6 +5,10 @@ import { FLOW_PT_BR } from './flows-pt-br.js';
 import { FLOW_JA } from './flows-ja.js';
 import { FLOW_ZH_CN } from './flows-zh-cn.js';
 const EN = {
+  'flow.firstOperation': 'First operation', 'flow.onSuccess': 'On success', 'flow.onFailure': 'On failure',
+  'flow.operation.ai': 'Generate with AI', 'flow.aiIds': 'Record key or data-chain expression', 'flow.aiHint': 'Uses the flow’s selected normal user and native read/update permissions. AI writes must be enabled.',
+  'flow.legacyAi': 'Existing AI automations', 'flow.legacyHint': 'Convert an existing rule into a flow. Its history is preserved; the old rule is disabled and the new flow starts inactive.', 'flow.convertAi': 'Convert to flow', 'flow.openFlow': 'Open flow',
+
   "flow.accessDenied": "Your role cannot view flows.",
   "flow.readOnly": "Read-only access. Flow editing requires an administrator.",
   "flow.runDenied": "Your role is not allowed to run this flow.",
@@ -57,6 +61,10 @@ const EN = {
   'flow.copySuffix': 'copy', 'flow.step': 'Step', 'flow.duration': 'Duration', 'flow.noSelection': 'Select the trigger or an operation to configure it.',
 };
 const TR = {
+  'flow.firstOperation': 'İlk işlem', 'flow.onSuccess': 'Başarılı olunca', 'flow.onFailure': 'Başarısız olunca',
+  'flow.operation.ai': 'AI ile içerik üret', 'flow.aiIds': 'Kayıt anahtarı veya veri zinciri ifadesi', 'flow.aiHint': 'Akışta seçilen normal kullanıcının native okuma/güncelleme izinleriyle çalışır. AI yazma izni açık olmalıdır.',
+  'flow.legacyAi': 'Mevcut AI otomasyonları', 'flow.legacyHint': 'Mevcut kuralı akışa dönüştürün. Geçmişi korunur; eski kural kapatılır ve yeni akış pasif başlar.', 'flow.convertAi': 'Akışa dönüştür', 'flow.openFlow': 'Akışı aç',
+
   "flow.accessDenied": "Rolünüzün akışları görüntüleme yetkisi yok.",
   "flow.readOnly": "Salt okunur erişim. Akışı düzenlemek için yönetici yetkisi gerekir.",
   "flow.runDenied": "Rolünüzün bu akışı çalıştırma izni yok.",

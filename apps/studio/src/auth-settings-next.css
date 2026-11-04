@@ -508,7 +508,7 @@
   line-height: 1.55;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .auth-shell {
     grid-template-columns: minmax(290px, .85fr) minmax(390px, 1.15fr);
   }

@@ -1,3 +1,4 @@
+export { BooleanFieldControl } from './BooleanFieldControl.jsx';
 export { AiSettingsPanel } from './AiSettingsPanel.jsx';
 export { AutomationOutputConstraints } from './AutomationOutputConstraints.jsx';
 export { AppRail, StudioNextFrame } from './AppRail.jsx';
@@ -37,6 +38,10 @@ export { JsonField } from './JsonField.jsx';
 export { JsonImportField } from './JsonImportField.jsx';
 export { ManualFlowActions } from './ManualFlowActions.jsx';
 export { FlowList } from './FlowList.jsx';
+export { ChoiceChecklist } from './ChoiceChecklist.jsx';
+export { FlowAiOperation } from './FlowAiOperation.jsx';
+export { FlowLegacyAutomations } from './FlowLegacyAutomations.jsx';
 export { RichTextEditor } from './RichTextEditor.jsx';
 export { NestedRelationsEditor, NestedRelationCell } from './NestedRelationsEditor.jsx';
 export { TableCellText } from './TableCellText.jsx';
+export { TableRowActions } from './TableRowActions.jsx';

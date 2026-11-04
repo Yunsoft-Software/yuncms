@@ -100,11 +100,20 @@ test('content table prioritizes project and file fields over managed accountabil
     'updated_at',
   ]);
   assert.deepEqual(defaultContentColumnKeys(contentTableFields(fields)), [
-    'id',
     'title',
     'price',
     'published_at',
     'cover_image',
     'attachment',
+    'created_at',
   ]);
+});
+
+test('readable title, email and translation identities keep the UUID optional without removing its column', () => {
+  for (const identity of [{ field: 'title' }, { field: 'name' }, { field: 'email' }, { field: '__translations', virtualRelation: { kind: 'translations' } }]) {
+    const fields = [{ field: 'id', type: 'uuid' }, identity];
+    assert.deepEqual(defaultContentColumnKeys(fields), [identity.field]);
+    assert.equal(contentTableFields(fields)[0].field, 'id');
+  }
+  assert.deepEqual(defaultContentColumnKeys([{ field: 'id' }, { field: 'enabled' }]), ['id', 'enabled']);
 });

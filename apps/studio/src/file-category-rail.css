@@ -80,7 +80,7 @@
 
 .file-category-list button.active small {
   background: var(--ui-accent-soft);
-  color: var(--ui-accent);
+  color: var(--ui-accent-ink, var(--ui-accent));
 }
 
 .file-library-workspace .file-list-controls {
@@ -106,7 +106,7 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .file-library-workspace {
     display: block;
   }

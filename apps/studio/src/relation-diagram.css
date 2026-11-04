@@ -69,7 +69,7 @@
   display: grid;
   place-items: center;
   gap: 5px;
-  color: var(--ui-accent);
+  color: var(--ui-accent-ink, var(--ui-accent));
 }
 
 .relation-diagram-connector span {

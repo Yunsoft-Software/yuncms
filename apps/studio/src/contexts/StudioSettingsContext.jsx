@@ -42,7 +42,7 @@ export function StudioSettingsProvider({ children }) {
   useEffect(() => {
     let cancelled = false;
 
-    apiRequest('/studio-settings', {}, { retryAuth: false })
+    apiRequest('/studio-settings')
       .then((response) => {
         if (!cancelled) applySettings(response?.data ?? DEFAULT_STUDIO_SETTINGS);
       })
@@ -121,7 +121,7 @@ export function StudioSettingsProvider({ children }) {
 
   return (
     <StudioSettingsContext.Provider value={value}>
-      {children}
+      {loading ? <div className="studio-boot" aria-busy="true"><span className="studio-boot-indicator" aria-hidden="true" /></div> : children}
     </StudioSettingsContext.Provider>
   );
 }
