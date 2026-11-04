@@ -44,8 +44,9 @@ test('long content and high-cardinality relations keep bounded rows, full values
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   for (const theme of ['light', 'dark']) {
     await setAppearance(request, theme);
-    await open(page, `/#/content/${fixture.parent}`);
-    await page.reload();
+    // A changed query opens the saved theme in a fresh Studio document. An
+    // immediate second reload aborts the first document's real boot requests.
+    await open(page, `/?layout_theme=${theme}#/content/${fixture.parent}`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     const row = page.locator('tbody tr').filter({ hasText: fixture.longTitle });
     await expect(row).toBeVisible(); await expect(row.locator('.nested-count-badge').getByText('+22', { exact: true })).toBeVisible();

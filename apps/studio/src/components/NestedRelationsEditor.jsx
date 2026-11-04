@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { tabTargetIndex } from '../tab-navigation.js';
+import { tabRevealDelta, tabTargetIndex } from '../tab-navigation.js';
 
 import { slugifyText } from '../content-relations.js';
 import {
@@ -178,7 +178,8 @@ function TranslationsSection({
       const selected = tabs.querySelector('[aria-selected="true"]');
       if (!selected) return;
       const bounds = tabs.getBoundingClientRect(), target = selected.getBoundingClientRect();
-      const left = target.left < bounds.left ? target.left - bounds.left : target.right > bounds.right ? target.right - bounds.right : 0;
+      const inset = Number.parseFloat(getComputedStyle(tabs).paddingInlineStart) || 0;
+      const left = tabRevealDelta(bounds, target, inset);
       if (left) tabs.scrollBy({ left, behavior: 'instant' });
     };
     const observer = new ResizeObserver(revealSelected);
