@@ -50,11 +50,18 @@ export async function inspectFieldRecovery(database, collection, field, definiti
   if (definition.type === 'json') throw fieldRecoveryError('UNSUPPORTED_SCHEMA_RECOVERY', collection, field);
   const physical = await physicalColumn(database, collection, field);
   if (!physical.column) throw fieldRecoveryError('FIELD_NOT_FOUND', collection, field);
+  // Separate catalog predicates let MySQL filter each branch efficiently.
+  // The exclusion preserves one row for a self-reference without discarding
+  // distinct constraints from other databases that happen to share names.
   const [foreignKeys] = await database.query(`SELECT CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME,
     REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE
-    WHERE (TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=? AND REFERENCED_TABLE_NAME IS NOT NULL)
-       OR (REFERENCED_TABLE_SCHEMA=DATABASE() AND REFERENCED_TABLE_NAME=? AND REFERENCED_COLUMN_NAME=?)
-    ORDER BY TABLE_NAME, CONSTRAINT_NAME, COLUMN_NAME`, [collection, field, collection, field]);
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=? AND REFERENCED_TABLE_NAME IS NOT NULL
+    UNION ALL
+    SELECT CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+    FROM information_schema.KEY_COLUMN_USAGE
+    WHERE REFERENCED_TABLE_SCHEMA=DATABASE() AND REFERENCED_TABLE_NAME=? AND REFERENCED_COLUMN_NAME=?
+      AND NOT (TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?)
+    ORDER BY TABLE_NAME, CONSTRAINT_NAME, COLUMN_NAME`, [collection, field, collection, field, collection, field]);
   const [checkTableColumn] = await database.query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='information_schema' AND TABLE_NAME='CHECK_CONSTRAINTS' AND COLUMN_NAME='TABLE_NAME'");
   const [checks] = await database.query(`SELECT c.CONSTRAINT_NAME, c.CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS c
     JOIN information_schema.TABLE_CONSTRAINTS t ON t.CONSTRAINT_SCHEMA=c.CONSTRAINT_SCHEMA AND t.CONSTRAINT_NAME=c.CONSTRAINT_NAME

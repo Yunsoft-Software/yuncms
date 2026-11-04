@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createInterruptedFieldFixture } from '../helpers/interrupted-field-fixture.mjs';
+import { fieldIndexName } from '../../packages/core/src/field-index.js';
 
 test('real SIGKILL after field DDL: explicit recovery preserves data, native authorization and schema version', {
   // Seven real recovery scenarios include child-process termination, multiple
@@ -82,7 +83,28 @@ test('real SIGKILL after field DDL: explicit recovery preserves data, native aut
       await f.database.query('ALTER TABLE recovery_records ADD COLUMN checked_value INT NULL CHECK(checked_value > 0)');
       assert.equal((await f.fields.inspectRecovery('recovery_records', 'checked_value', { field: 'checked_value', type: 'integer' })).compatible, false);
       await f.database.query('ALTER TABLE recovery_records ADD COLUMN parent_ref CHAR(36) NULL, ADD FOREIGN KEY(parent_ref) REFERENCES recovery_records(id)');
-      assert.equal((await f.fields.inspectRecovery('recovery_records', 'parent_ref', { field: 'parent_ref', type: 'uuid' })).compatible, false);
+      const self = await f.fields.inspectRecovery('recovery_records', 'parent_ref', { field: 'parent_ref', type: 'uuid' });
+      assert.equal(self.compatible, false);
+      assert.equal(self.physical.foreignKeys.filter(row => row.COLUMN_NAME === 'parent_ref').length, 1, 'A same-table reference is inspected once');
+      // MySQL permits references between columns in the same table, but not a
+      // column referencing itself. Use an independent native-compatible target.
+      await f.database.query('ALTER TABLE recovery_records ADD COLUMN referenced_value CHAR(36) NULL');
+      await f.database.query('UPDATE recovery_records SET referenced_value=id');
+      await f.database.query('ALTER TABLE recovery_records MODIFY referenced_value CHAR(36) NOT NULL, ADD UNIQUE INDEX `' + fieldIndexName('recovery_records', 'referenced_value') + '`(referenced_value)');
+      const referencedDefinition = { field: 'referenced_value', type: 'uuid', unique: true, required: true };
+      assert.equal((await f.fields.inspectRecovery('recovery_records', 'referenced_value', referencedDefinition)).compatible, true);
+      const external = f.dbName + '_refs';
+      assert.match(external, /^yuncms_test_recovery_[a-z0-9_]+$/);
+      let created = false;
+      try {
+        const [[table]] = await f.database.query("SELECT TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='recovery_records'");
+        assert.match(table.TABLE_COLLATION, /^[a-z0-9_]+$/);
+        await f.database.query('CREATE DATABASE `' + external + '` CHARACTER SET utf8mb4 COLLATE ' + table.TABLE_COLLATION); created = true;
+        await f.database.query('CREATE TABLE `' + external + '`.outside_links (ref CHAR(36) NULL, CONSTRAINT recovery_external_ref FOREIGN KEY(ref) REFERENCES `' + f.dbName + '`.recovery_records(referenced_value)) ENGINE=InnoDB');
+        const incoming = await f.fields.inspectRecovery('recovery_records', 'referenced_value', referencedDefinition);
+        assert.equal(incoming.compatible, false);
+        assert.equal(incoming.physical.foreignKeys.filter(row => row.CONSTRAINT_NAME === 'recovery_external_ref').length, 1, 'Incoming references from another database remain protected');
+      } finally { if (created) await f.database.query('DROP DATABASE `' + external + '`'); }
       assert.equal(await f.fields.readOne('recovery_records', 'checked_value'), null); assert.equal(await f.fields.readOne('recovery_records', 'parent_ref'), null);
     });
     accepted = true;
