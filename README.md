@@ -91,7 +91,7 @@ These screenshots illustrate the documented Studio workflows. Original capture a
 - permission-managed public/filtered Files use cases;
 - endpoint, hook and scheduled-job extensions;
 - optional Studio AI assistant using normal YunCMS permissions;
-- AI automations for repeated content transformations, with preview, persistent runs and a restricted execution user;
+- AI operations inside Flows for repeated content transformations, with persistent run history and a restricted execution user;
 - optional MCP endpoint using the same service/RBAC layer;
 - in-memory or Redis-backed permission cache and rate-limit state;
 - single-port Studio + API runtime;
@@ -455,9 +455,9 @@ The optional Studio AI assistant operates through the current user's normal YunC
 
 Read **[AI Assistant](docs/ai-assistant.md)**.
 
-For repeated tasks, define **[AI Automations](docs/ai-automations.md)** once in Studio or through MCP. New records and selected input-field changes can produce summaries, classifications or translations in designated output fields, with normal user permissions and visible run history.
+For repeated tasks, add **[Generate with AI](docs/flows.md#ai-content-operation)** to a Flow. New records and selected input-field changes can produce summaries, classifications or translations in designated output fields, with normal user permissions and visible run history.
 
-![AI automation editor with selected input/output fields and a restricted execution user](docs/assets/screenshots/studio-automations.jpg)
+Existing standalone AI rules and their history remain available from **Flows → Existing AI automations**. Convert a rule to an inactive flow, review it, then activate it.
 
 The optional MCP endpoint exposes bounded schema/data tools through the same service/RBAC layer. It is disabled and read-only by default; Administrators configure it under **Settings → MCP Connection** without editing `.env` or restarting YunCMS.
 
