@@ -195,7 +195,8 @@ test('real provider/native MySQL: declared output equality, observations and tra
   await t.test('rule revision changed during generation skips the original worker write', async () => {
     const { record, rule } = await fixture();
     try { await items.updateOne(record.id, { source_text: 'revision native-json-' + randomUUID() }); onCompleted = () => service.save({ ...baseRule, name: 'Revised while generating' }, rule.id); await worker.tick();
-      assert.equal((await latest(rule)).status, 'skipped'); assert.equal((await readSql(record.id)).summary, 'Original summary');
+      const run = await latest(rule);
+      assert.equal(run.status, 'skipped', `Native worker result: ${run.error_code ?? run.status}`); assert.equal((await readSql(record.id)).summary, 'Original summary');
     } finally { onCompleted = null; await service.remove(rule.id); }
   });
 
