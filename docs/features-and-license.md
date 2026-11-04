@@ -132,6 +132,9 @@ access to old hidden values.
   `x-yuncms-item-revision`, restores writable scalar fields using native
   validation, hooks, audit and a new revision.
 
+Restore preserves native current-user defaults and server-managed creation
+fields. Native update timestamps and actors describe the new restore operation.
+
 `ContentRevisionsService` exposes `readRevisions`, `readRevision` and
 `restoreRevision`. This is existing-record recovery, not deleted-record recovery,
 a multi-stage approval system or a backup replacement. Related records/files

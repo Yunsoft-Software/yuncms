@@ -255,6 +255,29 @@ test('real MySQL/HTTP: shared Free/Premium runtime, exact concurrent edits, prot
       await assert.rejects(denied.update('flowScripts', { enabled: true }), { code: 'FEATURE_DISABLED' });
     });
 
+    await t.test('history restore preserves native current-user defaults and server-managed timestamps and actors', async () => {
+      await features.update('contentHistory', { enabled: true });
+      const actorCollection = `v2_actor_${suffix}`;
+      await collections.createOne({ collection: actorCollection, systemFields: ['created_at', 'updated_at', 'created_by', 'updated_by'],
+        metadata: { contentTracking: { enabled: true, history: true } } });
+      childCollections.push(actorCollection);
+      const fields = new FieldsService(options);
+      await fields.createOne(actorCollection, { field: 'title', type: 'string' });
+      await fields.createOne(actorCollection, { field: 'owner', type: 'uuid', defaultPreset: 'current_user' });
+      const actorItems = new ItemsService(actorCollection, { ...options, accountability: createAccountability({ user: adminUser.id, role: adminRole.id, admin: true }) });
+      const initial = await actorItems.createOne({ title: 'Original with native defaults' });
+      await actorItems.updateOne(initial.id, { title: 'New value' });
+      const restored = await request(`/items/${actorCollection}/${initial.id}/revisions/1/restore`, {
+        token: adminToken, method: 'POST', headers: { 'x-yuncms-item-revision': '2' },
+      });
+      assert.equal(restored.status, 200, JSON.stringify(restored.body));
+      assert.equal(restored.body.data.title, initial.title);
+      assert.equal(restored.body.data.owner, adminUser.id);
+      assert.equal(restored.body.data.created_by, adminUser.id);
+      assert.equal(new Date(restored.body.data.created_at).getTime(), new Date(initial.created_at).getTime());
+      assert.equal((await actorItems.readEditState(initial.id)).revision, '3');
+    });
+
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
     try {

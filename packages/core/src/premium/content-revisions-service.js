@@ -5,6 +5,19 @@ import { FeaturesService } from '../services/features-service.js';
 import { contentTracking, parseItemRevision } from '../content-state.js';
 import { withTransaction } from '../transaction.js';
 import { featureError } from '../features.js';
+import { isSystemManagedField } from '../system-fields.js';
+
+export function historyRestoreValues(snapshot, schema) {
+  return Object.fromEntries(Object.entries(snapshot).filter(([field]) => {
+    const definition = Object.hasOwn(schema.fields, field) && schema.fields[field];
+    if (!definition || field === schema.primary_key || definition.readonly || isSystemManagedField(definition)) return false;
+    let metadata = definition.schema_metadata;
+    if (typeof metadata === 'string') {
+      try { metadata = JSON.parse(metadata); } catch { metadata = null; }
+    }
+    return metadata?.defaultPreset !== 'current_user';
+  }));
+}
 
 export class ContentRevisionsService extends ItemsService {
   async assertHistoryAccess(id) {
@@ -51,8 +64,7 @@ export class ContentRevisionsService extends ItemsService {
       const schema = await service.assertHistoryAccess(id);
       const historical = await service.readRevision(id, revision);
       if (!historical.snapshot || historical.action === 'delete') throw featureError('INVALID_PAYLOAD', 'This revision has no restorable record');
-      const changes = Object.fromEntries(Object.entries(historical.snapshot).filter(([field]) =>
-        Object.hasOwn(schema.fields, field) && field !== schema.primary_key && !schema.fields[field].readonly));
+      const changes = historyRestoreValues(historical.snapshot, schema);
       return service.updateOne(id, changes, { expectedRevision: expected });
     });
   }

@@ -11,6 +11,36 @@ async function license(request, headers) {
   expect(response.status()).toBe(200); return (await response.json()).data;
 }
 
+test('Premium history restores content with native current-user defaults and preserves creation metadata', async ({ page, request }) => {
+  const headers = await open(page, request);
+  const name = `history_owner_${crypto.randomUUID().replaceAll('-', '').slice(0, 12)}`;
+  let created = false;
+  try {
+    expect((await request.post('/features/license', { headers, data: { token: await license(request, headers) } })).status()).toBe(200);
+    const schema = await request.post('/schema/collections', { headers, data: { collection: name,
+      systemFields: ['created_at', 'updated_at', 'created_by', 'updated_by'], metadata: { contentTracking: { enabled: true, history: true } } } });
+    expect(schema.status()).toBe(201); created = true;
+    for (const field of [{ field: 'title', type: 'string' }, { field: 'owner', type: 'uuid', defaultPreset: 'current_user' }]) {
+      expect((await request.post(`/schema/collections/${name}/fields`, { headers, data: field })).status()).toBe(201);
+    }
+    const initialResponse = await request.post(`/items/${name}`, { headers, data: { title: 'Original with native owner' } });
+    expect(initialResponse.status()).toBe(201); const initial = (await initialResponse.json()).data;
+    expect(initial.owner).toBeTruthy();
+    expect((await request.patch(`/items/${name}/${initial.id}`, { headers, data: { title: 'Changed title' } })).status()).toBe(200);
+    await page.goto(`/#/content/${name}/${initial.id}`);
+    await page.getByRole('button', { name: 'Content history', exact: true }).click();
+    await page.getByRole('button', { name: /Revision 1/ }).click();
+    await page.getByRole('button', { name: 'Restore this revision', exact: true }).click();
+    await page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Restore this revision', exact: true }) }).getByRole('button', { name: 'Confirm', exact: true }).click();
+    await expect(page.locator('.record-editor').getByLabel('title', { exact: true })).toHaveValue(initial.title);
+    const restored = (await (await request.get(`/items/${name}/${initial.id}`, { headers })).json()).data;
+    expect(restored.owner).toBe(initial.owner); expect(restored.created_by).toBe(initial.created_by); expect(restored.created_at).toBe(initial.created_at);
+  } finally {
+    if (created) expect((await request.delete(`/schema/collections/${name}?destructive=true`, { headers })).status()).toBe(204);
+    await request.post('/extensions/flow-fixture/features/reset', { headers });
+  }
+});
+
 test('one browser build activates a real signed license, toggles native endpoints and stays bounded across all responsive profiles', async ({ page, request }, info) => {
   const headers = await open(page, request);
   await request.post('/extensions/flow-fixture/features/reset', { headers }); await page.reload();

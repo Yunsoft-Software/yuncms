@@ -4,6 +4,24 @@ import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { loadConfig } from '../src/config.js';
 import { createFeaturePolicy, verifyFeatureLicense } from '../src/features.js';
 import { parseItemRevision, assertItemRevision, contentTracking, restrictMutationToKeys } from '../src/content-state.js';
+import { historyRestoreValues } from '../src/premium/content-revisions-service.js';
+import { historySnapshot } from '../src/premium/history-recorder.js';
+
+test('history restores only native writable business fields while preserving server-owned defaults', () => {
+  const schema = { primary_key: 'id', fields: {
+    id: {}, title: {}, removed: undefined, readonly: { readonly: true },
+    owner: { schema_metadata: JSON.stringify({ defaultPreset: 'current_user' }) },
+    actor: { schema_metadata: { defaultPreset: 'current_user' } },
+    updated_at: { schema_metadata: { special: 'date-updated' } },
+  } };
+  assert.deepEqual(historyRestoreValues({ id: 'old', title: 'Original', removed: 'old', readonly: 'old', owner: 'old', actor: 'old', updated_at: 'old', missing: 'old' }, schema), { title: 'Original' });
+});
+
+test('history snapshots omit secret fields, binary values and entire sensitive JSON values', () => {
+  const record = { id: 'one', title: 'Visible', api_key: 'private', password_field: 'private', binary: Buffer.from('private'), profile: { visible: 1, nested: [{ credential: 'private' }] }, public_json: { tags: ['one', 'two'] } };
+  const fields = Object.fromEntries(Object.keys(record).map(field => [field, { type: field === 'binary' ? 'binary' : 'json' }]));
+  assert.deepEqual(historySnapshot(record, { fields }), { id: 'one', title: 'Visible', public_json: { tags: ['one', 'two'] } });
+});
 
 const keys = generateKeyPairSync('ed25519');
 const publicKey = keys.publicKey.export({ type: 'spki', format: 'pem' });
