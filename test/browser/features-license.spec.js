@@ -26,15 +26,32 @@ test('Premium history restores content with native current-user defaults and pre
     const initialResponse = await request.post(`/items/${name}`, { headers, data: { title: 'Original with native owner' } });
     expect(initialResponse.status()).toBe(201); const initial = (await initialResponse.json()).data;
     expect(initial.owner).toBeTruthy();
-    expect((await request.patch(`/items/${name}/${initial.id}`, { headers, data: { title: 'Changed title' } })).status()).toBe(200);
+    for (let index = 1; index < 25; index++) {
+      expect((await request.patch(`/items/${name}/${initial.id}`, { headers, data: { title: `Changed title ${index}` } })).status()).toBe(200);
+    }
+    const revisions = await request.get(`/items/${name}/${initial.id}/revisions?limit=100`, { headers });
+    expect(revisions.status()).toBe(200); expect((await revisions.json()).data).toHaveLength(25);
     await page.goto(`/#/content/${name}/${initial.id}`);
     await page.getByRole('button', { name: 'Content history', exact: true }).click();
+    const history = page.getByRole('dialog');
+    await expect(history.locator('.content-history-entry')).toHaveCount(25);
+    await expect(history.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
+    await history.getByRole('button', { name: 'Close', exact: true }).click();
+    expect((await request.patch(`/items/${name}/${initial.id}`, { headers, data: { title: 'Revision 26' } })).status()).toBe(200);
+    await page.reload();
+    await page.getByRole('button', { name: 'Content history', exact: true }).click();
+    await expect(history.locator('.content-history-entry')).toHaveCount(25);
+    await history.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(history.locator('.content-history-entry')).toHaveCount(1);
+    await expect(history.getByRole('button', { name: 'Previous', exact: true })).toBeEnabled();
+    await expect(history.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: /Revision 1/ }).click();
     await page.getByRole('button', { name: 'Restore this revision', exact: true }).click();
     await page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Restore this revision', exact: true }) }).getByRole('button', { name: 'Confirm', exact: true }).click();
     await expect(page.locator('.record-editor').getByLabel('title', { exact: true })).toHaveValue(initial.title);
     const restored = (await (await request.get(`/items/${name}/${initial.id}`, { headers })).json()).data;
     expect(restored.owner).toBe(initial.owner); expect(restored.created_by).toBe(initial.created_by); expect(restored.created_at).toBe(initial.created_at);
+    await history.getByRole('button', { name: 'Close', exact: true }).click();
   } finally {
     if (created) expect((await request.delete(`/schema/collections/${name}?destructive=true`, { headers })).status()).toBe(204);
     await request.post('/extensions/flow-fixture/features/reset', { headers });

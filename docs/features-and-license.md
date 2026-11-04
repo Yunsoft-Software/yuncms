@@ -117,6 +117,8 @@ separate transactions cannot guarantee that data and token describe one version.
 An administrator enables recording under **Features and license → Content history**
 by choosing a collection and enabling **Record content changes**. The record editor
 then offers a **Content history** dialog for inspecting and restoring revisions.
+The dialog shows 25 revisions per page and offers Next only when another recorded
+change exists; Previous returns to the preceding page.
 Alternatively enable recording through schema metadata, retaining other
 metadata keys: `contentTracking: { enabled: true, history: true }`. A valid
 `contentHistory` entitlement and enabled feature are also required. Each native

@@ -19,8 +19,10 @@ test('mixed distribution retains MIT and identifies only explicitly marked new P
     assert.equal(JSON.parse(await read(`packages/${name}/package.json`)).license, 'MIT');
     assert.match(await read(`packages/${name}/LICENSE`), /MIT License/);
   }
-  for (const name of await readdir(new URL('packages/core/src/premium/', root))) {
-    assert.match(await read(`packages/core/src/premium/${name}`), /^\/\/ SPDX-FileCopyrightText:[^\n]+\n\/\/ SPDX-License-Identifier: LicenseRef-YunCMS-Commercial\n/);
+  for (const directory of ['packages/core/src/premium/', 'apps/studio/src/premium/']) {
+    for (const name of await readdir(new URL(directory, root))) {
+      assert.match(await read(`${directory}${name}`), /^\/\/ SPDX-FileCopyrightText:[^\n]+\n\/\/ SPDX-License-Identifier: LicenseRef-YunCMS-Commercial\n/);
+    }
   }
   assert.match(await read('README.md'), /Community code and the extensions SDK retain MIT/);
   assert.match(await read('docs/README.md'), /features-and-license\.md/);

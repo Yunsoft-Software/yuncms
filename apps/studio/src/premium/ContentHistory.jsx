@@ -5,11 +5,13 @@ import { apiRequest } from '../api.js';
 import { editHeaders } from '../content-edit-state.js';
 import { Modal, useConfirmDialog } from '../components/index.js';
 import { useI18n } from '../i18n.js';
+import { CONTENT_HISTORY_PAGE_SIZE as PAGE_SIZE, contentHistoryPage } from './content-history-page.js';
 
 export function ContentHistory({ collection, record, onRestored, disabled }) {
   const { t, locale } = useI18n(), confirmAction = useConfirmDialog();
   const [open, setOpen] = useState(false), [rows, setRows] = useState([]), [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [offset, setOffset] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
   const path = `/items/${encodeURIComponent(collection)}/${encodeURIComponent(record.id)}/revisions`;
   async function perform(task) {
     setBusy(true); setError('');
@@ -17,8 +19,9 @@ export function ContentHistory({ collection, record, onRestored, disabled }) {
     finally { setBusy(false); }
   }
   async function load(nextOffset = 0) {
-    const result = await apiRequest(`${path}?limit=25&offset=${nextOffset}`);
-    setRows(result.data); setOffset(nextOffset); setSelected(null);
+    const result = await apiRequest(`${path}?limit=${PAGE_SIZE + 1}&offset=${nextOffset}`);
+    const page = contentHistoryPage(result.data);
+    setRows(page.rows); setHasNext(page.hasNext); setOffset(nextOffset); setSelected(null);
   }
   async function restore() {
     if (!selected || !await confirmAction({ title: t('features.restore'), description: t('features.restoreHint') })) return;
@@ -41,8 +44,8 @@ export function ContentHistory({ collection, record, onRestored, disabled }) {
         </button>)}
       </div>
       <div className="form-actions">
-        <button className="text-button" type="button" disabled={busy || offset === 0} onClick={() => perform(() => load(Math.max(0, offset - 25)))}>{t('common.previous')}</button>
-        <button className="text-button" type="button" disabled={busy || rows.length < 25} onClick={() => perform(() => load(offset + 25))}>{t('common.next')}</button>
+        <button className="text-button" type="button" disabled={busy || offset === 0} onClick={() => perform(() => load(Math.max(0, offset - PAGE_SIZE)))}>{t('common.previous')}</button>
+        <button className="text-button" type="button" disabled={busy || !hasNext} onClick={() => perform(() => load(offset + PAGE_SIZE))}>{t('common.next')}</button>
       </div>
       {selected && <dl className="content-history-snapshot">{Object.entries(selected.snapshot ?? {}).map(([field, value]) => <div key={field}><dt>{field}</dt><dd><pre>{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? '')}</pre></dd></div>)}</dl>}
     </Modal>

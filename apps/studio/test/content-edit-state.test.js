@@ -4,6 +4,17 @@ import { readFile } from 'node:fs/promises';
 import { ITEM_REVISION, withEditState, editHeaders, contentDraftKey } from '../src/content-edit-state.js';
 import { DICTIONARIES } from '../src/localization.js';
 import { readStudioRoute, studioDestinationForRoute } from '../src/studio-route.js';
+import { CONTENT_HISTORY_PAGE_SIZE, contentHistoryPage } from '../src/premium/content-history-page.js';
+
+test('history paging never offers an empty page at the exact native page boundary', () => {
+  const rows = Array.from({ length: 26 }, (_, index) => ({ revision: String(index + 1) }));
+  assert.equal(CONTENT_HISTORY_PAGE_SIZE, 25);
+  for (const count of [0, 1, 24, 25, 26]) {
+    const page = contentHistoryPage(rows.slice(0, count));
+    assert.deepEqual(page.rows, rows.slice(0, Math.min(count, 25)));
+    assert.equal(page.hasNext, count > 25);
+  }
+});
 test('edit revisions stay out of writable JSON and survive record normalization', () => {
   const record = withEditState({ data: { id: 'one', title: 'Draft' }, meta: { revision: '18446744073709551615' } }).data;
   assert.equal(record[ITEM_REVISION], '18446744073709551615');
