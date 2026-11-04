@@ -429,3 +429,8 @@ Content reads native create/update/delete capabilities separately from read acce
 Background refreshes with unchanged editable values preserve the current draft. Long identifiers wrap inside shared inspector headers so the Close control remains reachable.
 
 Editable fields are disabled while a save is pending; the inspector Close control remains available.
+
+## Features and concurrent edits
+
+See [Features and licensing](features-and-license.md) for the administrator feature
+screen and conflict handling when another user changes an open record.

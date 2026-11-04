@@ -53,6 +53,7 @@ export function serviceOptionsFromRequest(req, overrides = null) {
     permissionCache: req.context.permissionCache,
     requestId: req.id,
     authConfig: req.context.env?.auth ?? null,
+    featurePolicy: req.context.featurePolicy ?? null,
     ...extra,
     database,
   };

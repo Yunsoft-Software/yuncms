@@ -10,4 +10,4 @@ This package is installed by `@yunsoft/yuncms` and `@yunsoft/yuncms-api`. See th
 
 YunCMS is under active development, so interfaces and behavior may change between releases. Test upgrades and keep verified backups before production use.
 
-Use YunCMS at your own risk. This package is provided under the [MIT License](https://github.com/Yunsoft-Software/yuncms/blob/main/LICENSE) without warranty.
+Use YunCMS at your own risk. This distribution includes MIT Community code and explicitly marked commercial Premium components. See the [license notices](https://github.com/Yunsoft-Software/yuncms/blob/main/LICENSE) and [edition guide](https://github.com/Yunsoft-Software/yuncms/blob/main/docs/features-and-license.md). Previously released MIT rights remain valid.

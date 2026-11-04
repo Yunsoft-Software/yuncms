@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { createAccountability, isSystemManagedField, SchemaCache, withTransaction } from '@yunsoft/yuncms-core';
+import { createAccountability, FeaturesService, isSystemManagedField, SchemaCache, withTransaction } from '@yunsoft/yuncms-core';
 import { AI_AUTOMATION_ORIGIN, automationError, automationFromRow, matchesAutomation, normalizeAutomation, validateGeneratedFields } from './config.js';
 import { buildOutputContract, enforceOutputConstraints, validateConstraintDefinitions } from './output-constraints.js';
 
@@ -8,9 +8,9 @@ const COLUMNS = ['name', 'collection', 'run_as', 'enabled', 'on_create', 'on_upd
 
 export class AiAutomationsService {
   constructor({ database, accountability, services, schemaCache = new SchemaCache(), emitter = null,
-    storage = null, logger = console, assistant, settingsStore }) {
+    storage = null, logger = console, assistant, settingsStore, featurePolicy = null }) {
     if (!database || !accountability || !services) throw new Error('Automation service requires database, accountability and services');
-    Object.assign(this, { database, accountability, services, schemaCache, emitter, storage, logger, assistant, settingsStore });
+    Object.assign(this, { database, accountability, services, schemaCache, emitter, storage, logger, assistant, settingsStore, featurePolicy });
   }
 
   requireAdministrator() {
@@ -46,6 +46,7 @@ export class AiAutomationsService {
   }
 
   async executionOptions(rule, database = this.database) {
+    if (this.featurePolicy) await new FeaturesService({ database, accountability: this.accountability, featurePolicy: this.featurePolicy }).assertEnabled('aiFlows');
     const [users] = await database.query(
       `SELECT u.id, u.role, u.status, r.admin, r.public FROM yuncms_users u
        INNER JOIN yuncms_roles r ON r.id = u.role WHERE u.id = ?`, [rule.run_as],
@@ -69,7 +70,7 @@ export class AiAutomationsService {
     }
     validateConstraintDefinitions(rule, collection);
     const options = { database, schema, accountability: createAccountability({ user: user.id, role: user.role }),
-      emitter: this.emitter, storage: this.storage, logger: this.logger };
+      emitter: this.emitter, storage: this.storage, logger: this.logger, featurePolicy: this.featurePolicy };
     const permissions = new this.services.PermissionsService(options);
     const read = await permissions.resolve('read', rule.collection);
     const update = await permissions.resolve('update', rule.collection);
@@ -158,6 +159,10 @@ export class AiAutomationsService {
     if (!context.collection || context.collection.startsWith('yuncms_')
       || context[AI_AUTOMATION_ORIGIN] === true) return;
     const database = context.database ?? this.database;
+    if (this.featurePolicy) {
+      try { await new FeaturesService({ database, accountability: this.accountability, featurePolicy: this.featurePolicy }).assertEnabled('aiFlows'); }
+      catch (error) { if (error.code === 'FEATURE_DISABLED') return; throw error; }
+    }
     const [rows] = await database.query('SELECT * FROM yuncms_ai_automations WHERE collection = ? AND enabled = 1', [context.collection]);
     for (const row of rows) {
       const rule = automationFromRow(row);

@@ -2,7 +2,7 @@
   "name": "yuncms-workspace",
   "version": "0.1.47",
   "private": true,
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "workspaces": [
     "apps/*",

@@ -1,4 +1,6 @@
 import { ApiTokensService } from './api-tokens-service.js';
+import { FeaturesService } from './features-service.js';
+import { ContentRevisionsService } from '../premium/content-revisions-service.js';
 import { AuditService } from './audit-service.js';
 import { AuthService } from './auth-service.js';
 import { AuthTokensService } from './auth-tokens-service.js';
@@ -26,6 +28,8 @@ export function createCoreServiceRegistry() {
     TotpService,
     ExternalAuthService,
     ApiTokensService,
+    FeaturesService,
+    ContentRevisionsService,
     AuditService,
     ItemsService: SingletonItemsService,
     CollectionsService: SingletonCollectionsService,

@@ -3,6 +3,7 @@ import { createAccountability, createPublicAccountability, createSystemAccountab
 import { SchemaCache } from '../schema.js';
 import { transactionContext, withTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
+import { FeaturesService } from './features-service.js';
 import { resolveSystemResourceAccess } from './system-resource-access.js';
 import { compileFilter } from '../query.js';
 import { FLOW_LIMITS, FLOW_OPERATION_TYPES, assertFlowJson, flowError, normalizeFlow } from '../flows/definition.js';
@@ -248,6 +249,8 @@ export class FlowsService extends BaseService {
       const services = this.services ?? (await import('./core-services.js')).createCoreServiceRegistry().toObject();
       const schema = await this.schemaCache.get(database);
       const result = await executeFlowGraph(flow, { database, schema, accountability, services, trigger,
+        featurePolicy: this.featurePolicy,
+        assertFeature: (name, overrides = {}) => new FeaturesService({ ...this, database: overrides.database ?? database }).assertEnabled(name),
         emitter: this.emitter, storage: this.storage, logger: this.logger, mailer: this.mailer, permissionCache: this.permissionCache,
         requestId: this.requestId, requestHosts: this.requestHosts, env: this.flowEnv, operations: this.operations,
         scripts: this.scripts, ...(signal ? { signal } : {}), ...(budget ? { budget } : {}),

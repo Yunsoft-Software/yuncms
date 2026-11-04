@@ -45,6 +45,7 @@ test('Docker container backup and restore round trip preserves generated columns
   assert.equal(labels['org.opencontainers.image.title'], 'YunCMS', 'Image title label must be YunCMS');
   assert.equal(labels['org.opencontainers.image.version'], expectedVersion, `Image version must match workspace package.json (${expectedVersion})`);
   assert.equal(labels['org.opencontainers.image.revision'], expectedRevision, `Image revision label must match git HEAD 12-char prefix (${expectedRevision})`);
+  assert.equal(labels['org.opencontainers.image.licenses'], 'MIT AND LicenseRef-YunCMS-Commercial');
 
   // Credentials and names for dedicated disposable resources
   const suffix = randomBytes(4).toString('hex');
@@ -91,6 +92,10 @@ test('Docker container backup and restore round trip preserves generated columns
   // 2. Assert Node 24 runtime, non-root user, and native MySQL client in candidate image
   const nodeVersion = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'node', imageName, '-v']).trim();
   assert.match(nodeVersion, /^v24\./, `Container Node version must be 24 LTS, got: ${nodeVersion}`);
+  for (const [file, text] of [['MIT.txt', 'MIT License'], ['LicenseRef-YunCMS-Commercial.txt', 'YunCMS Premium Commercial License 1.0']]) {
+    const notice = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'cat', imageName, `/opt/yuncms/LICENSES/${file}`]);
+    assert.ok(notice.includes(text), `Container must include ${file}`);
+  }
 
   const uid = runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'id', imageName, '-u']).trim();
   assert.equal(uid, '1000', `Container must execute as the stable unprivileged UID 1000, got: ${uid}`);

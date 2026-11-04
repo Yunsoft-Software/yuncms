@@ -1,3 +1,24 @@
+YunCMS licensing notice
+
+YunCMS uses one repository and distribution for Community and Premium editions.
+Licensing is determined per file, not by which features the UI displays.
+
+* Files explicitly marked LicenseRef-YunCMS-Commercial, including their compiled
+  forms, are governed by the YunCMS Premium Commercial License below.
+* Other original YunCMS files remain under the MIT License below unless they
+  carry a more specific notice. The extensions SDK remains MIT-licensed.
+* Third-party notices and licenses remain applicable to their components.
+* Previously released MIT versions, including 0.1.47, retain their MIT grants.
+
+Premium implementations are identified by SPDX notices in source files under
+packages/core/src/premium/, packages/api/src/premium/ and apps/studio/src/premium/.
+Shared feature-policy infrastructure and Community services remain MIT.
+The full license texts are reproduced here so this notice is self-contained in
+npm packages and container distributions. Individual SPDX license texts also
+appear in LICENSES/ in the repository.
+
+----- MIT-licensed components -----
+
 MIT License
 
 Copyright (c) 2026 Yunsoft Software
@@ -19,3 +40,95 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+----- Commercial Premium components -----
+
+YunCMS Premium Commercial License 1.0
+Copyright (c) 2026 Yunsoft Software. All rights reserved.
+SPDX-License-Identifier: LicenseRef-YunCMS-Commercial
+
+1. Scope and separate notices
+This license applies only to files expressly marked
+SPDX-License-Identifier: LicenseRef-YunCMS-Commercial and their compiled forms
+("Premium Components"). Other YunCMS files and third-party dependencies retain
+their own licenses. It does not replace, revoke or restrict permissions already
+granted for YunCMS versions or components distributed under the MIT License.
+
+2. One codebase and Community distribution
+Yunsoft Software may distribute Community and Premium functionality in the same
+source tree, npm packages, Studio bundle and container image. Possession of a
+bundle or visibility of Premium source code does not grant production use of
+Premium Components. You may download, inspect, build and run the Community
+functionality, with Premium Components inactive, and redistribute complete,
+unmodified official distributions with all notices and feature controls intact.
+You may also redistribute builds that modify only MIT-licensed components,
+provided Premium sources, notices and entitlement controls remain intact and
+Premium use still requires a valid entitlement. Recompiling unchanged Premium
+sources as part of such a build is permitted.
+Premium Components are source-available proprietary software, not MIT-licensed
+or OSI-approved open-source software. No separate Premium codebase is required.
+
+3. Premium grant
+Subject to a valid entitlement issued or expressly authorized by Yunsoft
+Software, you may use, reproduce and modify Premium Components internally to
+operate the features, production site and associated environments identified by
+that entitlement. A YunCMS Premium one-time purchase grants perpetual use for
+its licensed production domain without a mandatory recurring license fee.
+The canonical domain and its www alias are one site; the CMS API hostname used
+only for that same site does not require an additional site license. Independent
+production sites/domains require their own entitlements. Local development and
+staging hosts must be associated with the licensed site and permitted by the
+entitlement. Hosting migrations do not require repurchase of the same site
+license; domain transfers follow the documented verification/transfer process.
+This license does not impose per-user, per-record or per-API-request fees.
+
+4. Feature entitlements and updates
+A purchase authorizes only the Premium features expressly included in its
+entitlement. Yunsoft Software can issue or update signed grants for those
+features. An administrator may disable an authorized feature but cannot grant
+additional commercial rights. Updates to purchased features are included when
+made available by Yunsoft Software; no promise to create particular future
+features or continue a particular service is made. Separately offered new
+products, managed hosting, implementation, priority support and third-party AI
+usage are not included unless expressly agreed. This license concerns YunCMS;
+it does not grant a YunPanel subscription or waive a separate product's terms.
+
+5. Customer data and operational continuity
+Your content and other customer data remain yours. Community features, native
+security protections, access to your data and ordinary export/backup rights are
+not conditional on a Premium purchase. A missing or unverifiable Premium
+entitlement does not authorize deletion of data or shutdown of Community
+functionality. Paid remote services and third-party providers retain their own
+availability, charging and data-processing terms. No unlimited hosted AI usage
+is included in a one-time software license.
+
+6. Restrictions applying only to Premium Components
+Except as expressly granted above or required by applicable law, you may not
+sell, sublicense, publish modified Premium Components, redistribute them
+separately, use them for unlicensed independent production sites, or remove or
+bypass entitlement controls to obtain rights you have not purchased. Internal
+modifications and integrations for your licensed deployment are permitted.
+These restrictions do not apply to MIT-licensed components or otherwise limit
+rights granted by third-party licenses. No trademark rights are granted.
+
+7. Termination and statutory rights
+A site license is not terminated merely because an optional support service
+expires or the licensing service is temporarily unavailable. It can be revoked
+following an applicable refund, payment reversal, fraud or material breach.
+For a remediable material breach, Yunsoft Software will give notice and a
+reasonable opportunity of at least 30 days to remedy before termination.
+After lawful termination, cease use of the affected Premium Components;
+Community use and your rights in your data continue. Nothing in this license
+excludes mandatory consumer, interoperability or other statutory rights.
+
+8. Warranty and liability
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, PREMIUM COMPONENTS ARE
+PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+YUNSOFT SOFTWARE IS NOT LIABLE FOR INDIRECT, SPECIAL OR CONSEQUENTIAL LOSS,
+LOSS OF PROFITS OR LOSS OF DATA. ITS AGGREGATE LIABILITY UNDER THIS LICENSE
+IS LIMITED TO THE AMOUNT PAID FOR THE AFFECTED PREMIUM SOFTWARE LICENSE.
+These exclusions and limits do not apply where prohibited by applicable law.
+Mandatory rights and express written commitments prevail over conflicting
+provisions. If any provision is unenforceable, the remaining provisions remain
+in effect to the extent permitted by applicable law.

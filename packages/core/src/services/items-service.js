@@ -16,6 +16,8 @@ import {
 import { SchemaCache } from '../schema.js';
 import { isSystemManagedField, systemMutationEntries } from '../system-fields.js';
 import { dispatchAfterCommit, transactionContext, withTransaction } from '../transaction.js';
+import { contentTracking, parseItemRevision, readItemRevision, advanceItemRevision, assertItemRevision, restrictMutationToKeys } from '../content-state.js';
+import { recordContentRevision } from '../premium/history-recorder.js';
 import { BaseService } from './base-service.js';
 import { PermissionsService } from './permissions-service.js';
 
@@ -467,6 +469,53 @@ export class ItemsService extends BaseService {
     }
   }
 
+  async readEditStates(ids) {
+    if (!Array.isArray(ids) || ids.length > 500) throw serviceError('INVALID_QUERY', 'Edit states accept at most 500 item keys');
+    if (!transactionContext(this.database)) return withTransaction(this.database,
+      database => new ItemsService(this.collection, { ...this, database }).readEditStates(ids), { isolationLevel: 'REPEATABLE READ' });
+    const schema = await this.getCollectionSchema();
+    if (!ids.length) return {};
+    const rows = [];
+    // Keep the public query limit intact while authorizing a full native page.
+    for (let offset = 0; offset < ids.length; offset += 100) rows.push(...await this.readMany({
+      fields: [schema.primary_key], filter: { [schema.primary_key]: { _in: ids.slice(offset, offset + 100) } }, limit: 100,
+    }));
+    const keys = rows.map(row => String(row[schema.primary_key]));
+    if (!keys.length) return {};
+    if (!contentTracking(schema).enabled) return Object.fromEntries(keys.map(key => [key, null]));
+    const [versions] = await this.database.query(`SELECT item_key, revision FROM yuncms_item_versions WHERE collection = ? AND item_key IN (${keys.map(() => '?').join(', ')})`, [this.collection, ...keys]);
+    const found = new Map(versions.map(row => [row.item_key, String(row.revision)]));
+    return Object.fromEntries(keys.map(key => [key, found.get(key) ?? '0']));
+  }
+
+  async readEditState(id) {
+    if (!transactionContext(this.database)) {
+      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).readEditState(id), { isolationLevel: 'REPEATABLE READ' });
+    }
+    const schema = await this.getCollectionSchema();
+    const permission = await this.resolvePermission('read');
+    const filter = combineCompiledFilters(
+      compileFilter(permission.filter, schema, { dynamicVariables: this.dynamicVariables() }),
+      compileFilter({ [schema.primary_key]: { _eq: id } }, schema),
+    );
+    const [rows] = await this.database.query(
+      `SELECT ${quoteIdentifier(schema.primary_key, 'field name')} FROM ${quoteIdentifier(this.collection, 'collection name')}${filter.sql} LIMIT 1 FOR SHARE`, filter.params,
+    );
+    if (!rows[0]) return null;
+    return { revision: contentTracking(schema).enabled ? await readItemRevision(this.database, this.collection, id) : null };
+  }
+
+  async recordChange(schema, key, action) {
+    if (!contentTracking(schema).tracked) return;
+    const revision = await advanceItemRevision(this.database, this.collection, key);
+    if (contentTracking(schema).history) {
+      const [rows] = await this.database.query(
+        `SELECT * FROM ${quoteIdentifier(this.collection, 'collection name')} WHERE ${quoteIdentifier(schema.primary_key, 'field name')} = ? LIMIT 1`, [key],
+      );
+      await recordContentRevision(this, schema, key, revision, action, rows[0] ?? null);
+    }
+  }
+
   async createOne(payload = {}) {
     if (!transactionContext(this.database) && (typeof this.database.getConnection === 'function' || typeof this.database.beginTransaction === 'function')) {
       return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).createOne(payload));
@@ -492,6 +541,7 @@ export class ItemsService extends BaseService {
       databaseMutationParams(fields.map((field) => [field, values[field]]), schema),
     );
 
+    await this.recordChange(schema, id, 'create');
     const record = await this.returnCreatedOrUpdated(id, schema);
     await this.actionMutation('items.create', { key: id, item: record }, { operation: 'create' });
     return record;
@@ -539,6 +589,7 @@ export class ItemsService extends BaseService {
 
     const records = [];
     for (const entry of staged) {
+      await this.recordChange(schema, entry.id, 'create');
       const record = await this.returnCreatedOrUpdated(entry.id, schema);
       records.push(record);
       await this.actionMutation('items.create', { key: entry.id, item: record }, { operation: 'create', bulk: true });
@@ -546,9 +597,10 @@ export class ItemsService extends BaseService {
     return records;
   }
 
-  async updateOne(id, payload = {}) {
+  async updateOne(id, payload = {}, { expectedRevision: suppliedRevision = null } = {}) {
+    const expectedRevision = parseItemRevision(suppliedRevision);
     if (!transactionContext(this.database) && (typeof this.database.getConnection === 'function' || typeof this.database.beginTransaction === 'function')) {
-      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).updateOne(id, payload));
+      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).updateOne(id, payload, { expectedRevision }));
     }
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('update');
@@ -566,11 +618,15 @@ export class ItemsService extends BaseService {
       compileFilter({ [schema.primary_key]: { _eq: id } }, schema),
     );
 
-    if (permission.validation) {
-      const [currentRows] = await this.database.query(`SELECT * FROM ${table}${filter.sql} LIMIT 1`, filter.params);
+    if (expectedRevision != null && !contentTracking(schema).enabled) {
+      throw serviceError('INVALID_ITEM_REVISION', 'Optimistic concurrency is not enabled for this collection');
+    }
+    if (permission.validation || contentTracking(schema).tracked) {
+      const [currentRows] = await this.database.query(`SELECT * FROM ${table}${filter.sql} LIMIT 1${contentTracking(schema).tracked ? ' FOR UPDATE' : ''}`, filter.params);
       const current = currentRows[0];
       if (!current) return null;
-      enforcePermissionValidation({ ...current, ...effectiveChanges }, permission.validation, schema, { dynamicVariables });
+      if (contentTracking(schema).tracked) assertItemRevision(expectedRevision, await readItemRevision(this.database, this.collection, id, { current: true }));
+      if (permission.validation) enforcePermissionValidation({ ...current, ...effectiveChanges }, permission.validation, schema, { dynamicVariables });
     }
 
     const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
@@ -579,6 +635,7 @@ export class ItemsService extends BaseService {
       [...databaseMutationParams(entries, schema), ...filter.params],
     );
     if (result.affectedRows === 0) return null;
+    await this.recordChange(schema, id, 'update');
     const record = await this.returnCreatedOrUpdated(id, schema);
     await this.actionMutation('items.update', { key: id, item: record, changes: effectiveChanges }, { operation: 'update' });
     return record;
@@ -606,31 +663,36 @@ export class ItemsService extends BaseService {
     const filter = this.compileActionFilters(filterInput, permission.filter, accessSchema, schema, null, dynamicVariables);
     const table = quoteIdentifier(this.collection, 'collection name');
 
-    if (permission.validation) {
+    let versionedRows = [];
+    if (permission.validation || contentTracking(schema).tracked) {
       const [rows] = await this.database.query(
-        `SELECT * FROM ${table}${filter.sql} LIMIT ?`,
+        `SELECT * FROM ${table}${filter.sql} LIMIT ?${contentTracking(schema).tracked ? ' FOR UPDATE' : ''}`,
         [...filter.params, MAX_BULK_VALIDATION_ROWS + 1],
       );
       if (rows.length > MAX_BULK_VALIDATION_ROWS) {
         throw serviceError('VALIDATION_BULK_LIMIT', `Permission validation can inspect at most ${MAX_BULK_VALIDATION_ROWS} rows per bulk update`);
       }
       for (const row of rows) {
-        enforcePermissionValidation({ ...row, ...effectiveChanges }, permission.validation, schema, { dynamicVariables });
+        if (permission.validation) enforcePermissionValidation({ ...row, ...effectiveChanges }, permission.validation, schema, { dynamicVariables });
       }
+      versionedRows = rows;
     }
 
+    const mutationFilter = contentTracking(schema).tracked ? restrictMutationToKeys(filter, schema.primary_key, versionedRows.map(row => row[schema.primary_key])) : filter;
     const setSql = entries.map(([field]) => `${quoteIdentifier(field, 'field name')} = ?`).join(', ');
     const [result] = await this.database.query(
-      `UPDATE ${table} SET ${setSql}${filter.sql}`,
-      [...databaseMutationParams(entries, schema), ...filter.params],
+      `UPDATE ${table} SET ${setSql}${mutationFilter.sql}`,
+      [...databaseMutationParams(entries, schema), ...mutationFilter.params],
     );
+    for (const row of versionedRows) await this.recordChange(schema, row[schema.primary_key], 'update');
     await this.actionMutation('items.update', { filter: filterInput, changes: effectiveChanges, affected: result.affectedRows }, { operation: 'update', bulk: true });
     return result.affectedRows;
   }
 
-  async deleteOne(id) {
+  async deleteOne(id, { expectedRevision: suppliedRevision = null } = {}) {
+    const expectedRevision = parseItemRevision(suppliedRevision);
     if (!transactionContext(this.database) && (typeof this.database.getConnection === 'function' || typeof this.database.beginTransaction === 'function')) {
-      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).deleteOne(id));
+      return withTransaction(this.database, database => new ItemsService(this.collection, { ...this, database }).deleteOne(id, { expectedRevision }));
     }
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('delete');
@@ -642,8 +704,15 @@ export class ItemsService extends BaseService {
       compileFilter(permission.filter, schema, { dynamicVariables }),
       compileFilter({ [schema.primary_key]: { _eq: key } }, schema),
     );
+    if (expectedRevision != null && !contentTracking(schema).enabled) throw serviceError('INVALID_ITEM_REVISION', 'Optimistic concurrency is not enabled for this collection');
+    if (contentTracking(schema).tracked) {
+      const [rows] = await this.database.query(`SELECT ${quoteIdentifier(schema.primary_key, 'field name')} FROM ${table}${filter.sql} LIMIT 1 FOR UPDATE`, filter.params);
+      if (!rows[0]) return false;
+      assertItemRevision(expectedRevision, await readItemRevision(this.database, this.collection, key, { current: true }));
+    }
     const [result] = await this.database.query(`DELETE FROM ${table}${filter.sql}`, filter.params);
     const deleted = result.affectedRows > 0;
+    if (deleted) await this.recordChange(schema, key, 'delete');
     if (deleted) await this.actionMutation('items.delete', { key }, { operation: 'delete' });
     return deleted;
   }
@@ -666,7 +735,15 @@ export class ItemsService extends BaseService {
     }
     const filter = this.compileActionFilters(effectiveFilter, permission.filter, accessSchema, schema);
     const table = quoteIdentifier(this.collection, 'collection name');
-    const [result] = await this.database.query(`DELETE FROM ${table}${filter.sql}`, filter.params);
+    let versionedRows = [];
+    if (contentTracking(schema).tracked) {
+      const [rows] = await this.database.query(`SELECT ${quoteIdentifier(schema.primary_key, 'field name')} FROM ${table}${filter.sql} LIMIT ? FOR UPDATE`, [...filter.params, MAX_BULK_VALIDATION_ROWS + 1]);
+      if (rows.length > MAX_BULK_VALIDATION_ROWS) throw serviceError('VALIDATION_BULK_LIMIT', `Versioned bulk mutations support at most ${MAX_BULK_VALIDATION_ROWS} rows`);
+      versionedRows = rows;
+    }
+    const mutationFilter = contentTracking(schema).tracked ? restrictMutationToKeys(filter, schema.primary_key, versionedRows.map(row => row[schema.primary_key])) : filter;
+    const [result] = await this.database.query(`DELETE FROM ${table}${mutationFilter.sql}`, mutationFilter.params);
+    for (const row of versionedRows) await this.recordChange(schema, row[schema.primary_key], 'delete');
     await this.actionMutation('items.delete', { filter: effectiveFilter, affected: result.affectedRows }, { operation: 'delete', bulk: true });
     return result.affectedRows;
   }

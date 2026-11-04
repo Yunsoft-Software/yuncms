@@ -14,6 +14,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 
 | Your goal | Read this | What you will learn |
 | --- | --- | --- |
+| Manage editions and content revisions | [Features and licensing](features-and-license.md) | Shared distribution, feature controls, concurrency and Premium history. |
 | Compare installation methods | [Installation Options](installation.md) | Docker Compose, `npx`, persistent npm and source-checkout tradeoffs. |
 | Install YunCMS with Docker | [Docker](docker.md) | Compose setup, persistent volumes, container CLI, backups and image updates. |
 | Install YunCMS with npm | [Getting Started](getting-started.md) | Requirements, npm installation, first collection, editor role and first API call. |

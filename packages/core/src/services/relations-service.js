@@ -1,3 +1,4 @@
+import { normalizeContentTracking } from '../content-state.js';
 import { createHash } from 'node:crypto';
 import { assertNativeReferenceTarget, NATIVE_REFERENCE_TARGETS, nativeReferenceError } from '../native-reference.js';
 
@@ -357,6 +358,7 @@ export class RelationsService extends BaseService {
             hidden: input.hidden !== false,
             note: input.note ?? `M2M junction: ${leftCollection} <-> ${rightCollection}`,
             metadata: {
+              contentTracking: normalizeContentTracking(),
               junction: true,
               leftCollection,
               rightCollection,

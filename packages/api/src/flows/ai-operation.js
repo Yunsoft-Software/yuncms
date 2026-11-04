@@ -31,8 +31,9 @@ export function createAiFlowOperation({ assistant, settingsStore, schemaCache })
     if (options.require_changed_inputs && context.data.$trigger.event === 'items.update'
       && !rule.input_fields.some(field => Object.hasOwn(context.data.$trigger.payload?.changes ?? {}, field))) return [];
     const service = new AiAutomationsService({ ...context, assistant, settingsStore, schemaCache });
-    const check = async () => {
+    const check = async (database = context.database) => {
       context.signal.throwIfAborted();
+      await context.assertFeature?.('aiFlows', { database });
       const settings = await settingsStore.readRuntime();
       if (!settings.enabled || !settings.writesEnabled) throw automationError('AI_WRITES_DISABLED', 'Enable AI writes before running AI operations');
     };
@@ -43,7 +44,7 @@ export function createAiFlowOperation({ assistant, settingsStore, schemaCache })
       const fields = [...rule.input_fields, ...rule.output_fields];
       const fingerprint = recordFingerprint(record, fields), actions = [];
       const result = await withTransaction(context.database, async database => {
-        await check();
+        await check(database);
         const [[currentFlow]] = await database.query('SELECT status, revision FROM yuncms_flows WHERE id = ? FOR UPDATE', [context.flow.id]);
         if (!currentFlow || currentFlow.status !== 'active' || currentFlow.revision !== context.flow.revision) throw automationError('AI_FLOW_CHANGED', 'Flow changed during AI generation; no output was saved');
         const execution = await service.executionOptions(rule, database);

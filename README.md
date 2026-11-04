@@ -17,7 +17,7 @@
   <a href="https://www.npmjs.com/package/@yunsoft/yuncms"><img alt="npm package version" src="https://img.shields.io/npm/v/%40yunsoft%2Fyuncms?logo=npm"></a>
   <a href="https://t.me/yunsoftofficial"><img alt="Telegram community" src="https://img.shields.io/badge/Community-Telegram-26A5E4?logo=telegram&logoColor=white"></a>
   <img alt="Node.js 24 LTS" src="https://img.shields.io/badge/Node.js-24_LTS-5FA04E?logo=nodedotjs&logoColor=white">
-  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/Yunsoft-Software/yuncms"></a>
+  <a href="LICENSE"><img alt="Community MIT; Premium Commercial" src="https://img.shields.io/badge/License-MIT_%2B_Commercial-blue"></a>
 </p>
 
 <p align="center">Developed and maintained by <a href="https://yunsoft.com"><strong>Yunsoft Software</strong></a>.</p>
@@ -496,6 +496,7 @@ The complete user/operator/integrator index is **[docs/README.md](docs/README.md
 - **[Setup and CLI](docs/setup-cli.md)**
 - **[Using YunCMS Studio](docs/studio.md)**
 - **[Configuration](docs/configuration.md)**
+- **[Features, editions and licensing](docs/features-and-license.md)**
 - **[Data Model Guide](docs/data-model.md)**
 - **[Studio Customization](docs/studio-customization.md)**
 
@@ -541,4 +542,7 @@ See **[Deployment](docs/deployment.md)** and **[Production Readiness](docs/produ
 
 # License
 
-MIT.
+Community code and the extensions SDK retain MIT. New explicitly marked Premium
+components use the YunCMS Premium Commercial License. Both editions share one
+distribution. Previously released MIT rights remain valid. See [LICENSE](LICENSE)
+and [features and licensing](docs/features-and-license.md).

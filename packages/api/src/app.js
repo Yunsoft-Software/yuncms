@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import express from 'express';
 import {
   createCoreServiceRegistry,
+  createFeaturePolicy,
   pingDatabase,
 } from '@yunsoft/yuncms-core';
 
@@ -10,6 +11,7 @@ import { apiErrorHandler } from './error-response.js';
 import { createPressureLimit } from './pressure-limit.js';
 import { createFixedWindowRateLimit } from './rate-limit.js';
 import { createAuditRouter } from './routes/audit.js';
+import { createFeaturesRouter } from './routes/features.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createFilesRouter } from './routes/files.js';
 import { createItemsRouter } from './routes/items.js';
@@ -57,7 +59,7 @@ function studioCors(config, customCorsPrefixes = []) {
     if (origin && allowedOrigin && origin === allowedOrigin) {
       res.set('access-control-allow-origin', origin);
       res.set('vary', 'Origin');
-      res.set('access-control-allow-headers', 'content-type, authorization, x-request-id, x-filename, x-title, x-mimetype, mcp-protocol-version, mcp-method, mcp-name, range, if-range, if-none-match, if-modified-since');
+      res.set('access-control-allow-headers', 'content-type, authorization, x-request-id, x-filename, x-title, x-mimetype, mcp-protocol-version, mcp-method, mcp-name, range, if-range, if-none-match, if-modified-since, prefer, x-yuncms-item-revision');
       res.set('access-control-allow-methods', 'GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS');
       res.set('access-control-expose-headers', 'etag, content-range, accept-ranges, last-modified');
     }
@@ -213,14 +215,21 @@ export function createApp({
   const apiRateLimit = createApiRateLimit(config, rateLimitStore, logger);
   if (apiRateLimit) app.use(apiRateLimit);
 
-  app.use(createAuthenticationMiddleware({ pool, config, logger, services, schemaCache, permissionCache, emitter, storage }));
+  const featurePolicy = createFeaturePolicy(config.features ?? {});
+  app.use(createAuthenticationMiddleware({ pool, config, logger, services, schemaCache, permissionCache, emitter, storage, featurePolicy }));
   const requestEvents = createRequestEvents(emitter);
   if (requestEvents) app.use(requestEvents);
 
-  if (aiRouter) app.use('/ai', aiRouter);
-  if (automationsRouter) app.use('/automations', automationsRouter);
+  const requireFeature = name => async (req, _res, next) => {
+    try {
+      await new services.FeaturesService({ accountability: req.accountability, database: pool, featurePolicy }).assertEnabled(name);
+      next();
+    } catch (error) { next(error); }
+  };
+  if (aiRouter) app.use('/ai', requireFeature('aiAssistant'), aiRouter);
+  if (automationsRouter) app.use('/automations', requireFeature('aiFlows'), automationsRouter);
   app.use('/flows', createFlowsRouter({ schemaCache: schemaCache ?? undefined, mailer, scripts: config.flows?.scripts, admissionRequired: config.flows?.admissionRequired, ...flowsOptions }));
-  if (mcpRouter) app.use('/mcp', mcpRouter);
+  if (mcpRouter) app.use('/mcp', requireFeature('mcp'), mcpRouter);
   app.use('/studio-navigation', createStudioNavigationRouter());
   app.use('/studio-settings', createStudioSettingsRouter());
   app.use('/auth', createAuthRouter({ mailer, config, logger, rateLimitStore, externalAuthRegistry }));
@@ -232,6 +241,7 @@ export function createApp({
   app.use('/permissions', createPermissionsRouter());
   app.use('/files', createFilesRouter({ maxUploadBytes: config.storage?.maxUploadBytes }));
   app.use('/audit', createAuditRouter());
+  app.use('/features', createFeaturesRouter());
 
   for (const extension of endpointExtensions) {
     if (!extension?.id || !extension?.router) throw new Error('Invalid endpoint extension runtime entry');

@@ -2,7 +2,7 @@
   "name": "@yunsoft/yuncms-api",
   "version": "0.1.47",
   "description": "Express API runtime and bundled Studio server for YunCMS.",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "engines": {
     "node": ">=24 <25"

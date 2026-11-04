@@ -47,7 +47,7 @@ LABEL org.opencontainers.image.title="YunCMS" \
   org.opencontainers.image.url="https://yunsoft.com" \
   org.opencontainers.image.source="https://github.com/Yunsoft-Software/yuncms" \
   org.opencontainers.image.documentation="https://github.com/Yunsoft-Software/yuncms/blob/main/docs/docker.md" \
-  org.opencontainers.image.licenses="MIT" \
+  org.opencontainers.image.licenses="MIT AND LicenseRef-YunCMS-Commercial" \
   org.opencontainers.image.created="${BUILD_DATE}" \
   org.opencontainers.image.version="${VERSION}" \
   org.opencontainers.image.revision="${VCS_REF}"
@@ -95,6 +95,7 @@ COPY --from=build --chown=node:node /opt/yuncms/package.json /opt/yuncms/package
 COPY --from=build --chown=node:node /opt/yuncms/node_modules /opt/yuncms/node_modules
 COPY --from=build --chown=node:node /opt/yuncms/packages /opt/yuncms/packages
 COPY --chown=node:node LICENSE /opt/yuncms/LICENSE
+COPY --chown=node:node LICENSES /opt/yuncms/LICENSES
 
 # YunCMS needs the ncurses libraries, but never executes the infocmp parser.
 # Neither the CLI nor trusted extensions need inherited privilege escalation.

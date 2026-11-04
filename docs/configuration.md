@@ -424,3 +424,8 @@ up separately from the database. Invalid nonempty values reject configuration.
 An absent key advertises TOTP unavailable; it never bypasses an already enabled
 factor. See [native two-factor authentication](auth.md#native-totp-two-factor-authentication)
 for discovery, setup, challenges, recovery, limits and session rotation.
+
+## Features and licensing
+
+See [Features and licensing](features-and-license.md#configure-trust) for the five
+license/feature configuration variables, defaults and trusted-key contract.

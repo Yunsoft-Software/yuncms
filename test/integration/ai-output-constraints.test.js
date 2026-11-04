@@ -290,7 +290,7 @@ test('real MySQL: 0026 upgrades a legacy rule without changing its value, flags 
   for (const field of ['source', 'summary']) await new FieldsService(owner).createOne('legacy_constraints', { field, type: 'text' });
   const id = randomUUID(); await database.query('INSERT INTO yuncms_ai_automations (id,name,collection,run_as,enabled,on_create,on_update,input_fields,output_fields,instruction,revision) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
     [id, 'Legacy unchanged', 'legacy_constraints', actor.id, 1, 0, 1, '["source"]', '["summary"]', 'Legacy instruction', 7]);
-  const result = await bootstrapDatabase(database); assert.deepEqual(result.newlyApplied, ['0026-ai-output-constraints', '0027-native-totp', '0028-ai-flow-conversion']);
+  const result = await bootstrapDatabase(database); assert.deepEqual(result.newlyApplied, ['0026-ai-output-constraints', '0027-native-totp', '0028-ai-flow-conversion', '0029-content-foundation']);
   const [[row]] = await database.query('SELECT * FROM yuncms_ai_automations WHERE id=?', [id]);
   assert.equal(row.output_constraints, null); assert.equal(row.name, 'Legacy unchanged'); assert.equal(row.revision, 7); assert.equal(row.enabled, 1); assert.equal(row.on_create, 0); assert.equal(row.on_update, 1);
   const service = new AiAutomationsService({ ...owner, services: createCoreServiceRegistry().toObject() });

@@ -4,6 +4,8 @@ import {
   closeDatabasePool,
   createCoreServiceRegistry,
   createDatabasePool,
+  createFeaturePolicy,
+  FeaturesService,
   createJsonLogger,
   createStorageRegistry,
   createSystemAccountability,
@@ -39,6 +41,7 @@ import { createAiFlowOperation } from './flows/ai-operation.js';
 loadEnvFileIfPresent();
 await assertMaintenanceStartupAllowed({ cwd: process.cwd(), env: process.env });
 const config = loadConfig();
+const featurePolicy = createFeaturePolicy(config.features);
 const externalAuthConfig = loadExternalAuthConfig(process.env);
 const logger = createJsonLogger({ level: config.logging.level });
 const pool = createDatabasePool(config.database);
@@ -118,13 +121,13 @@ async function start() {
     database: pool,
     logger,
   });
-  const aiAssistant = new AiAssistantService({ settingsStore: aiSettingsStore, logger, emitter,
+  const aiAssistant = new AiAssistantService({ assertFeature: (name, context) => new FeaturesService({ database: context?.database ?? pool, accountability: context?.accountability ?? createSystemAccountability(), featurePolicy }).assertEnabled(name), settingsStore: aiSettingsStore, logger, emitter,
     providerObservationsEnabled: config.ai?.providerObservationsEnabled });
   const aiRouter = createAiRouter({ assistant: aiAssistant, settingsStore: aiSettingsStore });
   const mcpSettingsStore = new McpSettingsStore({ database: pool });
   mailer?.setEmitter(emitter);
   registerInternalAudit({ emitter, services, database: pool, logger });
-  const automationOptions = { assistant: aiAssistant, settingsStore: aiSettingsStore, schemaCache };
+  const automationOptions = { featurePolicy, assistant: aiAssistant, settingsStore: aiSettingsStore, schemaCache };
   const automations = new AiAutomationsService({ ...automationOptions, database: pool,
     accountability: createSystemAccountability(), services, emitter, storage, logger });
   for (const event of ['items.create', 'items.update']) {
@@ -133,6 +136,7 @@ async function start() {
   automationWorker = new AiAutomationWorker(automations);
   const automationsRouter = createAutomationsRouter({ ...automationOptions, flowOptions: { operations: new Map([['ai', createAiFlowOperation(automationOptions)]]), admissionRequired: config.flows.admissionRequired } });
   const flowsOptions = {
+    featurePolicy,
     operations: new Map([['ai', createAiFlowOperation(automationOptions)]]),
     admissionRequired: config.flows.admissionRequired,
     schemaCache, mailer, requestHosts: config.flows.requestHosts, scripts: config.flows.scripts,

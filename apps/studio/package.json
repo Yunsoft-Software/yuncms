@@ -2,7 +2,7 @@
   "name": "@yunsoft/yuncms-studio",
   "version": "0.1.47",
   "private": true,
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "engines": {
     "node": ">=24 <25"

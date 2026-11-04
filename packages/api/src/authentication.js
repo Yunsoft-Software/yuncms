@@ -28,6 +28,7 @@ export function createAuthenticationMiddleware({
   permissionCache = null,
   emitter = null,
   storage = null,
+  featurePolicy = null,
 }) {
   return async (req, _res, next) => {
     try {
@@ -83,6 +84,7 @@ export function createAuthenticationMiddleware({
         storage,
         permissionCache,
         requestId: req.id,
+        featurePolicy,
       });
       next();
     } catch (error) {

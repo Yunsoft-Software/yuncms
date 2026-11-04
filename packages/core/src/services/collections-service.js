@@ -10,6 +10,7 @@ import { COLLECTION_SYSTEM_FIELDS, compileCollectionSystemFields, normalizeColle
 import { withConnectionTransaction } from '../transaction.js';
 import { BaseService } from './base-service.js';
 import { assertSchemaManager } from './schema-access.js';
+import { normalizeContentTracking } from '../content-state.js';
 
 const COLLECTION_METADATA_KEYS = new Set(['name', 'note', 'singleton', 'hidden', 'metadata', 'systemFields']);
 
@@ -99,6 +100,7 @@ export class CollectionsService extends BaseService {
   async createOne(input = {}) {
     assertSchemaManager(this.accountability);
     assertCollectionCreateMetadata(input);
+    const tracking = normalizeContentTracking(input.metadata?.contentTracking);
     const resolvedName = resolveSchemaName({
       displayName: input.name ?? input.collection,
       key: input.collection,
@@ -152,6 +154,7 @@ export class CollectionsService extends BaseService {
             hidden: input.hidden === true,
             metadata: {
               ...(input.metadata ?? {}),
+              contentTracking: tracking,
               systemFields: systemFields.fields,
             },
           });
@@ -218,6 +221,12 @@ export class CollectionsService extends BaseService {
         const error = new Error('System collection metadata cannot be changed through the dynamic schema API');
         error.code = 'SYSTEM_SCHEMA_READ_ONLY';
         throw error;
+      }
+      if (Object.hasOwn(patch, 'metadata')) {
+        const previousMetadata = typeof existing.metadata === 'string' ? JSON.parse(existing.metadata) : existing.metadata;
+        patch = { ...patch, metadata: { ...(patch.metadata ?? {}), contentTracking: normalizeContentTracking(
+          patch.metadata?.contentTracking ?? previousMetadata?.contentTracking,
+        ) } };
       }
       if (!Object.hasOwn(patch, 'systemFields')) {
         return withConnectionTransaction(connection, async () => {

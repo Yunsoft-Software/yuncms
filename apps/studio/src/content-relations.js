@@ -1,5 +1,6 @@
 import { inputValueForField as defaultInputValueForField, outputValueForField as defaultOutputValueForField } from './content-field-values.js';
 import { loadRelationLookup, primaryKeyFieldForFields } from './content-access.js';
+import { editHeaders, editRequest } from './content-edit-state.js';
 import { readAllStudioPages } from './paged-data.js';
 import { isFileField, isReadOnlyField, isSystemManagedField } from './field-ui.js';
 
@@ -332,6 +333,7 @@ export async function searchNestedParentIds(nestedRelations = [], search = '', {
 export async function loadNestedRecordRows(nestedRelations = [], recordId = null, { request } = {}) {
   if (!recordId || !nestedRelations.length || typeof request !== 'function') return {};
 
+  request = editRequest(request);
   const entries = await Promise.all(
     nestedRelations.map(async (rel) => {
       if (rel.kind === 'm2m') {
@@ -417,9 +419,33 @@ export async function saveNestedRelations({
   draftState = {},
   request,
   outputValueForField = defaultOutputValueForField,
+  onProgress,
 }) {
   if (!parentId || !nestedRelations.length || typeof request !== 'function') return;
 
+  // Keep confirmed progress when a later child fails. Retrying must neither
+  // create duplicate children nor reuse stale tokens for completed writes.
+  draftState = structuredClone(draftState);
+  existingRowsByKey = Object.fromEntries(Object.entries(existingRowsByKey).map(([key, rows]) => [key, [...rows]]));
+  const perform = async (rel, method, id, body, entry = null) => {
+    const target = rel.kind === 'm2m' ? rel.junctionCollection : rel.childCollection;
+    const rows = existingRowsByKey[rel.key] ?? [];
+    const pk = rel.primaryKey ?? 'id';
+    const previous = rows.find(row => String(row[pk] ?? row.id) === String(id));
+    const response = await editRequest(request)(`/items/${encodeURIComponent(target)}${id == null ? '' : `/${encodeURIComponent(id)}`}`, {
+      method, ...(body ? { body } : {}), headers: editHeaders(previous),
+    });
+    if (method === 'DELETE') {
+      existingRowsByKey[rel.key] = rows.filter(row => row !== previous);
+      if (entry) entry.id = null;
+    } else if (response?.data) {
+      const saved = response.data;
+      existingRowsByKey[rel.key] = [...rows.filter(row => row !== previous), saved];
+      if (entry) entry.id = saved[pk] ?? saved.id;
+    }
+    onProgress?.({ draftState, existingRowsByKey });
+    return response;
+  };
   for (const rel of nestedRelations) {
     const existingRows = existingRowsByKey[rel.key] ?? [];
     const relDraft = draftState[rel.key];
@@ -428,9 +454,7 @@ export async function saveNestedRelations({
     if (rel.kind === 'translations') {
       for (const [langCode, entry] of Object.entries(relDraft)) {
         if (entry.cleared && entry.id != null) {
-          await request(`/items/${encodeURIComponent(rel.childCollection)}/${encodeURIComponent(entry.id)}`, {
-            method: 'DELETE',
-          });
+          await perform(rel, 'DELETE', entry.id, null, entry);
           continue;
         }
         if (entry.cleared || !hasAnyNonEmptyValue(entry.values)) {
@@ -444,19 +468,9 @@ export async function saveNestedRelations({
         );
 
         if (entry.id != null) {
-          await request(`/items/${encodeURIComponent(rel.childCollection)}/${encodeURIComponent(entry.id)}`, {
-            method: 'PATCH',
-            body: payload,
-          });
+          await perform(rel, 'PATCH', entry.id, payload, entry);
         } else {
-          await request(`/items/${encodeURIComponent(rel.childCollection)}`, {
-            method: 'POST',
-            body: {
-              [rel.foreignKeyField]: parentId,
-              [rel.languageField]: langCode,
-              ...payload,
-            },
-          });
+          await perform(rel, 'POST', null, { [rel.foreignKeyField]: parentId, [rel.languageField]: langCode, ...payload }, entry);
         }
       }
     } else if (rel.kind === 'm2m') {
@@ -475,9 +489,7 @@ export async function saveNestedRelations({
         if (!selectedTargetIds.has(targetId)) {
           for (const row of rows) {
             if (row.id != null) {
-              await request(`/items/${encodeURIComponent(rel.junctionCollection)}/${encodeURIComponent(row.id)}`, {
-                method: 'DELETE',
-              });
+              await perform(rel, 'DELETE', row.id);
             }
           }
         }
@@ -486,13 +498,7 @@ export async function saveNestedRelations({
       // Create newly selected junction rows
       for (const targetId of selectedTargetIds) {
         if (!existingByTarget.has(targetId)) {
-          await request(`/items/${encodeURIComponent(rel.junctionCollection)}`, {
-            method: 'POST',
-            body: {
-              [rel.sourceJunctionField]: parentId,
-              [rel.targetJunctionField]: targetId,
-            },
-          });
+          await perform(rel, 'POST', null, { [rel.sourceJunctionField]: parentId, [rel.targetJunctionField]: targetId });
         }
       }
     } else if (rel.kind === 'o2m') {
@@ -500,9 +506,7 @@ export async function saveNestedRelations({
       for (const item of items) {
         if (item.deleted) {
           if (item.id != null) {
-            await request(`/items/${encodeURIComponent(rel.childCollection)}/${encodeURIComponent(item.id)}`, {
-              method: 'DELETE',
-            });
+            await perform(rel, 'DELETE', item.id, null, item);
           }
           continue;
         }
@@ -516,20 +520,12 @@ export async function saveNestedRelations({
           ]),
         );
         if (item.id != null) {
-          await request(`/items/${encodeURIComponent(rel.childCollection)}/${encodeURIComponent(item.id)}`, {
-            method: 'PATCH',
-            body: payload,
-          });
+          await perform(rel, 'PATCH', item.id, payload, item);
         } else {
-          await request(`/items/${encodeURIComponent(rel.childCollection)}`, {
-            method: 'POST',
-            body: {
-              [rel.foreignKeyField]: parentId,
-              ...payload,
-            },
-          });
+          await perform(rel, 'POST', null, { [rel.foreignKeyField]: parentId, ...payload }, item);
         }
       }
     }
   }
+  return { draftState, existingRowsByKey };
 }

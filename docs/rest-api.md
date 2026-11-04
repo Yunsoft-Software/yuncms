@@ -685,3 +685,8 @@ Configuration details are in [`configuration.md`](configuration.md) and deployme
 - [`permissions.md`](permissions.md) — RBAC, row filters, field permissions and system-resource delegation.
 - [`files.md`](files.md) — local/S3 storage and reconciliation.
 - [`extensions.md`](extensions.md) — endpoint and hook extensions.
+
+## Feature controls and edit revisions
+
+See [Features and licensing](features-and-license.md) for `/features`,
+`Prefer: yuncms-edit-state`, conditional item writes and Premium history endpoints.

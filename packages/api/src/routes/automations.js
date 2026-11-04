@@ -4,7 +4,7 @@ import { AiAutomationsService } from '../automations/service.js';
 
 export function automationServiceFromRequest(req, options = {}) {
   return new AiAutomationsService({ database: req.context.database, accountability: req.accountability,
-    services: req.context.services, emitter: req.context.emitter, storage: req.context.storage,
+    services: req.context.services, featurePolicy: req.context.featurePolicy, emitter: req.context.emitter, storage: req.context.storage,
     logger: req.context.logger, ...options });
 }
 

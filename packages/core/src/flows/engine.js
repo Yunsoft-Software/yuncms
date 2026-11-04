@@ -101,7 +101,9 @@ function boundedIds(value) {
 async function operation(node, data, context) {
   const options = node.type === 'script' ? node.options : resolveFlowTemplates(node.options, data);
   switch (node.type) {
-    case 'script': return executeFlowScript(options, data, context);
+    case 'script':
+      await context.assertFeature?.('flowScripts');
+      return executeFlowScript(options, data, context);
     case 'transform': return options.value ?? null;
     case 'condition': {
       if (!options.rules || typeof options.rules !== 'object' || Array.isArray(options.rules)) throw flowError('INVALID_FLOW_OPERATION', 'Condition rules are required');

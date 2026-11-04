@@ -1,4 +1,5 @@
 import { withAdvisoryLock } from './advisory-lock.js';
+import { contentFoundationMigration } from './migrations/0029-content-foundation.js';
 import { applyMigrations, assertMigrationsApplied } from './migrations.js';
 import { systemSchemaMigration } from './migrations/0001-system-schema.js';
 import { sessionAccessTokensMigration } from './migrations/0002-session-access-tokens.js';
@@ -60,6 +61,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   aiOutputConstraintsMigration,
   nativeTotpMigration,
   aiFlowConversionMigration,
+  contentFoundationMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(

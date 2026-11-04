@@ -2,7 +2,7 @@
 
 YunCMS V1 targets Node.js 24 LTS with a MySQL 8-compatible server. Operators can install the npm package directly or use the published Docker image; both paths run the same API, Studio and service layer.
 
-> YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com) and remains under active development. Treat every deployment as your own operational responsibility: test upgrades in staging, keep verified backups and complete the [Production Readiness](production-readiness.md) checklist. YunCMS is provided under the MIT License without warranty.
+> YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com) and remains under active development. Treat every deployment as your own operational responsibility: test upgrades in staging, keep verified backups and complete the [Production Readiness](production-readiness.md) checklist. Community code retains MIT; explicitly marked Premium code has commercial terms. See [features and licensing](features-and-license.md) for the shared distribution and license scope.
 
 ## Required runtime pieces
 

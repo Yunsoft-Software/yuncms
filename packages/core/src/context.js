@@ -12,6 +12,7 @@ export function createRequestContext({
   storage = null,
   permissionCache = null,
   requestId = null,
+  featurePolicy = null,
 } = {}) {
   requireAccountability(accountability);
 
@@ -32,5 +33,6 @@ export function createRequestContext({
     storage,
     permissionCache,
     requestId,
+    featurePolicy,
   });
 }

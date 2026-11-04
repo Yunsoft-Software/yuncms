@@ -63,6 +63,13 @@ export function loadConfig(env = process.env) {
   }
 
   return {
+    features: {
+      token: readString(env.YUNCMS_LICENSE_TOKEN, '') || null,
+      publicKey: readString(env.YUNCMS_LICENSE_PUBLIC_KEY, '') || null,
+      domain: readString(env.YUNCMS_LICENSE_DOMAIN, '') || null,
+      instanceId: readString(env.YUNCMS_LICENSE_INSTANCE_ID, '') || null,
+      disabled: readString(env.YUNCMS_FEATURES_DISABLED, '').split(',').map(value => value.trim()).filter(Boolean),
+    },
     ai: {
       providerObservationsEnabled: readBoolean(env.AI_PROVIDER_OBSERVATIONS_ENABLED, false),
     },
