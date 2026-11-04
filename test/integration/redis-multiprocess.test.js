@@ -14,10 +14,14 @@ import {
   CollectionsService,
   createDatabasePool,
   createSystemAccountability,
+  createStorageRegistry,
   ensurePublicRole,
   FieldsService,
+  FilesService,
   ItemsService,
   loadConfig,
+  LocalStorageDriver,
+  PermissionsService,
   RedisClient,
   RolesService,
   SchemaCache,
@@ -133,7 +137,7 @@ test('two API processes share Redis permission invalidation and rate-limit state
   const storageRoot = await mkdtemp(join(tmpdir(), 'yuncms-redis-process-'));
   const redis = new RedisClient({ url: process.env.YUNCMS_TEST_REDIS_URL });
   const processes = [];
-  const cleanup = { collectionCreated: false, tokenIds: [], userIds: [], roleIds: [], fileIds: [] };
+  const cleanup = { collectionCreated: false, tokenIds: [], userIds: [], roleIds: [], fileIds: [], permissionIds: [] };
 
   try {
     await bootstrapDatabase(pool);
@@ -275,8 +279,9 @@ test('two API processes share Redis permission invalidation and rate-limit state
       cleanup.fileIds.push(uploaded.payload.data.id);
       return uploaded.payload.data;
     }
-    const visibleFile = await upload('Public visible', `visible-${runId}`);
-    const hiddenFile = await upload('Public hidden', `hidden-${runId}`);
+    const visibleFile = await upload(`Public visible ${runId}`, `visible-${runId}`);
+    const hiddenFile = await upload(`Public hidden ${runId}`, `hidden-${runId}`);
+    const ownFilesPath = `/files?search=${encodeURIComponent(runId)}`;
 
     const publicDenied = await request(processB, '/files');
     assert.equal(publicDenied.response.status, 403);
@@ -287,12 +292,13 @@ test('two API processes share Redis permission invalidation and rate-limit state
         role: publicRole.id,
         collection: 'yuncms_files',
         action: 'read',
-        filter: { title: { _eq: 'Public visible' } },
+        filter: { title: { _eq: visibleFile.title } },
       },
     });
     assert.equal(publicPermission.response.status, 201);
+    cleanup.permissionIds.push(publicPermission.payload.data.id);
 
-    const filteredFiles = await request(processB, '/files');
+    const filteredFiles = await request(processB, ownFilesPath);
     assert.equal(filteredFiles.response.status, 200);
     assert.deepEqual(filteredFiles.payload.data.map((file) => file.id), [visibleFile.id]);
     assert.equal((await request(processB, `/files/${visibleFile.id}`)).response.status, 200);
@@ -304,7 +310,7 @@ test('two API processes share Redis permission invalidation and rate-limit state
       method: 'PATCH', token: adminToken.token, body: { filter: null },
     });
     assert.equal(unfilteredPermission.response.status, 200);
-    const unfilteredFiles = await request(processB, '/files');
+    const unfilteredFiles = await request(processB, ownFilesPath);
     assert.equal(unfilteredFiles.response.status, 200);
     assert.deepEqual(new Set(unfilteredFiles.payload.data.map((file) => file.id)), new Set([visibleFile.id, hiddenFile.id]));
     assert.equal((await request(processB, `/files/${hiddenFile.id}/content`)).response.status, 200);
@@ -313,6 +319,7 @@ test('two API processes share Redis permission invalidation and rate-limit state
       method: 'DELETE', token: adminToken.token,
     });
     assert.equal(publicPermissionDeleted.response.status, 204);
+    cleanup.permissionIds.splice(cleanup.permissionIds.indexOf(publicPermission.payload.data.id), 1);
     assert.equal((await request(processB, '/files')).response.status, 403);
     assert.equal((await request(processB, `/files/${visibleFile.id}`)).response.status, 403);
     assert.equal((await request(processB, `/files/${visibleFile.id}/content`)).response.status, 403);
@@ -350,9 +357,10 @@ test('two API processes share Redis permission invalidation and rate-limit state
     assert.equal(joinedKeys.includes(adminToken.token), false);
     assert.equal(joinedKeys.includes(memberToken.token), false);
 
-    for (const fileId of cleanup.fileIds.splice(0)) {
+    for (const fileId of [...cleanup.fileIds]) {
       const deleted = await request(processA, `/files/${fileId}`, { method: 'DELETE', token: adminToken.token });
       assert.equal(deleted.response.status, 204);
+      cleanup.fileIds.splice(cleanup.fileIds.indexOf(fileId), 1);
     }
   } finally {
     let cleanupError = null;
@@ -365,6 +373,10 @@ test('two API processes share Redis permission invalidation and rate-limit state
     } catch {}
     await redis.close().catch(() => {});
     try {
+      const files = new FilesService({ accountability: system, database: pool, storage: createStorageRegistry({ local: new LocalStorageDriver({ root: storageRoot }) }) });
+      for (const id of cleanup.fileIds) await files.deleteOne(id);
+      const permissions = new PermissionsService({ accountability: system, database: pool });
+      for (const id of cleanup.permissionIds) await permissions.deleteOne(id);
       if (cleanup.collectionCreated) {
         await new CollectionsService({ accountability: system, database: pool }).deleteOne(collection, { destructive: true });
       }

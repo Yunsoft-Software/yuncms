@@ -3,7 +3,9 @@ import test from 'node:test';
 import { createInterruptedFieldFixture } from '../helpers/interrupted-field-fixture.mjs';
 
 test('real SIGKILL after field DDL: explicit recovery preserves data, native authorization and schema version', {
-  skip: process.env.YUNCMS_TEST_MYSQL !== '1', timeout: 90000,
+  // Seven real recovery scenarios include child-process termination, multiple
+  // physical DDL operations and a deliberate one-second MySQL lock timeout.
+  skip: process.env.YUNCMS_TEST_MYSQL !== '1', timeout: 180000,
 }, async t => {
   const f = await createInterruptedFieldFixture(); let accepted = false;
   try {

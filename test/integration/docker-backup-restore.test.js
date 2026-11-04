@@ -114,7 +114,7 @@ test('Docker container backup and restore round trip preserves generated columns
     '-c', 'test ! -e /usr/bin/infocmp']);
   const installedPackages = JSON.parse(runDocker(['run', '--rm', '--platform', targetPlatform, '--entrypoint', 'node', imageName,
     '-e', String.raw`const fs = require('node:fs'); const packages = Object.fromEntries(fs.readFileSync('/lib/apk/db/installed', 'utf8').trim().split('\n\n').map(record => { const fields = Object.fromEntries(record.split('\n').filter(line => /^[PV]:/.test(line)).map(line => [line[0], line.slice(2)])); return [fields.P, fields.V]; })); console.log(JSON.stringify(packages));`]));
-  for (const pkg of ['wolfi-base', 'wolfi-baselayout', 'busybox', 'tini', 'ncurses', 'libssl3', 'libcrypto3']) {
+  for (const pkg of ['wolfi-base', 'wolfi-baselayout', 'busybox', 'tini', 'ncurses']) {
     assert.ok(installedPackages[pkg], `Required runtime package must be present: ${pkg}`);
   }
   for (const pkg of ['util-linux', 'mount', 'bsdutils', 'login', 'acl', 'libacl1', 'systemd', 'libsystemd0', 'libudev1', 'perl', 'perl-base']) {

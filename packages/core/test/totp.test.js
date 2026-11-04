@@ -43,7 +43,7 @@ test('recovery code parsing permits display separators and case but rejects shor
   for(const value of [null,1234,'a'.repeat(31),'g'.repeat(32),' a'.repeat(32)])assert.equal(normalizeRecoveryCode(value),null);
 });
 test('native TOTP migration is additive with owned credential/challenge rows and cascading user cleanup', () => {
-  const migration=CORE_MIGRATIONS.at(-1);assert.equal(migration.id,'0027-native-totp');assert.equal(migration.statements.length,2);
+  const migration=CORE_MIGRATIONS.find(entry=>entry.id==='0027-native-totp');assert.equal(migration.id,'0027-native-totp');assert.equal(migration.statements.length,2);
   assert.ok(migration.statements.every(sql=>sql.includes('ON DELETE CASCADE')));
   assert.match(migration.statements[0],/secret_ciphertext TEXT NULL/);assert.match(migration.statements[1],/password_fingerprint CHAR\(64\)/);
   assert.equal(migration.statements.some(sql=>/DROP|ALTER TABLE yuncms_users/.test(sql)),false);
