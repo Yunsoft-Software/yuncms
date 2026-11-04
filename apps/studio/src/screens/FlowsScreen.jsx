@@ -4,6 +4,7 @@ import { addFlowOperation, exportFlowDefinition, importFlowDefinition, newFlowDr
 import { useI18n } from '../i18n.js';
 import { navigateStudio, studioPath } from '../studio-route.js';
 import { parseJsonImportText } from '../json-import.js';
+import { useUnsavedChanges } from '../use-unsaved-changes.js';
 import { useConfirmDialog, FlowCanvas, FlowInspector, FlowList, FlowRunHistory, JsonField, JsonImportField, Modal } from '../components/index.js';
 
 export function FlowsScreen({ route }) {
@@ -29,6 +30,7 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
   const [runOpen, setRunOpen] = useState(false), [runPayload, setRunPayload] = useState({ body: { name: 'YunCMS' } });
   const [runInvalid, setRunInvalid] = useState(false), [paletteType, setPaletteType] = useState('transform');
   const dirty = baseline !== JSON.stringify(draft);
+  const unsaved = useUnsavedChanges(ready && dirty);
   useEffect(() => {
     let active = true;
     onLaunchHandled();
@@ -53,7 +55,7 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
     if (invalid) return;
     await perform(async () => {
       const result = await apiRequest(draft.id ? `/flows/${encodeURIComponent(draft.id)}` : '/flows', { method: draft.id ? 'PUT' : 'POST', body: draft });
-      const next = result.data; setDraft(next); setBaseline(JSON.stringify(next)); setSaved(true); setAccess({ manage: true, run: true });
+      const next = result.data; setDraft(next); setBaseline(JSON.stringify(next)); unsaved.clear(); setSaved(true); setAccess({ manage: true, run: true });
       navigateStudio(studioPath.flow(next.id));
     });
   }

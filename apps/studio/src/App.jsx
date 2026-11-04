@@ -12,6 +12,7 @@ import {
   YunsoftSupportLinks,
 } from './components/index.js';
 import { useI18n } from './i18n.js';
+import { confirmStudioNavigation } from './use-unsaved-changes.js';
 import { buildNavigationModel } from './navigation-model.js';
 import { displaySchemaName } from './schema-name.js';
 import {
@@ -28,12 +29,14 @@ import { ContentRouteScreen } from './screens/ContentRouteScreen.jsx';
 import { DataModelScreen } from './screens/DataModelScreen.jsx';
 import { FilesScreen } from './screens/FilesScreen.jsx';
 import { LoginScreen } from './screens/LoginScreen.jsx';
+import { FeaturesScreen } from './screens/FeaturesScreen.jsx';
 import { McpScreen } from './screens/McpScreen.jsx';
 import { RolesPermissionsScreen } from './screens/RolesPermissionsScreen.jsx';
 import { UsersScreen } from './screens/UsersScreen.jsx';
 import { SecurityScreen } from './screens/SecurityScreen.jsx';
 
 const settingsSections = [
+  { id: 'features', labelKey: 'features.title', icon: 'settings', adminOnly: true },
   { id: 'security', labelKey: 'tfa.title', icon: 'roles' },
   { id: 'data-model', labelKey: 'nav.dataModel', icon: 'model' },
   { id: 'users', labelKey: 'nav.users', icon: 'users' },
@@ -169,13 +172,28 @@ export function App() {
 
 
   useEffect(() => {
-    const updateRoute = () => {
-      const nextRoute = readStudioRoute();
-      setRoute(nextRoute);
-      setContentNavFocused(nextRoute.section === 'content');
-      setMobileNavOpen(false);
+    let acceptedHash = window.location.hash, checking = false;
+    const updateRoute = async () => {
+      if (checking || window.location.hash === acceptedHash) return;
+      checking = true;
+      try {
+        if (!await confirmStudioNavigation()) {
+          const url = new URL(window.location.href); url.hash = acceptedHash.slice(1);
+          window.history.replaceState(null, '', url);
+          return;
+        }
+        acceptedHash = window.location.hash;
+        const nextRoute = readStudioRoute();
+        setRoute(nextRoute);
+        setContentNavFocused(nextRoute.section === 'content');
+        setMobileNavOpen(false);
+      } finally { checking = false; }
     };
     const focusContentNavigation = () => setContentNavFocused(true);
+    // A same-document navigation can occur between the first render and effect
+    // registration. Synchronize the accepted route before observing later changes.
+    setRoute(readStudioRoute());
+    setContentNavFocused(readStudioRoute().section === 'content');
     window.addEventListener('hashchange', updateRoute);
     window.addEventListener('popstate', updateRoute);
     window.addEventListener(STUDIO_CONTENT_FOCUS_EVENT, focusContentNavigation);
@@ -298,6 +316,7 @@ export function App() {
     if (section === 'ai') return <AiScreen />;
     if (section === 'flows') return flowAccess.read
       ? <FlowsScreen key={`${session?.user?.id}:${session?.user?.role}:${session?.user?.admin}`} route={route} /> : <div className="error-banner" role="alert">{t('flow.accessDenied')}</div>;
+    if (section === 'features') return session?.user?.admin ? <FeaturesScreen /> : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;
     if (section === 'mcp') return session?.user?.admin
       ? <McpScreen />
       : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;

@@ -1,9 +1,9 @@
-const TOP_LEVEL_SECTIONS = new Set(['ai', 'automations', 'appearance', 'files', 'mcp', 'roles', 'users', 'security']);
+const TOP_LEVEL_SECTIONS = new Set(['features', 'ai', 'automations', 'appearance', 'files', 'mcp', 'roles', 'users', 'security']);
 export const STUDIO_CONTENT_FOCUS_EVENT = 'yuncms:studio-content-focus';
 
 export function studioDestinationForRoute(route) {
   if (['users', 'roles'].includes(route.section)) return 'access';
-  if (['appearance', 'mcp', 'security', 'automations', 'flows'].includes(route.section)) return 'settings';
+  if (['features', 'appearance', 'mcp', 'security', 'automations', 'flows'].includes(route.section)) return 'settings';
   return route.section;
 }
 
@@ -105,6 +105,7 @@ export const studioPath = Object.freeze({
   flow: id => `#/flows/${encode(id)}`,
   mcp: () => '#/mcp',
   appearance: () => '#/appearance',
+  features: () => '#/features',
 });
 
 export function navigateStudio(path, { replace = false } = {}) {

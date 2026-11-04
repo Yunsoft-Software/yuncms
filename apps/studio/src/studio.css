@@ -57,6 +57,7 @@
 
 /* Final shared visual and typography system for every workspace. */
 @import './studio-theme.css';
+@import './feature-settings.css';
 
 
 .record-form-grid { border: 0; padding: 0; margin: 0; min-width: 0; }

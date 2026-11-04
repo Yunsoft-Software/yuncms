@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { confirmStudioNavigation } from '../use-unsaved-changes.js';
 import { apiRequest } from '../api.js';
 import { useI18n } from '../i18n.js';
 import { JsonField } from './JsonField.jsx';
@@ -15,6 +16,7 @@ export function ManualFlowActions({ collection, keys = [], onComplete }) {
     return () => { active = false; };
   }, [collection]);
   async function execute(flow, payload = body) {
+    if (!await confirmStudioNavigation()) return;
     setBusy(true); setError(''); setNotice('');
     try {
       await apiRequest(`/flows/${encodeURIComponent(flow.id)}/run`, { method: 'POST', body: { collection, keys, body: payload } });

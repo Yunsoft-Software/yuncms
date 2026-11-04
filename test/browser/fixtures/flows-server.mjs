@@ -14,7 +14,7 @@ import { loadExtensionRuntime } from '../../../packages/api/src/extensions/runti
 import { createAiFlowOperation } from '../../../packages/api/src/flows/ai-operation.js';
 import { FlowRuntime } from '../../../packages/api/src/flows/runtime.js';
 import { startFlowNetwork } from '../../helpers/flow-network.mjs';
-import { randomBytes } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign, randomBytes } from 'node:crypto';
 import { ExtensionError } from '@yunsoft/yuncms-extensions-sdk';
 import { AiAssistantService } from '../../../packages/api/src/ai/service.js';
 import { AiSettingsStore } from '../../../packages/api/src/ai/settings-store.js';
@@ -26,8 +26,10 @@ import { createMcpRouter } from '../../../packages/api/src/mcp.js';
 import { McpSettingsStore } from '../../../packages/api/src/mcp/settings-store.js';
 
 if (process.env.YUNCMS_TEST_MYSQL !== '1' || process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE !== '1') throw Error('Browser acceptance requires an explicitly authorized disposable MySQL database');
+const licenseKeys = generateKeyPairSync('ed25519');
 const config = loadConfig({ ...process.env, AUTH_PUBLIC_URL: `http://127.0.0.1:${Number(process.env.YUNCMS_BROWSER_PORT ?? 34074)}`, AUTH_TOTP_KEY: process.env.AUTH_TOTP_KEY || randomBytes(32).toString('hex'), API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', AUTH_ACTION_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
 if (!/(test|ci|dev)/i.test(config.database.database)) throw Error('Browser fixture requires a disposable test/ci/dev database');
+config.features = { ...config.features, publicKey: licenseKeys.publicKey.export({ type: 'spki', format: 'pem' }), domain: 'browser.example.test' };
 const pool = createDatabasePool({ ...config.database, connectionLimit: 5 }), accountability = createSystemAccountability();
 const root = await mkdtemp(join(tmpdir(), 'yuncms-flows-browser-'));
 const logPath = join(root, 'server.jsonl'), logStream = createWriteStream(logPath, { flags: 'a' });
@@ -36,7 +38,7 @@ const emitter = new HookEmitter({ logger }), services = createCoreServiceRegistr
 const storage = createStorageRegistry({ local: new LocalStorageDriver({ root }) });
 const basic = { database: pool, accountability }, roleIds = [], userIds = [];
 const collection = 'browser_flow_records';
-let server, runtime, network, automationWorker, extensionRuntime;
+let server, runtime, network, automationWorker, extensionRuntime, priorLicense, priorFeatures;
 const aiAdmissionEvents = [];
 let allowAiGeneration = false;
 async function close() {
@@ -51,10 +53,20 @@ async function close() {
   await pool.query('DELETE FROM yuncms_collections WHERE collection = ?', [collection]);
   for (const id of userIds) await pool.query('DELETE FROM yuncms_users WHERE id = ?', [id]);
   for (const id of roleIds) { await pool.query('DELETE FROM yuncms_permissions WHERE role = ?', [id]); await pool.query('DELETE FROM yuncms_roles WHERE id = ?', [id]); }
+  if (priorLicense) {
+    await pool.query('DELETE FROM yuncms_license_state');
+    for (const row of priorLicense) await pool.query('INSERT INTO yuncms_license_state (id, token, updated_by, updated_at) VALUES (?, ?, ?, ?)', [row.id, row.token, row.updated_by, row.updated_at]);
+  }
+  if (priorFeatures) {
+    await pool.query('DELETE FROM yuncms_feature_settings');
+    for (const row of priorFeatures) await pool.query('INSERT INTO yuncms_feature_settings (feature, enabled, updated_by, updated_at) VALUES (?, ?, ?, ?)', [row.feature, row.enabled, row.updated_by, row.updated_at]);
+  }
   await pool.end(); await new Promise(resolve => logStream.end(resolve)); await rm(root, { recursive: true, force: true });
 }
 try {
   await bootstrapDatabase(pool);
+  [priorLicense] = await pool.query('SELECT * FROM yuncms_license_state');
+  [priorFeatures] = await pool.query('SELECT * FROM yuncms_feature_settings');
   await new CollectionsService(basic).createOne({ collection });
   await new FieldsService(basic).createOne(collection, { field: 'title', type: 'string' });
   await new FieldsService(basic).createOne(collection, { field: 'status', type: 'string' });
@@ -107,6 +119,20 @@ try {
       model: provider.AI_CHAT_MODEL, base_url: provider.OPENROUTER_BASE_URL || provider.AI_BASE_URL,
       provider: provider.AI_PROVIDER_ROUTING ?? null });
     allowAiGeneration = true; res.status(204).end();
+  });
+  fixture.post('/features/reset', async (_req, res) => {
+    await pool.query('DELETE FROM yuncms_license_state');
+    await pool.query('DELETE FROM yuncms_feature_settings');
+    res.status(204).end();
+  });
+  fixture.post('/features/license-token', (_req, res) => {
+    const now = Math.floor(Date.now() / 1000);
+    const header = Buffer.from(JSON.stringify({ alg: 'EdDSA', crv: 'Ed25519', typ: 'YUNSOFT-ENTITLEMENT+JWT',
+      kid: createHash('sha256').update(licenseKeys.publicKey.export({ type: 'spki', format: 'der' })).digest('hex').slice(0, 16) })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ iss: 'yunsoft-commerce', sub: 'browser-disposable-license', productCode: 'yuncms_premium',
+      status: 'active', billingModel: 'one_time_perpetual', iat: now, nbf: now - 1, exp: null,
+      allowedHosts: ['browser.example.test'], capabilities: { contentHistory: true } })).toString('base64url');
+    res.json({ data: `${header}.${payload}.${sign(null, Buffer.from(`${header}.${payload}`), licenseKeys.privateKey).toString('base64url')}` });
   });
   fixture.post('/ai/deny', (_req, res) => { allowAiGeneration = false; res.status(204).end(); });
   // Exercise the real lifecycle, without replacing the queue, services or clock.
@@ -171,7 +197,7 @@ try {
     rootDir: root, includeDependencies: false, services, database: pool, schemaCache: cache, emitter, storage, logger,
     env: process.env, authConfig: config.auth,
   });
-  const app = createApp({ pool, config, schemaCache: cache, storage, emitter, logger, mailer, flowsOptions,
+  const app = createApp({ pool, config, studioRoot: process.env.YUNCMS_BROWSER_STUDIO_ROOT || undefined, schemaCache: cache, storage, emitter, logger, mailer, flowsOptions,
     mcpRouter: createMcpRouter({ settingsStore: new McpSettingsStore({ database: pool }), logger }),
     aiRouter: createAiRouter({ assistant, settingsStore }), automationsRouter: createAutomationsRouter({ ...automationOptions, flowOptions: flowsOptions }),
     endpointExtensions: [...extensionRuntime.endpointExtensions, { id: 'flow-fixture', router: fixture }] });

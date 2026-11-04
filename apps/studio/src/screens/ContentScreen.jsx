@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { confirmStudioNavigation, useUnsavedChanges } from '../use-unsaved-changes.js';
+import { ContentHistory } from '../premium/ContentHistory.jsx';
+import { contentDraftKey, editHeaders, editRequest } from '../content-edit-state.js';
 import { apiRequest, readSession } from '../api.js';
 import {
   BooleanFieldControl,
@@ -208,6 +211,7 @@ function RecordForm({
   onOpenFull,
   compact = false,
   capabilities = null,
+  historyEnabled = false,
 }) {
   const { t } = useI18n();
   const action = record?.id ? 'update' : 'create';
@@ -223,9 +227,28 @@ function RecordForm({
   const [nestedFailed, setNestedFailed] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const cleanNestedDraft = useRef(nestedDraft);
+  const [cleanKey, setCleanKey] = useState(() => contentDraftKey(values, nestedDraft));
+  const draftKey = contentDraftKey(values, nestedDraft);
+  const currentDraftKey = useRef(draftKey); currentDraftKey.current = draftKey;
+  const dirty = draftKey !== cleanKey;
+  const unsaved = useUnsavedChanges(dirty && !saving);
+  const savedRecordRef = useRef(record);
+  const [historyLicensed, setHistoryLicensed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (historyEnabled && readSession()?.user?.admin) apiRequest('/features').then(result => {
+      if (active) setHistoryLicensed(result.data.features.contentHistory.enabled);
+    }).catch(() => { if (active) setHistoryLicensed(false); });
+    else setHistoryLicensed(false);
+    return () => { active = false; };
+  }, [historyEnabled]);
 
   useLayoutEffect(() => {
-    setValues(initialValues());
+    const initialized = initialValues();
+    setValues(initialized);
+    savedRecordRef.current = record;
+    setCleanKey(contentDraftKey(initialized, cleanNestedDraft.current)); unsaved.clear();
     setError('');
   }, [recordValuesKey]);
 
@@ -235,12 +258,17 @@ function RecordForm({
     if (!nestedRelations || nestedRelations.length === 0) {
       setExistingNestedRows({});
       setNestedDraft({});
+      cleanNestedDraft.current = {};
+      setCleanKey(contentDraftKey(initialValues(), {}));
       setNestedLoading(false);
       return () => { active = false; };
     }
     if (!record?.id) {
       setExistingNestedRows({});
-      setNestedDraft(buildInitialNestedDraft(nestedRelations, {}));
+      const initialized = buildInitialNestedDraft(nestedRelations, {});
+      setNestedDraft(initialized);
+      cleanNestedDraft.current = structuredClone(initialized);
+      setCleanKey(contentDraftKey(initialValues(), initialized));
       setNestedLoading(false);
       return () => { active = false; };
     }
@@ -249,7 +277,10 @@ function RecordForm({
       .then((loaded) => {
         if (!active) return;
         setExistingNestedRows(loaded);
-        setNestedDraft(buildInitialNestedDraft(nestedRelations, loaded, inputValueForField));
+        const initialized = buildInitialNestedDraft(nestedRelations, loaded, inputValueForField);
+        setNestedDraft(initialized);
+        cleanNestedDraft.current = structuredClone(initialized);
+        setCleanKey(contentDraftKey(initialValues(), initialized));
       })
       .catch((failure) => {
         if (!active) return;
@@ -278,31 +309,41 @@ function RecordForm({
         field.field,
         outputValueForField(field, values[field.field]),
       ]));
-      let savedRecord = record ?? null;
-      if (!record?.id || Object.keys(payload).length > 0) {
-        const path = record?.id
-          ? `/items/${encodeURIComponent(collection)}/${encodeURIComponent(record.id)}`
+      let savedRecord = savedRecordRef.current ?? null;
+      if (!savedRecord?.id || Object.keys(payload).length > 0) {
+        const path = savedRecord?.id
+          ? `/items/${encodeURIComponent(collection)}/${encodeURIComponent(savedRecord.id)}`
           : `/items/${encodeURIComponent(collection)}`;
-        const result = await apiRequest(path, {
-          method: record?.id ? 'PATCH' : 'POST',
+        const result = await editRequest(apiRequest)(path, {
+          method: savedRecord?.id ? 'PATCH' : 'POST',
+          headers: editHeaders(savedRecord),
           body: payload,
         });
         savedRecord = result?.data ?? savedRecord;
+        savedRecordRef.current = savedRecord;
       }
+      let savedDraft = nestedDraft;
       const parentId = savedRecord?.id ?? record?.id;
       if (parentId != null && nestedRelations.length > 0 && !nestedLoading) {
-        await saveNestedRelations({
+        const progress = await saveNestedRelations({
           parentId,
           nestedRelations,
           draftState: nestedDraft,
           existingRowsByKey: existingNestedRows,
           request: apiRequest,
           outputValueForField,
+          onProgress: progress => {
+            setNestedDraft(structuredClone(progress.draftState));
+            setExistingNestedRows({ ...progress.existingRowsByKey });
+          },
         });
+        savedDraft = progress?.draftState ?? savedDraft;
       }
+      cleanNestedDraft.current = structuredClone(savedDraft);
+      setCleanKey(contentDraftKey(values, savedDraft)); unsaved.clear();
       await onSaved(savedRecord);
     } catch (requestError) {
-      setError(requestError.message || t('content.saveError'));
+      setError(requestError.code === 'ITEM_REVISION_CONFLICT' ? t('features.editConflict') : requestError.message || t('content.saveError'));
     } finally {
       setSaving(false);
     }
@@ -317,7 +358,7 @@ function RecordForm({
           {collectionLabel && collectionLabel !== collection && <code className="schema-machine-key">{collection}</code>}
           <p>{record?.id ? t('content.updateDescription') : t('content.createDescription')}</p>
         </div>
-        <button className="text-button" type="button" onClick={onCancel}>{t('common.cancel')}</button>
+        <button className="text-button" type="button" onClick={async () => { if (await unsaved.confirmDiscard()) { setCleanKey(currentDraftKey.current); unsaved.clear(); onCancel(); } }}>{t('common.cancel')}</button>
       </div>
 
       {editable.length > 0 && (
@@ -416,8 +457,15 @@ function RecordForm({
 
       {error && <div className="error-banner" role="alert">{error}</div>}
       <div className="form-actions">
+        {historyEnabled && historyLicensed && record?.id && <ContentHistory collection={collection} record={savedRecordRef.current ?? record} disabled={saving} onRestored={async () => {
+          const current = (await editRequest(apiRequest)(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(record.id)}`)).data;
+          savedRecordRef.current = current;
+          const initialized = Object.fromEntries(editable.map(field => [field.field, inputValueForField(field, current[field.field])]));
+          setValues(initialized);
+          setCleanKey(contentDraftKey(initialized, cleanNestedDraft.current)); unsaved.clear(); setError('');
+        }} />}
         {compact && onOpenFull && (
-          <button className="secondary-button" type="button" onClick={onOpenFull}>
+          <button className="secondary-button" type="button" onClick={async () => { if (await unsaved.confirmDiscard()) { setCleanKey(currentDraftKey.current); unsaved.clear(); onOpenFull(); } }}>
             {t('content.openFullEditor')}
           </button>
         )}
@@ -432,6 +480,9 @@ function RecordForm({
 export function ContentScreen({ collection, collectionLabel = '', collections = [], visibleCollectionCount = 0, onOpenDataModel, route = {}, onNavigate }) {
   const { locale, t } = useI18n();
   const requestConfirmation = useConfirmDialog();
+  const collectionMetadata = collections.find(entry => entry.collection === collection)?.metadata;
+  let historyEnabled = false;
+  try { historyEnabled = (typeof collectionMetadata === 'string' ? JSON.parse(collectionMetadata) : collectionMetadata)?.contentTracking?.history === true; } catch { /* optional metadata */ }
   const collectionLabelVersion = JSON.stringify(collections.map((entry) => [entry.collection, entry.name]));
   const requestVersion = useRef(0);
   const schemaLoadingRef = useRef(true);
@@ -559,7 +610,7 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
         limit: pageSize,
         offset,
       });
-      const response = await apiRequest(path);
+      const response = await editRequest(apiRequest)(path);
       if (version !== requestVersion.current) return;
       const nextItems = (response?.data ?? []).map((item) => normalizeRecordPrimaryKey(item, primaryKey));
       const capabilityIds = nextItems.map((item) => item.id).filter((id) => id != null && id !== '');
@@ -620,7 +671,7 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
     setEditingRecord(null);
     setLoadedRecordKey('');
     setError('');
-    apiRequest(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(route.recordId)}`)
+    editRequest(apiRequest)(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(route.recordId)}`)
       .then((response) => { if (!cancelled) setEditingRecord(response?.data ? { id: route.recordId, ...response.data } : null); })
       .catch((requestError) => {
         if (!cancelled) {
@@ -659,7 +710,7 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
     try {
       await apiRequest(
         `/items/${encodeURIComponent(collection)}/${encodeURIComponent(record.id)}`,
-        { method: 'DELETE' },
+        { method: 'DELETE', headers: editHeaders(record) },
       );
       if (String(inspectedRecord?.id) === String(record.id)) setInspectedRecord(null);
       if (items.length === 1 && offset > 0) {
@@ -690,7 +741,7 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
     setNotice('');
     const results = await Promise.allSettled(selected.map((record) => apiRequest(
       `/items/${encodeURIComponent(collection)}/${encodeURIComponent(record.id)}`,
-      { method: 'DELETE' },
+      { method: 'DELETE', headers: editHeaders(record) },
     )));
     const failed = results.filter((result) => result.status === 'rejected').length;
     setSelectedRecordIds(new Set());
@@ -888,6 +939,7 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
         <RecordForm
           collection={collection}
           collectionLabel={collectionLabel}
+          historyEnabled={historyEnabled}
           fields={fields}
           capabilities={capabilities}
           relationLookups={relationLookups}
@@ -903,7 +955,7 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
         />
         {editing && <ManualFlowActions collection={collection} keys={[editing.id]} onComplete={async () => {
           try {
-            const refreshed = (await apiRequest(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(editing.id)}`)).data;
+            const refreshed = (await editRequest(apiRequest)(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(editing.id)}`)).data;
             setEditingRecord(refreshed ? { id: editing.id, ...refreshed } : null);
             await loadItems();
           }
@@ -1260,13 +1312,14 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
         title={visibleCollectionName}
         description={t('content.quickEdit')}
         closeLabel={t('studio.inspectorClose')}
-        onClose={() => setInspectedRecord(null)}
+        onClose={async () => { if (await confirmStudioNavigation()) setInspectedRecord(null); }}
       >
         {inspectedRecord && (
           <RecordForm
             compact
             collection={collection}
             collectionLabel={collectionLabel}
+            historyEnabled={historyEnabled}
             fields={fields}
             capabilities={capabilities}
             relationLookups={relationLookups}

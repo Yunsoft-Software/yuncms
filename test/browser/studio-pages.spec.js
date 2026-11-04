@@ -38,7 +38,7 @@ test.beforeAll(async ({ request }) => {
     ['users', '/users', '.mobile-user-card, tbody tr:has(.table-row-actions)'], ['new-user', '/users/new', '.create-user-panel input'], ['user-detail', `/users/${user.id}`, '.user-detail-page'],
     ['roles', '/roles', '.role-list-button'], ['new-role', '/roles/new', 'main input'], ['role-detail', `/roles/${role.id}`, '.role-summary-panel'], ['permission-detail', `/roles/${role.id}/permissions/${fixture.parent}/read`, '.permission-detail-page'],
     ['files', '/files', '.file-card img'], ['upload', '/files/new', '.file-dropzone'], ['file-detail', `/files/${file.id}`, '.file-detail-page img'],
-    ['ai', '/ai', '.ai-workspace textarea'], ['security', '/security', 'main input[type="password"]'], ['mcp', '/mcp', 'main input'], ['appearance', '/appearance', 'main input'],
+    ['ai', '/ai', '.ai-workspace textarea'], ['security', '/security', 'main input[type="password"]'], ['mcp', '/mcp', 'main input'], ['features', '/features', '.settings-feature-row input'], ['appearance', '/appearance', 'main input'],
     ['flows', '/flows', 'tbody tr, .flow-mobile-list article'], ['new-flow', '/flows/new', '.flow-canvas'], ['saved-flow', `/flows/${flow.id}`, '.flow-canvas']
   );
 });
