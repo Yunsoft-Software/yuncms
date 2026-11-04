@@ -38,7 +38,7 @@ export async function createInterruptedFieldFixture() {
     const admin = await users.createOne({ email: 'admin-' + nonce + '@example.test', password, role: adminRole.id });
     const staff = await users.createOne({ email: 'staff-' + nonce + '@example.test', password, role: staffRole.id });
     const emitter = new HookEmitter();
-    const app = createApp({ pool: database, config: { ...config, database: { ...config.database, database: dbName } },
+    const app = createApp({ studioRoot: process.env.YUNCMS_BROWSER_STUDIO_ROOT || undefined, pool: database, config: { ...config, database: { ...config.database, database: dbName } },
       schemaCache, emitter, storage: createStorageRegistry({ local: new LocalStorageDriver({ root: directory }) }) });
     server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
     const origin = 'http://127.0.0.1:' + server.address().port;

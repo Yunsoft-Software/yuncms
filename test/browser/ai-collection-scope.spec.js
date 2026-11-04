@@ -17,5 +17,5 @@ test('real browser preserves native admin identity while the server fences AI co
    return {normal:normal.status,denied:denied.status,code:denied.body.errors?.[0]?.code,unchanged:rows[0].secret.startsWith('ONLY_CONFIG_'),logout:logout.status};
   },{origin:f.origin,email:f.admin.email,password:f.password,collection:f.names.config,id:f.privateRow.id});
   expect(result).toEqual({normal:200,denied:403,code:'FORBIDDEN',unchanged:true,logout:204});accepted=true;
- }finally{await f.close({preserve:!accepted});}
+ }finally{await test.step('Close native HTTP fixture and dispose owned synthetic data',()=>f.close({preserve:!accepted}));}
 });

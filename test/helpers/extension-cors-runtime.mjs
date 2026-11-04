@@ -24,7 +24,7 @@ router.post('/messages',(req,res)=>res.json({message:req.body.message,public:req
 router.get('/events',(req,res)=>{res.set({'Content-Type':'text/event-stream','Cache-Control':'no-cache'});res.end('data: Actual extension event\\n\\n');});
 }};`);}
   const cache=new SchemaCache(),services=createCoreServiceRegistry().toObject(),emitter=new HookEmitter();runtime=await loadExtensionRuntime({rootDir:root,includeDependencies:false,services,database:pool,schemaCache:cache,emitter,env:{...process.env,CORS_ALLOWED_ORIGIN:allowedOrigin},authConfig:config.auth});
-  const app=createApp({pool,config,schemaCache:cache,emitter,endpointExtensions:runtime.endpointExtensions});api=app.listen(0,'127.0.0.1');await new Promise(resolve=>api.once('listening',resolve));apiOrigin='http://127.0.0.1:'+api.address().port;
+  const app=createApp({studioRoot:process.env.YUNCMS_BROWSER_STUDIO_ROOT||undefined,pool,config,schemaCache:cache,emitter,endpointExtensions:runtime.endpointExtensions});api=app.listen(0,'127.0.0.1');await new Promise(resolve=>api.once('listening',resolve));apiOrigin='http://127.0.0.1:'+api.address().port;
   return {apiOrigin,allowedOrigin,forbiddenOrigin,close:async()=>{await runtime.stopSchedules();for(const s of[allowed,forbidden,api])await new Promise(resolve=>s.close(resolve));await pool.end();await rm(root,{recursive:true,force:true});}};
  }catch(error){for(const s of[allowed,forbidden,api])if(s?.listening)await new Promise(resolve=>s.close(resolve));await runtime?.stopSchedules();await pool.end();await rm(root,{recursive:true,force:true});throw error;}
 }

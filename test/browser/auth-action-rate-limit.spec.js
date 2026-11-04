@@ -10,7 +10,7 @@ test.beforeAll(async()=>{
   const config=loadConfig({...process.env,API_RATE_LIMIT_ENABLED:'0',AUTH_ACTION_RATE_MAX:'5',PRESSURE_LIMIT_ENABLED:'0'});
   if(!/(test|ci|dev)/i.test(config.database.database))throw Error('Disposable database required');
   pool=createDatabasePool({...config.database,connectionLimit:2});
-  const app=createApp({pool,config});
+  const app=createApp({studioRoot:process.env.YUNCMS_BROWSER_STUDIO_ROOT||undefined,pool,config});
   server=await new Promise((resolve,reject)=>{const instance=app.listen(0,'127.0.0.1',()=>resolve(instance));instance.once('error',reject);});
   origin=`http://127.0.0.1:${server.address().port}`;
 });

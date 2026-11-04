@@ -53,7 +53,7 @@ export async function createAiCollectionFixture(){
  const settingsStore=new AiSettingsStore({database:pool,key:randomBytes(32)});
  const assistant=new AiAssistantService({settingsStore,emitter});
  const aiRouter=createAiRouter({assistant,settingsStore});
- const app=createApp({pool,config,schemaCache,permissionCache:cache,emitter,storage,aiRouter,endpointExtensions:[{id:'ai-scope-probe',router}]});
+ const app=createApp({studioRoot:process.env.YUNCMS_BROWSER_STUDIO_ROOT||undefined,pool,config,schemaCache,permissionCache:cache,emitter,storage,aiRouter,endpointExtensions:[{id:'ai-scope-probe',router}]});
  const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
  const origin='http://127.0.0.1:'+server.address().port;
  async function request(path,{method='GET',body,token}={}){
@@ -63,7 +63,11 @@ export async function createAiCollectionFixture(){
  async function login(user){const r=await request('/auth/login',{method:'POST',body:{email:user.email,password}});assert.equal(r.status,200);return r.body.data.access_token;}
  async function tool(token,name,args,extra={}){return request('/extensions/ai-scope-probe/tool',{method:'POST',token,body:{name,args,...extra}});}
  async function close({preserve=false}={}){
-  await new Promise(resolve=>server.close(resolve));
+  // Feature assertions have already consumed the real responses. Close only
+  // this fixture's browser keep-alive/preconnect sockets before SQL teardown.
+  const closed = new Promise(resolve=>server.close(resolve));
+  server.closeAllConnections();
+  await closed;
   try{if(!preserve){
    await new services.RelationsService(options).deleteM2O(names.business,'config_ref');
    await collections.deleteOne(names.business,{destructive:true});await collections.deleteOne(names.config,{destructive:true});
