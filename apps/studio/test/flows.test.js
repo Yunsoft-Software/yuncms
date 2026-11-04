@@ -9,6 +9,12 @@ import { readStudioRoute, studioPath } from '../src/studio-route.js';
 import { FLOW_OPERATION_TYPES } from '../../../packages/core/src/flows/definition.js';
 const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 
+test('Flow navigation shares one discard decision and successful deletion clears the removed draft guard', () => {
+  const screen = source('../src/screens/FlowsScreen.jsx');
+  assert.match(screen, /async function navigate\(path\) \{\s*if \(!await unsaved\.confirmDiscard\(\)\) return;\s*unsaved\.clear\(\)/);
+  assert.match(screen, /method: 'DELETE' \}\);\s*unsaved\.clear\(\);\s*navigateStudio\(studioPath\.flows\(\)\)/);
+});
+
 test('canvas reconciliation retains untouched node references and measured state without saving runtime geometry', () => {
   const previous = [
     { id: 'trigger', type: 'flow', selected: true, position: { x: 40, y: 100 }, data: { label: 'Start' } },

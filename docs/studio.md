@@ -27,6 +27,10 @@ Collection names stay on one line so navigation rows keep a consistent rhythm. W
 
 Studio uses a workbench layout with a stable application rail and task-specific navigation beside the active workspace.
 
+Content and Flow editors use the shared confirmation dialog when leaving an
+unsaved draft. Cancel keeps the draft; confirming discard proceeds once without
+a second prompt. Returning a content field to its saved value leaves it clean.
+
 The application rail opens:
 
 - **Content** — project collections that are visible in content navigation;

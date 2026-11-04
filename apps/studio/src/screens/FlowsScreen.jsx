@@ -47,7 +47,8 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
     try { await operation(); } catch (requestError) { setError(requestError.message); } finally { setBusy(false); }
   }
   async function navigate(path) {
-    if (dirty && !await confirmAction({ title: t('flow.unsaved'), description: t('flow.discardHint') })) return;
+    if (!await unsaved.confirmDiscard()) return;
+    unsaved.clear();
     if (path === studioPath.newFlow()) onCreateDraft(newFlowDraft());
     else navigateStudio(path);
   }
@@ -63,6 +64,7 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
     if (!await confirmAction({ title: t('common.delete'), description: t('flow.deleteHint'), tone: 'danger' })) return;
     await perform(async () => {
       await apiRequest(`/flows/${encodeURIComponent(draft.id)}?revision=${draft.revision}`, { method: 'DELETE' });
+      unsaved.clear();
       navigateStudio(studioPath.flows());
     });
   }

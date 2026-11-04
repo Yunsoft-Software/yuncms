@@ -23,6 +23,26 @@ async function createFlow(request, session, name, extra = {}) {
   } }); expect(response.status()).toBe(201); return (await response.json()).data;
 }
 async function selectTrigger(page) { await page.locator('.react-flow__node[data-id="trigger"]').click(); }
+
+test('a dirty Flow asks once before leaving or starting over; cancellation preserves the draft', async ({ page, request }) => {
+  await authenticate(page, request);
+  await page.goto('/#/flows/new');
+  const name = page.locator('.flow-inspector').getByLabel('Name', { exact: true });
+  await name.fill('Preserve this unsaved Flow');
+  await page.getByRole('button', { name: '← Back to flows', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(name).toHaveValue('Preserve this unsaved Flow');
+  await page.getByRole('button', { name: '← Back to flows', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Flows', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'New flow', exact: true }).click();
+  await name.fill('Start over after one confirmation');
+  await page.locator('.flow-toolbar-actions').getByRole('button', { name: 'New flow', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(name).toHaveValue('');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
 async function connect(page, source, target, branch = 'resolve') {
   const from = page.locator(`.react-flow__node[data-id="${source}"] .react-flow__handle[data-handleid="${branch}"]`);
   const to = page.locator(`.react-flow__node[data-id="${target}"] .react-flow__handle[data-handleid="input"]`);
