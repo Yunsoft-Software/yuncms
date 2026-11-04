@@ -42,6 +42,14 @@ test('field-builder labels use theme-aware accent ink rather than the action fil
   }
 });
 
+test('account status colors follow semantic theme tokens without legacy light-only ink', () => {
+  for (const [status, token] of [['active', '--ui-success'], ['suspended', '--ui-warning'], ['disabled', '--ui-text-secondary']]) {
+    const rule = theme.slice(theme.indexOf(`.studio-next-app .user-status-pill.${status}`)).split('}')[0];
+    assert.match(rule, new RegExp(`color: var\\(${token}\\)`), status);
+  }
+  assert.doesNotMatch(read('usability-pass.css'), /\.user-status-pill\.(active|suspended|disabled)\s*[,\{]/);
+});
+
 test('single-relation choices bound long labels and preserve their complete accessible tooltip', () => {
   assert.match(read('content-inspector-next.css'), /\.relation-picker-trigger > span:first-child,[\s\S]*?-webkit-line-clamp: 2/);
   assert.match(read('components/RelationPicker.jsx'), /title=\{selectedLabel \? String\(selectedLabel\) : undefined\}/);

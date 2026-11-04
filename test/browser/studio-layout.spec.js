@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { seedStudioLayout, cleanupStudioLayout } from '../helpers/studio-layout-fixture.mjs';
+import { expectReadableText } from '../helpers/studio-contrast.mjs';
 
 let fixture, session, headers;
 function nativeSend(request) {
@@ -98,23 +99,7 @@ test('new record honors native draft and true defaults through a real save and r
 });
 
 test('field-builder accent labels remain legible in both themes with the default and a custom accent', async ({ page, request }, info) => {
-  async function readable(locator) {
-    await expect(locator).toBeVisible();
-    const ratio = await locator.evaluate(element => {
-      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
-      const context = canvas.getContext('2d', { willReadFrequently: true });
-      const ancestors = []; for (let current = element; current; current = current.parentElement) ancestors.unshift(current);
-      context.fillStyle = '#fff'; context.fillRect(0, 0, 1, 1);
-      for (const ancestor of ancestors) { context.fillStyle = getComputedStyle(ancestor).backgroundColor; context.fillRect(0, 0, 1, 1); }
-      const background = context.getImageData(0, 0, 1, 1).data;
-      context.fillStyle = getComputedStyle(element).color; context.fillRect(0, 0, 1, 1);
-      const foreground = context.getImageData(0, 0, 1, 1).data;
-      const luminance = rgba => [...rgba].slice(0, 3).map(value => value / 255).map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
-      const a = luminance(background), b = luminance(foreground);
-      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-    });
-    expect(ratio, await locator.textContent()).toBeGreaterThanOrEqual(4.5);
-  }
+  const readable = expectReadableText;
   try {
     for (const theme of ['light', 'dark']) for (const accent of ['#2563eb', '#0f766e']) {
       await setAppearance(request, theme, accent);
@@ -130,6 +115,35 @@ test('field-builder accent labels remain legible in both themes with the default
       await readable(page.locator('.page-breadcrumbs button').first());
     }
   } finally { await setAppearance(request, 'system'); }
+});
+
+test('native account status and verification labels remain readable in every theme and responsive layout', async ({ page, request }, info) => {
+  const send = nativeSend(request);
+  const user = await send('/users', { method: 'POST', body: { email: `status-${crypto.randomUUID()}@example.test`, password: 'Native-status-fixture-123!' } });
+  try {
+    for (const theme of ['light', 'dark']) {
+      await setAppearance(request, theme);
+      for (const width of [390, 820, 1680]) {
+        await page.setViewportSize({ width, height: 960 });
+        for (const status of ['active', 'suspended', 'disabled']) {
+          await send(`/users/${user.id}`, { method: 'PATCH', body: { status } });
+          expect((await send(`/users/${user.id}`)).status).toBe(status);
+          await open(page, `/?status_appearance=${theme}-${width}-${status}#/users/${user.id}`);
+          await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+          const badge = page.locator(`.user-detail-page .user-status-pill.${status}`);
+          await expect(badge).toHaveText(status[0].toUpperCase() + status.slice(1));
+          await expectReadableText(badge);
+          await page.screenshot({ path: info.outputPath(`account-${theme}-${width}-${status}.png`), animations: 'disabled' });
+        }
+        await page.goto('/#/users');
+        const row = page.locator('.mobile-user-card, tbody tr').filter({ hasText: user.email }).filter({ visible: true });
+        await expectReadableText(row.getByText('Verified', { exact: true }));
+      }
+    }
+  } finally {
+    await send(`/users/${user.id}`, { method: 'DELETE' });
+    await setAppearance(request, 'system');
+  }
 });
 
 test('all Studio workspaces remain contained on desktop, tablet and mobile with a custom accent', async ({ page, request }, testInfo) => {

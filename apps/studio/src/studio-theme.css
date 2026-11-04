@@ -123,6 +123,9 @@ body { background: var(--ui-canvas); line-height: 1.5; font-family: 'Inter Varia
 .primary-button { border-color: transparent; border-radius: var(--ui-radius-control); background: var(--yun-action-bg); color: var(--yun-action-text); box-shadow: 0 2px 4px rgb(20 40 80 / 8%); }
 .primary-button:hover:not(:disabled) { background: var(--yun-action-bg); filter: brightness(.94); transform: none; }
 .secondary-button, .danger-button { border-radius: var(--ui-radius-control); }
+.studio-next-app .user-status-pill.active { color: var(--ui-success); background: color-mix(in srgb, var(--ui-success) 9%, var(--ui-surface)); }
+.studio-next-app .user-status-pill.suspended { color: var(--ui-warning); background: color-mix(in srgb, var(--ui-warning) 9%, var(--ui-surface)); }
+.studio-next-app .user-status-pill.disabled { color: var(--ui-text-secondary); background: var(--ui-surface-hover); }
 input[type='checkbox'] { accent-color: var(--ui-accent); }
 .studio-next-app input[type='checkbox'] { width: 16px; min-width: 16px; max-width: 16px; height: 16px; flex: 0 0 16px; justify-self: start; }
 .studio-next-app .field-option-card { grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 10px; }

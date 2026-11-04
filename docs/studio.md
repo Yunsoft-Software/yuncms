@@ -286,6 +286,8 @@ Supported administration includes:
 
 Protected Administrator/account invariants remain enforced by the API. Delegated user-management access is not equivalent to full Administrator access.
 
+Account-status and verification labels use the active light or dark theme's semantic colors. Their text keeps the state explicit alongside its color in both user cards and account details.
+
 # Roles & Permissions
 
 Open **Access** to work with roles and permissions.

@@ -3,7 +3,7 @@
 :root {
   --ui-border-strong: color-mix(in srgb, var(--studio-border) 72%, var(--studio-text) 28%);
   --ui-success: var(--studio-success-text);
-  --ui-warning: #a16207;
+  --ui-warning: #854d0e;
   --ui-info: var(--studio-accent);
   --ui-focus-ring: var(--studio-accent-soft);
   --ui-overlay: #0f172a;

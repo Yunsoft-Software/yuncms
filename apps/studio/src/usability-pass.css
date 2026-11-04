@@ -265,22 +265,6 @@
   text-transform: capitalize;
 }
 
-.user-status-pill.active,
-.verification-pill.verified {
-  background: #eef8f1;
-  color: #34714a;
-}
-
-.user-status-pill.suspended {
-  background: #fff7e8;
-  color: #876324;
-}
-
-.user-status-pill.disabled {
-  background: #f5f1f1;
-  color: #8b6565;
-}
-
 .verification-pill {
   white-space: nowrap;
 }
