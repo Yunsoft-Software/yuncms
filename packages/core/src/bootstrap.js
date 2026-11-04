@@ -27,6 +27,7 @@ import { flowReadPermissionsMigration } from './migrations/0024-flow-read-permis
 import { aiProviderRoutingMigration } from './migrations/0025-ai-provider-routing.js';
 import { aiOutputConstraintsMigration } from './migrations/0026-ai-output-constraints.js';
 import { nativeTotpMigration } from './migrations/0027-native-totp.js';
+import { aiFlowConversionMigration } from './migrations/0028-ai-flow-conversion.js';
 import { readSchemaVersion } from './schema-version.js';
 import { ensurePublicRole } from './setup.js';
 
@@ -58,6 +59,7 @@ export const CORE_MIGRATIONS = Object.freeze([
   aiProviderRoutingMigration,
   aiOutputConstraintsMigration,
   nativeTotpMigration,
+  aiFlowConversionMigration,
 ]);
 
 export const REQUIRED_CORE_MIGRATION_IDS = Object.freeze(

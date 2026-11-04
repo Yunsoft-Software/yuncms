@@ -81,7 +81,7 @@ export { UsersService } from './services/users-service.js';
 export { FlowsService, FLOW_FILTER_EVENTS, FLOW_ACTION_EVENTS, FLOW_ADMISSION_VERSION } from './services/flows-service.js';
 export { normalizeFlow, FLOW_LIMITS, FLOW_TRIGGERS, FLOW_OPERATION_TYPES } from './flows/definition.js';
 export { parseCronExpression, cronMatches, parseFlowCronExpression, flowCronMatchesUtc } from './flows/cron.js';
-export { flowExecutionStorage } from './flows/context.js';
+export { flowExecutionStorage, withFlowEvents } from './flows/context.js';
 export { RolesService } from './services/roles-service.js';
 export { PermissionsService } from './services/permissions-service.js';
 export { FilesService } from './services/files-service.js';

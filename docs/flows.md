@@ -1,6 +1,6 @@
 # Flows
 
-Flows connect a trigger to operations in a visual graph. Use them for content validation, record updates, collection actions, webhooks and scheduled work. They are independent of [AI Automations](ai-automations.md).
+Flows connect a trigger to operations in a visual graph. Use them for content validation, record updates, collection actions, webhooks and scheduled work. AI content generation is available as a **Generate with AI** operation in the same graph; see [AI operations and existing rules](ai-automations.md).
 
 ![Studio Flow editor with a connected trigger, operation and successful run](assets/screenshots/studio-flows.png)
 
@@ -13,7 +13,7 @@ Start with [your first flow](#your-first-flow), then follow the [branching examp
 | Run an action on selected Content records | [Content actions](#give-a-content-role-a-manual-action) |
 | Configure event hooks, webhooks or UTC schedules | [Trigger setup](#configure-the-other-triggers) |
 | Choose execution permissions and pass values | [Execution permissions](#execution-permissions), [Data chain](#data-chain-and-templates) |
-| Configure one of the thirteen operation types | [Operation reference](#built-in-operations) |
+| Configure an operation type | [Operation reference](#built-in-operations) |
 | Integrate through HTTP or diagnose a failed run | [REST reference](#rest-reference-and-minimal-definition), [Troubleshooting](#troubleshooting) |
 
 ## Build and run a flow in Studio
@@ -44,6 +44,7 @@ The editor uses Studio's shared components, typography, spacing, theme tokens an
 | --- | --- |
 | Flow catalogue | Use the separate paginated list to search/filter saved flows and open their editor page. **New flow** opens an empty editor. |
 | Operations toolbar | Choose an operation type, then click **Add operation**. The new node becomes selected. |
+| Connections | Drag between ports, or use **First operation**, **On success** and **On failure** in the settings panel. The selectors also work with touch and keyboard input. Use the selected-operation list to open a step without clicking a canvas node. |
 | Canvas | Pan, zoom, drag operation nodes and draw connections between their ports. The trigger stays anchored. Layout coordinates are saved with the definition. |
 | Inspector | Select the trigger to edit its name, activation, trigger type and execution permissions; select an operation to edit its key, type and JSON options or script source. |
 | Graph actions | Run a saved active manual flow, export the current definition, duplicate it or delete the saved flow and its history. |
@@ -153,7 +154,7 @@ The editor's Run button is for manual flows. To try a scheduled graph immediatel
 
 ### Mobile and dark appearance
 
-The same controls, inspector and history are available in the responsive layout. Pan and zoom inside the canvas to inspect a larger graph. Studio appearance controls supply the dark palette; flows do not have separate page-local theme settings.
+The same controls, inspector and history are available in the responsive layout. The diagram fits its available space again when the window or inspector layout changes size. Pan and zoom inside the canvas to inspect a larger graph. Studio appearance controls supply the dark palette; flows do not have separate page-local theme settings.
 
 <img src="assets/screenshots/studio-mobile-flows-dark.png" alt="Responsive Flow editor in Studio dark appearance with the inspector below the graph" width="390">
 
@@ -394,3 +395,27 @@ The trigger/data-chain/resolve-reject behavior was studied in the [Directus Flow
 Use a separate disposable MySQL database whose name contains `test`, `ci` or `dev`. Never point acceptance fixtures at production. Set the normal `DB_*` connection variables, `YUNCMS_TEST_MYSQL=1`, and `YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE=1`, then run `npm run test:flows` from the source checkout. This command builds Studio and sequentially runs pure unit/source checks, actual Node script processes, real MySQL/API integration (including password-admission regression) and Chromium Playwright. It fails on skipped, cancelled or failing tests; reports and logs are local under `.yuncms/flows-tests/acceptance/`. Chromium must already be installed (`npx playwright install chromium`). To run the same scenarios in all three engines, install them with `npx playwright install chromium firefox webkit` and set `YUNCMS_BROWSER_ENGINES=chromium,firefox,webkit`; the default is `chromium`. Node.js 24 and `openssl` are required for the real TLS fixtures. Browser cases allow 120 seconds including browser/context startup; UI assertions remain bounded to 8 seconds. Cases that intentionally wait for a native deadline or worker lease declare a larger total budget. Tests run serially with zero retries.
 
 The suite creates synthetic users/collections/flows, runs real HTTPS with trusted and untrusted certificates, sends SMTP to a local TCP server, polls actual UTC time, executes imports, checks native authorization/transaction rollback, competes with two real workers, holds an unexpired job row in a real transaction while another dispatcher polls, kills a worker and waits for its real one-minute lease, and checks script crashes/timeouts/heap limits. Network fixtures bind only to localhost. No database, HTTP/HTTPS, SMTP, script process, scheduler clock or browser request is mocked. Existing unrelated legacy repository suites retain their own coverage. These checks do not validate your production credentials, external provider availability, replica sizing or business-specific scripts; repeat the relevant scenarios with controlled integrations before activation.
+
+
+## AI content operation
+
+The API runtime registers `ai` alongside the core operations. In Studio choose **Generate with AI**, then select the collection, record key or typed data-chain expression, input fields, output fields and instruction. Choose **Selected user** in the trigger settings and select an active normal user with native read and update permissions. Administrator, system and Public execution cannot run this operation. Enable AI and AI writes in the AI settings.
+
+The operation supports 1–10 distinct record keys and 1–10 input/output fields. Input and output fields must be distinct. It uses the existing configured provider without tools, validates the exact output allowlist and optional equality constraints, then updates through `ItemsService`. Each record is a separate transaction: an error on a later record does not undo earlier completed records. A record changed during generation is skipped. Revoked permissions, a changed/deactivated flow or an expired execution deadline prevent that output from being saved. AI operations cannot run in blocking event filters; use an after-commit action instead. Generated writes do not recursively dispatch Flows or legacy AI rules.
+
+```json
+{
+  "collection": "articles",
+  "ids": "{{ $trigger.keys }}",
+  "input_fields": ["body"],
+  "output_fields": ["summary"],
+  "output_constraints": {},
+  "instruction": "Summarize the body in two sentences."
+}
+```
+
+`ids` accepts a scalar key or an array; a whole data-chain expression preserves its original type. For a single native event use `{{ $trigger.payload.key }}`. Bulk events without a stable record key are not supported. The output is an array of `{ id, status, output? }` results, visible in normal Flow run history. `require_changed_inputs: true` skips an update event when none of the configured source fields changed.
+
+Existing AI rules appear under **Flows → Existing AI automations**. **Convert to flow** preserves their instruction, fields, constraints, selected user and create/update events. It creates an inactive flow and disables the original rule in one transaction. Review and activate the new flow. Old history remains available; repeating conversion opens the same flow. Deleting the linked flow leaves its original rule disabled and preserves the old rule history; it can be converted again. Existing REST/MCP integrations remain available, while converted rules reject edits with `AUTOMATION_MOVED_TO_FLOW`.
+
+Trusted custom operations can use `withFlowEvents(false, async () => { ... })` from the core package to suppress recursive Flow dispatch while calling native services. This does not bypass permissions or ordinary extension hooks.

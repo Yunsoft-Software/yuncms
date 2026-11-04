@@ -175,7 +175,7 @@ export class AiAssistantService {
   }
 
   async #providerCompletion(messages, tools, config, context = null, responseFormat = null) {
-    if (!this.emitter) return this.#executeProviderRequest(messages, tools, config, responseFormat);
+    if (!this.emitter) return this.#executeProviderRequest(messages, tools, config, responseFormat, null, context?.signal);
     if (!context?.accountability?.user || context.accountability.public === true) {
       throw Object.assign(aiError('AI_ADMISSION_UNAVAILABLE', 'Verified AI execution context is required'), { status: 503 });
     }
@@ -185,7 +185,7 @@ export class AiAssistantService {
     try {
       await this.emitter.filter('ai.provider.before', admission, context);
       const result = await this.#executeProviderRequest(messages, tools, config, responseFormat,
-        { call_id: admission.call_id, context });
+        { call_id: admission.call_id, context }, context?.signal);
       completedUsage = result.nativeUsage;
       await this.emitter.filter('ai.provider.completed', { call_id: admission.call_id, usage: result.nativeUsage }, context);
       return result;
@@ -213,7 +213,7 @@ export class AiAssistantService {
     } finally { clearTimeout(timer); }
   }
 
-  async #executeProviderRequest(messages, tools, config, responseFormat = null, observation = null) {
+  async #executeProviderRequest(messages, tools, config, responseFormat = null, observation = null, signal = null) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
     timeout.unref?.();
@@ -229,7 +229,7 @@ export class AiAssistantService {
           'content-type': 'application/json',
         },
         body,
-        signal: controller.signal,
+        signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
       });
       // Keep the deadline active while the provider streams the response body.
       if (response?.ok) text = await response.text();

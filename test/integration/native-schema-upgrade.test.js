@@ -139,8 +139,11 @@ test('native unique constraints and additive managed-field upgrades preserve rea
   await t.test('metadata transaction failures compensate unique DDL and preserve the original index and records', async () => {
     const failed = await make('compensation'); await fields.createOne(failed, { field: 'code', type: 'string', indexed: true }); await items(failed).createMany([{ code: 'one' }, { code: 'two' }]);
     const before = await rows(failed), beforeDdl = await ddl(failed), beforeField = await fields.readOne(failed, 'code'), beforeVersion = await version();
-    const database = intercept(async (sql, _params, run) => { if (sql.startsWith('UPDATE yuncms_fields SET')) throw Object.assign(Error('Injected metadata failure'), { code: 'TEST_METADATA_FAILURE' }); return run(); });
-    await assert.rejects(new FieldsService({ ...basic, database }).updateSchema(failed, 'code', { unique: true, required: true }), { code: 'TEST_METADATA_FAILURE' });
+    const trigger = `test_metadata_update_${suffix}`;
+    await pool.query(`CREATE TRIGGER ${trigger} BEFORE UPDATE ON yuncms_fields FOR EACH ROW BEGIN IF NEW.collection = '${failed}' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Test metadata constraint'; END IF; END`);
+    try {
+      await assert.rejects(fields.updateSchema(failed, 'code', { unique: true, required: true }), { code: 'ER_SIGNAL_EXCEPTION' });
+    } finally { await pool.query(`DROP TRIGGER IF EXISTS ${trigger}`); }
     assert.deepEqual(await rows(failed), before); assert.equal(await ddl(failed), beforeDdl); assert.deepEqual(await fields.readOne(failed, 'code'), beforeField); assert.equal(await version(), beforeVersion);
   });
   await t.test('field uniqueness does not remove a relation-owned unique constraint or its foreign key', async () => {
@@ -193,8 +196,11 @@ test('native unique constraints and additive managed-field upgrades preserve rea
   await t.test('managed-field metadata failure restores the original physical schema and rolls back every new metadata row', async () => {
     const failed = await make('managed_failure'); await fields.createOne(failed, { field: 'title', type: 'string' }); await items(failed).createOne({ title: 'existing' });
     const before = await rows(failed), beforeDdl = await ddl(failed), beforeFields = await fields.readMany(failed), beforeVersion = await version();
-    const database = intercept(async (sql, params, run) => { if (sql.startsWith('INSERT INTO yuncms_fields') && params[1] === 'created_by') throw Object.assign(Error('Injected metadata failure'), { code: 'TEST_METADATA_FAILURE' }); return run(); });
-    await assert.rejects(new CollectionsService({ ...basic, database }).updateOne(failed, { systemFields: ['created_at', 'updated_at', 'created_by', 'updated_by'] }), { code: 'TEST_METADATA_FAILURE' });
+    const trigger = `test_metadata_insert_${suffix}`;
+    await pool.query(`CREATE TRIGGER ${trigger} BEFORE INSERT ON yuncms_fields FOR EACH ROW BEGIN IF NEW.collection = '${failed}' AND NEW.field = 'created_by' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Test metadata constraint'; END IF; END`);
+    try {
+      await assert.rejects(collections.updateOne(failed, { systemFields: ['created_at', 'updated_at', 'created_by', 'updated_by'] }), { code: 'ER_SIGNAL_EXCEPTION' });
+    } finally { await pool.query(`DROP TRIGGER IF EXISTS ${trigger}`); }
     assert.deepEqual(await rows(failed), before); assert.equal(await ddl(failed), beforeDdl); assert.deepEqual(await fields.readMany(failed), beforeFields); assert.equal(await version(), beforeVersion);
   });
 });

@@ -1,4 +1,5 @@
 import express from 'express';
+import { convertAutomationToFlow } from '../flows/convert-automation.js';
 import { AiAutomationsService } from '../automations/service.js';
 
 export function automationServiceFromRequest(req, options = {}) {
@@ -15,6 +16,7 @@ export function createAutomationsRouter(options) {
   router.post('/', async (req, res) => res.status(201).json({ data: await service(req).save(req.body) }));
   router.put('/:id', async (req, res) => res.json({ data: await service(req).save(req.body, req.params.id) }));
   router.delete('/:id', async (req, res) => { await service(req).remove(req.params.id); res.status(204).end(); });
+  router.post('/:id/convert-to-flow', async (req, res) => res.json({ data: await convertAutomationToFlow(service(req), req.params.id, options.flowOptions) }));
   router.get('/:id/runs', async (req, res) => res.json({ data: await service(req).runs(req.params.id) }));
   router.post('/runs/:id/retry', async (req, res) => res.json({ data: await service(req).retry(req.params.id) }));
   router.post('/preview', async (req, res) => res.json({ data: await service(req).preview(req.body?.rule, req.body?.item_key) }));

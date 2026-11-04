@@ -85,6 +85,7 @@ export class AiAutomationsService {
     return withTransaction(this.database, async database => {
       const previous = id ? await this.read(id, database, { lock: true }) : null;
       if (id && !previous) throw automationError('NOT_FOUND', 'Automation not found');
+      if (previous?.flow_id) throw automationError('AUTOMATION_MOVED_TO_FLOW', 'Manage this automation through its flow');
       // Lock before preserving omitted constraints, so an older concurrent
       // client cannot silently overwrite a newer constraint definition.
       const rule = normalizeAutomation(previous && !Object.hasOwn(input ?? {}, 'output_constraints')
@@ -129,7 +130,7 @@ export class AiAutomationsService {
     return { queued: true };
   }
 
-  async generate(rule, itemKey, database = this.database) {
+  async generate(rule, itemKey, database = this.database, { signal } = {}) {
     const options = await this.executionOptions(rule, database);
     const items = new this.services.ItemsService(rule.collection, options);
     const fields = [...rule.input_fields, ...rule.output_fields];
@@ -139,7 +140,7 @@ export class AiAutomationsService {
     const contract = buildOutputContract(rule, input, options.schema.collections[rule.collection]);
     const output = validateGeneratedFields(await this.assistant.generateFields({
       instruction: rule.instruction, input, outputFields: rule.output_fields, outputSchema: contract.schema,
-    }, { ...options, services: this.services, requestId: randomUUID() }), rule.output_fields);
+    }, { ...options, services: this.services, requestId: randomUUID(), signal }), rule.output_fields);
     enforceOutputConstraints(output, contract.expected);
     items.validatePayload(output, options.schema.collections[rule.collection], await items.resolvePermission('update'));
     return { record, output, outputConstraints: contract.expected };

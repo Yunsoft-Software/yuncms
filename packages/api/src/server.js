@@ -34,6 +34,7 @@ import { createAutomationsRouter } from './routes/automations.js';
 import { AiAutomationsService } from './automations/service.js';
 import { AiAutomationWorker } from './automations/worker.js';
 import { FlowRuntime } from './flows/runtime.js';
+import { createAiFlowOperation } from './flows/ai-operation.js';
 
 loadEnvFileIfPresent();
 await assertMaintenanceStartupAllowed({ cwd: process.cwd(), env: process.env });
@@ -130,8 +131,9 @@ async function start() {
     emitter.registerAction(event, (payload, context) => automations.enqueue(event, payload, context), { extensionId: 'core.ai-automations' });
   }
   automationWorker = new AiAutomationWorker(automations);
-  const automationsRouter = createAutomationsRouter(automationOptions);
+  const automationsRouter = createAutomationsRouter({ ...automationOptions, flowOptions: { operations: new Map([['ai', createAiFlowOperation(automationOptions)]]), admissionRequired: config.flows.admissionRequired } });
   const flowsOptions = {
+    operations: new Map([['ai', createAiFlowOperation(automationOptions)]]),
     admissionRequired: config.flows.admissionRequired,
     schemaCache, mailer, requestHosts: config.flows.requestHosts, scripts: config.flows.scripts,
     flowEnv: Object.fromEntries(config.flows.envAllowList.filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]])),

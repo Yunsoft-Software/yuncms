@@ -5,7 +5,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import {
   bootstrapDatabase, createDatabasePool, createAccountability, createSystemAccountability, createCoreServiceRegistry,
   CollectionsService, FieldsService, RolesService, UsersService, PermissionsService, ItemsService,
-  HookEmitter, SchemaCache, loadConfig, applyMigrations, CORE_MIGRATIONS,
+  HookEmitter, SchemaCache, FlowsService, loadConfig, applyMigrations, CORE_MIGRATIONS,
 } from '@yunsoft/yuncms-core';
 import { createApp } from '../../packages/api/src/app.js';
 import { registerInternalAudit } from '../../packages/api/src/audit-hooks.js';
@@ -14,6 +14,8 @@ import { AiSettingsStore } from '../../packages/api/src/ai/settings-store.js';
 import { AiAutomationsService } from '../../packages/api/src/automations/service.js';
 import { AiAutomationWorker } from '../../packages/api/src/automations/worker.js';
 import { createAutomationsRouter } from '../../packages/api/src/routes/automations.js';
+
+import { createAiFlowOperation } from '../../packages/api/src/flows/ai-operation.js';
 
 const enabled = process.env.YUNCMS_TEST_MYSQL === '1';
 const hash = value => createHash('sha256').update(value, 'utf8').digest('hex');
@@ -72,7 +74,8 @@ test('real provider/native MySQL: declared output equality, observations and tra
   const service = new AiAutomationsService({ ...owner, ...automationOptions, services, accountability: manager });
   const items = new ItemsService(collection, owner), worker = new AiAutomationWorker(service);
   for (const event of ['items.create', 'items.update']) emitter.registerAction(event, (payload, context) => service.enqueue(event, payload, context));
-  const app = createApp({ pool: database, config, emitter, schemaCache, logger, automationsRouter: createAutomationsRouter(automationOptions) });
+  const flowOptions = { operations: new Map([['ai', createAiFlowOperation(automationOptions)]]) };
+  const app = createApp({ pool: database, config, emitter, schemaCache, logger, flowsOptions: flowOptions, automationsRouter: createAutomationsRouter({ ...automationOptions, flowOptions }) });
   const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   t.after(() => new Promise(resolve => server.close(resolve)));
   const base = 'http://127.0.0.1:' + server.address().port;
@@ -172,7 +175,7 @@ test('real provider/native MySQL: declared output equality, observations and tra
   await t.test('worker commits a constrained value once and a fresh worker does not repeat it', async () => {
     const { record, rule } = await fixture(); const source = 'next native-json-' + randomUUID();
     try { await items.updateOne(record.id, { source_text: source }); await worker.tick();
-      const run = await latest(rule); assert.equal(run.status, 'succeeded'); assert.equal(run.attempts, 1);
+      const run = await latest(rule); assert.equal(run.status, 'succeeded', `Native worker result: ${run.error_code ?? run.status}`); assert.equal(run.attempts, 1);
       assert.equal(hash((await readSql(record.id)).summary), hash(source)); const calls = admission.length;
       await new AiAutomationWorker(service).tick(); assert.equal(admission.length, calls);
       assert.equal(hash((await new ItemsService(collection, { ...owner, schemaCache: new SchemaCache() }).readOne(record.id)).summary), hash(source));
@@ -226,6 +229,43 @@ test('real provider/native MySQL: declared output equality, observations and tra
       assert.equal((await readSql(record.id)).summary, 'Original summary');
     } finally { onCompleted = null; await permissions.updateOne(writePermission.id, { fields: ['summary'] }); await service.remove(rule.id); }
   });
+  await t.test('AI rules convert atomically and idempotently; native Flow execution preserves output constraints and permissions', async () => {
+    const { record, rule, source } = await fixture();
+    const flowService = new FlowsService({ ...owner, ...flowOptions, services, accountability: manager });
+    let flow;
+    try {
+      assert.equal((await request(`/automations/${rule.id}/convert-to-flow`, {}, actorToken)).status, 403);
+      assert.equal((await request(`/automations/${rule.id}/convert-to-flow`, {}, null)).status, 401);
+      const response = await request(`/automations/${rule.id}/convert-to-flow`, {}); assert.equal(response.status, 200); flow = (await response.json()).data;
+      assert.equal(flow.status, 'inactive'); assert.equal(flow.operations[0].type, 'ai'); assert.deepEqual(flow.operations[0].options.output_constraints, rule.output_constraints);
+      assert.equal((await service.read(rule.id)).enabled, false); assert.equal((await service.read(rule.id)).flow_id, flow.id);
+      const repeated = await request(`/automations/${rule.id}/convert-to-flow`, {}); assert.equal((await repeated.json()).data.id, flow.id);
+      assert.equal((await request(`/automations/${rule.id}`, baseRule, adminToken, 'PUT')).status, 409);
+      flow = await flowService.save({ ...flow, status: 'active' }, flow.id);
+      const dispatcher = new FlowsService({ ...owner, ...flowOptions, services });
+      const result = await dispatcher.runTriggered(flow.id, { event: 'items.update', collection, payload: { key: record.id, changes: { source_text: source } } }, manager);
+      assert.equal(result.output[0].status, 'succeeded'); assert.equal(hash((await readSql(record.id)).summary), hash(source));
+      const history = await flowService.readRuns(flow.id); assert.equal(history[0].trace[0].key, 'generate'); assert.equal(history[0].status, 'succeeded');
+      await items.updateOne(record.id, { summary: 'Owner edit' });
+      await permissions.updateOne(writePermission.id, { fields: ['hidden'] });
+      await assert.rejects(dispatcher.runTriggered(flow.id, { event: 'items.update', payload: { key: record.id, changes: { source_text: source } } }, manager), { code: 'FORBIDDEN_FIELD' });
+      assert.equal((await readSql(record.id)).summary, 'Owner edit');
+      await permissions.updateOne(writePermission.id, { fields: ['summary'] });
+      onCompleted = () => permissions.updateOne(writePermission.id, { fields: ['hidden'] });
+      await assert.rejects(dispatcher.runTriggered(flow.id, { event: 'items.update', payload: { key: record.id, changes: { source_text: source } } }, manager), { code: 'FORBIDDEN_FIELD' });
+      assert.equal((await readSql(record.id)).summary, 'Owner edit');
+      await permissions.updateOne(writePermission.id, { fields: ['summary'] });
+      onCompleted = async () => { flow = await flowService.save({ ...flow, status: 'inactive' }, flow.id); };
+      await assert.rejects(dispatcher.runTriggered(flow.id, { event: 'items.update', payload: { key: record.id, changes: { source_text: source } } }, manager), { code: 'AI_FLOW_CHANGED' });
+      assert.equal((await readSql(record.id)).summary, 'Owner edit');
+      await flowService.deleteOne(flow.id, flow.revision); flow = null;
+      const retained = await service.read(rule.id); assert.equal(retained.enabled, false); assert.equal(retained.flow_id, null);
+    } finally {
+      onCompleted = null;
+      await permissions.updateOne(writePermission.id, { fields: ['summary'] });
+      await service.remove(rule.id); if (flow) { const current = await flowService.readOne(flow.id); await flowService.deleteOne(flow.id, current.revision); }
+    }
+  });
   assert.equal(frozenWritesRejected, observations.length);
   for (const payload of observations) {
     assert.equal(Object.isFrozen(payload), true);
@@ -250,7 +290,7 @@ test('real MySQL: 0026 upgrades a legacy rule without changing its value, flags 
   for (const field of ['source', 'summary']) await new FieldsService(owner).createOne('legacy_constraints', { field, type: 'text' });
   const id = randomUUID(); await database.query('INSERT INTO yuncms_ai_automations (id,name,collection,run_as,enabled,on_create,on_update,input_fields,output_fields,instruction,revision) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
     [id, 'Legacy unchanged', 'legacy_constraints', actor.id, 1, 0, 1, '["source"]', '["summary"]', 'Legacy instruction', 7]);
-  const result = await bootstrapDatabase(database); assert.deepEqual(result.newlyApplied, ['0026-ai-output-constraints', '0027-native-totp']);
+  const result = await bootstrapDatabase(database); assert.deepEqual(result.newlyApplied, ['0026-ai-output-constraints', '0027-native-totp', '0028-ai-flow-conversion']);
   const [[row]] = await database.query('SELECT * FROM yuncms_ai_automations WHERE id=?', [id]);
   assert.equal(row.output_constraints, null); assert.equal(row.name, 'Legacy unchanged'); assert.equal(row.revision, 7); assert.equal(row.enabled, 1); assert.equal(row.on_create, 0); assert.equal(row.on_update, 1);
   const service = new AiAutomationsService({ ...owner, services: createCoreServiceRegistry().toObject() });

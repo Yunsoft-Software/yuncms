@@ -169,7 +169,7 @@ async function operation(node, data, context) {
 
 export async function executeFlowGraph(definition, context) {
   const customTypes = [...(context.operations?.keys() ?? [])];
-  const flow = { ...normalizeFlow(definition, { operationTypes: [...new Set([...FLOW_OPERATION_TYPES, ...customTypes])] }), id: definition.id };
+  const flow = { ...normalizeFlow(definition, { operationTypes: [...new Set([...FLOW_OPERATION_TYPES, ...customTypes])] }), id: definition.id, revision: definition.revision };
   const parent = flowExecutionStorage.getStore();
   const stack = parent?.stack ?? [];
   if (stack.includes(flow.id) || stack.length >= FLOW_LIMITS.depth) throw flowError('FLOW_RECURSION_LIMIT', 'Flow recursion limit reached');
