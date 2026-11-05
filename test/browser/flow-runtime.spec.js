@@ -261,17 +261,30 @@ test('actual concurrent HTTP script calls enforce capacity, persist the rejected
 
 test('queued revisions are skipped after an edit and real schedule polling continues during a slow job', async ({ page, request }) => {
   test.setTimeout(40000);
-  const slow = await create(request, [node('wait', 'sleep', { milliseconds: 4500 })], { trigger: 'event', options: { mode: 'action', events: ['items.create'], collections: [collection] } });
-  const queued = await create(request, [node('created', 'create', { collection, payload: { title: prefix + '-must-not-run', status: 'draft' } })], { trigger: 'event', options: { mode: 'action', events: ['items.create'], collections: [collection] } });
-  const result = await request.post(`/items/${collection}`, { headers, data: { title: prefix + '-original' } }); expect(result.status()).toBe(201);
-  await expect.poll(async () => (await runs(request, slow))[0]?.status, { timeout: 10000 }).toBe('running');
-  expect((await runs(request, queued))[0].status).toBe('pending'); await pause(request, queued);
-  const scheduled = await create(request, [node('value', 'transform', { value: '{{ $trigger.scheduled_at }}' })], { trigger: 'schedule', accountability: 'public', options: { cron: '* * * * * *', response: '$last' } });
-  await expect.poll(async () => (await runs(request, scheduled)).length, { timeout: 4000, intervals: [100] }).toBeGreaterThanOrEqual(2);
-  await pause(request, scheduled);
-  await expect.poll(async () => (await runs(request, queued))[0]?.status, { timeout: 12000 }).toBe('skipped');
-  expect((await records(request)).some(row => row.title.endsWith('must-not-run'))).toBe(false);
-  await pause(request, slow); await open(page, queued); await openHistory(page); await expect(page.locator('.flow-history')).toContainText('FLOW_DEFINITION_CHANGED');
+  const gate = '/gate/' + prefix, release = '/extensions/flow-fixture/network/release/' + prefix;
+  const slow = await create(request, [node('wait', 'request', { url: network.httpsUrl + gate })], { trigger: 'event', options: { mode: 'action', events: ['items.create'], collections: [collection] } });
+  try {
+    // Start the real HTTPS operation before creating the second definition.
+    // Two jobs from one trigger can have equal timestamps and no slow-first order.
+    const result = await request.post(`/items/${collection}`, { headers, data: { title: prefix + '-original' } }); expect(result.status()).toBe(201);
+    await expect.poll(async () => (await (await request.get('/extensions/flow-fixture', { headers })).json()).data.requests.some(request => request.path === gate), { timeout: 10000 }).toBe(true);
+    expect((await runs(request, slow))[0].status).toBe('running');
+    const queued = await create(request, [node('created', 'create', { collection, payload: { title: prefix + '-must-not-run', status: 'draft' } })], { trigger: 'event', options: { mode: 'action', events: ['items.create'], collections: [collection] } });
+    expect((await request.post(`/items/${collection}`, { headers, data: { title: prefix + '-second' } })).status()).toBe(201);
+    expect((await runs(request, queued))[0].status).toBe('pending'); await pause(request, queued);
+    const scheduled = await create(request, [node('value', 'transform', { value: '{{ $trigger.scheduled_at }}' })], { trigger: 'schedule', accountability: 'public', options: { cron: '* * * * * *', response: '$last' } });
+    await expect.poll(async () => (await runs(request, scheduled)).length, { timeout: 4000, intervals: [100] }).toBeGreaterThanOrEqual(2);
+    expect((await runs(request, slow)).some(run => run.status === 'running')).toBe(true);
+    await pause(request, scheduled);
+    expect((await request.post(release)).status()).toBe(403);
+    expect((await request.post(release, { headers })).status()).toBe(204);
+    await expect.poll(async () => (await runs(request, queued))[0]?.status, { timeout: 12000 }).toBe('skipped');
+    expect((await records(request)).map(row => row.title).sort()).toEqual([prefix + '-original', prefix + '-second'].sort());
+    await pause(request, slow); await open(page, queued); await openHistory(page); await expect(page.locator('.flow-history')).toContainText('FLOW_DEFINITION_CHANGED');
+  } finally {
+    expect((await request.post(release, { headers })).status()).toBe(204);
+    await pause(request, slow);
+  }
 });
 
 test('a queued trigger actor losing active status is denied when the real worker claims its job', async ({ page, request }) => {

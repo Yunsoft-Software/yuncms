@@ -23,11 +23,24 @@ export async function startFlowNetwork() {
   }
   setDefaultCACertificates([...previousCA, certificates[0].cert.toString()]);
   process.env.NODE_EXTRA_CA_CERTS = certificates[0].path;
-  const requests = [], messages = [], sockets = new Set();
+  const requests = [], messages = [], sockets = new Set(), gates = new Map(), releasedGates = new Set();
+  function releaseGate(name) {
+    releasedGates.add(name);
+    for (const response of gates.get(name) ?? []) {
+      if (!response.destroyed) { response.writeHead(200, { 'content-type': 'application/json' }); response.end(JSON.stringify({ released: true })); }
+    }
+    gates.delete(name);
+  }
   const https = createHttpsServer(certificates[0], async (req, res) => {
     const url = new URL(req.url, 'https://localhost');
     const chunks = []; for await (const chunk of req) chunks.push(chunk);
     const body = Buffer.concat(chunks).toString(); requests.push({ path: url.pathname, method: req.method, body, proof: req.headers['x-flow-proof'] });
+    const gate = /^\/gate\/([a-zA-Z0-9_-]{1,80})$/.exec(url.pathname)?.[1];
+    if (gate) {
+      if (releasedGates.has(gate)) { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ released: true })); return; }
+      const waiting = gates.get(gate) ?? new Set(); gates.set(gate, waiting); waiting.add(res);
+      res.once('close', () => waiting.delete(res)); return;
+    }
     if (url.pathname === '/redirect') { res.writeHead(302, { location: `https://127.0.0.1:${https.address().port}/echo` }); res.end(); return; }
     if (url.pathname === '/failure') { res.writeHead(503); res.end('Service unavailable'); return; }
     if (url.pathname === '/invalid-json') { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{broken'); return; }
@@ -68,8 +81,9 @@ export async function startFlowNetwork() {
     });
   });
   const httpsPort = await listen(https), untrustedPort = await listen(untrusted), smtpPort = await listen(smtp);
-  return { root, requests, messages, httpsUrl: `https://localhost:${httpsPort}`, untrustedUrl: `https://localhost:${untrustedPort}`, smtpPort,
+  return { root, requests, messages, releaseGate, httpsUrl: `https://localhost:${httpsPort}`, untrustedUrl: `https://localhost:${untrustedPort}`, smtpPort,
     async close() {
+      for (const gate of gates.keys()) releaseGate(gate);
       for (const socket of sockets) socket.destroy();
       https.closeAllConnections(); untrusted.closeAllConnections();
       await Promise.all([https, untrusted, smtp].map(server => new Promise(resolve => server.close(resolve))));

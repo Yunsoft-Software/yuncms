@@ -111,6 +111,7 @@ try {
   const fixture = express.Router();
   fixture.use((req, _res, next) => { if (!req.accountability.admin) throw Object.assign(new Error('Fixture management requires administrator access'), { code: 'FORBIDDEN' }); next(); });
   fixture.get('/', (_req, res) => res.json({ data: { httpsUrl: network.httpsUrl, untrustedUrl: network.untrustedUrl, requests: network.requests, messages: network.messages, aiAdmissionEvents } }));
+  fixture.post('/network/release/:name', (req, res) => { network.releaseGate(req.params.name); res.status(204).end(); });
   fixture.post('/ai/allow', async (_req, res) => {
     if (!process.env.YUNCMS_TEST_REAL_PROVIDER_FILE) throw Error('Real provider file is required for browser AI acceptance');
     const provider = JSON.parse(await readFile(process.env.YUNCMS_TEST_REAL_PROVIDER_FILE, 'utf8'));
