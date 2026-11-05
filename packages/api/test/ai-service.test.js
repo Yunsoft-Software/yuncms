@@ -214,6 +214,7 @@ test('AI write tool loop requires server capability and per-request write consen
   assert.equal(result.deletes_enabled, false);
   assert.equal(result.operations.length, 1);
   assert.deepEqual(result.operations[0], { operation: 'items_create', collection: 'articles', success: true });
+  assert.deepEqual(result.mutations, [{ operation: 'items_create', collection: 'articles', id: 'created-1' }]);
   assert.equal(constructed.collection, 'articles');
   assert.equal(constructed.options.accountability.user, 'user-1');
   assert.equal(providerBodies[0].tools.some((tool) => tool.function.name === 'items_create'), true);
@@ -271,6 +272,7 @@ test('AI full mode advertises and executes delete while preserving request accou
   assert.equal(result.writes_enabled, true);
   assert.equal(result.deletes_enabled, true);
   assert.deepEqual(result.operations, [{ operation: 'items_delete', collection: 'articles', success: true }]);
+  assert.deepEqual(result.mutations, [{ operation: 'items_delete', collection: 'articles', id: 'article-1' }]);
   assert.equal(constructed.collection, 'articles');
   assert.equal(constructed.options.accountability.user, 'user-1');
   assert.equal(providerBodies[0].tools.some((tool) => tool.function.name === 'items_delete'), true);
@@ -293,4 +295,37 @@ test('AI does not advertise writes when the user has not enabled write mode for 
   });
   assert.equal(providerBody.tools.some((tool) => tool.function.name === 'items_delete'), false);
   assert.match(providerBody.messages[0].content, /This request is read-only/);
+});
+
+test('AI mutation receipts reflect native execution, not the model claim', async () => {
+  const toolTurn = (name, args) => okResponse({ choices: [{ message: { role: 'assistant', content: null,
+    tool_calls: [{ id: 'call-1', type: 'function', function: { name, arguments: JSON.stringify(args) } }] } }] });
+  const claim = okResponse({ choices: [{ message: { role: 'assistant', content: 'Kaydı sildim.' } }] });
+  const run = async (ItemsService, turns, overrides = {}) => {
+    const service = new AiAssistantService({ config: config({ writesEnabled: true, ...overrides }), fetchImpl: async () => turns.shift() });
+    return service.chat(request(ItemsService), { messages: [{ role: 'user', content: 'article-1 kaydını sil' }], locale: 'tr', allowWrites: true, allowDeletes: true });
+  };
+  const narrated = await run(class {}, [claim]);
+  assert.equal(narrated.message, 'Kaydı sildim.');
+  assert.deepEqual(narrated.operations, []);
+  assert.deepEqual(narrated.mutations, []);
+
+  const refused = await run(class { async deleteOne() { throw Object.assign(new Error('Denied'), { code: 'FORBIDDEN' }); } },
+    [toolTurn('items_delete', { collection: 'articles', id: 'article-1' }), claim]);
+  assert.deepEqual(refused.operations, [{ operation: 'items_delete', collection: 'articles', success: false }]);
+  assert.deepEqual(refused.mutations, []);
+
+  // A committed write stays visible even when its result is too large to show the model.
+  const oversized = await run(class { async updateOne(id) { return { id, body: 'x'.repeat(2000) }; } },
+    [toolTurn('items_update', { collection: 'articles', id: 'article-1', data: { title: 'New' } }), claim], { maxToolResultBytes: 100 });
+  assert.equal(oversized.operations[0].success, false);
+  assert.deepEqual(oversized.mutations, [{ operation: 'items_update', collection: 'articles', id: 'article-1' }]);
+
+  const read = await run(class { async readOne() { return { id: 'article-1' }; } },
+    [toolTurn('items_read_one', { collection: 'articles', id: 'article-1' }), claim]);
+  assert.deepEqual(read.mutations, []);
+});
+
+test('AI system prompt forbids claiming a change without a successful tool in this request', () => {
+  assert.match(systemPrompt({ locale: 'en', writesEnabled: true, deletesEnabled: true }), /only when the matching tool succeeded during this request/);
 });

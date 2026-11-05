@@ -623,7 +623,7 @@ The built-in Studio assistant uses the authenticated request's normal accountabi
 | `GET /ai/status` | Authenticated user; configuration availability without credentials or routing details. |
 | `GET /ai/settings` | Administrator; provider URL/model, optional routing, safety limits and `has_api_key`, never the saved key. |
 | `PATCH /ai/settings` | Administrator; update the same settings. `provider` is a bounded optional gateway routing object; `null` or `{}` clears it. Changing URL requires explicit key replacement/removal and clears old routing unless supplied again. |
-| `POST /ai/chat` | Authenticated user; bounded messages, locale and permitted access mode. The destination, model and routing come from server settings. |
+| `POST /ai/chat` | Authenticated user; the response's `mutations` array is the proof of completed changes; bounded messages, locale and permitted access mode. The destination, model and routing come from server settings. |
 
 See [`ai-assistant.md`](ai-assistant.md) for compatible provider shortcuts, custom
 endpoints, the complete routing contract, configuration, privacy, write modes and
