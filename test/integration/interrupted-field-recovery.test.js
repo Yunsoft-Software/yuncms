@@ -107,6 +107,26 @@ test('real SIGKILL after field DDL: explicit recovery preserves data, native aut
       } finally { if (created) await f.database.query('DROP DATABASE `' + external + '`'); }
       assert.equal(await f.fields.readOne('recovery_records', 'checked_value'), null); assert.equal(await f.fields.readOne('recovery_records', 'parent_ref'), null);
     });
+    await t.test('real interrupted JSON field recovers exactly, keeps stored data and rejects incompatible shapes', async () => {
+      const definition = { field: 'journal', type: 'json' }, value = { state: 'submitted', attempts: [1, 2] };
+      await f.interrupt(definition);
+      await f.database.query('UPDATE recovery_records SET journal=? WHERE id=?', [JSON.stringify(value), f.row.id]);
+      await assert.rejects(f.fields.createOne('recovery_records', definition), { code: 'SCHEMA_RECOVERY_REQUIRED' });
+      for (const other of [{ field: 'journal', type: 'text' }, { field: 'journal', type: 'json', required: true }]) {
+        assert.equal((await f.fields.inspectRecovery('recovery_records', 'journal', other)).compatible, false);
+      }
+      const preview = await f.fields.inspectRecovery('recovery_records', 'journal', definition); assert.equal(preview.compatible, true);
+      const before = (await f.database.query('SHOW CREATE TABLE recovery_records'))[0], version = await f.version();
+      await f.fields.recoverOne('recovery_records', 'journal', { definition, confirm: true, expectedSignature: preview.signature });
+      assert.deepEqual((await f.database.query('SHOW CREATE TABLE recovery_records'))[0], before);
+      assert.equal(await f.version(), version + 1); assert.equal((await f.fields.readOne('recovery_records', 'journal')).type, 'json');
+      const native = await f.request('/items/recovery_records/' + f.row.id, { token: admin });
+      assert.equal(native.status, 200); assert.deepEqual(native.body.data.journal, value);
+      await f.database.query('ALTER TABLE recovery_records ADD COLUMN derived_json JSON GENERATED ALWAYS AS (journal) VIRTUAL');
+      assert.equal((await f.fields.inspectRecovery('recovery_records', 'derived_json', { field: 'derived_json', type: 'json' })).compatible, false);
+      await f.database.query('ALTER TABLE recovery_records ADD COLUMN checked_json JSON NULL CHECK (JSON_LENGTH(checked_json) > 0)');
+      assert.equal((await f.fields.inspectRecovery('recovery_records', 'checked_json', { field: 'checked_json', type: 'json' })).compatible, false);
+    });
     accepted = true;
   } finally { await f.close({ preserve: !accepted }); }
 });

@@ -333,7 +333,7 @@ Creation and physical schema updates accept boolean `unique` and `indexed` optio
 
 If interrupted creation leaves a physical column without field metadata, normal creation returns 409 `SCHEMA_RECOVERY_REQUIRED`. It never adopts or drops the column. An administrator can inspect recovery with `{ "definition": { "field": "content", "type": "text" } }`, then explicitly confirm the same definition using `{ "definition": { "field": "content", "type": "text" }, "expectedSignature": "<inspection signature>", "confirm": true }`. Inspection returns the actual/expected physical shape, `compatible`, `schemaVersion` and `signature`; confirmation returns 201 with the recovered field. Different physical schemas return 409 `SCHEMA_RECOVERY_MISMATCH`; changed definitions/schema versions return 409 `SCHEMA_RECOVERY_STALE`. Existing metadata returns 409 `FIELD_EXISTS`. Inspect again after a stale response. Both endpoints require native schema-manager accountability; public and non-administrator roles remain forbidden.
 
-Recovery writes metadata and increments schema version atomically, without changing the original column or records. Native `schema.field.create` admission still applies. JSON, relation-owned fields, extra foreign/check constraints and system collections cannot be recovered this way. See [interrupted field recovery](data-model.md#interrupted-field-creation) for precautions and the direct service methods.
+Recovery writes metadata and increments schema version atomically, without changing the original column or records. Native `schema.field.create` admission still applies. Relation-owned fields, extra foreign/check constraints and system collections cannot be recovered this way. See [interrupted field recovery](data-model.md#interrupted-field-creation) for precautions and the direct service methods.
 
 Example string field:
 
@@ -632,7 +632,7 @@ The built-in Studio assistant uses the authenticated request's normal accountabi
 | `GET /ai/status` | Authenticated user; configuration availability without credentials or routing details. |
 | `GET /ai/settings` | Administrator; provider URL/model, optional routing, safety limits and `has_api_key`, never the saved key. |
 | `PATCH /ai/settings` | Administrator; update the same settings. `provider` is a bounded optional gateway routing object; `null` or `{}` clears it. Changing URL requires explicit key replacement/removal and clears old routing unless supplied again. |
-| `POST /ai/chat` | Authenticated user; bounded messages, locale and permitted access mode. The destination, model and routing come from server settings. |
+| `POST /ai/chat` | Authenticated user; the response's `mutations` array is the proof of completed changes; bounded messages, locale and permitted access mode. The destination, model and routing come from server settings. |
 
 See [`ai-assistant.md`](ai-assistant.md) for compatible provider shortcuts, custom
 endpoints, the complete routing contract, configuration, privacy, write modes and

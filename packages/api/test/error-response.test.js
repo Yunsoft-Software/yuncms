@@ -40,7 +40,6 @@ test('known client errors map to stable http statuses', () => {
   for (const code of ['SCHEMA_RECOVERY_REQUIRED', 'SCHEMA_RECOVERY_MISMATCH', 'SCHEMA_RECOVERY_STALE']) {
     assert.equal(statusForError({ code }), 409);
   }
-  assert.equal(statusForError({ code: 'UNSUPPORTED_SCHEMA_RECOVERY' }), 400);
 });
 
 test('malformed external auth state is a safe client error', () => {

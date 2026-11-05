@@ -295,6 +295,14 @@ export function serializeAiToolResult(value, maxBytes = 250_000) {
   });
 }
 
+// Built only from a mutation the native service completed, never from model text.
+export function mutationReceipt(name, args, result) {
+  if (name === 'items_create') return { operation: name, collection: args.collection, id: result?.id ?? null };
+  if (name === 'items_update') return { operation: name, collection: args.collection, id: args.id };
+  if (name === 'items_delete') return { operation: name, collection: args.collection, id: result?.deleted ?? args.id };
+  return null;
+}
+
 export function operationSummary(name, args = {}, success = true) {
   return {
     operation: name,

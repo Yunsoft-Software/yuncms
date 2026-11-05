@@ -410,7 +410,7 @@ Native AI chat authentication and tool authorization remain in the API. Hook-ena
 
 - `ai.chat.before`: request messages, locale and caller access flags; throw a typed error to deny the chat.
 - `ai.tools.policy`: starts with `{ denied_collections: [] }`; return the server-owned collection fence for this chat. It runs before provider/tool work and can only narrow the existing caller's collection access.
-- `ai.chat.completed`: successful final message, operations and aggregate usage; a filter may add a receipt or reject completion persistence.
+- `ai.chat.completed`: successful final message, operations, completed mutations and aggregate usage; a filter may add a receipt or reject completion persistence.
 - `ai.chat.failed`: error code, including admission/completion failures.
 - `ai.provider.before`: one provider round's server-generated `call_id`, configured maximum output and conservative `estimated_max_tokens` (UTF-8 input/tool bytes plus output and protocol allowance). Reserve application capacity here.
 - `ai.provider.completed`: the same `call_id` and `usage: { totalTokens, estimated }`. Reconcile the reservation before the round returns.
