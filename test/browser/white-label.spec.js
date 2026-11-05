@@ -132,6 +132,26 @@ test('real Free/Premium UI: fixed vendor identity, upgrade discovery, opted-in c
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(await page.locator('.studio-brand-fallback').evaluateAll(elements => elements.every(element => element.getBoundingClientRect().width <= element.parentElement.getBoundingClientRect().width + 1))).toBe(true);
       await page.screenshot({ path: testInfo.outputPath(`premium-long-brand-${width}.png`), fullPage: true });
+      if ([320, 820, 1024].includes(width)) {
+        const menu = page.getByRole('button', { name: 'Open menu', exact: true });
+        const bounds = await page.getByRole('main').boundingBox();
+        await menu.click();
+        const drawer = page.getByRole('dialog', { name: 'Studio sections', exact: true });
+        const close = drawer.getByRole('button', { name: 'Close menu', exact: true });
+        await expect(close).toBeFocused();
+        await expect(drawer.locator('.sidebar-support-links')).toBeHidden();
+        expect(await drawer.locator('.sidebar-footer').evaluate(element => {
+          const probe = document.createElement('span'); probe.style.color = 'var(--ui-border)'; element.append(probe);
+          const matches = getComputedStyle(element).borderTopColor === getComputedStyle(probe).color;
+          probe.remove(); return matches;
+        })).toBe(true);
+        expect(await page.getByRole('main').boundingBox()).toEqual(bounds);
+        await page.keyboard.press('Shift+Tab'); await expect(drawer.getByRole('button', { name: 'Sign out', exact: true })).toBeFocused();
+        await page.keyboard.press('Tab'); await expect(close).toBeFocused();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath(`premium-long-brand-menu-${width}.png`), fullPage: true });
+        await page.keyboard.press('Escape'); await expect(drawer).toHaveCount(0); await expect(menu).toBeFocused();
+      }
     }
     expect((await f.request('/features/whiteLabel', { method: 'PATCH', token: adminToken, body: { enabled: false } })).status).toBe(200);
     await login.goto(f.origin + '/'); await expect(login.locator('.studio-brand[href="https://yunsoft.com"]').first()).toBeVisible();

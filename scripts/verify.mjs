@@ -81,6 +81,7 @@ const FAST_TESTS = [
   'packages/core/test/license-distribution.test.js',
   'apps/studio/test/content-edit-state.test.js',
   'apps/studio/test/white-label.test.js',
+  'apps/studio/test/navigation-focus.test.js',
   'packages/core/test/items-required-fields.test.js',
   'packages/core/test/items-query-hooks.test.js',
   'packages/core/test/items-transactions.test.js',

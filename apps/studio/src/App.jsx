@@ -15,6 +15,7 @@ import {
 import { useI18n } from './i18n.js';
 import { confirmStudioNavigation } from './use-unsaved-changes.js';
 import { buildNavigationModel } from './navigation-model.js';
+import { nextNavigationFocusIndex } from './navigation-focus.js';
 import { displaySchemaName } from './schema-name.js';
 import {
   navigateStudio,
@@ -218,9 +219,9 @@ export function App() {
     if (event.key === 'Escape') { event.preventDefault(); setMobileNavOpen(false); return; }
     if (event.key !== 'Tab') return;
     const controls = [...navigationRef.current.querySelectorAll('button:not(:disabled), a[href], input, select')].filter(item => item.getClientRects().length);
-    const first = controls[0], last = controls.at(-1);
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    const next = nextNavigationFocusIndex(controls.length, controls.indexOf(document.activeElement), event.shiftKey);
+    event.preventDefault();
+    controls[next]?.focus();
   }
 
   useEffect(() => {

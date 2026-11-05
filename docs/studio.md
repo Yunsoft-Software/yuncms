@@ -46,6 +46,8 @@ When a tool has its own structure, Studio keeps that context nearby. Content sho
 
 On narrow screens the application rail becomes a compact bottom navigation and contextual controls adapt to the available width. Existing record cards, drawers and full-width editing surfaces remain available where a desktop table would be impractical.
 
+The navigation menu keeps Tab and Shift+Tab inside its visible controls, including branding links, across browser keyboard preferences. Escape closes the menu and returns focus to the menu button.
+
 <p align="center">
   <img src="assets/screenshots/studio-mobile-menu.png" alt="YunCMS mobile navigation menu" width="360">
 </p>

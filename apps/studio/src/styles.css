@@ -645,7 +645,7 @@ td select {
   display: grid;
   gap: 8px;
   padding: 18px 8px 0;
-  border-top: 1px solid #edf0f5;
+  border-top: 1px solid var(--ui-border, var(--studio-border-soft, #edf0f5));
 }
 
 .sidebar-health {

@@ -94,6 +94,7 @@ body { background: var(--ui-canvas); line-height: 1.5; font-family: 'Inter Varia
 .studio-next-app .sidebar-account { min-width: 0; border-top-color: var(--ui-border); }
 .studio-next-app .sidebar-account strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-support-links { border-top: 1px solid var(--ui-border-soft); padding-top: 14px; }
+.sidebar-support-links:empty { display: none; }
 .yunsoft-support-links { display: flex; flex-wrap: wrap; gap: 8px 14px; }
 .yunsoft-support-links a { color: var(--ui-text-tertiary); font-size: 11px; text-decoration: none; }
 .yunsoft-support-links a:hover, .yunsoft-support-links a:focus-visible { color: var(--ui-accent-ink); text-decoration: underline; }

@@ -210,8 +210,14 @@ test('phone and tablet navigation overlays the page, traps focus and closes with
     expect(await main.boundingBox()).toEqual(before);
     const bounds = await drawer.boundingBox();
     expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    const brand = drawer.locator('.studio-brand');
+    await expect(brand).toHaveAttribute('href', 'https://yunsoft.com');
+    // The official brand is now a keyboard-accessible link before Close menu.
+    // Include it in both directions instead of assuming Close is the first stop.
+    await page.keyboard.press('Shift+Tab'); await expect(brand).toBeFocused();
     await page.keyboard.press('Shift+Tab');
     await expect(drawer.getByRole('link').last()).toBeFocused();
+    await page.keyboard.press('Tab'); await expect(brand).toBeFocused();
     await page.keyboard.press('Tab'); await expect(close).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(drawer).toHaveCount(0); await expect(menu).toBeFocused();
