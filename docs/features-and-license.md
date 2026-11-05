@@ -33,7 +33,7 @@ load, so a white-label login does not request the default vendor favicon.
 The official Community installation retains its Yunsoft identity and product
 links. Its branding fields cannot be changed through the settings API or UI;
 theme, accent, language and registration settings remain available. Community
-administrators can use **Get Premium** to open the Yunsoft product catalog.
+administrators can use **Get Premium** to contact Yunsoft about a license.
 Upgrading a previously customized Community installation requires an entitled,
 enabled white-label feature to continue displaying that customization. Stored
 names and file references are preserved when the feature is disabled, expires

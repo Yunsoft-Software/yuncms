@@ -16,10 +16,14 @@ test('real Free/Premium UI: fixed vendor identity, upgrade discovery, opted-in c
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Features and license', exact: true })).toBeVisible();
     await expect(page.getByRole('checkbox', { name: 'White-label branding', exact: true })).toBeDisabled();
-    await expect(page.locator('.premium-upsell').first()).toHaveAttribute('href', 'https://yunsoft.com/products?product=yuncms_premium');
+    const campaign = '?utm_source=studio&utm_medium=yuncms&utm_campaign=yuncms-premium';
+    await expect(page.locator('.premium-upsell').first()).toHaveAttribute('href', 'https://yunsoft.com/contact' + campaign);
     await expect(page.locator('.studio-brand[href="https://yunsoft.com"]').first()).toBeVisible();
     await page.goto(f.origin + '/#/appearance');
     await expect(page.getByLabel('Brand name', { exact: true })).toHaveCount(0);
+    await page.getByLabel('My language', { exact: true }).selectOption('tr');
+    await expect(page.locator('main .premium-upsell')).toHaveAttribute('href', 'https://yunsoft.com/tr/iletisim' + campaign);
+    await page.getByLabel(translate('tr', 'appearance.currentLanguage'), { exact: true }).selectOption('en');
     await page.locator('input[type=color]').fill('#4f46e5');
     await page.getByRole('form', { name: 'Branding & Appearance', exact: true }).getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Studio appearance settings saved.', { exact: true })).toBeVisible();

@@ -338,7 +338,7 @@ Appearance editor, including through its direct URL.
 
 The official Community Studio retains its Yunsoft name, logo and product links.
 Theme, accent, language and registration settings remain editable. Community
-administrators can open the product catalog with **Get Premium**.
+administrators can contact Yunsoft about a license with **Get Premium**.
 
 Custom names, logos, favicons and removal of visible vendor branding require the
 Premium `whiteLabel` entitlement. Enable **White-label branding** under

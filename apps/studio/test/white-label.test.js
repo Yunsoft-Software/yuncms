@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { brandStudioMessage } from '../src/premium/white-label.js';
 import { translate, DICTIONARIES, hasTranslation } from '../src/localization.js';
 import { normalizeStudioSettings, resolveStudioLogo, resolveStudioFavicon, studioDocumentTitle } from '../src/studio-settings.js';
-import { premiumCatalogUrl } from '../src/upgrade-link.js';
+import { premiumContactUrl } from '../src/upgrade-link.js';
 
 const branding = { white_label_enabled: true, white_label_available: true, premium: true, brand_name: 'Acme Workspace' };
 test('white-label avoids default remote logos, favicons and vendor document titles', () => {
@@ -32,9 +32,10 @@ test('white-label and Premium discovery translations exist in all supported lang
     const message = translate(locale, 'features.' + key); assert.ok(message); assert.notEqual(message, 'features.' + key);
   }
 });
-test('upgrade links point to the real bilingual product catalog without starting checkout', () => {
-  assert.equal(premiumCatalogUrl('tr'), 'https://yunsoft.com/tr/urunler?product=yuncms_premium');
-  assert.equal(premiumCatalogUrl('en'), 'https://yunsoft.com/products?product=yuncms_premium');
+test('upgrade links point to the bilingual Yunsoft contact pages with the Premium campaign', () => {
+  const campaign = '?utm_source=studio&utm_medium=yuncms&utm_campaign=yuncms-premium';
+  assert.equal(premiumContactUrl('tr'), 'https://yunsoft.com/tr/iletisim' + campaign);
+  for (const locale of ['en', 'de']) assert.equal(premiumContactUrl(locale), 'https://yunsoft.com/contact' + campaign);
 });
 test('initial Studio document is neutral until verified public branding has loaded', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
