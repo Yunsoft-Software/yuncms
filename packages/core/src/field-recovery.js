@@ -42,12 +42,18 @@ export function compatibleFieldRecovery(physical, expected) {
     && JSON.stringify(canonical({ column: physical.column, indexes: physical.indexes })) === JSON.stringify(canonical(expected));
 }
 
+// MariaDB stores JSON as LONGTEXT plus a column-named JSON_VALID constraint. That
+// server-created constraint is part of the JSON type; any other check still blocks.
+export function isNativeJsonValidityCheck(check, field, expected, serverVersion) {
+  return /mariadb/i.test(serverVersion) && expected?.column?.type === 'longtext' && check.CONSTRAINT_NAME === field
+    && String(check.CHECK_CLAUSE).replaceAll(/\s/g, '').toLowerCase() === `json_valid(\`${field}\`)`.toLowerCase();
+}
+
 // Empty temporary DDL asks the actual server to normalize types, defaults and
 // collation. It never alters, copies or drops the original table or its records.
 export async function inspectFieldRecovery(database, collection, field, definition, schemaVersion) {
   assertFieldIndexOptions(definition);
   const compiled = compileFieldColumn(definition);
-  if (definition.type === 'json') throw fieldRecoveryError('UNSUPPORTED_SCHEMA_RECOVERY', collection, field);
   const physical = await physicalColumn(database, collection, field);
   if (!physical.column) throw fieldRecoveryError('FIELD_NOT_FOUND', collection, field);
   const [foreignKeys] = await database.query(`SELECT CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME,
@@ -74,6 +80,10 @@ export async function inspectFieldRecovery(database, collection, field, definiti
     expected = await physicalColumn(database, temporary, field);
   } finally {
     if (created) await database.query(`DROP TEMPORARY TABLE ${name}`);
+  }
+  if (definition.type === 'json') {
+    const [[{ version }]] = await database.query('SELECT VERSION() AS version');
+    physical.checkConstraints = physical.checkConstraints.filter(check => !isNativeJsonValidityCheck(check, field, expected, version));
   }
   return { collection, field, physical, expected, schemaVersion,
     compatible: compatibleFieldRecovery(physical, expected),
