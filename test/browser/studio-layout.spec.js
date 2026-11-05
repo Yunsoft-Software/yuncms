@@ -119,17 +119,26 @@ test('field-builder accent labels remain legible in both themes with the default
 
 test('native account status and verification labels remain readable in every theme and responsive layout', async ({ page, request }, info) => {
   const send = nativeSend(request);
-  const user = await send('/users', { method: 'POST', body: { email: `status-${crypto.randomUUID()}@example.test`, password: 'Native-status-fixture-123!' } });
+  const email = `${'w'.repeat(52)}${crypto.randomUUID().slice(0, 8)}@account.example.test`;
+  const user = await send('/users', { method: 'POST', body: { email, password: 'Native-status-fixture-123!' } });
   try {
     for (const theme of ['light', 'dark']) {
       await setAppearance(request, theme);
-      for (const width of [390, 820, 1680]) {
+      for (const width of [320, 390, 820, 1680]) {
         await page.setViewportSize({ width, height: 960 });
         for (const status of ['active', 'suspended', 'disabled']) {
           await send(`/users/${user.id}`, { method: 'PATCH', body: { status } });
           expect((await send(`/users/${user.id}`)).status).toBe(status);
           await open(page, `/?status_appearance=${theme}-${width}-${status}#/users/${user.id}`);
           await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+          const heading = page.getByRole('heading', { name: email, exact: true });
+          await expect(heading).toBeVisible();
+          expect(await heading.evaluate(title => {
+            const bounds = title.closest('.workspace-section-heading').getBoundingClientRect();
+            const text = document.createRange();
+            text.selectNodeContents(title);
+            return [...text.getClientRects()].every(rect => rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1);
+          }), `email heading at ${width}px in ${theme} appearance`).toBe(true);
           const badge = page.locator(`.user-detail-page .user-status-pill.${status}`);
           await expect(badge).toHaveText(status[0].toUpperCase() + status.slice(1));
           await expectReadableText(badge);

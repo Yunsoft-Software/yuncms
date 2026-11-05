@@ -25,6 +25,11 @@ test('managed-user creation copy tells operators verification is automatic', () 
   assert.match(source, /users\.createDescription/);
 });
 
+test('account headings can wrap email addresses without spaces', () => {
+  const styles = readFileSync(resolve(import.meta.dirname, '../src/users-mcp-next.css'), 'utf8');
+  assert.match(styles, /\.user-detail-page > \.workspace-section-heading h2\s*\{[^}]*overflow-wrap:\s*anywhere/);
+});
+
 test('Users screen filters out the public role from assignable user roles and supports email, custom field and password updates', () => {
   assert.match(source, /roles\.filter\(\(role\) => !role\.public\)/);
   assert.match(source, /saveUserDetails/);

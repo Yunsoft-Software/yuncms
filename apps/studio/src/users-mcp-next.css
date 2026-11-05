@@ -145,6 +145,7 @@
   margin: 0;
   font-size: 18px;
   letter-spacing: -.015em;
+  overflow-wrap: anywhere;
 }
 
 .user-detail-page > .workspace-section-heading p {
