@@ -72,6 +72,8 @@ sandbox against trusted server code or administrators modifying MIT source.
 
 ## Manage an installation
 
+![Features and license in YunCMS Studio](assets/screenshots/studio-features.png)
+
 An administrator opens **Settings → Features and license**, installs the signed
 token, and enables or disables authorized features. A database-installed token
 takes precedence over the environment token and applies without rebuilding or

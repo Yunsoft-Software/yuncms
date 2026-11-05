@@ -68,7 +68,7 @@ yuncms update --dry-run
 Or inspect a specific target:
 
 ```bash
-yuncms update --to 0.2.0 --dry-run
+yuncms update --to 2.0.0 --dry-run
 ```
 
 Preflight checks include:
@@ -102,7 +102,7 @@ yuncms backup
 Optional exact destination:
 
 ```bash
-yuncms backup --output /srv/backups/yuncms-before-0.2.0
+yuncms backup --output /srv/backups/yuncms-before-2.0.0
 ```
 
 The backup contains:
@@ -146,6 +146,11 @@ A backup command rechecks service state and the MySQL maintenance lock after sna
 
 ## Update
 
+YunCMS 2.0 enables revision tracking on existing project collections. Review the
+[content editing and branding changes](features-and-license.md) before upgrading
+from 0.1.47. Existing custom Studio branding is preserved in settings and takes
+effect when the installation enables its Premium white-label entitlement.
+
 After stopping the service supervisor:
 
 ```bash
@@ -155,13 +160,13 @@ yuncms update
 To pin the release:
 
 ```bash
-yuncms update --to 0.2.0
+yuncms update --to 2.0.0
 ```
 
 If the currently installed YunCMS version predates the managed `update` command itself, invoke the already-published target CLI explicitly as the one-time bootstrap updater:
 
 ```bash
-npx --yes @yunsoft/yuncms@0.2.0 update --to 0.2.0
+npx --yes @yunsoft/yuncms@2.0.0 update --to 2.0.0
 ```
 
 For this first transition, **the old runtime does not have the new startup gate**, so the supervisor must remain fully disabled throughout the operation. Once the installed project is on a gate-enabled YunCMS version, later managed updates gain the additional startup-lock protection.
@@ -169,7 +174,7 @@ For this first transition, **the old runtime does not have the new startup gate*
 For S3 installations, only after provider-side object recovery/versioning has been verified:
 
 ```bash
-yuncms update --to 0.2.0 --allow-unverified-s3
+yuncms update --to 2.0.0 --allow-unverified-s3
 ```
 
 The flag name is deliberately explicit: it acknowledges that YunCMS itself has not backed up S3 objects.

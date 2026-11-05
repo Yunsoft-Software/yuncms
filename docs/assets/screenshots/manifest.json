@@ -1,7 +1,7 @@
 {
-  "yuncmsVersion": "0.1.47",
+  "yuncmsVersion": "2.0.0",
   "capturedAt": "2026-11-04",
-  "source": "Studio workspace screenshots captured from the current native Studio with synthetic data. Flow image provenance is recorded separately below.",
+  "source": "Studio workflow screenshots with synthetic data. Original capture dates and source details are recorded below.",
   "files": [
     "studio-content.png",
     "studio-data-model.png",
@@ -22,7 +22,8 @@
     "studio-flows-event-filter.png",
     "studio-flows-script.png",
     "studio-flows-list.png",
-    "studio-flows-import.png"
+    "studio-flows-import.png",
+    "studio-features.png"
   ],
   "verifiedAt": "2026-11-04",
   "flowCaptures": {
@@ -208,6 +209,16 @@
         "height": 844,
         "sha256": "459470198116eab441416bab50ba0418e296bca0705b9fb619ca7865f2a22665"
       }
+    }
+  },
+  "editionCaptures": {
+    "studio-features.png": {
+      "sourceCommit": "2d2fe7da67f9a6eeb260b9f4e162de1b8a0af853",
+      "capturedAt": "2026-11-05",
+      "engine": "Chromium",
+      "sha256": "f2b022886d0e9d1e78b8a353ebb905541a774b20191fb77520e1657b9b67d7af",
+      "width": 1680,
+      "height": 1050
     }
   }
 }

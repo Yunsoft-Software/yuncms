@@ -1,6 +1,6 @@
 # Deployment Baseline
 
-YunCMS V1 targets Node.js 24 LTS with a MySQL 8-compatible server. Operators can install the npm package directly or use the published Docker image; both paths run the same API, Studio and service layer.
+YunCMS targets Node.js 24 LTS with a MySQL 8-compatible server. Operators can install the npm package directly or use the published Docker image; both paths run the same API, Studio and service layer.
 
 > YunCMS is developed and maintained by [Yunsoft Software](https://yunsoft.com) and remains under active development. Treat every deployment as your own operational responsibility: test upgrades in staging, keep verified backups and complete the [Production Readiness](production-readiness.md) checklist. Community code retains MIT; explicitly marked Premium code has commercial terms. See [features and licensing](features-and-license.md) for the shared distribution and license scope.
 
@@ -119,7 +119,7 @@ Shared MySQL schema mutation is serialized through advisory locks, but multi-ins
 - trusted extension code executes in each API process;
 - graceful deployment/draining before force termination.
 
-Redis/shared rate-limit infrastructure is not required for a single-process V1, but a shared limiter or equivalent edge policy is required if one cluster-wide authentication budget is a production requirement.
+Redis/shared rate-limit infrastructure is not required for a single-process installation, but a shared limiter or equivalent edge policy is required if one cluster-wide authentication budget is a production requirement.
 
 ## TLS and HTTP headers
 
