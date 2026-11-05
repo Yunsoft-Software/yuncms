@@ -587,6 +587,15 @@ GET /studio-settings/favicon
 PATCH /studio-settings
 ```
 
+Public and managed Studio settings include effective `white_label_enabled`,
+`white_label_available` and `premium` booleans. These are read-only and cannot be
+granted in a PATCH. Changing `brand_name`, `logo_url`, `logo_file` or
+`favicon_file` requires an entitled, enabled `whiteLabel` feature. Community
+responses always use the official brand, and file-backed branding endpoints
+return 404 while white-label is inactive. Other appearance and registration
+settings retain their existing administrator boundary. See
+[white-label branding](features-and-license.md#white-label-branding-and-community-identity).
+
 Safe display settings are readable before authentication so the login/reset/verification screens can render configured branding. Updating Studio settings requires administrative/system access.
 
 Logo and favicon settings point to Files records rather than arbitrary external asset URLs.

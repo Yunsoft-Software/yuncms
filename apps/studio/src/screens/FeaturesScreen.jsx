@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { apiRequest } from '../api.js';
 import { useI18n } from '../i18n.js';
+import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
+import { PremiumUpsell } from '../components/index.js';
 
 export function FeaturesScreen() {
   const { t } = useI18n();
+  const { settings, refreshSettings } = useStudioSettings();
   const [collections, setCollections] = useState([]), [selected, setSelected] = useState('');
   const [status, setStatus] = useState(null), [token, setToken] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
@@ -26,6 +29,7 @@ export function FeaturesScreen() {
       await apiRequest(path, { method: path === '/features/license' ? 'POST' : 'PATCH', body });
       if (path === '/features/license') setToken('');
       setStatus((await apiRequest('/features')).data);
+      await refreshSettings();
       setNotice(t('common.saved'));
     } catch (failure) { setStatus(previous); setError(failure.message); }
     finally { setBusy(false); }
@@ -44,7 +48,7 @@ export function FeaturesScreen() {
     finally { setBusy(false); }
   }
   return <div className="settings-feature-page">
-    <header className="page-header"><div><p className="eyebrow">YunCMS</p><h1>{t('features.title')}</h1><p>{t('features.description')}</p></div></header>
+    <header className="page-header"><div><p className="eyebrow">{settings.brand_name}</p><h1>{t('features.title')}</h1><p>{t('features.description')}</p></div><PremiumUpsell /></header>
     {error && <div className="error-banner" role="alert">{error}</div>}
     {notice && <div className="notice-banner" role="status">{notice}</div>}
     {!status ? <section className="panel empty-state">{t('common.loading')}</section> : <>

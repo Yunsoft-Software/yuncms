@@ -9,7 +9,14 @@ export const FEATURE_CATALOG = Object.freeze({
   mcp: Object.freeze({ name: 'MCP', tier: 'free' }),
   flowScripts: Object.freeze({ name: 'Flow scripts', tier: 'free' }),
   contentHistory: Object.freeze({ name: 'Content history', tier: 'premium' }),
+  whiteLabel: Object.freeze({ name: 'White-label branding', tier: 'premium', defaultEnabled: false }),
 });
+
+export function effectiveFeatureState(policy, override) {
+  const enabled = policy.allowed && (override ?? policy.defaultEnabled ?? true);
+  return { ...policy, enabled, reason: !policy.licensed ? 'license_required'
+    : policy.ownerDisabled ? 'owner_disabled' : !enabled ? (override === undefined && policy.defaultEnabled === false ? 'default_disabled' : 'administrator_disabled') : null };
+}
 
 export function featureError(code, message) {
   const error = new Error(message);

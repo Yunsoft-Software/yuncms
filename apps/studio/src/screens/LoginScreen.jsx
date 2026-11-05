@@ -9,7 +9,7 @@ import {
   apiRequest,
   verifySecondFactor,
 } from '../api.js';
-import { AuthBrandPanel, SecondFactorInput, YunsoftFooter } from '../components/index.js';
+import { AuthBrandPanel, SecondFactorInput, StudioCaption, YunsoftFooter } from '../components/index.js';
 import { authenticationResult, factorVerification } from '../two-factor.js';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
@@ -209,7 +209,7 @@ export function LoginScreen({ onAuthenticated }) {
         <AuthBrandPanel />
         <section className="auth-card" aria-labelledby="login-title">
           <div>
-            <p className="eyebrow">YunCMS {t('app.studio')}</p>
+            <StudioCaption />
             <h1 id="login-title">{title}</h1>
             <p className="lede">{description}</p>
           </div>

@@ -97,6 +97,11 @@ export function StudioSettingsProvider({ children }) {
     return applySettings(response?.data ?? settings);
   }, [applySettings, settings]);
 
+  const refreshSettings = useCallback(async () => {
+    const response = await apiRequest('/studio-settings');
+    return applySettings(response.data);
+  }, [applySettings]);
+
   const value = useMemo(() => ({
     settings,
     resolvedTheme,
@@ -107,6 +112,7 @@ export function StudioSettingsProvider({ children }) {
     setLocale,
     useDefaultLocale,
     saveSettings,
+    refreshSettings,
   }), [
     settings,
     resolvedTheme,
@@ -117,6 +123,7 @@ export function StudioSettingsProvider({ children }) {
     setLocale,
     useDefaultLocale,
     saveSettings,
+    refreshSettings,
   ]);
 
   return (

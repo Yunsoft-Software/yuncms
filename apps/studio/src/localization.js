@@ -1,4 +1,5 @@
 import { FEATURE_LOCALES } from './locales/features.js';
+import { brandStudioMessage } from './premium/white-label.js';
 import { TFA_LOCALES } from './locales/two-factor.js';
 import { AUTOMATION_LOCALES } from './locales/automations.js';
 import { FLOW_LOCALES } from './locales/flows.js';
@@ -97,9 +98,9 @@ export const DICTIONARIES = Object.freeze({
   'zh-CN': ZH_CN,
 });
 
-function interpolate(message, values = {}) {
-  return message.replace(/\{(\w+)\}/g, (_, key) => (
-    Object.hasOwn(values, key) ? String(values[key]) : `{${key}}`
+function interpolate(message, values = {}, branding = null) {
+  return message.replace(/\{(\w+)\}|yuncms|yunsoft/gi, (token, key) => (
+    key ? (Object.hasOwn(values, key) ? String(values[key]) : `{${key}}`) : brandStudioMessage(token, branding)
   ));
 }
 
@@ -107,10 +108,10 @@ export function hasTranslation(locale, key) {
   return Object.hasOwn(DICTIONARIES[locale] ?? {}, key);
 }
 
-export function translate(locale, key, values = {}) {
+export function translate(locale, key, values = {}, branding = null) {
   const dictionary = DICTIONARIES[locale] ?? EN;
   const message = dictionary[key] ?? EN[key] ?? key;
-  return interpolate(message, values);
+  return interpolate(message, values, branding);
 }
 
 export { SUPPORTED_LOCALES };

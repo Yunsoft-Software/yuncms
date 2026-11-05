@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Yunsoft Software
 // SPDX-License-Identifier: MIT
 import { BaseService } from './base-service.js';
-import { FEATURE_CATALOG, assertFeatureName, createFeaturePolicy, featureError } from '../features.js';
+import { FEATURE_CATALOG, assertFeatureName, createFeaturePolicy, effectiveFeatureState, featureError } from '../features.js';
 import { withTransaction } from '../transaction.js';
 import { AuditService } from './audit-service.js';
 
@@ -26,20 +26,22 @@ export class FeaturesService extends BaseService {
     const features = {};
     for (const name of Object.keys(FEATURE_CATALOG)) {
       const policy = currentPolicy.describe(name);
-      const enabled = policy.allowed && overrides.get(name) !== false;
-      features[name] = { ...policy, enabled, reason: !policy.licensed ? 'license_required'
-        : policy.ownerDisabled ? 'owner_disabled' : !enabled ? 'administrator_disabled' : null };
+      features[name] = effectiveFeatureState(policy, overrides.get(name));
     }
     return { features, license: this.accountability.admin || this.accountability.system ? currentPolicy.licenseStatus() : undefined };
   }
 
-  async assertEnabled(name) {
+  async readFeature(name, { policy = null } = {}) {
     assertFeatureName(name);
-    const policy = (await this.currentPolicy()).describe(name);
-    if (!policy.licensed) throw featureError('FEATURE_NOT_LICENSED', 'This feature requires a valid license');
-    if (policy.ownerDisabled) throw featureError('FEATURE_DISABLED', 'This feature is disabled by the operator');
+    const descriptor = (policy ?? await this.currentPolicy()).describe(name);
     const [rows] = await this.database.query('SELECT enabled FROM yuncms_feature_settings WHERE feature = ?', [name]);
-    if (rows[0] && !Boolean(rows[0].enabled)) throw featureError('FEATURE_DISABLED', 'This feature is disabled by an administrator');
+    return effectiveFeatureState(descriptor, rows[0] ? Boolean(rows[0].enabled) : undefined);
+  }
+
+  async assertEnabled(name) {
+    const state = await this.readFeature(name);
+    if (!state.licensed) throw featureError('FEATURE_NOT_LICENSED', 'This feature requires a valid license');
+    if (!state.enabled) throw featureError('FEATURE_DISABLED', 'This feature is disabled');
     return true;
   }
 

@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { useI18n } from '../i18n.js';
+import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 
 export const YUNCMS_GITHUB = 'https://github.com/Yunsoft-Software/yuncms';
 export const YUNCMS_SPONSORS = 'https://github.com/sponsors/Yunsoft-Software';
@@ -13,6 +13,8 @@ export function yunsoftContact(source) {
 
 export function YunsoftSupportLinks({ source = 'studio' }) {
   const { t } = useI18n();
+  const { settings } = useStudioSettings();
+  if (settings.white_label_enabled) return null;
   return <div className="yunsoft-support-links">
     <a href={yunsoftContact(source)} target="_blank" rel="noopener noreferrer">{t('support.contact')} ↗</a>
     <a href={YUNCMS_GITHUB} target="_blank" rel="noopener noreferrer">{t('support.star')} ↗</a>
@@ -22,14 +24,9 @@ export function YunsoftSupportLinks({ source = 'studio' }) {
 
 export function YunsoftSupportCard() {
   const { t } = useI18n();
-  const [dismissed, setDismissed] = useState(() => {
-    try { return localStorage.getItem('yuncms.support-dismissed') === '1'; } catch { return false; }
-  });
-  if (dismissed) return null;
+  const { settings } = useStudioSettings();
+  if (settings.white_label_enabled) return null;
   return <aside className="yunsoft-support-card" aria-label={t('support.title')}>
-    <button className="text-button" type="button" aria-label={t('common.close')} onClick={() => {
-      setDismissed(true); try { localStorage.setItem('yuncms.support-dismissed', '1'); } catch { /* Optional presentation preference. */ }
-    }}>×</button>
     <strong>{t('support.title')}</strong><p>{t('support.description')}</p><YunsoftSupportLinks />
   </aside>;
 }

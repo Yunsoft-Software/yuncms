@@ -10,6 +10,7 @@ import {
   StudioBrand,
   YunsoftFooter,
   YunsoftSupportLinks,
+  PremiumUpsell,
 } from './components/index.js';
 import { useI18n } from './i18n.js';
 import { confirmStudioNavigation } from './use-unsaved-changes.js';
@@ -43,7 +44,7 @@ const settingsSections = [
   { id: 'roles', labelKey: 'nav.roles', icon: 'roles' },
   { id: 'mcp', labelKey: 'nav.mcp', icon: 'mcp', adminOnly: true },
   { id: 'flows', labelKey: 'flow.title', icon: 'flows', capability: 'flows' },
-  { id: 'appearance', labelKey: 'nav.appearance', icon: 'appearance' },
+  { id: 'appearance', labelKey: 'nav.appearance', icon: 'appearance', adminOnly: true },
 ];
 
 function readAuthAction() {
@@ -320,7 +321,9 @@ export function App() {
     if (section === 'mcp') return session?.user?.admin
       ? <McpScreen />
       : <div className="error-banner" role="alert">{t('mcp.adminOnly')}</div>;
-    if (section === 'appearance') return <AppearanceScreen />;
+    if (section === 'appearance') return session?.user?.admin
+      ? <AppearanceScreen />
+      : <div className="error-banner" role="alert">{t('features.settingsAdminOnly')}</div>;
     if (section === 'security') return <SecurityScreen />;
     return (
       <ContentRouteScreen
@@ -528,6 +531,7 @@ export function App() {
           </div>
 
           {session?.user?.admin === true && !navigationCollapsed && <div className="sidebar-support-links"><YunsoftSupportLinks source="studio-sidebar" /></div>}
+          {session?.user?.admin === true && <PremiumUpsell compact={navigationCollapsed} />}
 
           <div className="sidebar-branding-footer">
             <LanguageSwitcher compact />

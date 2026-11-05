@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import {
   BrandAssetPicker,
@@ -6,6 +6,7 @@ import {
   PublicRegistrationSettings,
   StudioBrand,
   YunsoftFooter,
+  PremiumUpsell,
 } from '../components/index.js';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { useI18n } from '../i18n.js';
@@ -25,6 +26,7 @@ export function AppearanceScreen() {
     useDefaultLocale,
   } = useStudioSettings();
   const { t } = useI18n();
+  const brandNameHintId = useId();
   const [form, setForm] = useState(settings);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -46,15 +48,13 @@ export function AppearanceScreen() {
     setNotice('');
     try {
       const patch = {
-        brand_name: form.brand_name,
-        logo_file: form.logo_file || null,
-        favicon_file: form.favicon_file || null,
         accent_color: form.accent_color,
         theme: form.theme,
         default_locale: form.default_locale,
       };
-      if ([YUNSOFT_LIGHT_LOGO_URL, YUNSOFT_DARK_LOGO_URL].includes(form.logo_url)) {
-        patch.logo_url = form.logo_url;
+      if (settings.white_label_enabled) {
+        Object.assign(patch, { brand_name: form.brand_name, logo_file: form.logo_file || null, favicon_file: form.favicon_file || null });
+        if ([YUNSOFT_LIGHT_LOGO_URL, YUNSOFT_DARK_LOGO_URL].includes(form.logo_url)) patch.logo_url = form.logo_url;
       }
       await saveSettings(patch);
       setNotice(t('appearance.saved'));
@@ -68,7 +68,7 @@ export function AppearanceScreen() {
   function resetBranding() {
     setForm((current) => ({
       ...current,
-      brand_name: DEFAULT_STUDIO_SETTINGS.brand_name,
+      brand_name: settings.white_label_enabled ? 'Studio' : DEFAULT_STUDIO_SETTINGS.brand_name,
       logo_url: DEFAULT_STUDIO_SETTINGS.logo_url,
       logo_file: null,
       favicon_file: null,
@@ -81,7 +81,7 @@ export function AppearanceScreen() {
   return (
     <div className="appearance-layout">
       <div className="form-stack">
-        <form className="panel appearance-form" onSubmit={handleSave}>
+        <form className="panel appearance-form" aria-label={t('section.appearanceTitle')} onSubmit={handleSave}>
           <div className="panel-header appearance-heading">
             <div>
               <p className="eyebrow">{t('appearance.branding')}</p>
@@ -89,24 +89,31 @@ export function AppearanceScreen() {
               <p>{t('section.appearanceDescription')}</p>
             </div>
             <button className="secondary-button" type="button" onClick={resetBranding}>
-              {t('appearance.resetYunsoft')}
+              {t('features.resetAppearance')}
             </button>
           </div>
 
           {loadError && <div className="notice-banner" role="status">{t('appearance.loadWarning')}</div>}
           {error && <div className="error-banner" role="alert">{error}</div>}
           {notice && <div className="notice-banner" role="status">{notice}</div>}
+          {!settings.white_label_enabled && <section className="white-label-upgrade">
+            <div><strong>{t('features.whiteLabel')}</strong><p>{t('features.whiteLabelHint')}</p>
+              {settings.premium && <a href="#/features">{t('features.manageFeatures')}</a>}</div>
+            <PremiumUpsell />
+          </section>}
 
           <div className="appearance-grid">
-            <label className="field-label">
+            {settings.white_label_enabled && <><label className="field-label">
               <span>{t('appearance.brandName')}</span>
               <input
+                aria-label={t('appearance.brandName')}
+                aria-describedby={brandNameHintId}
                 value={form.brand_name || ''}
                 maxLength={100}
                 onChange={(event) => update('brand_name', event.target.value)}
                 required
               />
-              <small>{t('appearance.brandNameHint')}</small>
+              <small id={brandNameHintId}>{t('appearance.brandNameHint')}</small>
             </label>
 
             <div className="appearance-brand-assets">
@@ -121,6 +128,7 @@ export function AppearanceScreen() {
                 onChange={(fileId) => update('favicon_file', fileId)}
               />
             </div>
+            </>}
 
             <label className="field-label">
               <span>{t('appearance.accentColor')}</span>

@@ -185,6 +185,8 @@ button:focus-visible {
 
 .studio-brand {
   min-width: 0;
+  text-decoration: none;
+  color: inherit;
   display: flex;
   align-items: center;
   padding-inline: 4px;
@@ -210,6 +212,7 @@ button:focus-visible {
 
 .studio-brand-fallback {
   width: auto;
+  max-width: 100%;
   min-width: 34px;
   height: 34px;
   display: inline-grid;
@@ -225,6 +228,14 @@ button:focus-visible {
 
 .studio-brand-fallback-compact {
   display: none;
+}
+
+.studio-brand-fallback-full {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .studio-brand.compact .studio-brand-fallback {

@@ -330,6 +330,22 @@ See [Roles and permissions](permissions.md).
 
 # Appearance and branding
 
+Installation appearance settings are administrator-only. Other authenticated
+users retain their personal language selector but cannot open the global
+Appearance editor, including through its direct URL.
+
+The official Community Studio retains its Yunsoft name, logo and product links.
+Theme, accent, language and registration settings remain editable. Community
+administrators can open the product catalog with **Get Premium**.
+
+Custom names, logos, favicons and removal of visible vendor branding require the
+Premium `whiteLabel` entitlement. Enable **White-label branding** under
+**Features and license**, then configure **Appearance**. It starts disabled even
+with an entitled license. Login, navigation, document title, vendor links and
+upgrade prompts follow the effective setting. Disabling it restores the official
+brand while preserving saved custom assets for later reuse. See
+[editions and licensing](features-and-license.md#white-label-branding-and-community-identity).
+
 Studio branding/settings can control project-facing elements such as:
 
 - project/site name;

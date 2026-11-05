@@ -13,14 +13,31 @@ Relevant migrations:
 - `0010-studio-favicon-file` — optional Files-backed favicon;
 - `0020-studio-locales` — expanded default-locale constraint.
 
-The administrator can change:
+Only administrators can open the global Appearance editor. Personal language
+selection remains available to other users. Administrators can change:
 
-- brand name;
-- logo selected from YunCMS Files;
-- favicon selected from YunCMS Files;
+- brand name (Premium white-label);
+- logo selected from YunCMS Files (Premium white-label);
+- favicon selected from YunCMS Files (Premium white-label);
 - accent color;
 - theme: `system`, `light` or `dark`;
 - default locale: `en`, `tr`, `es`, `de`, `fr`, `pt-BR`, `ja` or `zh-CN`.
+
+The official Community distribution retains its Yunsoft identity. Changing the
+brand name, logo or favicon requires an explicit `whiteLabel: true` Premium
+entitlement and enabling **White-label branding** in **Features and license**.
+The feature is disabled by default; theme, accent, locale and registration remain
+available in Community. Effective `white_label_enabled`,
+`white_label_available` and `premium` flags are read-only. Disabled, missing,
+expired or operator-denied rights restore official branding without deleting
+saved customer names or file references. The branding asset routes return 404
+while the feature is inactive.
+
+When enabled, Studio removes vendor promotional links, UI attribution and upgrade
+prompts and applies the custom name to the login screen and document title.
+Without selected custom images it uses a text brand and neutral favicon. Source
+and distribution license/copyright notices remain required; MIT code retains
+its modification rights. See [editions and licensing](features-and-license.md).
 
 `GET /studio-settings` is intentionally public because login/reset/verification surfaces need safe display settings before authentication. It exposes only display settings. `PATCH /studio-settings` is administrator/system-only through `StudioSettingsService`.
 
@@ -48,7 +65,9 @@ logo_file    -> yuncms_files.id
 favicon_file -> yuncms_files.id
 ```
 
-Both foreign keys are nullable and use `ON DELETE SET NULL`. Deleting the selected branding file therefore returns Studio to the built-in fallback instead of leaving a broken id in settings.
+Both foreign keys are nullable and use `ON DELETE SET NULL`. Deleting the selected
+branding file therefore returns an active white-label Studio to its text brand
+or neutral favicon instead of leaving a broken id in settings.
 
 Only image MIME types are accepted by `StudioSettingsService`; a raw API client cannot bypass the Studio image picker and configure a PDF/video as the logo or favicon.
 
@@ -94,9 +113,11 @@ Default favicon/icon:
 https://yunsoft.com/light-icon.png
 ```
 
-The default icon is available immediately during page load. When Studio settings load and `favicon_file` is configured, Studio switches to the Files-backed `/studio-settings/favicon` asset.
-
-A custom Files-backed logo replaces the Yunsoft logo artwork. The small `Powered by Yunsoft` / copyright footer is independent and remains visible.
+The initial document uses a neutral icon until verified settings load. Community
+then uses the default icon and retains the Yunsoft footer. Active white-label
+installations use the selected Files-backed favicon or a neutral icon and hide
+the vendor footer. No default vendor favicon is requested on a white-label cold
+login.
 
 ---
 

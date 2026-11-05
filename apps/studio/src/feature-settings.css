@@ -1,4 +1,13 @@
 .settings-feature-page { display: grid; gap: var(--space-5, 20px); min-width: 0; }
+.premium-upsell { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; max-width: 100%; padding: 9px 12px; border: 1px solid var(--studio-accent); border-radius: var(--ui-radius-control); color: var(--ui-accent-ink, var(--studio-accent)); background: var(--ui-surface); font-size: 12px; font-weight: 600; line-height: 1.4; text-decoration: none; text-align: center; overflow-wrap: anywhere; }
+.premium-upsell:hover { background: var(--ui-surface-subtle); }
+.premium-upsell svg { flex: 0 0 auto; }
+.premium-upsell.compact { padding: 9px; }
+.premium-upsell.compact span { display: none; }
+.white-label-upgrade { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-surface); background: var(--ui-surface-subtle); }
+.white-label-upgrade > div { flex: 1 1 220px; min-width: 0; }
+.white-label-upgrade p { margin: 6px 0 0; }
+.white-label-upgrade a { max-width: 100%; }
 .settings-feature-page > .page-header { margin-bottom: 0; }
 .settings-feature-list { display: grid; min-width: 0; }
 .settings-feature-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--yun-line); min-width: 0; }

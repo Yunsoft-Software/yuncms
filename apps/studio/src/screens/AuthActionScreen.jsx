@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { apiRequest } from '../api.js';
-import { AuthBrandPanel, YunsoftFooter } from '../components/index.js';
+import { AuthBrandPanel, StudioCaption, YunsoftFooter } from '../components/index.js';
 import { useI18n } from '../i18n.js';
 
 export function AuthActionScreen({ action, token, onDone }) {
@@ -59,7 +59,7 @@ export function AuthActionScreen({ action, token, onDone }) {
         <AuthBrandPanel />
         <section className="auth-card" aria-labelledby="auth-action-title">
           <div>
-            <p className="eyebrow">YunCMS {t('app.studio')}</p>
+            <StudioCaption />
             <h1 id="auth-action-title">{action === 'verify' ? t('auth.verifyEmail') : t('auth.resetPassword')}</h1>
             <p className="lede">
               {action === 'verify' ? t('auth.verifyDescription') : t('auth.newPasswordDescription')}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../api.js';
 import { addFlowOperation, exportFlowDefinition, importFlowDefinition, newFlowDraft, removeFlowOperation } from '../flow-graph.js';
 import { useI18n } from '../i18n.js';
+import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { navigateStudio, studioPath } from '../studio-route.js';
 import { parseJsonImportText } from '../json-import.js';
 import { useUnsavedChanges } from '../use-unsaved-changes.js';
@@ -18,6 +19,7 @@ export function FlowsScreen({ route }) {
 
 function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCreateDraft }) {
   const { t } = useI18n(), confirmAction = useConfirmDialog();
+  const { settings } = useStudioSettings();
   const [configuration, setConfiguration] = useState(null), [ready, setReady] = useState(false), [access, setAccess] = useState({ manage: false, run: false });
   const [draft, setDraft] = useState(() => initialDraft ?? newFlowDraft()), [selected, setSelected] = useState('trigger');
   const [run, setRun] = useState(null), [historyOpen, setHistoryOpen] = useState(false), [historyRefresh, setHistoryRefresh] = useState(0);
@@ -27,7 +29,7 @@ function FlowEditor({ route, initialDraft, launchImport, onLaunchHandled, onCrea
   const [saved, setSaved] = useState(false), [baseline, setBaseline] = useState('');
   const [importOpen, setImportOpen] = useState(launchImport), [importText, setImportText] = useState('');
   const [importError, setImportError] = useState(''), [importReading, setImportReading] = useState(false);
-  const [runOpen, setRunOpen] = useState(false), [runPayload, setRunPayload] = useState({ body: { name: 'YunCMS' } });
+  const [runOpen, setRunOpen] = useState(false), [runPayload, setRunPayload] = useState({ body: { name: settings.white_label_enabled ? settings.brand_name : 'YunCMS' } });
   const [runInvalid, setRunInvalid] = useState(false), [paletteType, setPaletteType] = useState('transform');
   const dirty = baseline !== JSON.stringify(draft);
   const unsaved = useUnsavedChanges(ready && dirty);

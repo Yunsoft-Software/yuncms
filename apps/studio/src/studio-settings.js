@@ -16,6 +16,9 @@ export const DEFAULT_STUDIO_SETTINGS = Object.freeze({
   default_locale: 'en',
   public_registration_enabled: false,
   public_registration_require_email_verification: false,
+  white_label_enabled: false,
+  white_label_available: false,
+  premium: false,
 });
 
 const LOCALE_KEY = 'yuncms.studio.locale';
@@ -29,7 +32,7 @@ export function normalizeStudioSettings(value = {}) {
       : DEFAULT_STUDIO_SETTINGS.brand_name,
     logo_url: typeof value.logo_url === 'string' && value.logo_url.trim()
       ? value.logo_url.trim()
-      : DEFAULT_STUDIO_SETTINGS.logo_url,
+      : value.white_label_enabled === true ? '' : DEFAULT_STUDIO_SETTINGS.logo_url,
     logo_file: typeof value.logo_file === 'string' && value.logo_file.trim()
       ? value.logo_file.trim()
       : null,
@@ -47,6 +50,9 @@ export function normalizeStudioSettings(value = {}) {
     public_registration_require_email_verification:
       value.public_registration_require_email_verification === true,
     updated_at: value.updated_at ?? null,
+    white_label_enabled: value.white_label_enabled === true,
+    white_label_available: value.white_label_available === true,
+    premium: value.premium === true,
   };
 }
 
@@ -75,6 +81,7 @@ export function resolveTheme(theme, prefersDark = false) {
 export function resolveStudioLogo(settings, resolvedTheme = 'light') {
   const normalized = normalizeStudioSettings(settings);
   if (normalized.logo_file) return STUDIO_LOGO_ASSET_PATH;
+  if (normalized.white_label_enabled) return '';
 
   const isYunsoftDefault = normalized.logo_url === YUNSOFT_LIGHT_LOGO_URL
     || normalized.logo_url === YUNSOFT_DARK_LOGO_URL;
@@ -85,7 +92,7 @@ export function resolveStudioLogo(settings, resolvedTheme = 'light') {
 
 export function resolveStudioFavicon(settings) {
   const normalized = normalizeStudioSettings(settings);
-  return normalized.favicon_file ? STUDIO_FAVICON_ASSET_PATH : YUNSOFT_DEFAULT_FAVICON_URL;
+  return normalized.favicon_file ? STUDIO_FAVICON_ASSET_PATH : normalized.white_label_enabled ? 'data:,' : YUNSOFT_DEFAULT_FAVICON_URL;
 }
 
 export function applyStudioFavicon(settings, apiUrl = '') {
@@ -102,9 +109,15 @@ export function applyStudioFavicon(settings, apiUrl = '') {
   link.href = href;
 }
 
+export function studioDocumentTitle(settings) {
+  const normalized = normalizeStudioSettings(settings);
+  return normalized.white_label_enabled ? normalized.brand_name : `${normalized.brand_name} Studio`;
+}
+
 export function applyStudioAppearance(settings, prefersDark = false) {
   if (typeof document === 'undefined') return;
   const normalized = normalizeStudioSettings(settings);
+  document.title = studioDocumentTitle(normalized);
   const root = document.documentElement;
   root.dataset.theme = resolveTheme(normalized.theme, prefersDark);
   root.style.setProperty('--studio-accent', normalized.accent_color);

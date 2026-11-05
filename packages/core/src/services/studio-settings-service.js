@@ -1,5 +1,7 @@
 import { canonicalStudioLocale, STUDIO_LOCALE_CODES } from '../studio-locales.js';
 import { BaseService } from './base-service.js';
+import { FeaturesService } from './features-service.js';
+import { effectiveStudioBranding } from '../premium/white-label.js';
 
 const THEMES = new Set(['system', 'light', 'dark']);
 const ACCENT_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -105,6 +107,14 @@ function managedSettings(row) {
 }
 
 export class StudioSettingsService extends BaseService {
+  async branding(row) {
+    const features = new FeaturesService(this);
+    const policy = await features.currentPolicy();
+    const state = await features.readFeature('whiteLabel', { policy });
+    return effectiveStudioBranding(row, { enabled: state.enabled, available: state.allowed,
+      premium: policy.licenseStatus().status === 'active' });
+  }
+
   async #readSettingsRow() {
     const [rows] = await this.database.query(
       `SELECT brand_name, logo_url, logo_file, favicon_file, accent_color, theme, default_locale,
@@ -124,12 +134,14 @@ export class StudioSettingsService extends BaseService {
   }
 
   async readPublic() {
-    return publicSettings(await this.#readSettingsRow());
+    const row = await this.#readSettingsRow();
+    return { ...publicSettings(row), ...await this.branding(row) };
   }
 
   async readOne() {
     assertManager(this.accountability);
-    return managedSettings(await this.#readSettingsRow());
+    const row = await this.#readSettingsRow();
+    return { ...managedSettings(row), ...await this.branding(row) };
   }
 
   async readImageAssetContent(settingKey, label) {
@@ -207,6 +219,9 @@ export class StudioSettingsService extends BaseService {
     ]);
     if (keys.length === 0 || keys.some((key) => !allowed.has(key))) {
       throw invalid('Studio settings patch contains unsupported properties');
+    }
+    if (keys.some(key => ['brand_name', 'logo_url', 'logo_file', 'favicon_file'].includes(key))) {
+      await new FeaturesService(this).assertEnabled('whiteLabel');
     }
 
     let normalizedRegistrationEnabled;
@@ -296,3 +311,6 @@ export const STUDIO_SETTING_DEFAULTS = Object.freeze({
   public_registration_role: null,
   public_registration_require_email_verification: false,
 });
+
+export { assertManager, normalizeBrandName, normalizeLogoUrl, normalizeImageFile, normalizeAccent,
+  normalizeTheme, normalizeLocale, normalizeBoolean, normalizeRegistrationRole, publicSettings };

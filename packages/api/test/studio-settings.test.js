@@ -1,152 +1,28 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { publicSettings } from '../../core/src/services/studio-settings-service.js';
+import { effectiveStudioBranding } from '../../core/src/premium/white-label.js';
 
-import {
-  createPublicAccountability,
-  createServiceRegistry,
-  StudioSettingsService,
-} from '@yunsoft/yuncms-core';
-import { createApp } from '../src/app.js';
+// HTTP, authentication, storage and image response headers are exercised against
+// actual MySQL/Express in test/integration/white-label.test.js.
+const row = { brand_name: 'Client', logo_url: 'https://yunsoft.com/light-logo.png', logo_file: 'logo', favicon_file: 'icon',
+  accent_color: '#2563eb', theme: 'dark', default_locale: 'tr', public_registration_enabled: 1,
+  public_registration_require_email_verification: 1, public_registration_role: 'private-role',
+  token: 'not-public', password_hash: 'not-public', updated_at: '2026-11-05' };
 
-const LOGO_FILE_ID = '123e4567-e89b-42d3-a456-426614174000';
-const FAVICON_FILE_ID = '223e4567-e89b-42d3-a456-426614174001';
-
-class PublicAuthService {
-  async resolvePublicAccountability() {
-    return createPublicAccountability({ role: 'public-role' });
-  }
-
-  async authenticateBearerToken() {
-    throw new Error('not used');
-  }
-}
-
-function settingsDatabase({ logoFile = null, faviconFile = null } = {}) {
-  return {
-    async query(sql, params = []) {
-      if (sql.includes('FROM yuncms_studio_settings')) {
-        return [[{
-          brand_name: 'YunCMS',
-          logo_url: 'https://yunsoft.com/light-logo.png',
-          logo_file: logoFile,
-          favicon_file: faviconFile,
-          accent_color: '#2563eb',
-          theme: 'system',
-          default_locale: 'en',
-          updated_at: null,
-        }], []];
-      }
-      if (sql.includes('FROM yuncms_files')) {
-        const id = params[0];
-        const favicon = id === FAVICON_FILE_ID;
-        return [[{
-          id,
-          storage: 'local',
-          filename_disk: favicon ? 'branding-favicon.png' : 'branding-logo.svg',
-          mimetype: favicon ? 'image/png' : 'image/svg+xml',
-          filesize: 6,
-        }], []];
-      }
-      throw new Error(`Unexpected database query: ${sql}`);
-    },
-  };
-}
-
-async function withServer(operation, { logoFile = null, faviconFile = null, storage = null } = {}) {
-  const pool = settingsDatabase({ logoFile, faviconFile });
-  const registry = createServiceRegistry({
-    AuthService: PublicAuthService,
-    StudioSettingsService,
-  });
-  const app = createApp({
-    pool,
-    config: {
-      server: { studioOrigin: 'http://localhost:3008', trustProxyHops: 0 },
-      storage: { maxUploadBytes: 1024 },
-      auth: { rateLimit: {} },
-    },
-    storage,
-    serviceRegistry: registry,
-    logger: { info() {}, warn() {}, error() {} },
-  });
-  const server = await new Promise((resolve, reject) => {
-    const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
-    instance.once('error', reject);
-  });
-  try {
-    const { port } = server.address();
-    await operation(`http://127.0.0.1:${port}`);
-  } finally {
-    await new Promise((resolve) => server.close(resolve));
-  }
-}
-
-test('anonymous Studio can read safe display settings before login', async () => {
-  await withServer(async (origin) => {
-    const response = await fetch(`${origin}/studio-settings`);
-    assert.equal(response.status, 200);
-    assert.deepEqual((await response.json()).data, {
-      brand_name: 'YunCMS',
-      logo_url: 'https://yunsoft.com/light-logo.png',
-      logo_file: null,
-      favicon_file: null,
-      accent_color: '#2563eb',
-      theme: 'system',
-      default_locale: 'en',
-      public_registration_enabled: false,
-      public_registration_require_email_verification: false,
-      updated_at: null,
-    });
-  });
+test('public Studio settings project only documented display and registration flags', () => {
+  assert.deepEqual(Object.keys(publicSettings(row)).sort(), ['brand_name','logo_url','logo_file','favicon_file','accent_color','theme','default_locale','public_registration_enabled','public_registration_require_email_verification','updated_at'].sort());
+  assert.equal(publicSettings(row).public_registration_enabled, true);
+  assert.equal(publicSettings(row).public_registration_require_email_verification, true);
 });
-
-function storageFixture() {
-  return {
-    get(name) {
-      assert.equal(name, 'local');
-      return {
-        async get(key) {
-          assert.ok(['branding-logo.svg', 'branding-favicon.png'].includes(key));
-          return Buffer.from(key.includes('favicon') ? 'PNG123' : '<svg/>');
-        },
-      };
-    },
-  };
-}
-
-async function assertPublicImageResponse(response, contentType) {
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get('content-type') || '', contentType);
-  assert.equal(response.headers.get('content-security-policy'), 'sandbox');
-  assert.equal(response.headers.get('cache-control'), 'no-cache, must-revalidate');
-  assert.equal(response.headers.get('content-disposition'), 'inline');
-}
-
-test('anonymous Studio can read only the configured file-backed logo with sandboxed revalidation', async () => {
-  await withServer(async (origin) => {
-    const response = await fetch(`${origin}/studio-settings/logo`);
-    await assertPublicImageResponse(response, /image\/svg\+xml/);
-    assert.equal(Buffer.from(await response.arrayBuffer()).toString(), '<svg/>');
-  }, { logoFile: LOGO_FILE_ID, storage: storageFixture() });
+test('effective Community public response cannot expose stored custom branding or private account data', () => {
+  const response = { ...publicSettings(row), ...effectiveStudioBranding(row) };
+  assert.equal(response.brand_name, 'YunCMS'); assert.equal(response.logo_file, null); assert.equal(response.favicon_file, null);
+  for (const key of ['token','password_hash','public_registration_role']) assert.equal(Object.hasOwn(response, key), false);
+  assert.equal(response.theme, 'dark'); assert.equal(response.default_locale, 'tr');
 });
-
-test('anonymous Studio can read only the configured file-backed favicon with sandboxed revalidation', async () => {
-  await withServer(async (origin) => {
-    const response = await fetch(`${origin}/studio-settings/favicon`);
-    await assertPublicImageResponse(response, /image\/png/);
-    assert.equal(Buffer.from(await response.arrayBuffer()).toString(), 'PNG123');
-  }, { faviconFile: FAVICON_FILE_ID, storage: storageFixture() });
-});
-
-test('anonymous Studio cannot mutate branding settings', async () => {
-  await withServer(async (origin) => {
-    const response = await fetch(`${origin}/studio-settings`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ theme: 'dark' }),
-    });
-    assert.equal(response.status, 403);
-    const payload = await response.json();
-    assert.equal(payload.errors[0].code, 'FORBIDDEN');
-  });
+test('entitled white-label public response contains only effective asset identifiers without vendor artwork', () => {
+  const response = { ...publicSettings(row), ...effectiveStudioBranding(row, { enabled: true, available: true, premium: true }) };
+  assert.equal(response.brand_name, 'Client'); assert.equal(response.logo_url, null); assert.equal(response.logo_file, 'logo');
+  assert.equal(response.white_label_enabled, true); assert.equal(Object.hasOwn(response, 'token'), false);
 });

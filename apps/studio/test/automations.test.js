@@ -46,11 +46,11 @@ test('all eight languages cover automation statuses, instructions and support CT
   for (const dictionary of Object.values(AUTOMATION_LOCALES)) assert.deepEqual(Object.keys(dictionary).sort(), keys);
 });
 
-test('support card can be dismissed and the footer links are limited to administrators', () => {
+test('official Community support branding is not dismissible and footer links remain limited to administrators', () => {
   const card = readFileSync(new URL('../src/components/YunsoftSupportCard.jsx', import.meta.url), 'utf8');
   const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
-  assert.match(card, /localStorage\.setItem\('yuncms.support-dismissed', '1'\)/);
-  assert.match(card, /aria-label=\{t\('common.close'\)\}/);
+  assert.doesNotMatch(card, /support-dismissed|localStorage|setDismissed/);
+  assert.match(card, /settings\.white_label_enabled/);
   assert.match(card, /rel="noopener noreferrer"/);
   assert.match(card, /utm_campaign.*yuncms-services/);
   assert.match(card, /YUNCMS_SPONSORS = 'https:\/\/github\.com\/sponsors\/Yunsoft-Software'/);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { loadConfig } from '../src/config.js';
-import { createFeaturePolicy, verifyFeatureLicense } from '../src/features.js';
+import { createFeaturePolicy, effectiveFeatureState, verifyFeatureLicense } from '../src/features.js';
 import { parseItemRevision, assertItemRevision, contentTracking, restrictMutationToKeys } from '../src/content-state.js';
 import { historyRestoreValues } from '../src/premium/content-revisions-service.js';
 import { historySnapshot } from '../src/premium/history-recorder.js';
@@ -42,6 +42,18 @@ test('one distribution preserves Free capabilities without any license', () => {
   assert.equal(policy.describe('mcp').allowed, true);
   assert.equal(policy.describe('contentHistory').allowed, false);
   assert.equal(policy.licenseStatus().status, 'missing');
+});
+
+test('white-label requires an explicit signed boolean claim and administrator opt-in by default', () => {
+  for (const capabilities of [{}, { whiteLabel: 'true' }, { whiteLabel: 1 }, { whiteLabel: false }]) {
+    assert.equal(createFeaturePolicy({ token: token({ capabilities }), publicKey, domain: 'example.com' }).describe('whiteLabel').allowed, false);
+  }
+  const policy = createFeaturePolicy({ token: token({ capabilities: { whiteLabel: true } }), publicKey, domain: 'example.com' }).describe('whiteLabel');
+  assert.equal(policy.allowed, true); assert.equal(policy.defaultEnabled, false);
+  assert.equal(effectiveFeatureState(policy).enabled, false);
+  assert.equal(effectiveFeatureState(policy).reason, 'default_disabled');
+  assert.equal(effectiveFeatureState(policy, true).enabled, true);
+  assert.equal(effectiveFeatureState(policy, false).enabled, false);
 });
 
 test('actual Ed25519 entitlement grants only explicit Premium capabilities and canonical allowed hosts', () => {

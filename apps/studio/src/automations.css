@@ -1,6 +1,3 @@
 .automation-form-fields { border:0; padding:0; margin:0; display:grid; gap:20px; min-width:0; }
-.yunsoft-support-card { position:relative; margin-top:28px; border:1px solid var(--studio-border); border-radius:12px; padding:18px 42px 18px 18px; }
-.yunsoft-support-card p { margin:8px 0 12px; color:var(--studio-text-muted); }
-.yunsoft-support-card > button { position:absolute; right:12px; top:10px; }
 .yunsoft-support-links { display:flex; flex-wrap:wrap; gap:14px; font-size:12px; }
 .sidebar-support-links .yunsoft-support-links { gap:8px 12px; font-size:11px; padding-top:10px; border-top:1px solid var(--studio-border); }

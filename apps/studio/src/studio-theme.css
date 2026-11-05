@@ -99,8 +99,7 @@ body { background: var(--ui-canvas); line-height: 1.5; font-family: 'Inter Varia
 .yunsoft-support-links a:hover, .yunsoft-support-links a:focus-visible { color: var(--ui-accent-ink); text-decoration: underline; }
 .sidebar-support-links .yunsoft-support-links { display: grid; gap: 7px; }
 .yunsoft-support-card { position: relative; display: grid; gap: 8px; margin-block: 18px; padding: 20px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-surface); background: var(--ui-surface-subtle); }
-.yunsoft-support-card > button { position: absolute; inset: 12px 12px auto auto; }
-.yunsoft-support-card > strong { padding-inline-end: 28px; color: var(--ui-text); font-size: 13px; }
+.yunsoft-support-card > strong { color: var(--ui-text); font-size: 13px; }
 .yunsoft-support-card > p { max-width: 680px; margin: 0; font-size: 12px; line-height: 1.6; color: var(--ui-text-secondary); }
 .studio-next-app .main-content { min-width: 0; padding: 30px 32px 40px; background: var(--ui-canvas); }
 .studio-next-app .screen-stack { gap: 20px; }

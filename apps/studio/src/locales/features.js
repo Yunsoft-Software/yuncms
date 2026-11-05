@@ -12,6 +12,18 @@ const values = {
 export const FEATURE_LOCALES = Object.fromEntries(Object.entries(values).map(([locale, texts]) => [locale,
   Object.fromEntries(keys.map((key, i) => [`features.${key}`, texts[i]]))]));
 
+const settingsAdminOnly = {
+  en: 'Only administrators can view and change installation appearance settings.',
+  tr: 'Kurulumun görünüm ayarlarını yalnızca yöneticiler görüntüleyebilir ve değiştirebilir.',
+  es: 'Solo los administradores pueden ver y cambiar la apariencia de la instalación.',
+  de: 'Nur Administratoren können die Darstellung der Installation anzeigen und ändern.',
+  fr: 'Seuls les administrateurs peuvent consulter et modifier l’apparence de l’installation.',
+  'pt-BR': 'Somente administradores podem visualizar e alterar a aparência da instalação.',
+  ja: 'インストールの外観設定を表示・変更できるのは管理者のみです。',
+  'zh-CN': '只有管理员可以查看和更改此安装的外观设置。',
+};
+for (const [locale, text] of Object.entries(settingsAdminOnly)) FEATURE_LOCALES[locale]['features.settingsAdminOnly'] = text;
+
 const history = {
  en: ['Restore this revision','This replaces the current scalar fields and discards unsaved form changes. Related records are unchanged. Continue?','History contains recorded changes made while recording was enabled.','No recorded revisions.','Revision {revision}'],
  tr: ['Bu sürümü geri yükle','Mevcut alanlar değiştirilecek ve formdaki kaydedilmemiş değişiklikler silinecek. İlişkili kayıtlar aynı kalır. Devam edilsin mi?','Geçmiş, kayıt etkin durumdayken yapılan değişiklikleri içerir.','Kaydedilmiş sürüm yok.','Sürüm {revision}'],
@@ -43,3 +55,35 @@ const unsaved = {
  ja: ['未保存の変更','未保存の変更を破棄しますか？'], 'zh-CN': ['未保存的更改','是否放弃未保存的更改？'],
 };
 for (const [locale, texts] of Object.entries(unsaved)) ['unsaved','discard'].forEach((key, i) => { FEATURE_LOCALES[locale][`features.${key}`] = texts[i]; });
+
+const branding = {
+ en: ['White-label branding', 'Use your own name, logo and favicon and remove vendor links. Requires Premium and enabling White-label branding in Features and license.', 'Get Premium', 'Reset appearance', 'Manage features'],
+ tr: ['White-label marka', 'Kendi adınızı, logonuzu ve faviconunuzu kullanın; üretici bağlantılarını kaldırın. Premium lisansı ve Özellikler ve lisans bölümünden etkinleştirme gerekir.', 'Premium’a geç', 'Görünümü sıfırla', 'Özellikleri yönet'],
+ es: ['Marca propia', 'Usa tu nombre, logotipo e icono y elimina los enlaces del proveedor. Requiere Premium y activar Marca propia en Funciones y licencia.', 'Obtener Premium', 'Restablecer apariencia', 'Gestionar funciones'],
+ de: ['Eigenes Branding', 'Verwenden Sie eigenen Namen, Logo und Favicon ohne Anbieterlinks. Erfordert Premium und die Aktivierung unter Funktionen und Lizenz.', 'Premium erhalten', 'Darstellung zurücksetzen', 'Funktionen verwalten'],
+ fr: ['Marque blanche', 'Utilisez votre nom, logo et favicon sans liens du fournisseur. Nécessite Premium et son activation dans Fonctionnalités et licence.', 'Passer à Premium', 'Réinitialiser l’apparence', 'Gérer les fonctionnalités'],
+ 'pt-BR': ['Marca própria', 'Use seu nome, logotipo e favicon e remova os links do fornecedor. Requer Premium e ativação em Recursos e licença.', 'Obter Premium', 'Redefinir aparência', 'Gerenciar recursos'],
+ ja: ['ホワイトラベル', '独自の名前・ロゴ・ファビコンを使用し、提供元リンクを非表示にします。Premiumと「機能とライセンス」での有効化が必要です。', 'Premiumにアップグレード', '外観をリセット', '機能を管理'],
+ 'zh-CN': ['白标品牌', '使用自己的名称、标志和网站图标，并移除供应商链接。需要 Premium，并在功能与许可证中启用白标品牌。', '升级至 Premium', '重置外观', '管理功能'],
+};
+for (const [locale, texts] of Object.entries(branding)) ['whiteLabel','whiteLabelHint','getPremium','resetAppearance','manageFeatures'].forEach((key, i) => { FEATURE_LOCALES[locale][`features.${key}`] = texts[i]; });
+
+const brandingDefaults = {
+ en: ['Not enabled yet.', 'Your brand name is used until you select a logo.', 'Choose your favicon from Files; a neutral icon is used when none is selected.'],
+ tr: ['Henüz etkinleştirilmedi.', 'Logo seçilene kadar marka adınız gösterilir.', 'Faviconunuzu Dosyalar’dan seçin; seçilmediğinde tarafsız bir simge kullanılır.'],
+ es: ['Aún no está activado.', 'Se muestra tu nombre de marca hasta que elijas un logotipo.', 'Elige tu icono de Archivos; si no seleccionas ninguno, se usa un icono neutro.'],
+ de: ['Noch nicht aktiviert.', 'Bis zur Auswahl eines Logos wird Ihr Markenname angezeigt.', 'Wählen Sie Ihr Favicon aus Dateien; ohne Auswahl wird ein neutrales Symbol verwendet.'],
+ fr: ['Pas encore activé.', 'Votre nom de marque est affiché jusqu’au choix d’un logo.', 'Choisissez le favicon dans Fichiers ; sans sélection, une icône neutre est utilisée.'],
+ 'pt-BR': ['Ainda não ativado.', 'O nome da marca é exibido até você escolher um logotipo.', 'Escolha seu favicon em Arquivos; sem seleção, é usado um ícone neutro.'],
+ ja: ['まだ有効になっていません。', 'ロゴを選択するまでブランド名を表示します。', 'ファイルからファビコンを選択します。未選択の場合は中立的なアイコンを使用します。'],
+ 'zh-CN': ['尚未启用。', '选择标志之前显示品牌名称。', '从文件中选择网站图标；未选择时使用中性图标。'],
+};
+for (const [locale, texts] of Object.entries(brandingDefaults)) ['default_disabled','brandNameFallback','neutralFavicon'].forEach((key, i) => { FEATURE_LOCALES[locale][`features.${key}`] = texts[i]; });
+
+const brandingImages = {
+ en: ['No image selected', 'Remove image'], tr: ['Görsel seçilmedi', 'Görseli kaldır'],
+ es: ['Sin imagen seleccionada', 'Quitar imagen'], de: ['Kein Bild ausgewählt', 'Bild entfernen'],
+ fr: ['Aucune image sélectionnée', 'Retirer l’image'], 'pt-BR': ['Nenhuma imagem selecionada', 'Remover imagem'],
+ ja: ['画像は未選択です', '画像を削除'], 'zh-CN': ['未选择图片', '移除图片'],
+};
+for (const [locale, texts] of Object.entries(brandingImages)) ['noBrandImage','clearBrandImage'].forEach((key, i) => { FEATURE_LOCALES[locale][`features.${key}`] = texts[i]; });

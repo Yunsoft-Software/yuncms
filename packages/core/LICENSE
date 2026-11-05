@@ -59,12 +59,13 @@ Yunsoft Software may distribute Community and Premium functionality in the same
 source tree, npm packages, Studio bundle and container image. Possession of a
 bundle or visibility of Premium source code does not grant production use of
 Premium Components. You may download, inspect, build and run the Community
-functionality, with Premium Components inactive, and redistribute complete,
+functionality, with paid functionality inactive, and redistribute complete,
 unmodified official distributions with all notices and feature controls intact.
 You may also redistribute builds that modify only MIT-licensed components,
 provided Premium sources, notices and entitlement controls remain intact and
 Premium use still requires a valid entitlement. Recompiling unchanged Premium
-sources as part of such a build is permitted.
+sources as part of such a build is permitted. Entitlement verification and
+Community branding controls may execute in Community mode.
 Premium Components are source-available proprietary software, not MIT-licensed
 or OSI-approved open-source software. No separate Premium codebase is required.
 
@@ -92,6 +93,16 @@ features or continue a particular service is made. Separately offered new
 products, managed hosting, implementation, priority support and third-party AI
 usage are not included unless expressly agreed. This license concerns YunCMS;
 it does not grant a YunPanel subscription or waive a separate product's terms.
+
+White-label presentation is authorized only when the entitlement expressly
+includes the whiteLabel capability and the installation administrator enables
+it. This permits replacing the visible Studio name, logos and favicon and
+removing Yunsoft promotional links and UI attribution for the licensed site.
+The official Community distribution retains its vendor branding. This product
+configuration policy does not revoke or restrict MIT grants, including rights
+to modify MIT-licensed Community code. White-label rights do not permit removing
+copyright, license or third-party notices required in source files, packages,
+container distributions or other legally required locations.
 
 5. Customer data and operational continuity
 Your content and other customer data remain yours. Community features, native

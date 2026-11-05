@@ -18,9 +18,13 @@ export function StudioBrand({ compact = false, previewSettings = null }) {
   const logoUrl = absoluteLogoUrl(resolveStudioLogo(effectiveSettings, resolvedTheme));
   const [failedLogo, setFailedLogo] = useState('');
   const showLogo = logoUrl && failedLogo !== logoUrl;
+  const Tag = effectiveSettings.white_label_enabled === true ? 'div' : 'a';
+  const brandLink = effectiveSettings.white_label_enabled === true ? {} : {
+    href: 'https://yunsoft.com', target: '_blank', rel: 'noopener noreferrer',
+  };
 
   return (
-    <div className={`studio-brand ${compact ? 'compact' : ''}`} aria-label={effectiveSettings.brand_name}>
+    <Tag {...brandLink} className={`studio-brand ${compact ? 'compact' : ''}`} aria-label={effectiveSettings.brand_name} title={brandName}>
       {showLogo ? (
         <img
           className="studio-brand-logo"
@@ -34,7 +38,7 @@ export function StudioBrand({ compact = false, previewSettings = null }) {
           <span className="studio-brand-fallback-compact">{brandName.slice(0, 1).toUpperCase()}</span>
         </span>
       )}
-    </div>
+    </Tag>
   );
 }
 
@@ -68,8 +72,16 @@ export function AuthBrandPanel() {
   );
 }
 
+export function StudioCaption() {
+  const { settings } = useStudioSettings();
+  const { t } = useI18n();
+  return <p className="eyebrow">{settings.white_label_enabled ? settings.brand_name : 'YunCMS'} {t('app.studio')}</p>;
+}
+
 export function YunsoftFooter({ compact = false }) {
   const { t } = useI18n();
+  const { settings } = useStudioSettings();
+  if (settings.white_label_enabled) return null;
   return (
     <div className={`yunsoft-footer ${compact ? 'compact' : ''}`}>
       <span>{t('appearance.poweredBy')}</span>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { useI18n } from '../i18n.js';
+import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { FilePickerModal } from './FilePickerModal.jsx';
 import { FilePreview } from './FilePreview.jsx';
 
@@ -15,6 +16,7 @@ export function BrandAssetPicker({
   kind = 'logo',
 }) {
   const { t } = useI18n();
+  const { settings } = useStudioSettings();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
@@ -35,7 +37,7 @@ export function BrandAssetPicker({
   }, [value]);
 
   const title = t(kind === 'favicon' ? 'appearance.faviconFromFiles' : 'appearance.logoFromFiles');
-  const hint = t(kind === 'favicon' ? 'appearance.faviconFromFilesHint' : 'appearance.logoFromFilesHint');
+  const hint = t(kind === 'favicon' ? (settings.white_label_enabled ? 'features.neutralFavicon' : 'appearance.faviconFromFilesHint') : 'appearance.logoFromFilesHint');
 
   return (
     <div className="brand-asset-picker">
@@ -51,8 +53,8 @@ export function BrandAssetPicker({
           </>
         ) : (
           <span className="brand-asset-default">
-            <strong>{t('appearance.defaultAsset')}</strong>
-            <small>{t(kind === 'favicon' ? 'appearance.defaultFaviconHint' : 'appearance.defaultLogoHint')}</small>
+            <strong>{t(settings.white_label_enabled ? 'features.noBrandImage' : 'appearance.defaultAsset')}</strong>
+            <small>{t(settings.white_label_enabled ? (kind === 'favicon' ? 'features.neutralFavicon' : 'features.brandNameFallback') : (kind === 'favicon' ? 'appearance.defaultFaviconHint' : 'appearance.defaultLogoHint'))}</small>
           </span>
         )}
         <div className="brand-asset-actions">
@@ -61,7 +63,7 @@ export function BrandAssetPicker({
           </button>
           {value && (
             <button className="text-button" type="button" onClick={() => onChange(null)}>
-              {t('appearance.useDefaultAsset')}
+              {t(settings.white_label_enabled ? 'features.clearBrandImage' : 'appearance.useDefaultAsset')}
             </button>
           )}
         </div>

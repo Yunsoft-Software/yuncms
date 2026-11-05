@@ -18,6 +18,36 @@ request a replacement entitlement from Yunsoft for a domain/instance transfer.
 YunPanel is a separate product with its own subscription. Provider AI charges,
 managed hosting and support are not included in a YunCMS software license.
 
+## White-label branding and Community identity
+
+The `whiteLabel` capability is Premium and **disabled by default**, including
+when a valid entitlement contains `whiteLabel: true`. An administrator enables
+**Settings → Features and license → White-label branding**, then uses
+**Appearance** to set the Studio name, logo and favicon from native Files.
+Vendor logos, promotional/support links, UI attribution and upgrade prompts
+are removed while this feature is effective. The login screen and document
+title use the same branding. Without custom images, the branded name and a
+neutral favicon are used; the initial HTML is neutral until verified settings
+load, so a white-label login does not request the default vendor favicon.
+
+The official Community installation retains its Yunsoft identity and product
+links. Its branding fields cannot be changed through the settings API or UI;
+theme, accent, language and registration settings remain available. Community
+administrators can use **Get Premium** to open the Yunsoft product catalog.
+Upgrading a previously customized Community installation requires an entitled,
+enabled white-label feature to continue displaying that customization. Stored
+names and file references are preserved when the feature is disabled, expires
+or becomes unavailable, and become effective again when it is re-enabled.
+Existing signed licenses without an explicit boolean `whiteLabel: true` do not
+gain the new capability implicitly. Public effective flags reveal no license
+token or customer/license identifier and cannot be set by clients.
+
+White-label changes presentation, not API resource identifiers, SDK names or
+copyright/license notices in source and distributions. MIT-licensed Community
+code and prior MIT releases retain their modification and redistribution rights;
+this official product policy does not prohibit a legally permitted MIT fork
+from changing its presentation.
+
 ## Configure trust
 
 Configure these values on the server, never in the browser bundle:
@@ -56,6 +86,7 @@ configuration when moving the installation.
 | `mcp` | Community | Official MCP HTTP endpoint |
 | `flowScripts` | Community | Native Flow script operation; existing script configuration must also allow it |
 | `contentHistory` | Premium | Opt-in revision recording, administrator history and restore services |
+| `whiteLabel` | Premium | Custom Studio name, logo and favicon; removal of vendor branding and promotional links |
 
 The effective value requires a licensed capability (for Premium), no operator
 deny, and no administrator disable. A Studio checkbox cannot grant a paid
