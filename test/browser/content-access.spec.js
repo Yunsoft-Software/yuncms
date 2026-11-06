@@ -87,6 +87,9 @@ test('ordinary CRUD grants retain native create, quick update, confirmed row del
     await page.getByRole('dialog').getByRole('button', { name: 'Delete record', exact: true }).click(); await expect(row).toHaveCount(0);
     const bulk = [await create(request, headers, `Bulk permission A ${key}`), await create(request, headers, `Bulk permission B ${key}`)]; records.push(...bulk);
     await page.reload();
+    const table = page.locator('section.table-panel');
+    await expect(table).toHaveAttribute('aria-busy', 'false');
+    await expect(recordRow(page, bulk[0].id)).toBeVisible();
     // Search is debounced and the resulting native list refresh clears selection.
     // Wait for that real request and its capability refresh before selecting rows.
     const searched = page.waitForResponse(response => {
@@ -95,7 +98,7 @@ test('ordinary CRUD grants retain native create, quick update, confirmed row del
     }, { timeout: 15000 });
     await page.getByRole('searchbox', { name: 'Search', exact: true }).fill(key);
     expect((await searched).status()).toBe(200);
-    await expect(page.locator('section.table-panel')).toHaveAttribute('aria-busy', 'false');
+    await expect(table).toHaveAttribute('aria-busy', 'false');
     for (const record of bulk) await recordRow(page, record.id).locator('input[type="checkbox"]').check();
     await page.getByRole('button', { name: 'Delete selected', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete selected', exact: true }).click();

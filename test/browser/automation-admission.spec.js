@@ -27,7 +27,8 @@ test('Studio automation preview displays admission denial and preserves the reco
   await page.getByRole('button', { name: 'Test on a record', exact: true }).click();
   expect((await preview).status()).toBe(402);
   await expect(page.getByRole('alert')).toContainText('AI capacity exhausted');
-  const readback = await request.get(`/items/browser_flow_records/${record.id}`, { headers });
+  const readback = await request.get(`/items/browser_flow_records/${record.id}`, { headers, maxRetries: 1 });
+  expect(readback.status()).toBe(200);
   expect((await readback.json()).data.status).toBe('original');
   const evidence = (await (await request.get('/extensions/flow-fixture', { headers })).json()).data.aiAdmissionEvents;
   expect(evidence.at(-1)).toMatchObject({ user: actor.id, admin: false });
