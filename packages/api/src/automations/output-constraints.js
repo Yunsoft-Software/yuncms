@@ -1,5 +1,6 @@
 const TEXT_TYPES = new Set(['string', 'text']);
-const MAX_SCHEMA_BYTES = 50_000;
+const MAX_CONTRACT_BYTES = 50_000;
+export const BOUND_INPUT_MARKER = 'YUNCMS_BOUND_INPUT';
 
 function constraintError(code, field, message) {
   return Object.assign(new Error(message), { code, path: field });
@@ -59,14 +60,23 @@ export function buildOutputContract(rule, input, collection) {
     }
     return [field, value];
   }));
-  const schema = { type: 'object', properties: Object.fromEntries(rule.output_fields.map(field => [field, {
-    ...propertySchema(collection.fields[field]),
-    ...(Object.hasOwn(expected, field) ? { enum: [expected[field]] } : {}),
-  }])), required: [...rule.output_fields], additionalProperties: false };
-  if (Buffer.byteLength(JSON.stringify(schema), 'utf8') > MAX_SCHEMA_BYTES) {
+  // The provider grammar stays independent of record data, including newlines in bound text.
+  const schema = { type: 'object', properties: Object.fromEntries(rule.output_fields.map(field => [field,
+    Object.hasOwn(expected, field) ? { type: 'string', enum: [BOUND_INPUT_MARKER] } : propertySchema(collection.fields[field]),
+  ])), required: [...rule.output_fields], additionalProperties: false };
+  if (Buffer.byteLength(JSON.stringify(schema) + JSON.stringify(expected), 'utf8') > MAX_CONTRACT_BYTES) {
     throw constraintError('AI_OUTPUT_CONSTRAINT_INPUT_INVALID', 'output_constraints', 'The generated output constraint exceeds the supported size');
   }
   return { schema, expected: Object.freeze(expected) };
+}
+
+export function materializeBoundOutputs(output, expected) {
+  for (const field of Object.keys(expected)) {
+    if (!Object.hasOwn(output, field) || output[field] !== BOUND_INPUT_MARKER) {
+      throw constraintError('AI_OUTPUT_CONSTRAINT_FAILED', field, 'Generated output did not confirm its configured input binding');
+    }
+  }
+  return { ...output, ...expected };
 }
 
 export function enforceOutputConstraints(output, expected, bindings = null) {

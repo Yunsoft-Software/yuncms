@@ -13,6 +13,7 @@ import { AiAssistantService } from '../../packages/api/src/ai/service.js';
 import { AiSettingsStore } from '../../packages/api/src/ai/settings-store.js';
 import { AiAutomationsService } from '../../packages/api/src/automations/service.js';
 import { AiAutomationWorker } from '../../packages/api/src/automations/worker.js';
+import { BOUND_INPUT_MARKER } from '../../packages/api/src/automations/output-constraints.js';
 import { createAutomationsRouter } from '../../packages/api/src/routes/automations.js';
 
 import { createAiFlowOperation } from '../../packages/api/src/flows/ai-operation.js';
@@ -107,7 +108,7 @@ test('real provider/native MySQL: declared output equality, observations and tra
     assert.equal(observations.length, before);
   });
 
-  await t.test('preview is read-only and strict schema/native/proposed values share exact bytes', async () => {
+  await t.test('strict preview resolves the provider binding to the exact multiline Unicode bytes without writing', async () => {
     const { record, rule, source } = await fixture();
     try {
       const audit = await auditCount(), start = observations.length;
@@ -117,11 +118,35 @@ test('real provider/native MySQL: declared output equality, observations and tra
       const [sent, received] = observations.slice(start); assert.equal(sent.phase, 'request'); assert.equal(received.phase, 'response'); assert.equal(sent.call_id, received.call_id);
       const wire = JSON.parse(sent.body), raw = JSON.parse(JSON.parse(received.body).choices[0].message.content);
       assert.equal(wire.response_format.type, 'json_schema'); assert.equal(wire.response_format.json_schema.strict, true);
-      assert.equal(hash(wire.response_format.json_schema.schema.properties.summary.enum[0]), hash(source));
-      assert.equal(hash(raw.summary), hash(body.data.proposed.summary));
+      assert.deepEqual(wire.response_format.json_schema.schema.properties.summary, { type: 'string', enum: [BOUND_INPUT_MARKER] });
+      assert.equal(raw.summary, BOUND_INPUT_MARKER);
+      assert.equal(hash(JSON.parse(wire.messages[1].content).record.source_text), hash(source));
       assert.equal(JSON.stringify(errors).includes('Synthetic observer body must stay private'), false);
       assert.equal(admission.includes(sent.call_id), true);
     } finally { await service.remove(rule.id); }
+  });
+
+  await t.test('a real truncated provider completion is tried once more and still fails closed', async () => {
+    const before = observations.length;
+    const value = randomBytes(1800).toString('hex');
+    const previousLimit = (await settingsStore.readRuntime()).maxOutputTokens;
+    await settingsStore.update({ max_output_tokens: 128 });
+    try {
+      await assert.rejects(assistant.generateFields({
+        instruction: 'Return the required schema value verbatim.', input: {}, outputFields: ['summary'],
+        outputSchema: { type: 'object', properties: { summary: { type: 'string', enum: [value] } },
+          required: ['summary'], additionalProperties: false },
+      }, { database, accountability: createAccountability({ user: actor.id, role: role.id }), requestId: randomUUID() }),
+      { code: 'AI_PROVIDER_RESPONSE_INVALID' });
+      const exchange = observations.slice(before);
+      assert.deepEqual(exchange.map(event => event.phase), ['request', 'response', 'request', 'response']);
+      assert.notEqual(exchange[0].call_id, exchange[2].call_id);
+      assert.equal(exchange[0].body_sha256, exchange[2].body_sha256);
+      for (const event of [exchange[1], exchange[3]]) {
+        assert.equal(event.http_status, 200);
+        assert.equal(JSON.parse(event.body).choices[0].finish_reason, 'length');
+      }
+    } finally { await settingsStore.update({ max_output_tokens: previousLimit }); }
   });
 
   await t.test('default-off observations expose no body while the same native generation still works', async () => {

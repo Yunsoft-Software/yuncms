@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createAccountability, FeaturesService, isSystemManagedField, SchemaCache, withTransaction } from '@yunsoft/yuncms-core';
 import { AI_AUTOMATION_ORIGIN, automationError, automationFromRow, matchesAutomation, normalizeAutomation, validateGeneratedFields } from './config.js';
-import { buildOutputContract, enforceOutputConstraints, validateConstraintDefinitions } from './output-constraints.js';
+import { buildOutputContract, materializeBoundOutputs, validateConstraintDefinitions } from './output-constraints.js';
 
 const OUTPUT_TYPES = new Set(['string', 'text', 'json', 'boolean', 'integer', 'bigint', 'decimal', 'date', 'datetime', 'timestamp']);
 const COLUMNS = ['name', 'collection', 'run_as', 'enabled', 'on_create', 'on_update', 'input_fields', 'output_fields', 'output_constraints', 'instruction'];
@@ -139,10 +139,13 @@ export class AiAutomationsService {
     if (!record) throw automationError('NOT_FOUND', 'Record is missing or inaccessible to Run as');
     const input = Object.fromEntries(rule.input_fields.map((field) => [field, record[field]]));
     const contract = buildOutputContract(rule, input, options.schema.collections[rule.collection]);
-    const output = validateGeneratedFields(await this.assistant.generateFields({
+    const generated = validateGeneratedFields(await this.assistant.generateFields({
       instruction: rule.instruction, input, outputFields: rule.output_fields, outputSchema: contract.schema,
+      boundOutputFields: Object.keys(contract.expected),
     }, { ...options, services: this.services, requestId: randomUUID(), signal }), rule.output_fields);
-    enforceOutputConstraints(output, contract.expected);
+    const output = contract.schema
+      ? validateGeneratedFields(materializeBoundOutputs(generated, contract.expected), rule.output_fields)
+      : generated;
     items.validatePayload(output, options.schema.collections[rule.collection], await items.resolvePermission('update'));
     return { record, output, outputConstraints: contract.expected };
   }

@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import test from 'node:test';
 import {
   bootstrapDatabase, closeDatabasePool, CollectionsService, createCoreServiceRegistry, createDatabasePool,
@@ -6,6 +9,7 @@ import {
   PermissionsService, RolesService, SchemaCache, UsersService,
 } from '@yunsoft/yuncms-core';
 import { AiAssistantService } from '../../packages/api/src/ai/service.js';
+import { AiSettingsStore } from '../../packages/api/src/ai/settings-store.js';
 import { AiAutomationsService } from '../../packages/api/src/automations/service.js';
 import { AiAutomationWorker } from '../../packages/api/src/automations/worker.js';
 import { createAutomationsRouter } from '../../packages/api/src/routes/automations.js';
@@ -16,6 +20,12 @@ test('real MySQL: AI automations preserve permissions, queue/restart/rollback bo
 }, async () => {
   const config = loadConfig(process.env);
   if (process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE !== '1' || !/(test|ci|dev)/i.test(config.database.database)) throw new Error('Disposable MySQL database and explicit destructive opt-in required');
+  assert.ok(process.env.YUNCMS_TEST_REAL_PROVIDER_FILE, 'Real provider file is required for AI integration acceptance');
+  const provider = JSON.parse(await readFile(process.env.YUNCMS_TEST_REAL_PROVIDER_FILE, 'utf8'));
+  const providerSettings = { enabled: true, writes_enabled: true,
+    api_key: provider.OPENROUTER_API_KEY || provider.OPENROUTER_KEY || provider.AI_API_KEY,
+    model: provider.AI_CHAT_MODEL, base_url: provider.OPENROUTER_BASE_URL || provider.AI_BASE_URL,
+    provider: provider.AI_PROVIDER_ROUTING ?? null };
   const database = createDatabasePool(config.database);
   const system = createSystemAccountability();
   const schemaCache = new SchemaCache({ versionCheckTtlMs: 0 });
@@ -25,20 +35,18 @@ test('real MySQL: AI automations preserve permissions, queue/restart/rollback bo
   const collection = `ai_requests_${Date.now().toString(36)}`;
   const ownerEmail = `ai_owner_${Date.now()}@example.test`;
   let role, ownerRole, actor, rule, server;
-  let generated = 0, providerFailure = null, duringGeneration = null, rejectMutation = false;
-  const settings = { enabled: true, writesEnabled: true, apiKey: 'local-test-only', model: 'test',
-    baseUrl: 'https://provider.invalid/v1', timeoutMs: 1000, maxMessageChars: 12000, maxOutputTokens: 1500 };
-  const settingsStore = { async readRuntime() { return settings; } };
-  const assistant = new AiAssistantService({ settingsStore, fetchImpl: async (_url, request) => {
-    generated += 1;
-    const body = JSON.parse(request.body);
-    const input = JSON.parse(body.messages[1].content).record;
-    assert.deepEqual(Object.keys(input), ['message']);
-    assert.equal(JSON.stringify(body).includes('private-secret'), false);
+  let duringGeneration = null, rejectMutation = false;
+  const requests = [], completions = [];
+  const settingsStore = new AiSettingsStore({ database, key: randomBytes(32) });
+  const assistant = new AiAssistantService({ settingsStore, emitter, providerObservationsEnabled: true });
+  emitter.registerAction('ai.provider.observed', payload => {
+    if (payload.phase === 'request') requests.push(JSON.parse(payload.body));
+  });
+  emitter.registerFilter('ai.provider.completed', async payload => {
+    completions.push(payload);
     if (duringGeneration) { const operation = duringGeneration; duringGeneration = null; await operation(); }
-    if (providerFailure) throw Object.assign(new Error('test provider offline'), { code: providerFailure });
-    return { ok: true, async text() { return JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify({ summary: `Summary: ${input.message}` }) } }] }); } };
-  } });
+    return payload;
+  });
   let owner;
   const automationOptions = { assistant, settingsStore, schemaCache };
   let automation;
@@ -50,6 +58,7 @@ test('real MySQL: AI automations preserve permissions, queue/restart/rollback bo
   const items = () => new ItemsService(collection, options);
   try {
     await bootstrapDatabase(database);
+    await settingsStore.update(providerSettings);
     ownerRole = await roles.createOne({ name: `AI Owner ${Date.now()}`, admin: true });
     owner = await users.createOne({ email: ownerEmail, password: 'Disposable-Ai-Owner-9417!', role: ownerRole.id });
     await collections.createOne({ collection });
@@ -60,7 +69,8 @@ test('real MySQL: AI automations preserve permissions, queue/restart/rollback bo
     await permissions.createOne({ role: role.id, collection, action: 'update', fields: ['summary'], filter: { message: { _neq: 'blocked' } } });
     automation = new AiAutomationsService({ ...automationOptions, ...options, accountability: { user: owner.id, admin: true }, services });
     const initialDefinition = { name: 'Summarize requests', collection, run_as: actor.id, enabled: true,
-      on_create: true, on_update: true, input_fields: ['message'], output_fields: ['summary'], instruction: 'Summarize the supplied message.' };
+      on_create: true, on_update: true, input_fields: ['message'], output_fields: ['summary'],
+      instruction: 'Set summary to the exact string "Summary: " followed by the message value verbatim.' };
     rule = await automation.save(initialDefinition);
     for (const event of ['items.create', 'items.update']) emitter.registerAction(event, (payload, context) => automation.enqueue(event, payload, context));
     emitter.registerFilter('items.update', (payload) => { if (rejectMutation && Object.hasOwn(payload, 'summary')) throw Object.assign(new Error('Test validation failure'), { code: 'VALIDATION_FAILED' }); return payload; });
@@ -70,9 +80,9 @@ test('real MySQL: AI automations preserve permissions, queue/restart/rollback bo
     const proposed = await automation.preview(initialDefinition, String(first.id));
     assert.equal(proposed.proposed.summary, 'Summary: hello');
     assert.equal((await items().readOne(first.id)).summary, null);
-    const beforeConcurrent = generated;
+    const beforeConcurrent = completions.length;
     await Promise.all([worker.tick(), new AiAutomationWorker(automation).tick()]);
-    assert.equal(generated, beforeConcurrent + 1);
+    assert.equal(completions.length, beforeConcurrent + 1);
     assert.equal((await items().readOne(first.id)).summary, 'Summary: hello');
     assert.equal((await automation.runs(rule.id)).length, 1); // Generated update does not enqueue itself.
     assert.equal((await automation.runs(rule.id))[0].status, 'succeeded');
@@ -108,25 +118,37 @@ test('real MySQL: AI automations preserve permissions, queue/restart/rollback bo
     await users.updateOne(actor.id, { status: 'active' });
 
     // Provider outages retry with bounded attempts and persist across worker instances.
-    await items().createOne({ message: 'retry' }); providerFailure = 'offline';
+    await items().createOne({ message: 'retry' });
+    const portReservation = createServer();
+    await new Promise((resolve, reject) => portReservation.once('error', reject).listen(0, '127.0.0.1', resolve));
+    const offlineUrl = `http://127.0.0.1:${portReservation.address().port}/v1`;
+    await new Promise((resolve, reject) => portReservation.close(error => error ? reject(error) : resolve()));
+    await settingsStore.update({ base_url: offlineUrl, api_key: 'disposable-offline-fixture', provider: null });
     await worker.tick();
     const retryRun = (await automation.runs(rule.id)).find((entry) => entry.status === 'pending');
     assert.equal(retryRun.attempts, 1); assert.equal(retryRun.error_code, 'AI_PROVIDER_UNAVAILABLE');
     await database.query("UPDATE yuncms_ai_automation_runs SET status = 'running' WHERE id = ?", [retryRun.id]);
-    providerFailure = null;
+    await settingsStore.update(providerSettings);
     await new AiAutomationWorker(automation).tick();
     assert.equal((await automation.runs(rule.id)).find((entry) => entry.id === retryRun.id).status, 'succeeded');
 
     // Rule revisions invalidate pending work; disabling AI writes produces a visible failure.
     await items().createOne({ message: 'old rule' });
     const definition = { name: rule.name, collection, run_as: actor.id, enabled: true, on_create: true, on_update: true,
-      input_fields: ['message'], output_fields: ['summary'], instruction: 'Updated instruction.' };
+      input_fields: ['message'], output_fields: ['summary'], instruction: initialDefinition.instruction };
     rule = await automation.save(definition, rule.id); await worker.tick();
-    await items().createOne({ message: 'writes off' }); settings.writesEnabled = false;
-    await worker.tick(); settings.writesEnabled = true;
+    await items().createOne({ message: 'writes off' });
+    await settingsStore.update({ writes_enabled: false });
+    await worker.tick();
+    await settingsStore.update({ writes_enabled: true });
     const offRun = (await automation.runs(rule.id)).find((entry) => entry.error_code === 'AI_WRITES_DISABLED');
     assert.ok(offRun); await automation.retry(offRun.id); await worker.tick();
     assert.equal((await automation.runs(rule.id)).find((entry) => entry.id === offRun.id).status, 'succeeded');
+    assert.ok(requests.length >= completions.length);
+    for (const request of requests) {
+      assert.deepEqual(Object.keys(JSON.parse(request.messages[1].content).record), ['message']);
+      assert.equal(JSON.stringify(request).includes('private-secret'), false);
+    }
 
     await assert.rejects(automation.save({ ...definition, input_fields: ['secret'] }), { code: 'FORBIDDEN_FIELD' });
     await assert.rejects(automation.save({ ...definition, output_fields: ['id'] }), { code: 'INVALID_AUTOMATION' });

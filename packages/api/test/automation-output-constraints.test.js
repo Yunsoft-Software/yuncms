@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { automationFromRow, normalizeAutomation } from '../src/automations/config.js';
-import { buildOutputContract, enforceOutputConstraints, normalizeOutputConstraints, validateConstraintDefinitions } from '../src/automations/output-constraints.js';
+import { BOUND_INPUT_MARKER, buildOutputContract, enforceOutputConstraints, materializeBoundOutputs, normalizeOutputConstraints, validateConstraintDefinitions } from '../src/automations/output-constraints.js';
 import { automationResponseFormat, providerAdmissionEstimate } from '../src/ai/service.js';
 import { errorBody, statusForError } from '../src/error-response.js';
 import { normalizeAiSettingsPatch } from '../src/ai/config.js';
@@ -40,18 +40,24 @@ test('only text/string equality is admitted, and arbitrary JSON outputs are not 
     { fields: { ...collection.fields, payload: { type: 'json' } } }), { code: 'INVALID_AUTOMATION' });
 });
 
-test('strict schema enums and server guards use the same exact source snapshot without normalization', () => {
+test('a stable strict schema confirms the binding and the server preserves the exact source snapshot', () => {
   for (const source of ['native-json-value', ' leading and trailing ', 'Türkçe 日本語 🙂\nnext', '', null]) {
     const contract = buildOutputContract(rule, { source }, collection);
-    assert.deepEqual(contract.schema.properties.summary.enum, [source]);
+    assert.deepEqual(contract.schema.properties.summary, { type: 'string', enum: [BOUND_INPUT_MARKER] });
     assert.deepEqual(contract.schema.required, ['summary']);
     assert.equal(contract.schema.additionalProperties, false);
     assert.equal(Object.isFrozen(contract.expected), true);
-    const value = { summary: source };
+    const wire = { summary: BOUND_INPUT_MARKER, category: 'unchanged' };
+    const value = materializeBoundOutputs(wire, contract.expected);
+    assert.deepEqual(value, { summary: source, category: 'unchanged' });
+    assert.equal(wire.summary, BOUND_INPUT_MARKER);
     assert.equal(enforceOutputConstraints(value, contract.expected), value);
     assert.equal(enforceOutputConstraints({ summary: 'anything' }, {} ).summary, 'anything');
   }
   const contract = buildOutputContract(rule, { source: 'native-json-value' }, collection);
+  for (const output of [{ summary: 'native-json-value' }, { summary: null }, {}]) {
+    assert.throws(() => materializeBoundOutputs(output, contract.expected), { code: 'AI_OUTPUT_CONSTRAINT_FAILED', path: 'summary' });
+  }
   for (const output of [{ summary: 'native--value' }, { summary: 'NATIVE-JSON-VALUE' }, { summary: null }, {}, null]) {
     assert.throws(() => enforceOutputConstraints(output, contract.expected), error => {
       assert.equal(error.code, 'AI_OUTPUT_CONSTRAINT_FAILED'); assert.equal(error.path, 'summary');
@@ -99,7 +105,7 @@ test('final native results must preserve the bound input snapshot as well as its
   }
 });
 
-test('native capacity reservations include the actual dynamic schema, preserving the legacy estimate otherwise', () => {
+test('native capacity reservations include the actual wire schema, preserving the legacy estimate otherwise', () => {
   const messages = [{ role: 'user', content: 'input' }], tools = [], config = { maxOutputTokens: 1500 };
   const legacy = Buffer.byteLength(JSON.stringify(messages) + JSON.stringify(tools), 'utf8') + 1500 + 1024;
   assert.equal(providerAdmissionEstimate(messages, tools, config, automationResponseFormat()), legacy);

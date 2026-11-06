@@ -40,10 +40,7 @@ test('real MySQL: native transaction-bound Items defer audit and automation, inc
       role: role.id, collection, action, fields: action === 'read' ? ['id', 'title', 'summary'] : ['summary'],
     });
     const accountability = createAccountability({ user: user.id, admin: true });
-    automation = new AiAutomationsService({ ...options, accountability, emitter, services, logger,
-      assistant: { async generateFields() { throw new Error('enqueue must never contact a provider'); } },
-      settingsStore: { async readRuntime() { return { enabled: false }; } },
-    });
+    automation = new AiAutomationsService({ ...options, accountability, emitter, services, logger });
     rule = await automation.save({ name: 'Transaction enqueue', collection, run_as: user.id, enabled: true,
       on_create: true, on_update: true, input_fields: ['title'], output_fields: ['summary'], instruction: 'Summarize title.' });
     registerInternalAudit({ emitter, services, database, logger });

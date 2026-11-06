@@ -34,15 +34,14 @@ fields. Other scalar outputs may share the rule; JSON outputs require a separate
 rule when equality constraints are enabled. Run as must still be able to read
 both fields and update the output. The declaration does not grant access.
 
-The provider receives a strict JSON Schema requiring exactly the output keys,
-with a one-value `enum` containing the authorized input snapshot for each bound
-output. Choose a provider/model supporting this schema mode. YunCMS retains the
-configured model and routing, and never falls back to unrestricted text. It also
-checks the result itself: a schema claim from the provider is not trusted as the
-only validation. Strings must be exactly equal, including whitespace and Unicode;
-there is no trimming, normalization, replacement or output repair. Null is valid
-only when the bound output is nullable. Missing, mistyped, null-to-required or
-oversized input constraints fail before a provider request.
+The provider receives a strict JSON Schema requiring exactly the output keys. A
+bound field requires the fixed `YUNCMS_BOUND_INPUT` marker in the response. YunCMS
+checks the marker and resolves it to the authorized input snapshot before returning
+a proposal or validating a write. This keeps multiline text and Unicode out of
+the provider's schema literals. The resulting field preserves the input exactly,
+including whitespace. Null is valid only when the bound output is nullable.
+Missing, mistyped, null-to-required or oversized input constraints fail before a
+provider request. Choose a provider and route that support strict schema mode.
 
 A mismatch returns HTTP 400 / `AI_OUTPUT_CONSTRAINT_FAILED`, with the output
 field path and without either value. Preview returns no proposal and does not
@@ -65,12 +64,13 @@ OpenAI-compatible JSON mode; there is no fallback to unrestricted text if it is
 rejected. Ordinary assistant conversations retain their existing text/tool mode.
 The provider must return a JSON object containing exactly the output fields. Missing/extra fields, tool calls, oversized output or invalid values fail the run. YunCMS validates values through the collection schema and the Run as user's update permission before writing them.
 
-Malformed JSON (including Markdown fences or trailing prose) produces
-`AI_TOOL_ARGUMENTS_INVALID`. YunCMS does not repair that output or automatically
-retry this terminal error; the record stays unchanged and the failed run remains
-visible in history. A provider completion may still incur usage even when its
-content is rejected. Validate the chosen provider/model with representative
-previews; a successful later run does not make an earlier failed run successful.
+If the provider returns malformed JSON, including fenced or truncated text,
+YunCMS discards that response and makes at most one additional generation request
+within the original time limit. It uses the same model, routing policy and response format.
+Each request goes through admission and each completion can incur usage. A second
+malformed response fails with HTTP 502 / `AI_PROVIDER_RESPONSE_INVALID`. The record
+stays unchanged and a failed worker run remains visible in history. Refusals, tool
+calls, incorrect fields and failed bindings are rejected without a JSON retry.
 
 Preview and background generation both use the native `ai.provider.before`,
 `ai.provider.completed` and `ai.provider.failed` lifecycle. Extensions can reject

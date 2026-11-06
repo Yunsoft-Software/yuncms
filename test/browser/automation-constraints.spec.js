@@ -17,7 +17,7 @@ async function editor(page, session, actor, name) {
 
 test('Studio declares and persists exact equality and previews the actual provider without writing', async ({ page, request }) => {
   const { session, headers, actor } = await fixture(request), name = 'Constrained browser ' + randomUUID().slice(0, 8);
-  const source = 'Owned native-json-' + randomUUID();
+  const source = ' Owned native-json-' + randomUUID() + ' Türkçe 日本語 🙂\nnext ';
   const created = await request.post('/items/browser_flow_records', { headers, data: { title: source, status: 'Original summary' } }); expect(created.status()).toBe(201); const record = (await created.json()).data;
   expect((await request.post('/extensions/flow-fixture/ai/allow', { headers })).status()).toBe(204);
   let id;
@@ -33,7 +33,7 @@ test('Studio declares and persists exact equality and previews the actual provid
     const preview = page.waitForResponse(r => r.url().endsWith('/automations/preview') && r.request().method() === 'POST');
     await page.getByRole('button', { name: 'Test on a record', exact: true }).click(); const proposed = await preview; expect(proposed.status()).toBe(200);
     expect((await proposed.json()).data.proposed.status).toBe(source);
-    await expect(page.locator('.flow-ai-preview-result pre').last()).toContainText(source);
+    await expect(page.locator('.flow-ai-preview-result pre').last()).toHaveText(JSON.stringify({ status: source }, null, 2));
     const row = (await (await request.get('/items/browser_flow_records/' + record.id, { headers })).json()).data;
     expect(row.title).toBe(source); expect(row.status).toBe('Original summary');
   } finally { await removeAiFlow(request, headers, id); expect((await request.post('/extensions/flow-fixture/ai/deny', { headers })).status()).toBe(204); }
