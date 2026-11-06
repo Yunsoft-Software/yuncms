@@ -499,7 +499,7 @@ export class ItemsService extends BaseService {
       compileFilter({ [schema.primary_key]: { _eq: id } }, schema),
     );
     const [rows] = await this.database.query(
-      `SELECT ${quoteIdentifier(schema.primary_key, 'field name')} FROM ${quoteIdentifier(this.collection, 'collection name')}${filter.sql} LIMIT 1 FOR SHARE`, filter.params,
+      `SELECT ${quoteIdentifier(schema.primary_key, 'field name')} FROM ${quoteIdentifier(this.collection, 'collection name')}${filter.sql} LIMIT 1 LOCK IN SHARE MODE`, filter.params,
     );
     if (!rows[0]) return null;
     return { revision: contentTracking(schema).enabled ? await readItemRevision(this.database, this.collection, id) : null };

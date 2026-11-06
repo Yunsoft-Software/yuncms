@@ -45,8 +45,9 @@ export function parseItemRevision(value) {
 
 export async function readItemRevision(database, collection, key, { current = false } = {}) {
   // A locking/current read is required: a repeatable-read transaction may have
+  // LOCK IN SHARE MODE is the shared-lock syntax both MySQL and MariaDB accept.
   // established its older snapshot while resolving schema or permissions.
-  const [rows] = await database.query(`SELECT revision FROM yuncms_item_versions WHERE collection = ? AND item_key = ?${current ? ' FOR SHARE' : ''}`, [collection, String(key)]);
+  const [rows] = await database.query(`SELECT revision FROM yuncms_item_versions WHERE collection = ? AND item_key = ?${current ? ' LOCK IN SHARE MODE' : ''}`, [collection, String(key)]);
   return String(rows[0]?.revision ?? 0);
 }
 
