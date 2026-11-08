@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 // Production installations also run on MariaDB, which rejects MySQL-only clauses.
 async function sources(dir) {
@@ -16,7 +17,8 @@ async function sources(dir) {
 
 test('runtime SQL avoids shared-lock syntax that MariaDB rejects', async () => {
   for (const pkg of ['core', 'api']) {
-    for (const file of await sources(new URL(`../../${pkg}/src`, import.meta.url).pathname)) {
+    const root = fileURLToPath(new URL(`../../${pkg}/src`, import.meta.url));
+    for (const file of await sources(root)) {
       assert.doesNotMatch(await readFile(file, 'utf8'), /\bFOR\s+SHARE\b/i, file);
     }
   }
