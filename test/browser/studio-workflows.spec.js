@@ -73,8 +73,12 @@ test('role and user management persist native permissions, status changes, sessi
     await page.reload(); await expect(page.getByLabel('Role name', { exact: true })).toHaveValue('Renamed workflow ' + suffix);
     expect((await request.post('/schema/system-collections/yuncms_users/fields', { headers, data: { field: counterField, name: 'External counter', type: 'bigint' } })).status()).toBe(201); counterCreated = true;
     await page.goto('/#/users/new');
-    await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByRole('combobox', { name: 'Role', exact: true }).selectOption(role.id);
+    const emailField = page.getByLabel('Email', { exact: true });
+    await emailField.click();
+    await emailField.pressSequentially(email);
+    await page.getByLabel('Password', { exact: true }).fill(password);
+    await expect(emailField).toHaveValue(email);
     user = await mutation(page, '/users', 'POST', () => page.getByRole('button', { name: 'Create user', exact: true }).click());
     await expect(page.locator('.user-detail-page')).toBeVisible();
     await page.getByRole('spinbutton', { name: /^External counter/ }).fill('9007199254740993');
