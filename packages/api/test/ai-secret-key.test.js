@@ -28,7 +28,11 @@ test('concurrent first-start callers receive one complete key and leave no tempo
   for (let round = 0; round < 8; round++) {
     const cwd = await mkdtemp(join(tmpdir(), 'yuncms-ai-key-race-'));
     t.after(() => rm(cwd, { recursive: true, force: true }));
-    const results = await Promise.all(Array.from({ length: 24 }, () => loadOrCreateAiSettingsKey({ cwd })));
+    const attempts = await Promise.allSettled(Array.from({ length: 24 }, () => loadOrCreateAiSettingsKey({ cwd })));
+    const results = attempts.map(attempt => {
+      if (attempt.status === 'rejected') throw attempt.reason;
+      return attempt.value;
+    });
     assert.equal(results.filter(result => result.created).length, 1);
     for (const result of results) assert.deepEqual(result.key, results[0].key);
     assert.equal(Buffer.from((await readFile(results[0].path, 'utf8')).trim(), 'base64').length, 32);

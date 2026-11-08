@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { link, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const KEY_BYTES = 32;
 const DEFAULT_KEY_PATH = '.yuncms/ai-settings.key';
@@ -51,7 +52,13 @@ export async function loadOrCreateAiSettingsKey({ cwd = process.cwd(), path = DE
     return { key: generated, path: absolutePath, created: true };
   } catch (error) {
     if (error?.code !== 'EEXIST') throw keyError('YunCMS AI settings key could not be created', error);
-    const raced = await readExisting(absolutePath);
+    // HFS+ can report EEXIST before the competing hard link is readable.
+    let raced = await readExisting(absolutePath);
+    for (const retryMs of [5, 10, 20, 40, 80]) {
+      if (raced) break;
+      await delay(retryMs);
+      raced = await readExisting(absolutePath);
+    }
     if (!raced) throw keyError('YunCMS AI settings key disappeared during creation');
     return { key: raced, path: absolutePath, created: false };
   } finally {
