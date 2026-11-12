@@ -171,6 +171,10 @@ function TranslationsSection({
   const [viewMode, setViewMode] = useState('tabs');
   const selectedLang = languages.some(language => language.code === activeLang) ? activeLang : languages[0]?.code;
   const languageKeys = languages.map(language => language.code).join('|');
+  const tabStatuses = languages.map((language) => {
+    const entry = draft[language.code];
+    return !entry?.cleared && hasFilledTranslation(entry?.values) ? '1' : '0';
+  }).join('');
   const tabsRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -186,9 +190,10 @@ function TranslationsSection({
     };
     const observer = new ResizeObserver(revealSelected);
     observer.observe(tabs);
+    for (const tab of tabs.querySelectorAll('[role="tab"]')) observer.observe(tab);
     revealSelected();
     return () => observer.disconnect();
-  }, [selectedLang, languageKeys, viewMode]);
+  }, [selectedLang, languageKeys, tabStatuses, viewMode]);
 
   const visibleLanguages = viewMode === 'split' && !compact
     ? languages
@@ -287,7 +292,7 @@ function TranslationsSection({
                   if (target === null) return;
                   event.preventDefault();
                   setActiveLang(languages[target].code);
-                  event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[target]?.focus();
+                  event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[target]?.focus({ preventScroll: true });
                 }}
               >
                 <span className="nested-lang-code">{shortLanguageBadge(lang.code)}</span>

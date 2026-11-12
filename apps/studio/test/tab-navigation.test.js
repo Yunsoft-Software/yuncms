@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { tabRevealDelta, tabTargetIndex } from '../src/tab-navigation.js';
 
@@ -20,4 +21,11 @@ test('fractional tab edges scroll by a complete pixel and preserve the CSS inset
   assert.equal(tabRevealDelta(bounds, { left: 200, right: 319.75 }, 3), 3);
   assert.equal(tabRevealDelta(bounds, { left: 20.25, right: 200 }, 3), -3);
   assert.equal(tabRevealDelta(bounds, { left: 23.25, right: 316.75 }, 3), 0);
+});
+
+test('nested language tabs re-reveal the selected tab when individual tab buttons resize or hydrate', async () => {
+  const source = await readFile(new URL('../src/components/NestedRelationsEditor.jsx', import.meta.url), 'utf8');
+  assert.match(source, /for \(const tab of tabs\.querySelectorAll\('\[role="tab"\]'\)\) observer\.observe\(tab\);/);
+  assert.match(source, /\[selectedLang,\s*languageKeys,\s*tabStatuses,\s*viewMode\]/);
+  assert.match(source, /\.focus\(\{\s*preventScroll:\s*true\s*\}\)/);
 });
