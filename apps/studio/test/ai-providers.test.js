@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { mutationText, operationText } from '../src/ai-operations.js';
 import { AI_PROVIDERS, aiProviderPreset, changeAiProviderEndpoint } from '../src/ai-providers.js';
-import { DICTIONARIES } from '../src/localization.js';
+import { DICTIONARIES, translate } from '../src/localization.js';
 
 test('provider shortcuts cover independent compatible APIs and leave arbitrary endpoints and models selectable', () => {
   assert.deepEqual(AI_PROVIDERS.map(x => x.id), ['openai', 'openrouter', 'zai', 'deepseek', 'groq']);
@@ -23,8 +25,38 @@ test('changing endpoints clears staged credentials and routing and requires expl
   assert.equal(same.apiKey, form.apiKey); assert.equal(same.enabled, true); assert.deepEqual(same.provider, form.provider);
 });
 
-test('provider and routing controls have text in every Studio locale', () => {
+test('provider, routing and mutation-receipt controls have text in every Studio locale', () => {
   for (const [locale, dictionary] of Object.entries(DICTIONARIES)) {
-    for (const key of ['ai.provider', 'ai.customProvider', 'ai.providerHint', 'ai.providerChanged', 'ai.providerRouting', 'ai.providerRoutingHint', 'ai.invalidProviderRouting']) assert.ok(dictionary[key], locale + ':' + key);
+    for (const key of [
+      'ai.provider',
+      'ai.customProvider',
+      'ai.providerHint',
+      'ai.providerChanged',
+      'ai.providerRouting',
+      'ai.providerRoutingHint',
+      'ai.invalidProviderRouting',
+      'ai.mutations',
+      'ai.mutationCreate',
+      'ai.mutationUpdate',
+      'ai.mutationDelete',
+      'ai.noMutations',
+    ]) assert.ok(dictionary[key], locale + ':' + key);
   }
+  const tEn = (key, values) => translate('en', key, values);
+  const tTr = (key, values) => translate('tr', key, values);
+  assert.equal(
+    mutationText({ operation: 'items_delete', collection: 'articles', id: 'abc-123' }, tEn),
+    'Deleted articles #abc-123',
+  );
+  assert.equal(
+    mutationText({ operation: 'items_update', collection: 'articles', id: 'abc-123' }, tTr),
+    'articles #abc-123 güncellendi',
+  );
+  assert.equal(mutationText({ operation: 'items_read_one', collection: 'articles', id: '1' }, tEn), '');
+  assert.equal(operationText({ operation: 'items_delete', collection: 'articles', success: true }, tEn), 'Deleted a articles record');
+
+  const screenSource = readFileSync(new URL('../src/screens/AiScreen.jsx', import.meta.url), 'utf8');
+  assert.match(screenSource, /className="ai-mutation-list"/);
+  assert.match(screenSource, /t\('ai\.noMutations'\)/);
+  assert.match(screenSource, /mutationText\(mutation, t\)/);
 });

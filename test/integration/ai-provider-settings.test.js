@@ -135,3 +135,84 @@ test('real compatible provider: native chat uses the chosen server routing while
   assert.equal(body.data.writes_enabled, false); assert.ok(started.length >= 2);
   assert.deepEqual(completed, started); assert.equal((await new ItemsService(collection, options).readOne(record.id)).message, marker);
 });
+
+test('real compatible provider: multi-turn chat executes fresh create, update and delete tools with complete UUID receipts while preserving siblings', {
+  skip: process.env.YUNCMS_TEST_MYSQL !== '1', timeout: 180000,
+}, async () => {
+  assert.equal(process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE, '1');
+  assert.ok(process.env.YUNCMS_TEST_REAL_PROVIDER_FILE, 'An actual provider is required');
+  const provider = JSON.parse(await readFile(process.env.YUNCMS_TEST_REAL_PROVIDER_FILE, 'utf8'));
+  const config = loadConfig(process.env); assert.match(config.database.database, /(test|ci|dev)/i);
+  const database = createDatabasePool(config.database);
+  const options = { database, accountability: createSystemAccountability() };
+  const collection = 'ai_multiturn_' + randomUUID().replaceAll('-', '').slice(0, 8);
+  let server, role, actor, createdCollection = false;
+  try {
+    await bootstrapDatabase(database);
+    await new CollectionsService(options).createOne({ collection, primaryKeyType: 'uuid' });
+    createdCollection = true;
+    await new FieldsService(options).createOne(collection, { field: 'title', type: 'string', required: true });
+    const schemaCache = new SchemaCache({ versionCheckTtlMs: 0 });
+    const schema = await schemaCache.get(database);
+    const items = new ItemsService(collection, { ...options, schema });
+    const sibling = await items.createOne({ title: 'Sibling record to keep' });
+    role = await new RolesService(options).createOne({ name: collection + ' writer' });
+    const password = 'Multi-turn-writer-123!';
+    actor = await new UsersService(options).createOne({ email: collection + '@example.test', role: role.id, password });
+    for (const action of ['read', 'create', 'update', 'delete']) {
+      await new PermissionsService({ ...options, schema }).createOne({ role: role.id, collection, action, fields: ['id', 'title'] });
+    }
+    const store = new AiSettingsStore({ database, key: randomBytes(32) });
+    await store.update({
+      enabled: true,
+      writes_enabled: true,
+      base_url: provider.OPENROUTER_BASE_URL || provider.AI_BASE_URL,
+      model: provider.AI_CHAT_MODEL,
+      api_key: provider.OPENROUTER_API_KEY || provider.OPENROUTER_KEY || provider.AI_API_KEY,
+      provider: provider.AI_PROVIDER_ROUTING ?? null,
+      timeout_ms: 45000,
+    });
+    const assistant = new AiAssistantService({ settingsStore: store });
+    const app = createApp({ pool: database, config, schemaCache, aiRouter: createAiRouter({ assistant, settingsStore: store }) });
+    server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const login = await fetch(base + '/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: actor.email, password }) });
+    assert.equal(login.status, 200);
+    const headers = { authorization: `Bearer ${(await login.json()).data.access_token}`, 'content-type': 'application/json' };
+    const history = [];
+    const sendTurn = async (content, flags) => {
+      history.push({ role: 'user', content });
+      const res = await fetch(base + '/ai/chat', { method: 'POST', headers, body: JSON.stringify({ messages: history, locale: 'en', ...flags }) });
+      const json = await res.json();
+      assert.equal(res.status, 200, JSON.stringify(json));
+      history.push({ role: 'assistant', content: json.data.message });
+      return json.data;
+    };
+    const refused = await sendTurn(`Create one record in collection ${collection} with title "Turn two draft".`, { allow_writes: false, allow_deletes: false });
+    assert.deepEqual(refused.mutations, []);
+
+    const created = await sendTurn(`Create one record in collection ${collection} with title "Turn two draft" and report its exact id.`, { allow_writes: true, allow_deletes: false });
+    assert.equal(created.mutations.length, 1, JSON.stringify(created));
+    const createdId = created.mutations[0].id;
+    assert.match(createdId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    assert.deepEqual(created.mutations, [{ operation: 'items_create', collection, id: createdId }]);
+
+    const updated = await sendTurn(`Update record ${createdId} in collection ${collection} so title is "Turn three updated". Keep sibling record ${sibling.id} unchanged.`, { allow_writes: true, allow_deletes: false });
+    assert.deepEqual(updated.mutations, [{ operation: 'items_update', collection, id: createdId }], JSON.stringify(updated));
+    assert.equal((await items.readOne(createdId)).title, 'Turn three updated');
+
+    const deleted = await sendTurn(`Delete only record ${createdId} from collection ${collection} once, and preserve sibling record ${sibling.id}.`, { allow_writes: true, allow_deletes: true });
+    assert.deepEqual(deleted.mutations, [{ operation: 'items_delete', collection, id: createdId }], JSON.stringify(deleted));
+    assert.equal(await items.readOne(createdId), null);
+    assert.equal((await items.readOne(sibling.id)).title, 'Sibling record to keep');
+  } finally {
+    if (server) { server.closeAllConnections?.(); await new Promise(resolve => server.close(resolve)); }
+    if (createdCollection) await new CollectionsService(options).deleteOne(collection, { destructive: true }).catch(() => {});
+    if (actor) await database.query('DELETE FROM yuncms_users WHERE id = ?', [actor.id]);
+    if (role) {
+      await database.query('DELETE FROM yuncms_permissions WHERE role = ?', [role.id]);
+      await database.query('DELETE FROM yuncms_roles WHERE id = ?', [role.id]);
+    }
+    await database.end();
+  }
+});

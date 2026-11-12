@@ -57,6 +57,8 @@ test('Studio AI client uses built-in chat and administrator settings routes', ()
   assert.match(screenSource, /requestError\?\.status === 403/);
   assert.match(screenSource, /status\?\.writes_available/);
   assert.match(screenSource, /aiChat\(nextHistory, \{ locale, \.\.\.aiAccessFlags\(accessMode\) \}\)/);
+  assert.match(screenSource, /mutationText\(/);
+  assert.match(screenSource, /ai-mutation-list/);
   assert.match(screenSource, /AI_ACCESS_MODES\.READ/);
   assert.match(screenSource, /AI_ACCESS_MODES\.WRITE/);
   assert.match(screenSource, /AI_ACCESS_MODES\.FULL/);

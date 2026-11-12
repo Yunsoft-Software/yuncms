@@ -150,12 +150,15 @@ function readToolDefinitions(maxItems) {
     ),
     toolDefinition(
       'items_read_one',
-      'Read one item by id with optional field and relation selection. Normal YunCMS read permissions apply.',
+      'Read one item by its complete id with optional field and relation selection. Normal YunCMS read permissions apply.',
       {
         type: 'object',
         properties: {
           collection: { type: 'string' },
-          id: { oneOf: [{ type: 'string' }, { type: 'number' }] },
+          id: {
+            description: 'Complete, unshortened primary key of the item (never truncate UUIDs).',
+            oneOf: [{ type: 'string' }, { type: 'number' }],
+          },
           fields: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' }, maxItems: 100 }] },
           expand: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' }, maxItems: 100 }] },
         },
@@ -169,7 +172,7 @@ function writeToolDefinitions({ deletesEnabled = false } = {}) {
   const tools = [
     toolDefinition(
       'items_create',
-      'Create one YunCMS item. Use only when the user clearly asks to create data. Field permissions, validation, hooks and auditing apply.',
+      'Create one YunCMS item. Call this tool in the current turn whenever the user clearly asks to create data; text alone never creates records. Field permissions, validation, hooks and auditing apply.',
       {
         type: 'object',
         properties: { collection: { type: 'string' }, data: { type: 'object' } },
@@ -178,12 +181,15 @@ function writeToolDefinitions({ deletesEnabled = false } = {}) {
     ),
     toolDefinition(
       'items_update',
-      'Update one YunCMS item by id. Use only when the user clearly asks to change data. Normal permissions and validation apply.',
+      'Update one YunCMS item by its complete id. Call this tool in the current turn whenever the user clearly asks to change data; text alone never updates records. Normal permissions and validation apply.',
       {
         type: 'object',
         properties: {
           collection: { type: 'string' },
-          id: { oneOf: [{ type: 'string' }, { type: 'number' }] },
+          id: {
+            description: 'Complete, unshortened primary key of the item to update (never truncate UUIDs).',
+            oneOf: [{ type: 'string' }, { type: 'number' }],
+          },
           data: { type: 'object' },
         },
         required: ['collection', 'id', 'data'],
@@ -192,12 +198,15 @@ function writeToolDefinitions({ deletesEnabled = false } = {}) {
   ];
   if (deletesEnabled) tools.push(toolDefinition(
       'items_delete',
-      'Delete one YunCMS item by id. Use only when the user explicitly asks to delete that item. Normal delete permissions and hooks apply.',
+      'Delete one YunCMS item by its complete id. Call this tool in the current turn whenever the user explicitly asks to delete that item; text alone never deletes records. Normal delete permissions and hooks apply.',
       {
         type: 'object',
         properties: {
           collection: { type: 'string' },
-          id: { oneOf: [{ type: 'string' }, { type: 'number' }] },
+          id: {
+            description: 'Complete, unshortened primary key of the item to delete (never truncate UUIDs).',
+            oneOf: [{ type: 'string' }, { type: 'number' }],
+          },
         },
         required: ['collection', 'id'],
       },

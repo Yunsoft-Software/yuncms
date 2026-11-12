@@ -323,14 +323,16 @@
   border-bottom-left-radius: 5px;
 }
 
-.ai-operation-list {
+.ai-operation-list,
+.ai-mutation-list {
   max-width: min(760px, 88%);
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.ai-operation {
+.ai-operation,
+.ai-mutation {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -342,7 +344,20 @@
   font-size: 10px;
 }
 
-.ai-operation.success > span:first-child {
+.ai-mutation code {
+  font-size: 10px;
+  color: inherit;
+  background: transparent;
+  padding: 0;
+}
+
+.ai-mutation.none {
+  border-style: dashed;
+  color: var(--studio-text-muted);
+}
+
+.ai-operation.success > span:first-child,
+.ai-mutation.verified > span:first-child {
   color: #22a06b;
   font-weight: 800;
 }
@@ -515,7 +530,8 @@
   }
 
   .ai-message-body,
-  .ai-operation-list {
+  .ai-operation-list,
+  .ai-mutation-list {
     max-width: 94%;
   }
 

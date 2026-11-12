@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiChat, aiSettings, aiStatus } from '../api.js';
 import { AI_ACCESS_MODES, aiAccessFlags } from '../ai-access.js';
 import { trimConversationHistory } from '../ai-history.js';
+import { mutationText, operationText } from '../ai-operations.js';
 import { AiSettingsPanel } from '../components/index.js';
 import { useI18n } from '../i18n.js';
 import { YunsoftSupportCard } from '../components/index.js';
@@ -12,21 +13,6 @@ const STARTER_KEYS = Object.freeze([
   'ai.starterStructure',
   'ai.starterOverview',
 ]);
-
-const OPERATION_KEYS = Object.freeze({
-  schema_list_collections: 'ai.operationCollections',
-  schema_describe_collection: 'ai.operationSchema',
-  items_read_many: 'ai.operationReadMany',
-  items_read_one: 'ai.operationReadOne',
-  items_create: 'ai.operationCreate',
-  items_update: 'ai.operationUpdate',
-  items_delete: 'ai.operationDelete',
-});
-
-function operationText(operation, t) {
-  const key = OPERATION_KEYS[operation?.operation] ?? 'ai.operationGeneric';
-  return t(key, { collection: operation?.collection || t('ai.operationData') });
-}
 
 export function AiScreen() {
   const { locale, t } = useI18n();
@@ -125,6 +111,8 @@ export function AiScreen() {
           role: 'assistant',
           content: result?.message || t('ai.emptyResponse'),
           operations: Array.isArray(result?.operations) ? result.operations : [],
+          mutations: Array.isArray(result?.mutations) ? result.mutations : [],
+          writesEnabled: Boolean(result?.writes_enabled ?? aiAccessFlags(accessMode).allowWrites),
         },
       ]);
     } catch {
@@ -249,6 +237,23 @@ export function AiScreen() {
                   ))}
                 </div>
               )}
+              {message.role === 'assistant' && (message.mutations?.length > 0 || message.writesEnabled) && (
+                <div className="ai-mutation-list" aria-label={t('ai.mutations')}>
+                  {message.mutations?.length > 0 ? (
+                    message.mutations.map((mutation, mutationIndex) => (
+                      <span
+                        key={`${mutation.operation}-${mutation.collection || ''}-${mutation.id ?? ''}-${mutationIndex}`}
+                        className="ai-mutation verified"
+                      >
+                        <span aria-hidden="true">✓</span>
+                        <code>{mutationText(mutation, t)}</code>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="ai-mutation none">{t('ai.noMutations')}</span>
+                  )}
+                </div>
+              )}
             </article>
           ))}
 
@@ -320,4 +325,4 @@ export function AiScreen() {
   );
 }
 
-export { operationText };
+export { mutationText, operationText };

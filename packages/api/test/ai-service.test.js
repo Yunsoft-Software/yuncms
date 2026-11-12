@@ -162,8 +162,12 @@ test('AI assistant sends a protected system prompt and returns a normal chat ans
   assert.match(providerBody.messages[0].content, /current account does not have that access/);
   assert.match(providerBody.messages[0].content, /untrusted data/);
   assert.match(providerBody.messages[0].content, /stored content/);
+  assert.match(providerBody.messages[0].content, /Earlier assistant messages in the conversation omit their historical tool calls/);
+  assert.match(providerBody.messages[0].content, /complete, exact, unshortened record identifiers/);
   assert.equal(providerBody.messages[1].role, 'user');
   assert.equal(providerBody.tools.some((tool) => tool.function.name === 'items_create'), false);
+  const readOne = providerBody.tools.find((tool) => tool.function.name === 'items_read_one');
+  assert.match(readOne.function.parameters.properties.id.description, /never truncate UUIDs/);
 });
 
 test('AI write tool loop requires server capability and per-request write consent', async () => {
@@ -277,6 +281,9 @@ test('AI full mode advertises and executes delete while preserving request accou
   assert.equal(constructed.options.accountability.user, 'user-1');
   assert.equal(providerBodies[0].tools.some((tool) => tool.function.name === 'items_delete'), true);
   assert.match(providerBodies[0].messages[0].content, /without a separate per-operation approval step/);
+  assert.match(providerBodies[0].messages[0].content, /MUST call items_create, items_update or items_delete during this request/);
+  const deleteTool = providerBodies[0].tools.find((tool) => tool.function.name === 'items_delete');
+  assert.match(deleteTool.function.parameters.properties.id.description, /never truncate UUIDs/);
   assert.equal(JSON.parse(providerBodies[1].messages.at(-1).content).data.deleted, true);
 });
 
