@@ -137,11 +137,12 @@ editor; list clipping never truncates stored content.
 Required fields and write-field restrictions are validated by the API. System fields such as creation/update timestamps and users are filled automatically when configured for the collection.
 
 New record and nested relation forms initialize explicit schema defaults,
-including `draft`, boolean `true`/`false` and numeric `0`. A required select
-without an explicit default starts with a selection prompt; the first option
-is never implicitly treated as a publication decision. Editing a stored value,
-including an explicit empty/null value, does not replace it with a new-record
-default.
+including `draft`, boolean `true`/`false` and numeric `0`. Select fields without
+an explicit default—or whose configured default is outside the field's current
+choices—start with an empty selection prompt so the first option is never
+implicitly treated as a publication decision. Editing a stored value, including
+an explicit empty/null value or a legacy value outside current choices,
+preserves the stored value instead of replacing it with a new-record default.
 
 On mobile, records become readable cards rather than forcing the desktop table into a narrow viewport:
 

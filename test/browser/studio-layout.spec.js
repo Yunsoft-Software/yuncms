@@ -79,6 +79,8 @@ test('long content and high-cardinality relations keep bounded rows, full values
 });
 
 test('new record honors native draft and true defaults through a real save and reload', async ({ page, request }) => {
+  const send = nativeSend(request);
+  const customCollection = `studio_select_guard_${crypto.randomUUID().replaceAll('-', '').slice(0, 8)}`;
   await open(page, `/#/content/${fixture.parent}/new`);
   const form = page.locator('.record-editor'); await expect(form).toBeVisible();
   await expect(form.locator('[data-field="status"] select')).toHaveValue('draft');
@@ -95,7 +97,23 @@ test('new record honors native draft and true defaults through a real save and r
     expect((await response.json()).data.status).toBe('draft');
     await page.goto(`/#/content/${fixture.parent}/${item.id}`);
     await expect(page.locator('[data-field="status"] select')).toHaveValue('draft');
-  } finally { expect((await request.delete(`/items/${fixture.parent}/${item.id}`, { headers })).status()).toBe(204); }
+
+    await send('/schema/collections', { method: 'POST', body: { collection: customCollection } });
+    await send(`/schema/collections/${customCollection}/fields`, { method: 'POST', body: { field: 'title', type: 'string', required: true } });
+    await send(`/schema/collections/${customCollection}/fields`, { method: 'POST', body: { field: 'status', type: 'string', required: true, interface: 'select-dropdown', options: { choices: ['published', 'draft'] } } });
+    await send(`/schema/collections/${customCollection}/fields`, { method: 'POST', body: { field: 'stage', type: 'string', interface: 'select-dropdown', options: { choices: ['published', 'draft'] }, defaultValue: 'unlisted_default' } });
+    await page.goto(`/#/content/${customCollection}/new`);
+    const customForm = page.locator('.record-editor'); await expect(customForm).toBeVisible();
+    await expect(customForm.locator('[data-field="status"] select')).toHaveValue('');
+    await expect(customForm.locator('[data-field="stage"] select')).toHaveValue('');
+    const legacy = await send(`/items/${customCollection}`, { method: 'POST', body: { title: 'Legacy stored state', status: 'legacy_review', stage: 'legacy_stage' } });
+    await page.goto(`/#/content/${customCollection}/${legacy.id}`);
+    await expect(page.locator('[data-field="status"] select')).toHaveValue('legacy_review');
+    await expect(page.locator('[data-field="stage"] select')).toHaveValue('legacy_stage');
+  } finally {
+    await request.delete(`/schema/collections/${customCollection}?destructive=true`, { headers });
+    expect((await request.delete(`/items/${fixture.parent}/${item.id}`, { headers })).status()).toBe(204);
+  }
 });
 
 test('field-builder accent labels remain legible in both themes with the default and a custom accent', async ({ page, request }, info) => {

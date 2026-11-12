@@ -368,6 +368,8 @@ function RecordForm({
             const currentValue = values[field.field] ?? '';
             const label = fieldLabel(field);
             const richText = isRichTextField(field);
+            const isDropdown = isSelectDropdownField(field);
+            const choices = isDropdown ? selectChoicesForField(field) : [];
             const FieldTag = richText ? 'div' : 'label';
 
             return (
@@ -400,16 +402,19 @@ function RecordForm({
                     noneLabel={t('common.none')}
                     onChange={(value) => changeValue(field.field, value)}
                   />
-                ) : isSelectDropdownField(field) ? (
+                ) : isDropdown ? (
                   <select
-                    value={values[field.field] ?? ''}
+                    value={currentValue}
                     onChange={(event) => changeValue(field.field, event.currentTarget.value)}
                     required={Boolean(field.required)}
                   >
                     <option value="">{field.required ? t('content.select') : t('common.none')}</option>
-                    {selectChoicesForField(field).map((choice) => (
+                    {choices.map((choice) => (
                       <option key={choice.value} value={choice.value}>{choice.label}</option>
                     ))}
+                    {currentValue && !choices.some((choice) => String(choice.value) === String(currentValue)) && (
+                      <option value={currentValue}>{String(currentValue)}</option>
+                    )}
                   </select>
                 ) : richText ? (
                   <RichTextEditor

@@ -17,17 +17,30 @@ test('new record defaults preserve draft, boolean true, false, zero and empty st
 test('required selects never infer a default from option order and stored values override defaults', () => {
   const field = { type: 'string', field: 'status', required: true, interface: 'select-dropdown', options: { choices: ['published', 'draft'] } };
   assert.equal(inputValueForField(field, undefined), '');
+  assert.equal(inputValueForField({ ...field, schema_metadata: { defaultValue: 'invalid_state' } }, undefined), '');
+  assert.equal(inputValueForField({ ...field, schema_metadata: JSON.stringify({ defaultValue: 'invalid_state' }) }, undefined), '');
+  assert.equal(inputValueForField({ ...field, schema_metadata: { defaultValue: 'draft' } }, undefined), 'draft');
   assert.equal(inputValueForField({ ...field, schema_metadata: { defaultValue: 'draft' } }, 'archived'), 'archived');
   assert.equal(inputValueForField({ ...field, schema_metadata: { defaultValue: 'draft' } }, null), '');
   assert.equal(inputValueForField({ ...field, schema_metadata: '{invalid' }, undefined), '');
   assert.equal(inputValueForField({ type: 'boolean' }, '0'), false);
 });
 
-test('nested forms share typed defaults and preserve existing values', () => {
-  const rel = { key: 'children', kind: 'o2m', primaryKey: 'id', editableFields: [{ field: 'enabled', type: 'boolean', schema_metadata: { defaultValue: true } }] };
-  const draft = buildInitialNestedDraft([rel], { children: [{ id: 1 }, { id: 2, enabled: false }] });
+test('nested forms share typed defaults, reject invalid select defaults on new rows and preserve existing values', () => {
+  const rel = {
+    key: 'children',
+    kind: 'o2m',
+    primaryKey: 'id',
+    editableFields: [
+      { field: 'enabled', type: 'boolean', schema_metadata: { defaultValue: true } },
+      { field: 'state', type: 'string', interface: 'select-dropdown', options: { choices: ['published', 'draft'] }, schema_metadata: { defaultValue: 'unlisted' } },
+    ],
+  };
+  const draft = buildInitialNestedDraft([rel], { children: [{ id: 1 }, { id: 2, enabled: false, state: 'legacy_state' }] });
   assert.equal(draft.children[0].values.enabled, true);
+  assert.equal(draft.children[0].values.state, '');
   assert.equal(draft.children[1].values.enabled, false);
+  assert.equal(draft.children[1].values.state, 'legacy_state');
 });
 
 test('BIGINT serialization preserves exact decimal strings across the entire signed MySQL range', () => {
@@ -42,9 +55,10 @@ test('BIGINT serialization preserves exact decimal strings across the entire sig
   assert.match(users, /outputValueForField\(field, rawValue\)/);
 });
 
-test('record and nested select controls expose an explicit empty choice', () => {
+test('record and nested select controls expose an explicit empty choice and preserve stored out-of-choice values', () => {
   for (const name of ['screens/ContentScreen.jsx', 'components/NestedRelationsEditor.jsx']) {
     const source = readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8');
     assert.match(source, /<option value="">\{(?:field\.)?required \? t\('content.select'\) : t\('common.none'\)\}<\/option>/);
+    assert.match(source, /!choices\.some\(\(choice\) => String\(choice\.value\) === String\((?:currentValue|value)\)\)/);
   }
 });

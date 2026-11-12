@@ -30,11 +30,16 @@ test('Studio typed defaults preserve native schema defaults through real authent
     for (const field of [
       { field: 'title', type: 'string', required: true },
       { field: 'status', type: 'string', required: true, interface: 'select-dropdown', options: { choices: ['published', 'draft'] }, defaultValue: 'draft' },
+      { field: 'review_stage', type: 'string', interface: 'select-dropdown', options: { choices: ['published', 'draft'] }, defaultValue: 'invalid_stage' },
       { field: 'enabled', type: 'boolean', required: true, defaultValue: true },
       { field: 'quantity', type: 'integer', required: true, defaultValue: 0 },
       { field: 'external_counter', type: 'bigint' },
     ]) await send(`/schema/collections/${collection}/fields`, 'POST', field);
     const fields = await send(`/schema/collections/${collection}/fields`);
+    const reviewField = fields.find(field => field.field === 'review_stage');
+    assert.equal(inputValueForField(reviewField, undefined), '');
+    assert.equal(outputValueForField(reviewField, inputValueForField(reviewField, undefined)), null);
+    assert.equal(inputValueForField(reviewField, 'legacy_stage'), 'legacy_stage');
     const payload = Object.fromEntries(fields.filter(field => ['status', 'enabled', 'quantity'].includes(field.field)).map(field => [field.field, outputValueForField(field, inputValueForField(field, undefined))]));
     assert.deepEqual(payload, { status: 'draft', enabled: true, quantity: 0 });
     const record = await send(`/items/${collection}`, 'POST', { title: 'Studio default proof', ...payload });

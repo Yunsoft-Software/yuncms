@@ -1,4 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { inputValueForField } from '../content-field-values.js';
+import { relationPreview } from '../content-presentation.js';
 import { tabRevealDelta, tabTargetIndex } from '../tab-navigation.js';
 
 import { slugifyText } from '../content-relations.js';
@@ -694,5 +696,3 @@ export function NestedRelationCell({ relation, rows = [], files = [], t }) {
 
   return <span className="content-value-empty">—</span>;
 }
-import { inputValueForField } from '../content-field-values.js';
-import { relationPreview } from '../content-presentation.js';
