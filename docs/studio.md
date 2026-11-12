@@ -44,7 +44,7 @@ The visible navigation is not an authorization boundary. Roles and permissions d
 
 When a tool has its own structure, Studio keeps that context nearby. Content shows collection navigation, Files shows asset categories, Data Model shows schema resources, and Access keeps role navigation beside the permission workspace.
 
-On narrow screens the application rail becomes a compact bottom navigation and contextual controls adapt to the available width. Existing record cards, drawers and full-width editing surfaces remain available where a desktop table would be impractical.
+On narrow screens the application rail becomes a compact bottom navigation and contextual controls adapt to the available width. Existing record cards, drawers and full-width editing surfaces remain available where a desktop table would be impractical, and keyboard focus scrolling clears both the fixed header and bottom navigation bar.
 
 The navigation menu keeps Tab and Shift+Tab inside its visible controls, including branding links, across browser keyboard preferences. Escape closes the menu and returns focus to the menu button.
 

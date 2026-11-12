@@ -232,8 +232,12 @@ export function App() {
   }, []);
 
   useLayoutEffect(() => {
-    const resetScroll = () => window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    resetScroll();
+    const resetScroll = () => {
+      const active = document.activeElement;
+      if (active && active !== document.body && active !== document.documentElement) return;
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    };
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     const frame = window.requestAnimationFrame(resetScroll);
     const settledFrame = window.setTimeout(resetScroll, 50);
     return () => {

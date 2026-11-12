@@ -20,6 +20,9 @@ test('Studio mobile shell resets page scroll and never inherits the desktop coll
   assert.match(app, /section-\$\{section\} route-\$\{route\.view \|\| 'list'\}/);
   assert.match(app, /window\.matchMedia\('\(max-width: 1100px\)'\)/);
   assert.match(css, /@media \(max-width: 1100px\)/);
+  assert.match(css, /overflow-x: clip/);
+  assert.doesNotMatch(css, /html,\s*body,\s*#root\s*\{[^}]*overflow-x:\s*hidden/s);
+  assert.match(css, /scroll-padding-bottom:\s*92px/);
   assert.match(css, /grid-template-rows: auto minmax\(0, 1fr\)/);
   assert.match(css, /\.sidebar-brand-row,[\s\S]*justify-content: space-between/);
   assert.match(css, /\.main-content > \.page-header[\s\S]*display: none/);

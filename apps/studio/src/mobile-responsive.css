@@ -7,11 +7,16 @@
 }
 
 @media (max-width: 1100px) {
+  html {
+    scroll-padding-top: 84px;
+    scroll-padding-bottom: 92px;
+  }
+
   html,
   body,
   #root {
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   .studio-shell,
