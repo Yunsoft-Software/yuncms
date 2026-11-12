@@ -46,8 +46,9 @@ node scripts/verify.mjs strict
 ### 2. Complete Source Suite (`npm test`)
 
 - **Scope:** All unit test files across `packages/core`, `packages/api`, `packages/cli`, `packages/extensions-sdk`, and `apps/studio`.
-- **Infrastructure required:** None. Executes all isolated tests and pure mocks across the repository.
+- **Infrastructure required:** None. Executes all isolated tests across the repository.
 - **Behavior:** Passes if all executed tests succeed; skips are permitted for optional infrastructure-dependent suites.
+- **Concurrency tuning:** Set `YUNCMS_TEST_CONCURRENCY=<positive-integer>` (for example `YUNCMS_TEST_CONCURRENCY=2`) on memory-constrained or shared hosts to bound parallel `node --test` worker processes during `fast`, `full`, and `release` runs while keeping MySQL integration suites serialized at concurrency `1`.
 
 ### 3. Release Candidate Suite (`npm run test:release`)
 

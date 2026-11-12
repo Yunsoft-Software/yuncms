@@ -188,3 +188,17 @@ export function isStrictVerificationMode(mode = 'full', env = process.env) {
 }
 
 export const isStrictMode = isStrictVerificationMode;
+
+export function resolveSuiteConcurrency(explicitConcurrency = null, env = process.env) {
+  if (explicitConcurrency != null) return explicitConcurrency;
+  const raw = String(env?.YUNCMS_TEST_CONCURRENCY ?? '').trim();
+  if (!raw) return null;
+  if (!/^[1-9]\d*$/.test(raw)) {
+    throw new Error(`YUNCMS_TEST_CONCURRENCY must be a positive integer (received: '${raw}')`);
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    throw new Error(`YUNCMS_TEST_CONCURRENCY must be a positive integer (received: '${raw}')`);
+  }
+  return parsed;
+}

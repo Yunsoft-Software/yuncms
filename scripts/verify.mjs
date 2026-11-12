@@ -8,6 +8,7 @@ import {
   formatTestSummary,
   isStrictVerificationMode,
   parseTestSummary,
+  resolveSuiteConcurrency,
   validateStrictProfile,
 } from './verification-profile.mjs';
 
@@ -221,7 +222,8 @@ function run(command, args, { label, env = process.env } = {}) {
 
 function runNodeTests(files, label, { concurrency = null, strict = isStrict } = {}) {
   const started = Date.now();
-  const concurrencyArgs = concurrency == null ? [] : [`--test-concurrency=${concurrency}`];
+  const resolvedConcurrency = resolveSuiteConcurrency(concurrency, process.env);
+  const concurrencyArgs = resolvedConcurrency == null ? [] : [`--test-concurrency=${resolvedConcurrency}`];
   const result = spawn(
     process.execPath,
     ['--test', '--test-reporter=tap', ...concurrencyArgs, ...files],
@@ -277,6 +279,13 @@ assertRuntime();
 if (!['fast', 'full', 'release', 'strict'].includes(MODE)) {
   console.error('Usage: node scripts/verify.mjs [fast|full|release|strict]');
   process.exit(2);
+}
+
+try {
+  resolveSuiteConcurrency(null, process.env);
+} catch (error) {
+  console.error(`✗ ${error.message}`);
+  process.exit(1);
 }
 
 if (isStrict) {

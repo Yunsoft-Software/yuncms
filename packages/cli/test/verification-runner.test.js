@@ -9,6 +9,7 @@ import {
   formatTestSummary,
   isStrictVerificationMode,
   parseTestSummary,
+  resolveSuiteConcurrency,
   validateStrictProfile,
 } from '../../../scripts/verification-profile.mjs';
 
@@ -377,4 +378,31 @@ test('pure strict-mode matrix: isStrictVerificationMode enforces flag and mode c
   // 4. Default mode fallback ('full') when mode argument is omitted
   assert.equal(isStrictVerificationMode(undefined, {}), false);
   assert.equal(isStrictVerificationMode(undefined, { YUNCMS_TEST_STRICT: '1' }), false);
+});
+
+test('suite concurrency contract: resolveSuiteConcurrency preserves defaults, explicit overrides, and rejects invalid values', () => {
+  assert.equal(resolveSuiteConcurrency(null, {}), null);
+  assert.equal(resolveSuiteConcurrency(null, { YUNCMS_TEST_CONCURRENCY: '   ' }), null);
+  assert.equal(resolveSuiteConcurrency(null, { YUNCMS_TEST_CONCURRENCY: '2' }), 2);
+  assert.equal(resolveSuiteConcurrency(1, { YUNCMS_TEST_CONCURRENCY: '4' }), 1);
+
+  for (const invalid of ['0', '-1', '1.5', 'auto', '2workers']) {
+    assert.throws(
+      () => resolveSuiteConcurrency(null, { YUNCMS_TEST_CONCURRENCY: invalid }),
+      /YUNCMS_TEST_CONCURRENCY must be a positive integer/,
+    );
+  }
+
+  const invalidRun = spawnSync(
+    process.execPath,
+    ['scripts/verify.mjs', 'fast'],
+    {
+      cwd: ROOT,
+      env: { ...process.env, YUNCMS_TEST_CONCURRENCY: '0' },
+      encoding: 'utf8',
+      timeout: 10_000,
+    },
+  );
+  assert.equal(invalidRun.status, 1);
+  assert.match(invalidRun.stderr, /YUNCMS_TEST_CONCURRENCY must be a positive integer/);
 });
