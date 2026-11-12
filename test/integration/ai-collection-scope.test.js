@@ -59,6 +59,16 @@ test('native AI collection fences cover cached administrators, discovery, relati
   assert.equal((await f.tool(member,'items_create',{collection:f.names.business,data:{title:'Unauthorized member write'}})).status,403);
   const [[audit]]=await f.pool.query('SELECT user FROM yuncms_audit_log WHERE collection=? AND item_key=? AND action=? ORDER BY id DESC LIMIT 1',[f.names.business,id,'items.update']);
   assert.equal(audit.user,f.admin.id);
+  const [[readGrant]]=await f.pool.query("SELECT id FROM yuncms_permissions WHERE role=? AND collection=? AND action='read'",[f.member.role,f.names.business]);
+  assert.equal((await f.request('/permissions/'+readGrant.id,{method:'PATCH',token,body:{filter:{title:{_neq:'Hidden after update'}}}})).status,200);
+  assert.equal((await f.request('/permissions',{method:'POST',token,body:{role:f.member.role,collection:f.names.business,action:'update',fields:['title'],filter:{id:{_eq:id}}}})).status,201);
+  const hiddenUpdate=await f.tool(member,'items_update',{collection:f.names.business,id,data:{title:'Hidden after update'}});
+  assert.equal(hiddenUpdate.status,200,'A completed write remains successful when its result no longer matches the read filter');
+  assert.deepEqual(hiddenUpdate.body.data,{id});
+  assert.equal((await f.request('/items/'+f.names.business+'/'+id,{token:member})).status,404);
+  assert.equal((await f.tool(token,'items_read_one',{collection:f.names.business,id,fields:'id,title'})).body.data.title,'Hidden after update');
+  const [[memberAudit]]=await f.pool.query('SELECT user FROM yuncms_audit_log WHERE collection=? AND item_key=? AND action=? ORDER BY id DESC LIMIT 1',[f.names.business,id,'items.update']);
+  assert.equal(memberAudit.user,f.member.id);
   assert.equal((await f.tool(token,'items_delete',{collection:f.names.business,id})).status,200);
   assert.equal((await f.request('/items/'+f.names.config,{token})).status,200,'The original administrator remains authorized outside AI');
   f.setPolicy(null);

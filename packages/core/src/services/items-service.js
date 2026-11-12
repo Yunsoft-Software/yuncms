@@ -462,7 +462,7 @@ export class ItemsService extends BaseService {
 
   async returnCreatedOrUpdated(id, schema) {
     try {
-      return await this.readOne(id);
+      return await this.readOne(id) ?? { [schema.primary_key]: id };
     } catch (error) {
       if (error?.code !== 'FORBIDDEN') throw error;
       return { [schema.primary_key]: id };
