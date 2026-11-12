@@ -27,6 +27,7 @@ const SAFE_TOOL_ERROR_CODES = new Set([
   'FOREIGN_KEY_MISSING',
   'FOREIGN_KEY_RESTRICTED',
   'DUPLICATE_KEY',
+  'NOT_FOUND',
 ]);
 
 const collectionSchema = z.string()
@@ -258,12 +259,16 @@ export async function executeAiTool(req, name, args, {
   }
   if (name === 'items_update') {
     const input = parseArguments(updateSchema, args);
-    return itemService(req, input.collection).updateOne(input.id, input.data);
+    const item = await itemService(req, input.collection).updateOne(input.id, input.data);
+    if (item == null) throw toolError('NOT_FOUND', 'Item not found');
+    return item;
   }
   if (name === 'items_delete') {
     if (!deletesEnabled) throw toolError('AI_TOOL_FORBIDDEN', 'Assistant delete tools are disabled');
     const input = parseArguments(deleteSchema, args);
-    return { deleted: await itemService(req, input.collection).deleteOne(input.id) };
+    const deleted = await itemService(req, input.collection).deleteOne(input.id);
+    if (!deleted) throw toolError('NOT_FOUND', 'Item not found');
+    return { deleted };
   }
 
   throw toolError('AI_TOOL_UNKNOWN', 'The assistant requested an unknown tool');
@@ -298,8 +303,8 @@ export function serializeAiToolResult(value, maxBytes = 250_000) {
 // Built only from a mutation the native service completed, never from model text.
 export function mutationReceipt(name, args, result) {
   if (name === 'items_create') return { operation: name, collection: args.collection, id: result?.id ?? null };
-  if (name === 'items_update') return { operation: name, collection: args.collection, id: args.id };
-  if (name === 'items_delete') return { operation: name, collection: args.collection, id: result?.deleted ?? args.id };
+  if (name === 'items_update' && result != null) return { operation: name, collection: args.collection, id: args.id };
+  if (name === 'items_delete' && result?.deleted === true) return { operation: name, collection: args.collection, id: args.id };
   return null;
 }
 

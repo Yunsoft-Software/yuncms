@@ -232,8 +232,8 @@ test('AI full mode advertises and executes delete while preserving request accou
     constructor(collection, options) {
       constructed = { collection, options };
     }
-    async deleteOne(id) {
-      return id;
+    async deleteOne() {
+      return true;
     }
   }
   const service = new AiAssistantService({
@@ -277,7 +277,7 @@ test('AI full mode advertises and executes delete while preserving request accou
   assert.equal(constructed.options.accountability.user, 'user-1');
   assert.equal(providerBodies[0].tools.some((tool) => tool.function.name === 'items_delete'), true);
   assert.match(providerBodies[0].messages[0].content, /without a separate per-operation approval step/);
-  assert.match(providerBodies[1].messages.at(-1).content, /article-1/);
+  assert.equal(JSON.parse(providerBodies[1].messages.at(-1).content).data.deleted, true);
 });
 
 test('AI does not advertise writes when the user has not enabled write mode for the request', async () => {

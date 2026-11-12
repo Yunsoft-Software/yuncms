@@ -4,9 +4,23 @@ import test from 'node:test';
 import {
   aiToolDefinitions,
   executeAiTool,
+  mutationReceipt,
   safeAiToolError,
   serializeAiToolResult,
 } from '../src/ai/tools.js';
+
+test('AI mutation receipts reject missing targets and preserve the actual delete key', () => {
+  const args = { collection: 'articles', id: 'article-1' };
+  assert.equal(mutationReceipt('items_update', args, null), null);
+  assert.equal(mutationReceipt('items_update', args, undefined), null);
+  assert.equal(mutationReceipt('items_delete', args, { deleted: false }), null);
+  assert.deepEqual(mutationReceipt('items_delete', args, { deleted: true }), {
+    operation: 'items_delete', collection: 'articles', id: 'article-1',
+  });
+  assert.deepEqual(mutationReceipt('items_delete', { collection: 'articles', id: 0 }, { deleted: true }), {
+    operation: 'items_delete', collection: 'articles', id: 0,
+  });
+});
 
 function fakeRequest(ItemsService = class {}) {
   return {
@@ -93,8 +107,8 @@ test('AI full access preserves accountability while executing a delete', async (
     constructor(collection, options) {
       constructed = { collection, options };
     }
-    async deleteOne(id) {
-      return id;
+    async deleteOne() {
+      return true;
     }
   }
   const req = fakeRequest(ItemsService);
@@ -104,7 +118,7 @@ test('AI full access preserves accountability while executing a delete', async (
   }, { writesEnabled: true, deletesEnabled: true });
   assert.equal(constructed.collection, 'articles');
   assert.equal(constructed.options.accountability, req.accountability);
-  assert.deepEqual(result, { deleted: 'article-1' });
+  assert.deepEqual(result, { deleted: true });
 });
 
 test('AI tool argument validation rejects model-generated unknown properties', async () => {

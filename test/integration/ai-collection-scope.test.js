@@ -45,6 +45,14 @@ test('native AI collection fences cover cached administrators, discovery, relati
   ]));assert.deepEqual(concurrent,Array.from({length:4},()=>[200,403]));
   const created=await f.tool(token,'items_create',{collection:f.names.business,data:{title:'Allowed business create'}});assert.equal(created.status,200);
   const id=created.body.data.id;
+  const missingId=id.split('-')[0];
+  for(const name of ['items_update','items_delete']){
+   const missing=await f.tool(token,name,{collection:f.names.business,id:missingId,...(name==='items_update'?{data:{title:'Must not update'}}:{})});
+   assert.equal(missing.status,404,name+' must reject a nonexistent target');
+   assert.equal(missing.body.errors[0].code,'NOT_FOUND');
+   assert.equal(missing.body.data,undefined);
+   assert.equal((await f.tool(token,'items_read_one',{collection:f.names.business,id,fields:'id,title'})).body.data.title,'Allowed business create');
+  }
   assert.equal((await f.tool(token,'items_update',{collection:f.names.business,id,data:{title:'Allowed business update'}})).status,200);
   assert.equal((await f.tool(token,'items_read_one',{collection:f.names.business,id,fields:'id,title'})).body.data.title,'Allowed business update');
   assert.equal((await f.tool(member,'items_read_many',{collection:f.names.business,fields:'id,title'})).status,200);
