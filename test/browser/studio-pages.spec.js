@@ -65,6 +65,15 @@ for (const { width, height, theme } of profiles) test(`every Studio page renders
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       await expect(page.locator('main .error-banner')).toHaveCount(0);
       await waitForStudioPaint(page, name);
+      const clippedLogos = await page.locator('.studio-brand-logo').evaluateAll(logos => logos.flatMap(logo => {
+        const rect = logo.getBoundingClientRect();
+        if (!rect.width && !rect.height) return [];
+        const brand = logo.closest('.studio-brand')?.getBoundingClientRect();
+        return rect.width < 24 || rect.height < 16 || !brand || rect.top < brand.top - 1 || rect.bottom > brand.bottom + 1 || rect.left < brand.left - 1 || rect.right > brand.right + 1
+          ? [{ src: logo.currentSrc || logo.src, width: rect.width, height: rect.height, top: rect.top, bottom: rect.bottom, brandTop: brand?.top ?? null, brandBottom: brand?.bottom ?? null }]
+          : [];
+      }));
+      expect(clippedLogos, `${name}: brand logos must render unclipped`).toEqual([]);
       if (width <= 1100) {
         await expect(page.getByRole('button', { name: 'Open menu', exact: true })).toBeInViewport();
         await expect(page.locator('.sidebar-brand-row .studio-brand-logo')).toBeInViewport();

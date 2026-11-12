@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { captureStudio } from '../helpers/studio-screenshot.mjs';
 
 const password = 'Browser-flow-fixture-123!';
 async function signIn(request, email = 'flows-admin@example.test') {
@@ -46,7 +47,7 @@ test('administrator chooses independent compatible providers or a custom URL and
     const settings = (await (await request.get('/ai/settings', { headers })).json()).data;
     expect(settings.provider).toEqual(configured); expect(settings.has_api_key).toBe(true);
     expect(JSON.stringify(settings)).not.toContain('Synthetic-provider-browser-key');
-    await page.screenshot({ path: '.yuncms/flows-tests/provider-settings.png', fullPage: true });
+    await captureStudio(page, page, { path: '.yuncms/flows-tests/provider-settings.png', fullPage: true });
     await provider.selectOption('custom'); await base.fill('https://my-compatible.example.test/inference/v1');
     const customSaved = page.waitForResponse(response => response.url().endsWith('/ai/settings') && response.request().method() === 'PATCH');
     await panel.getByRole('button', { name: 'Save settings', exact: true }).click(); expect((await customSaved).status()).toBe(200);

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { captureStudio } from '../helpers/studio-screenshot.mjs';
 
 function messageText(raw) {
   const split = raw.indexOf('\r\n\r\n'), headers = raw.slice(0, split), body = raw.slice(split + 4);
@@ -48,7 +49,7 @@ test('public registration, real SMTP verification and password reset complete th
     for (const width of [320, 390, 820, 1100, 1680]) {
       await guest.setViewportSize({ width, height: 900 }); await expect(guest.locator('.auth-card')).toBeVisible();
       expect(await guest.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-      await guest.screenshot({ path: info.outputPath(`login-${width}.png`), fullPage: true });
+      await captureStudio(guest, guest, { path: info.outputPath(`login-${width}.png`), fullPage: true });
     }
     await guest.getByRole('button', { name: 'Create an account', exact: true }).click();
     await guest.getByLabel('Email', { exact: true }).fill(email); await guest.getByLabel('Password', { exact: true }).fill(password);

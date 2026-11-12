@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { seedStudioLayout, cleanupStudioLayout } from '../helpers/studio-layout-fixture.mjs';
 import { expectReadableText } from '../helpers/studio-contrast.mjs';
+import { captureStudio } from '../helpers/studio-screenshot.mjs';
 
 let fixture, session, headers;
 function nativeSend(request) {
@@ -62,7 +63,7 @@ test('long content and high-cardinality relations keep bounded rows, full values
     await row.getByRole('button', { name: 'Quick edit', exact: true }).scrollIntoViewIfNeeded();
     await expect(row.getByRole('button', { name: 'Quick edit', exact: true })).toBeInViewport({ ratio: 1 });
     await expectContained(page);
-    await page.screenshot({ path: `.yuncms/studio-refresh-20261104/content-${testInfo.project.name}-${theme}.png`, fullPage: true });
+    await captureStudio(page, page, { path: `.yuncms/studio-refresh-20261104/content-${testInfo.project.name}-${theme}.png`, fullPage: true });
     await row.getByRole('button', { name: 'Quick edit', exact: true }).click();
     const inspector = page.getByRole('dialog'); await expect(inspector).toBeVisible();
     await expect(inspector.locator('.record-editor > fieldset [data-field="title"] input')).toHaveValue(fixture.longTitle);
@@ -128,7 +129,7 @@ test('field-builder accent labels remain legible in both themes with the default
       await readable(page.locator('.accountability-option code').first());
       await page.goto(`/#/data-model/${fixture.parent}/fields/new`);
       await readable(page.locator('.field-config-type'));
-      await page.screenshot({ path: info.outputPath(`field-labels-${theme}-${accent.slice(1)}.png`), animations: 'disabled', fullPage: true });
+      await captureStudio(page, page, { path: info.outputPath(`field-labels-${theme}-${accent.slice(1)}.png`), fullPage: true });
       await page.goto(`/#/content/${fixture.parent}/new`);
       await readable(page.locator('.page-breadcrumbs button').first());
     }
@@ -160,7 +161,7 @@ test('native account status and verification labels remain readable in every the
           const badge = page.locator(`.user-detail-page .user-status-pill.${status}`);
           await expect(badge).toHaveText(status[0].toUpperCase() + status.slice(1));
           await expectReadableText(badge);
-          await page.screenshot({ path: info.outputPath(`account-${theme}-${width}-${status}.png`), animations: 'disabled' });
+          await captureStudio(page, page, { path: info.outputPath(`account-${theme}-${width}-${status}.png`) });
         }
         await page.goto('/#/users');
         const row = page.locator('.mobile-user-card, tbody tr').filter({ hasText: user.email }).filter({ visible: true });
@@ -189,12 +190,12 @@ test('all Studio workspaces remain contained on desktop, tablet and mobile with 
       await expect(page.locator('main .error-banner')).toHaveCount(0);
       await expectContained(page);
       if (width === 1440 && ['/files', '/data-model', '/roles', '/appearance', '/flows'].includes(path)) {
-        await page.screenshot({ path: `.yuncms/studio-refresh-20261104/${path.slice(1)}-${testInfo.project.name}.png`, fullPage: true });
+        await captureStudio(page, page, { path: `.yuncms/studio-refresh-20261104/${path.slice(1)}-${testInfo.project.name}.png`, fullPage: true });
       }
       if (path === `/content/${fixture.parent}`) {
         const surface = width <= 1100 ? page.locator('.mobile-record-list') : page.locator('.table-scroll');
         await expect(surface).toBeVisible();
-        await page.screenshot({ path: `.yuncms/studio-refresh-20261104/workspace-${testInfo.project.name}-${width}.png`, fullPage: true });
+        await captureStudio(page, page, { path: `.yuncms/studio-refresh-20261104/workspace-${testInfo.project.name}-${width}.png`, fullPage: true });
       }
       if (path === '/files' && width <= 1100) {
         const title = await page.locator('.file-category-rail-title').boundingBox();
@@ -332,7 +333,7 @@ test('24 languages and 520 native relations stay bounded, remain reachable and s
     const label = picker.locator('.nested-m2m-label').first();
     await expect(label).toHaveAttribute('title', await label.textContent());
     await expectContained(page);
-    await page.screenshot({ path: `.yuncms/studio-refresh-20261104/stress-${info.project.name}-${width}.jpg`, fullPage: true });
+    await captureStudio(page, page, { path: `.yuncms/studio-refresh-20261104/stress-${info.project.name}-${width}.jpg`, fullPage: true });
   }
   const arabicTitle = `عنوان محفوظ عبر واجهة النظام ${crypto.randomUUID()}`;
   await page.locator('.nested-language-card[data-lang="ar-SA"] [data-field="title"] input').fill(arabicTitle);
@@ -369,7 +370,7 @@ test('24 languages and 520 native relations stay bounded, remain reachable and s
     await relation.getByRole('option').click();
     await expect(trigger).toHaveAttribute('title', /Topic 520:/);
     expect(await trigger.evaluate(element => element.getBoundingClientRect().height)).toBeLessThanOrEqual(64);
-    await page.screenshot({ path: info.outputPath(`relation-choice-${width}.png`), animations: 'disabled', fullPage: true });
+    await captureStudio(page, page, { path: info.outputPath(`relation-choice-${width}.png`), fullPage: true });
   }
   const unchanged = await request.get(`/items/${fixture.junction}/${link.id}`, { headers }); expect(unchanged.status()).toBe(200);
   expect((await unchanged.json()).data.topic_id).toBe(link.topic_id);

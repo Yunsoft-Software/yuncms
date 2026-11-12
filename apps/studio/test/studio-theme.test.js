@@ -197,3 +197,14 @@ test('late collection labels and schema refreshes cannot clear an already loaded
   assert.doesNotMatch(schemaEffect, /collectionLabelVersion/);
   assert.match(source, /setLoadedRecordKey\(''\)/);
 });
+
+test('visual browser captures await full logo bitmap decode and finite animations before screenshotting', () => {
+  const helper = readFileSync(new URL('../../../test/helpers/studio-screenshot.mjs', import.meta.url), 'utf8');
+  assert.match(helper, /expect\(page\.locator\('\.studio-boot'\)\)\.toHaveCount\(0\)/);
+  assert.match(helper, /await image\.decode\(\)/);
+  assert.match(helper, /if \(srcAfter !== srcBefore \|\| !image\.complete \|\| image\.naturalWidth === 0\)/);
+  assert.match(helper, /catch \(error\) \{\s*const srcAfter = image\.currentSrc \|\| image\.src;\s*pending\.push\(/);
+  assert.match(helper, /document\.getAnimations/);
+  const pagesSpec = readFileSync(new URL('../../../test/browser/studio-pages.spec.js', import.meta.url), 'utf8');
+  assert.match(pagesSpec, /brand logos must render unclipped/);
+});

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { createWhiteLabelFixture } from '../helpers/white-label-fixture.mjs';
 import { translate } from '../../apps/studio/src/localization.js';
 import { expectReadableText } from '../helpers/studio-contrast.mjs';
+import { captureStudio } from '../helpers/studio-screenshot.mjs';
 
 test('real Free/Premium UI: fixed vendor identity, upgrade discovery, opted-in customer branding and cold anonymous login', async ({ page, browser }, testInfo) => {
   const f = await createWhiteLabelFixture(); let accepted = false;
@@ -37,14 +38,14 @@ test('real Free/Premium UI: fixed vendor identity, upgrade discovery, opted-in c
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       await expectReadableText(page.locator('main .premium-upsell'));
       await expectReadableText(page.locator('.sidebar-footer .premium-upsell'));
-      await page.screenshot({ path: testInfo.outputPath(`free-upgrade-${theme}-1440.png`), fullPage: true });
+      await captureStudio(page, page, { path: testInfo.outputPath(`free-upgrade-${theme}-1440.png`), fullPage: true });
     }
 
     const widths = [320, 390, 768, 820, 1024, 1280, 1920];
     for (const width of widths) {
       await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      await page.screenshot({ path: testInfo.outputPath(`free-appearance-${width}.png`), fullPage: true });
+      await captureStudio(page, page, { path: testInfo.outputPath(`free-appearance-${width}.png`), fullPage: true });
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(f.origin + '/#/features');
@@ -91,7 +92,7 @@ test('real Free/Premium UI: fixed vendor identity, upgrade discovery, opted-in c
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
         await expect(page.getByLabel('Brand name', { exact: true })).toHaveValue('Acme Workspace');
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-        await page.screenshot({ path: testInfo.outputPath(`premium-appearance-${theme}-${width}.png`), fullPage: true });
+        await captureStudio(page, page, { path: testInfo.outputPath(`premium-appearance-${theme}-${width}.png`), fullPage: true });
       }
     }
     const anonymous = await browser.newContext({ viewport: { width: 390, height: 844 } }); contexts.push(anonymous);
@@ -103,7 +104,7 @@ test('real Free/Premium UI: fixed vendor identity, upgrade discovery, opted-in c
     await expect(login.locator('a[href*="yunsoft.com"]')).toHaveCount(0);
     await expect(login.locator('link[data-yuncms-favicon]')).toHaveAttribute('href', 'data:,');
     expect(vendorRequests).toEqual([]);
-    await login.screenshot({ path: testInfo.outputPath('premium-cold-login-390.png'), fullPage: true });
+    await captureStudio(login, login, { path: testInfo.outputPath('premium-cold-login-390.png'), fullPage: true });
     for (const action of ['reset', 'verify']) {
       await login.goto(f.origin + '/?auth_action=' + action + '&token=invalid-test-only-token');
       await expect(login.locator('.auth-card .eyebrow')).toHaveText('Acme Workspace Studio');
@@ -124,7 +125,7 @@ test('real Free/Premium UI: fixed vendor identity, upgrade discovery, opted-in c
     await expect(staff.locator('nav .nav-item-child').filter({ hasText: translate('en', 'nav.appearance') })).toHaveCount(0);
     await expect(staff.locator('.premium-upsell')).toHaveCount(0);
     await expect(staff.locator('.studio-brand').first()).toHaveAttribute('aria-label', 'Acme Workspace');
-    await staff.screenshot({ path: testInfo.outputPath('premium-staff-permission-1280.png'), fullPage: true });
+    await captureStudio(staff, staff, { path: testInfo.outputPath('premium-staff-permission-1280.png'), fullPage: true });
     await page.goto(f.origin + '/#/appearance');
     const longName = 'Acme Türkçe 日本語 Workspace '.repeat(5).slice(0, 100);
     await page.getByLabel('Brand name', { exact: true }).fill(longName);
@@ -136,7 +137,7 @@ test('real Free/Premium UI: fixed vendor identity, upgrade discovery, opted-in c
       await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(await page.locator('.studio-brand-fallback').evaluateAll(elements => elements.every(element => element.getBoundingClientRect().width <= element.parentElement.getBoundingClientRect().width + 1))).toBe(true);
-      await page.screenshot({ path: testInfo.outputPath(`premium-long-brand-${width}.png`), fullPage: true });
+      await captureStudio(page, page, { path: testInfo.outputPath(`premium-long-brand-${width}.png`), fullPage: true });
       if ([320, 820, 1024].includes(width)) {
         const menu = page.getByRole('button', { name: 'Open menu', exact: true });
         const bounds = await page.getByRole('main').boundingBox();
@@ -154,7 +155,7 @@ test('real Free/Premium UI: fixed vendor identity, upgrade discovery, opted-in c
         await page.keyboard.press('Shift+Tab'); await expect(drawer.getByRole('button', { name: 'Sign out', exact: true })).toBeFocused();
         await page.keyboard.press('Tab'); await expect(close).toBeFocused();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-        await page.screenshot({ path: testInfo.outputPath(`premium-long-brand-menu-${width}.png`), fullPage: true });
+        await captureStudio(page, page, { path: testInfo.outputPath(`premium-long-brand-menu-${width}.png`), fullPage: true });
         await page.keyboard.press('Escape'); await expect(drawer).toHaveCount(0); await expect(menu).toBeFocused();
       }
     }

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { FIELD_TYPE_OPTIONS } from '../../apps/studio/src/field-ui.js';
 import { createDatabasePool, loadConfig, quoteIdentifier, withAdvisoryLock } from '@yunsoft/yuncms-core';
+import { captureStudio } from '../helpers/studio-screenshot.mjs';
 
 let session, headers;
 const password = 'Browser-workflow-fixture-123!';
@@ -48,7 +49,7 @@ test('native file upload, preview, metadata editing, download and confirmed dele
     for (const width of [320, 390, 820, 1100, 1680]) {
       await page.setViewportSize({ width, height: 900 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-      await page.screenshot({ path: info.outputPath(`file-${width}.png`), fullPage: true });
+      await captureStudio(page, page, { path: info.outputPath(`file-${width}.png`), fullPage: true });
     }
     await detail.getByRole('button', { name: 'Delete', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -146,7 +147,7 @@ test('Studio creates every supported field type through native schema writes and
       if (['image', 'file'].includes(option.value)) expect(field.interface).toBe(option.value);
       await page.goto(`/#/data-model/${collection}/fields/value_${option.value}`);
       await expect(page.locator('.field-detail-grid')).toContainText('value_' + option.value);
-      await page.screenshot({ path: info.outputPath('field-' + option.value + '.png'), fullPage: true });
+      await captureStudio(page, page, { path: info.outputPath('field-' + option.value + '.png'), fullPage: true });
     }
     await page.goto(`/#/content/${collection}/new`);
     const editor = page.locator('.record-editor');
@@ -182,7 +183,7 @@ test('Studio creates every supported field type through native schema writes and
       await expect(control.locator('select')).toHaveValue('');
       await control.locator('select').selectOption(mediaFile.id);
     }
-    await page.screenshot({ path: info.outputPath('all-fields-editor.png'), fullPage: true });
+    await captureStudio(page, page, { path: info.outputPath('all-fields-editor.png'), fullPage: true });
     await page.goto(`/#/content/${collection}`);
     await expect(page.locator('.table-panel')).toHaveAttribute('aria-busy', 'false');
     await page.locator('.mobile-filter-toggle').click();

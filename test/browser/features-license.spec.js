@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { captureStudio } from '../helpers/studio-screenshot.mjs';
 const collection = 'browser_flow_records';
 async function open(page, request, path = '/#/features', email = 'flows-admin@example.test') {
   const response = await request.post('/auth/login', { data: { email, password: 'Browser-flow-fixture-123!' } });
@@ -84,7 +85,7 @@ test('one browser build activates a real signed license, toggles native endpoint
         await expect(page.getByRole('checkbox', { name: 'Content history', exact: true })).toBeEnabled();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
         await expect(page.locator('.settings-feature-row').first()).toHaveCSS('display', 'flex');
-        await page.screenshot({ path: `.yuncms/v2-development-20261104/screenshots/features-${info.project.name}-${theme}-${width}.png`, fullPage: true, animations: 'disabled' });
+        await captureStudio(page, page, { path: `.yuncms/v2-development-20261104/screenshots/features-${info.project.name}-${theme}-${width}.png`, fullPage: true });
       }
     }
   } finally {
@@ -117,7 +118,7 @@ test('two real editors retain the losing draft on conflict and custom navigation
     for (const width of [360, 820, 1536]) {
       await other.setViewportSize({ width, height: 1000 });
       expect(await other.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-      await other.screenshot({ path: `.yuncms/v2-development-20261104/screenshots/conflict-${info.project.name}-${width}.png`, fullPage: true });
+      await captureStudio(other, other, { path: `.yuncms/v2-development-20261104/screenshots/conflict-${info.project.name}-${width}.png`, fullPage: true });
     }
     await other.locator('.record-editor').getByRole('button', { name: 'Cancel', exact: true }).click();
     const dialog = other.getByRole('dialog'); await expect(dialog).toBeVisible();
@@ -159,7 +160,7 @@ test('Premium administrator history restores a native revision through the same 
         await page.setViewportSize({ width, height: width < 700 ? 844 : 1000 });
         const bounds = await page.getByRole('dialog').evaluate(element => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right }; });
         expect(bounds.left).toBeGreaterThanOrEqual(-1); expect(bounds.right).toBeLessThanOrEqual(width + 1);
-        await page.screenshot({ path: `.yuncms/v2-development-20261104/screenshots/history-${info.project.name}-${theme}-${width}.png`, fullPage: true, animations: 'disabled' });
+        await captureStudio(page, page, { path: `.yuncms/v2-development-20261104/screenshots/history-${info.project.name}-${theme}-${width}.png`, fullPage: true });
       }
       if (theme === 'light') await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
     }
