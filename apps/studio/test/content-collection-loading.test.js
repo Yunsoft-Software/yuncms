@@ -14,3 +14,10 @@ test('collection switches synchronously block stale item loads until the new sch
     /if \(!collection \|\| schemaLoading \|\| schemaLoadingRef\.current \|\| fields\.length === 0\) return;/,
   );
 });
+
+test('cold routed record open derives collection labels without restarting schema or nested relation hydration', () => {
+  assert.match(source, /loadCollectionSchema\(collection\);\s*\}, \[collection, locale\]\);/);
+  assert.match(source, /const collectionNamesByKey = useMemo\(/);
+  assert.match(source, /}, \[record\?\.id, nestedRelationsKey\]\);/);
+  assert.match(source, /if \(creating \|\| route\.view === 'record'\) return;/);
+});

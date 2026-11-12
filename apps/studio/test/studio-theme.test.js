@@ -191,8 +191,9 @@ test('content forms align boolean controls, nested label actions and full-width 
 
 test('late collection labels and schema refreshes cannot clear an already loaded record', () => {
   const source = readFileSync(new URL('../src/screens/ContentScreen.jsx', import.meta.url), 'utf8');
-  const schemaEffect = source.slice(source.indexOf('    setInspectedRecord(null);', source.indexOf('setSearch(searchInput.trim())')), source.indexOf('  }, [collection, locale, collectionLabelVersion]'));
+  const schemaEffect = source.slice(source.indexOf('    setInspectedRecord(null);', source.indexOf('setSearch(searchInput.trim())')), source.indexOf('  }, [collection, locale]'));
   assert.ok(schemaEffect.includes('loadCollectionSchema(collection)'));
   assert.doesNotMatch(schemaEffect, /setEditingRecord/);
+  assert.doesNotMatch(schemaEffect, /collectionLabelVersion/);
   assert.match(source, /setLoadedRecordKey\(''\)/);
 });

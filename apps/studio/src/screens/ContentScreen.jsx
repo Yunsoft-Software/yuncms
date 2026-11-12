@@ -252,6 +252,11 @@ function RecordForm({
     setError('');
   }, [recordValuesKey]);
 
+  const nestedRelationsKey = useMemo(
+    () => (nestedRelations ?? []).map((rel) => `${rel.key}:${rel.kind}:${rel.childCollection ?? ''}:${rel.junctionCollection ?? ''}`).join('|'),
+    [nestedRelations],
+  );
+
   useEffect(() => {
     let active = true;
     setNestedFailed(false);
@@ -293,7 +298,7 @@ function RecordForm({
         if (active) setNestedLoading(false);
       });
     return () => { active = false; };
-  }, [record?.id, nestedRelations]);
+  }, [record?.id, nestedRelationsKey]);
 
   function changeValue(field, value) {
     setValues(current => ({ ...current, [field]: value }));
@@ -489,12 +494,41 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
   let historyEnabled = false;
   try { historyEnabled = (typeof collectionMetadata === 'string' ? JSON.parse(collectionMetadata) : collectionMetadata)?.contentTracking?.history === true; } catch { /* optional metadata */ }
   const collectionLabelVersion = JSON.stringify(collections.map((entry) => [entry.collection, entry.name]));
+  const collectionNamesByKey = useMemo(
+    () => new Map(collections.filter((entry) => entry?.name).map((entry) => [entry.collection, entry.name])),
+    [collectionLabelVersion],
+  );
   const requestVersion = useRef(0);
   const schemaLoadingRef = useRef(true);
-  const [fields, setFields] = useState([]);
+  const [rawFields, setFields] = useState([]);
   const [capabilities, setCapabilities] = useState(null);
   const [relationLookups, setRelationLookups] = useState({});
-  const [nestedRelations, setNestedRelations] = useState([]);
+  const [rawNestedRelations, setNestedRelations] = useState([]);
+  const fields = useMemo(() => {
+    let changed = false;
+    const mapped = rawFields.map((field) => {
+      const targetName = collectionNamesByKey.get(relationLookups[field.field]?.targetCollection);
+      if (targetName && (!field.name || field.name === field.field) && field.name !== targetName) {
+        changed = true;
+        return { ...field, name: targetName };
+      }
+      return field;
+    });
+    return changed ? mapped : rawFields;
+  }, [rawFields, relationLookups, collectionNamesByKey]);
+  const nestedRelations = useMemo(() => {
+    let changed = false;
+    const mapped = rawNestedRelations.map((relation) => {
+      const targetKey = relation.targetCollection || relation.childCollection;
+      const targetName = collectionNamesByKey.get(targetKey);
+      if (targetName && relation.alias === targetKey && relation.alias !== targetName) {
+        changed = true;
+        return { ...relation, alias: targetName };
+      }
+      return relation;
+    });
+    return changed ? mapped : rawNestedRelations;
+  }, [rawNestedRelations, collectionNamesByKey]);
   const [nestedSummaries, setNestedSummaries] = useState({});
   const [files, setFiles] = useState([]);
   const [items, setItems] = useState([]);
@@ -570,16 +604,10 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
         ? await apiRequest('/files').catch(() => ({ data: [] }))
         : { data: [] };
       if (version !== requestVersion.current) return;
-      setFields(loadedFields.map((field) => {
-        const target = collections.find((entry) => entry.collection === lookups[field.field]?.targetCollection);
-        return target?.name && (!field.name || field.name === field.field) ? { ...field, name: target.name } : field;
-      }));
+      setFields(loadedFields);
       setCapabilities(capabilityResponse.data);
       setRelationLookups(lookups);
-      setNestedRelations(discoveredNested.map((relation) => {
-        const target = collections.find((entry) => entry.collection === (relation.targetCollection || relation.childCollection));
-        return target?.name && relation.alias === target.collection ? { ...relation, alias: target.name } : relation;
-      }));
+      setNestedRelations(discoveredNested);
       setFiles(fileResponse?.data ?? []);
     } catch (requestError) {
       if (version !== requestVersion.current) return;
@@ -665,7 +693,7 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
     setOffset(0);
     setNotice('');
     loadCollectionSchema(collection);
-  }, [collection, locale, collectionLabelVersion]);
+  }, [collection, locale]);
 
   useEffect(() => {
     if (route.view !== 'record' || !collection || !route.recordId) {
@@ -694,12 +722,13 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
     apiRequest(`/studio-navigation/collections/${encodeURIComponent(collection)}/capabilities?ids=${encodeURIComponent(JSON.stringify([route.recordId]))}`)
       .then(response => { if (active) setCapabilities(current => ({ ...response.data, records: { ...current?.records, ...response.data.records } })); }).catch(() => { if (active) setCapabilities(null); });
     return () => { active = false; };
-  }, [collection, route.view, route.recordId, fields]);
+  }, [collection, route.view, route.recordId, rawFields]);
 
   useEffect(() => {
     if (!collection || schemaLoading || schemaLoadingRef.current || fields.length === 0) return;
+    if (creating || route.view === 'record') return;
     loadItems(collection, fields);
-  }, [collection, fields, filters, offset, pageSize, schemaLoading, search, sortDirection, sortField]);
+  }, [collection, creating, rawFields, filters, offset, pageSize, route.view, schemaLoading, search, sortDirection, sortField]);
 
   async function removeRecord(record) {
     if (!record?.id || !canWriteContent(capabilities, 'delete', record.id)) return;
@@ -954,15 +983,14 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
           onFileUploaded={registerUploadedFile}
           onCancel={() => onNavigate?.(studioPath.content(collection))}
           onSaved={async () => {
-            await loadItems();
-            onNavigate?.(studioPath.content(collection));
+            if (onNavigate) onNavigate(studioPath.content(collection));
+            else await loadItems();
           }}
         />
         {editing && <ManualFlowActions collection={collection} keys={[editing.id]} onComplete={async () => {
           try {
             const refreshed = (await editRequest(apiRequest)(`/items/${encodeURIComponent(collection)}/${encodeURIComponent(editing.id)}`)).data;
             setEditingRecord(refreshed ? { id: editing.id, ...refreshed } : null);
-            await loadItems();
           }
           catch (failure) { if (failure.status === 404) onNavigate?.(studioPath.content(collection)); else throw failure; }
         }} />}
