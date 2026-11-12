@@ -1,5 +1,6 @@
 import { quoteIdentifier } from './identifier.js';
 import { resolveDynamicVariables } from './dynamic-variables.js';
+import { lookupManyToOneRelation, relationTargetSchema, SCHEMA_SNAPSHOT } from './schema.js';
 
 const QUERY_KEYS = new Set(['fields', 'filter', 'sort', 'limit', 'offset', 'search', 'aggregate', 'groupBy']);
 const FILTER_OPERATORS = new Set([
@@ -117,9 +118,12 @@ export function parseItemsQuery(raw = {}, options = {}) {
     if (!QUERY_KEYS.has(key)) throw queryError(`Unknown query parameter: ${key}`, key);
   }
 
+  const filter = normalizeFilter(raw.filter);
+  if (filter) assertFilterBudget(filter, limits);
+
   const query = {
     fields: normalizeDelimited(raw.fields, 'fields', { maxItems: limits.maxFields }),
-    filter: normalizeFilter(raw.filter),
+    filter,
     sort: normalizeDelimited(raw.sort, 'sort', { maxItems: limits.maxSortFields }),
     limit: normalizeInteger(raw.limit, limits.defaultLimit, { label: 'limit', min: 1, max: limits.maxLimit }),
     offset: normalizeInteger(raw.offset, 0, { label: 'offset', min: 0, max: limits.maxOffset }),
@@ -132,12 +136,138 @@ export function parseItemsQuery(raw = {}, options = {}) {
   return Object.freeze(query);
 }
 
+export function isRelationalFilterKey(key) {
+  return key === '_and' || key === '_or' || !key.startsWith('_');
+}
+
+export function assertFilterBudget(filter, options = {}) {
+  if (filter == null) return null;
+  const maxFilterDepth = options.maxFilterDepth ?? QUERY_LIMITS.maxFilterDepth;
+  const maxFilterNodes = options.maxFilterNodes ?? QUERY_LIMITS.maxFilterNodes;
+  const allowRelational = options.allowRelational !== false;
+  const rootPath = options.path ?? 'filter';
+
+  let nodes = 0;
+  const stack = [{ node: filter, path: rootPath, depth: 1 }];
+
+  while (stack.length > 0) {
+    const { node, path, depth } = stack.pop();
+    if (!node || typeof node !== 'object' || Array.isArray(node)) {
+      throw queryError('Filter node must be an object', path);
+    }
+    if (depth > maxFilterDepth) {
+      throw queryError(`Filter depth cannot exceed ${maxFilterDepth}`, path);
+    }
+    nodes += 1;
+    if (nodes > maxFilterNodes) {
+      throw queryError(`Filter cannot contain more than ${maxFilterNodes} nodes`, path);
+    }
+
+    const entries = Object.entries(node);
+    if (entries.length === 0) {
+      throw queryError('Filter cannot be empty', path);
+    }
+    if (entries.length > maxFilterNodes) {
+      throw queryError(`Filter cannot contain more than ${maxFilterNodes} nodes`, path);
+    }
+
+    const nextFrames = [];
+    for (const [key, value] of entries) {
+      if (key === '_and' || key === '_or') {
+        if (!Array.isArray(value) || value.length === 0) {
+          throw queryError(`${key} requires a non-empty array`, `${path}.${key}`);
+        }
+        const boundedLength = Math.min(value.length, maxFilterNodes + 1);
+        for (let index = 0; index < boundedLength; index += 1) {
+          nextFrames.push({
+            node: value[index],
+            path: `${path}.${key}.${index}`,
+            depth: depth + 1,
+          });
+        }
+        continue;
+      }
+
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw queryError('Field filters must be operator objects', `${path}.${key}`);
+      }
+      const fieldEntries = Object.entries(value);
+      if (fieldEntries.length === 0) {
+        throw queryError('Field filter cannot be empty', `${path}.${key}`);
+      }
+      if (fieldEntries.length > maxFilterNodes) {
+        throw queryError(`Filter cannot contain more than ${maxFilterNodes} nodes`, `${path}.${key}`);
+      }
+
+      const relationalEntries = [];
+      for (const [subKey, subValue] of fieldEntries) {
+        if (FILTER_OPERATORS.has(subKey)) continue;
+        if (allowRelational && isRelationalFilterKey(subKey)) {
+          relationalEntries.push([subKey, subValue]);
+        }
+      }
+      if (relationalEntries.length > 0) {
+        nextFrames.push({
+          node: Object.fromEntries(relationalEntries),
+          path: `${path}.${key}`,
+          depth: depth + 1,
+        });
+      }
+    }
+
+    for (let index = nextFrames.length - 1; index >= 0; index -= 1) {
+      stack.push(nextFrames[index]);
+    }
+  }
+
+  return filter;
+}
+
+function filterRelationStats(rootNode) {
+  const state = { count: 0, maxDepth: 0, visited: 0 };
+  if (!rootNode || typeof rootNode !== 'object' || Array.isArray(rootNode)) return state;
+  const stack = [{ node: rootNode, depth: 1, relationDepth: 0 }];
+  while (stack.length > 0) {
+    const { node, depth, relationDepth } = stack.pop();
+    if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
+    if (depth > QUERY_LIMITS.maxFilterDepth) continue;
+    state.visited += 1;
+    if (state.visited > QUERY_LIMITS.maxFilterNodes) break;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === '_and' || key === '_or') {
+        if (Array.isArray(value)) {
+          const boundedLength = Math.min(value.length, QUERY_LIMITS.maxFilterNodes);
+          for (let index = boundedLength - 1; index >= 0; index -= 1) {
+            stack.push({ node: value[index], depth: depth + 1, relationDepth });
+          }
+        }
+        continue;
+      }
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const relationalEntries = Object.entries(value).filter(([subKey]) => isRelationalFilterKey(subKey));
+      if (relationalEntries.length === 0) continue;
+      const nextRelationDepth = relationDepth + 1;
+      state.count += 1;
+      if (nextRelationDepth > state.maxDepth) state.maxDepth = nextRelationDepth;
+      if (nextRelationDepth < QUERY_LIMITS.maxRelationDepth) {
+        stack.push({
+          node: Object.fromEntries(relationalEntries),
+          depth: depth + 1,
+          relationDepth: nextRelationDepth,
+        });
+      }
+    }
+  }
+  return state;
+}
+
 export function queryCost(query, { relationDepth = 0, relationCount = 0 } = {}) {
+  const filterRelations = query?.filter ? filterRelationStats(query.filter) : { count: 0, maxDepth: 0 };
   let cost = 1 + Number(query?.limit ?? QUERY_LIMITS.defaultLimit);
   cost += (query?.fields?.length ?? 0) * 2;
   cost += (query?.sort?.length ?? 0) * 5;
-  cost += relationCount * 50;
-  cost += relationDepth * 100;
+  cost += (relationCount + filterRelations.count) * 50;
+  cost += Math.max(relationDepth, filterRelations.maxDepth) * 100;
   if (query?.search) cost += 100;
   if (query?.aggregate) cost += 250 + Object.values(query.aggregate).flat().length * 25;
   return cost;
@@ -293,7 +423,17 @@ function compileOperator(fieldSql, operator, value, path, limits, field) {
   }
 }
 
-function compileFilterObject(filter, schema, path, limits, state, depth) {
+function compileFilterObject(
+  filter,
+  schema,
+  path,
+  limits,
+  state,
+  depth,
+  relationDepth = 0,
+  qualifier = null,
+  snapshot = null,
+) {
   if (!filter || typeof filter !== 'object' || Array.isArray(filter)) throw queryError('Filter node must be an object', path);
   if (depth > limits.maxFilterDepth) throw queryError(`Filter depth cannot exceed ${limits.maxFilterDepth}`, path);
   state.nodes += 1;
@@ -304,21 +444,127 @@ function compileFilterObject(filter, schema, path, limits, state, depth) {
   for (const [key, value] of Object.entries(filter)) {
     if (key === '_and' || key === '_or') {
       if (!Array.isArray(value) || value.length === 0) throw queryError(`${key} requires a non-empty array`, `${path}.${key}`);
-      const children = value.map((child, index) => compileFilterObject(child, schema, `${path}.${key}.${index}`, limits, state, depth + 1));
+      const children = value.map((child, index) => compileFilterObject(
+        child,
+        schema,
+        `${path}.${key}.${index}`,
+        limits,
+        state,
+        depth + 1,
+        relationDepth,
+        qualifier,
+        snapshot,
+      ));
       fragments.push(`(${children.map((child) => child.sql).join(key === '_and' ? ' AND ' : ' OR ')})`);
       for (const child of children) params.push(...child.params);
       continue;
     }
     const field = resolveField(schema, key, `${path}.${key}`);
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw queryError('Field filters must be operator objects', `${path}.${key}`);
-    const fieldSql = quoteIdentifier(key, 'field name');
+    const entries = Object.entries(value);
+    if (entries.length === 0) throw queryError('Field filter cannot be empty', `${path}.${key}`);
+
+    const scalarEntries = [];
+    const relationalEntries = [];
+    for (const [subKey, subValue] of entries) {
+      if (FILTER_OPERATORS.has(subKey)) {
+        scalarEntries.push([subKey, subValue]);
+      } else if (isRelationalFilterKey(subKey)) {
+        relationalEntries.push([subKey, subValue]);
+      } else {
+        throw queryError(`Unknown filter operator: ${subKey}`, `${path}.${key}.${subKey}`);
+      }
+    }
+
+    const fieldSql = qualifier
+      ? `${qualifier}.${quoteIdentifier(key, 'field name')}`
+      : quoteIdentifier(key, 'field name');
     const fieldFragments = [];
-    for (const [operator, operatorValue] of Object.entries(value)) {
+    for (const [operator, operatorValue] of scalarEntries) {
       const compiled = compileOperator(fieldSql, operator, operatorValue, `${path}.${key}.${operator}`, limits, field);
       fieldFragments.push(compiled.sql);
       params.push(...compiled.params);
     }
-    if (fieldFragments.length === 0) throw queryError('Field filter cannot be empty', `${path}.${key}`);
+
+    if (relationalEntries.length > 0) {
+      const relation = limits.allowRelational !== false && schema?.collection
+        ? lookupManyToOneRelation(snapshot, schema.collection, key)
+        : null;
+      if (!relation) {
+        const [firstKey] = relationalEntries[0];
+        throw queryError(`Unknown filter operator: ${firstKey}`, `${path}.${key}.${firstKey}`);
+      }
+      const nextRelationDepth = relationDepth + 1;
+      if (nextRelationDepth > limits.maxRelationDepth) {
+        throw queryError(`Filter relation depth cannot exceed ${limits.maxRelationDepth}`, `${path}.${key}`);
+      }
+      const baseTargetSchema = relationTargetSchema(snapshot, relation.one_collection);
+      if (!baseTargetSchema) {
+        throw queryError(`Relation target is not filterable: ${relation.one_collection}`, `${path}.${key}`);
+      }
+      const relatedScope = typeof limits.resolveRelatedScope === 'function'
+        ? limits.resolveRelatedScope(relation, `${path}.${key}`, baseTargetSchema)
+        : null;
+      const targetSchema = relatedScope?.schema ?? baseTargetSchema;
+      const targetPermissionFilter = relatedScope?.permissionFilter ?? null;
+
+      const aliasSql = quoteIdentifier(`__yrel_${++state.aliasCounter}`, 'relation filter alias');
+      const outerFieldSql = qualifier
+        ? `${qualifier}.${quoteIdentifier(key, 'field name')}`
+        : `${quoteIdentifier(schema.collection, 'collection name')}.${quoteIdentifier(key, 'field name')}`;
+      const targetKey = relation.one_field || baseTargetSchema.primary_key || 'id';
+      const targetKeySql = `${aliasSql}.${quoteIdentifier(targetKey, 'field name')}`;
+      const targetTableSql = quoteIdentifier(relation.one_collection, 'collection name');
+      const targetFromSql = state.rootCollection && relation.one_collection === state.rootCollection
+        ? `(SELECT * FROM ${targetTableSql} LIMIT 18446744073709551615) AS ${aliasSql}`
+        : `${targetTableSql} AS ${aliasSql}`;
+
+      const innerClauses = [`${targetKeySql} = ${outerFieldSql}`];
+      if (targetPermissionFilter) {
+        const resolvedPermissionFilter = resolveDynamicVariables(
+          targetPermissionFilter,
+          limits.dynamicVariables ?? {},
+          {
+            allowUnresolved: limits.allowUnresolvedDynamicVariables,
+            path: `${path}.${key}`,
+          },
+        );
+        const permissionLimits = {
+          ...limits,
+          resolveRelatedScope: null,
+          maxFilterNodes: limits.maxFilterNodes + QUERY_LIMITS.maxFilterNodes,
+        };
+        const compiledPermission = compileFilterObject(
+          resolvedPermissionFilter,
+          baseTargetSchema,
+          `${path}.${key}`,
+          permissionLimits,
+          state,
+          1,
+          nextRelationDepth,
+          aliasSql,
+          snapshot,
+        );
+        innerClauses.push(`(${compiledPermission.sql})`);
+        params.push(...compiledPermission.params);
+      }
+
+      const compiledRelated = compileFilterObject(
+        Object.fromEntries(relationalEntries),
+        targetSchema,
+        `${path}.${key}`,
+        limits,
+        state,
+        depth + 1,
+        nextRelationDepth,
+        aliasSql,
+        snapshot,
+      );
+      innerClauses.push(`(${compiledRelated.sql})`);
+      params.push(...compiledRelated.params);
+      fieldFragments.push(`EXISTS (SELECT 1 FROM ${targetFromSql} WHERE ${innerClauses.join(' AND ')})`);
+    }
+
     fragments.push(`(${fieldFragments.join(' AND ')})`);
   }
   if (fragments.length === 0) throw queryError('Filter cannot be empty', path);
@@ -330,13 +576,30 @@ export function compileFilter(filter, schema, options = {}) {
   const {
     dynamicVariables = {},
     allowUnresolvedDynamicVariables = false,
+    allowRelational = true,
+    schemaSnapshot = null,
+    resolveRelatedScope = null,
     ...limitOptions
   } = options;
-  const limits = { ...QUERY_LIMITS, ...limitOptions, allowUnresolvedDynamicVariables };
+  const snapshot = schemaSnapshot ?? schema?.[SCHEMA_SNAPSHOT] ?? null;
+  const limits = {
+    ...QUERY_LIMITS,
+    ...limitOptions,
+    dynamicVariables,
+    allowUnresolvedDynamicVariables,
+    allowRelational,
+    resolveRelatedScope,
+  };
+  assertFilterBudget(filter, limits);
   const resolvedFilter = resolveDynamicVariables(filter, dynamicVariables, {
     allowUnresolved: allowUnresolvedDynamicVariables,
     path: 'filter',
   });
-  const compiled = compileFilterObject(resolvedFilter, schema, 'filter', limits, { nodes: 0 }, 1);
+  const state = {
+    nodes: 0,
+    aliasCounter: 0,
+    rootCollection: schema?.collection ?? null,
+  };
+  const compiled = compileFilterObject(resolvedFilter, schema, 'filter', limits, state, 1, 0, null, snapshot);
   return { sql: ` WHERE ${compiled.sql}`, params: compiled.params };
 }

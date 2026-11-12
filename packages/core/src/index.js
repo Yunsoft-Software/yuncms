@@ -93,7 +93,7 @@ export { StudioSettingsService, STUDIO_SETTING_DEFAULTS } from './services/studi
 export { StudioSchemaService } from './services/studio-schema-service.js';
 export { NavigationGroupsService } from './services/navigation-groups-service.js';
 export { SchemaMetadataRepository } from './schema-metadata-repository.js';
-export { loadSchemaSnapshot, SchemaCache } from './schema.js';
+export { attachSchemaSnapshot, loadSchemaSnapshot, SchemaCache, SCHEMA_SNAPSHOT } from './schema.js';
 export { assertFieldType, compileFieldColumn } from './field-types.js';
 export {
   COLLECTION_SYSTEM_FIELDS,
@@ -113,6 +113,7 @@ export {
 export {
   QUERY_LIMITS,
   parseItemsQuery,
+  assertFilterBudget,
   queryCost,
   assertQueryCost,
   compileSelectFields,

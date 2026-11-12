@@ -54,7 +54,7 @@ function evaluateNode(record, node) {
 
 export function assertPermissionValidationRule(rule, schema) {
   if (rule == null) return null;
-  compileFilter(rule, schema, { allowUnresolvedDynamicVariables: true });
+  compileFilter(rule, schema, { allowUnresolvedDynamicVariables: true, allowRelational: false });
   return rule;
 }
 

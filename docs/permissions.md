@@ -150,7 +150,19 @@ Example intent:
 
 The server applies the permission row filter first and combines it with the caller's own `filter` using `AND`. A caller cannot use `_or` or another query expression to widen the role's permitted data.
 
-Fields used by caller `fields`, `filter`, `sort`, search and aggregate operations are checked against effective readability. Hidden fields are not silently used to broaden a query.
+Permission row filters (`read`, `update`, `delete`) also support bounded M2O relational predicates across declared foreign-key fields (up to 4 hops). For example, to expose a child translation collection (`articles_translations.articles_id -> articles.id`) publicly only when its parent article is published, without denormalizing `status` onto the child table, configure the Public `read` row filter in Studio's **Advanced JSON** mode or via `/permissions`:
+
+```json
+{
+  "articles_id": {
+    "status": { "_eq": "published" }
+  }
+}
+```
+
+Administrator-authored permission row filters are evaluated against the current schema snapshot (enforcing parent scope even when the role has a restricted field allowlist or no direct `read` grant on the parent collection). If a referenced relation or target field is later removed from the schema, the permission filter fails closed (`INVALID_QUERY`) rather than widening access.
+
+Fields used by caller `fields`, `filter`, `sort`, search and aggregate operations are checked against effective readability. Hidden fields and unpermitted related rows are not used to broaden a query or act as a cross-collection oracle.
 
 ## Create/update field allowlists
 
@@ -174,7 +186,7 @@ For create, YunCMS evaluates the candidate record containing generated primary k
 
 For update, the service loads the currently permitted row, applies the patch plus generated update metadata, then validates the resulting candidate before mutation.
 
-A failed rule returns `VALIDATION_FAILED`. Large bulk validation is bounded; requests beyond the supported candidate limit fail instead of silently skipping validation.
+A failed rule returns `VALIDATION_FAILED`. Prospective-record `validation` rules evaluate scalar fields of the candidate write payload only; relational M2O predicates belong in `read` / `update` / `delete` row `filter` rules and are rejected in `validation` with `INVALID_QUERY`. Large bulk validation is bounded; requests beyond the supported candidate limit fail instead of silently skipping validation.
 
 ## Relation permissions
 

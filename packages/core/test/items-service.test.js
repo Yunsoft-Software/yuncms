@@ -306,3 +306,116 @@ test('ISO datetime and timestamp values are converted across single and bulk mut
     new Date(timestampIso).toISOString(),
   ]);
 });
+
+test('deep and wide filters are rejected by iterative budget checks before any permission or metadata pre-scan', async () => {
+  const relationalSchema = {
+    version: 1,
+    collections: {
+      articles: {
+        collection: 'articles',
+        primary_key: 'id',
+        fields: {
+          id: { field: 'id', type: 'uuid' },
+          status: { field: 'status', type: 'string' },
+        },
+      },
+      articles_translations: {
+        collection: 'articles_translations',
+        primary_key: 'id',
+        fields: {
+          id: { field: 'id', type: 'uuid' },
+          articles_id: { field: 'articles_id', type: 'uuid' },
+          title: { field: 'title', type: 'string' },
+        },
+      },
+    },
+    relations: [
+      {
+        many_collection: 'articles_translations',
+        many_field: 'articles_id',
+        one_collection: 'articles',
+        one_field: 'id',
+      },
+    ],
+  };
+
+  let deepLogical = { articles_id: { status: { _eq: 'published' } } };
+  for (let index = 0; index < 15_000; index += 1) {
+    deepLogical = { _and: [deepLogical] };
+  }
+
+  let deepRelational = { status: { _eq: 'published' } };
+  for (let index = 0; index < 15_000; index += 1) {
+    deepRelational = { articles_id: deepRelational };
+  }
+
+  let deepScalarValue = 'published';
+  for (let index = 0; index < 15_000; index += 1) {
+    deepScalarValue = [deepScalarValue];
+  }
+  const deepScalarFilter = { title: { _eq: deepScalarValue } };
+
+  const wideRelational = {
+    _or: Array.from({ length: 500 }, (_, index) => ({
+      articles_id: { status: { _eq: `state-${index}` } },
+    })),
+  };
+
+  let schemaGetCalls = 0;
+  const databaseCalls = [];
+  const database = {
+    async query(sql, params) {
+      databaseCalls.push({ sql, params });
+      throw new Error('Database must not be queried before filter budget validation');
+    },
+  };
+  const schemaCache = {
+    async get() {
+      schemaGetCalls += 1;
+      return relationalSchema;
+    },
+  };
+
+  const service = new ItemsService('articles_translations', {
+    database,
+    schemaCache,
+    accountability: { user: 'user-1', role: 'role-1', admin: false, system: false },
+  });
+
+  for (const adversarialFilter of [deepLogical, deepRelational, wideRelational]) {
+    await assert.rejects(
+      () => service.readMany({ filter: adversarialFilter }),
+      (error) => error.code === 'INVALID_QUERY',
+    );
+    await assert.rejects(
+      () => service.updateMany(adversarialFilter, { title: 'Updated' }),
+      (error) => error.code === 'INVALID_QUERY',
+    );
+    await assert.rejects(
+      () => service.deleteMany(adversarialFilter),
+      (error) => error.code === 'INVALID_QUERY',
+    );
+  }
+
+  assert.equal(databaseCalls.length, 0, 'zero permission or SQL queries may run for out-of-budget filters');
+  assert.equal(schemaGetCalls <= 3, true, 'readMany getCollectionSchema runs once before normalizeReadQuery, never scanning relations');
+
+  // Also verify compileActionFilters directly rejects 15,000-level deep trees and deep scalar values with zero DB calls.
+  const directService = new ItemsService('articles_translations', {
+    database,
+    schema: relationalSchema,
+    accountability: { user: 'user-1', role: 'role-1', admin: false, system: false },
+  });
+  for (const adversarialFilter of [deepLogical, deepRelational, wideRelational, deepScalarFilter]) {
+    await assert.rejects(
+      () => directService.compileActionFilters(
+        adversarialFilter,
+        null,
+        relationalSchema.collections.articles_translations,
+        relationalSchema.collections.articles_translations,
+      ),
+      (error) => error.code === 'INVALID_QUERY',
+    );
+  }
+  assert.equal(databaseCalls.length, 0);
+});

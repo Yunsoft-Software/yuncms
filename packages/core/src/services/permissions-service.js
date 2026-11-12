@@ -3,7 +3,7 @@ import { isAccountabilityCollectionDenied } from '../accountability.js';
 
 import { assertPermissionValidationRule } from '../permission-validation.js';
 import { compileFilter } from '../query.js';
-import { SchemaCache } from '../schema.js';
+import { attachSchemaSnapshot, SchemaCache } from '../schema.js';
 import { dispatchAfterCommit } from '../transaction.js';
 import {
   assertSystemPermissionPayload,
@@ -111,7 +111,7 @@ export class PermissionsService extends BaseService {
       error.code = 'COLLECTION_NOT_FOUND';
       throw error;
     }
-    return collectionSchema;
+    return attachSchemaSnapshot(collectionSchema, snapshot);
   }
 
   async resolve(action, collection) {

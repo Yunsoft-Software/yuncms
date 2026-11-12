@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 
 import { compileFieldColumn } from '../src/field-types.js';
 import {
+  assertQueryCost,
   compileFilter,
   compileSelectFields,
   compileSort,
   parseItemsQuery,
+  queryCost,
   QUERY_LIMITS,
 } from '../src/query.js';
+import { attachSchemaSnapshot } from '../src/schema.js';
 
 const schema = {
   fields: {
@@ -186,4 +189,139 @@ test('datetime comparisons normalize ISO offsets using trusted field types and b
     }
   }
   assert.deepEqual(compileFilter({ text: { _eq: '2026-08-31T04:56:17.687Z' } }, dates).params, ['2026-08-31T04:56:17.687Z']);
+});
+
+test('filter compiler supports bounded M2O relational predicates, self-joins and native user safety', () => {
+  const relationalSnapshot = {
+    version: 1,
+    collections: {
+      articles: {
+        collection: 'articles',
+        primary_key: 'id',
+        fields: {
+          id: { field: 'id', type: 'uuid' },
+          status: { field: 'status', type: 'string' },
+          author_id: { field: 'author_id', type: 'uuid' },
+          category_id: { field: 'category_id', type: 'uuid' },
+        },
+      },
+      articles_translations: {
+        collection: 'articles_translations',
+        primary_key: 'id',
+        fields: {
+          id: { field: 'id', type: 'uuid' },
+          articles_id: { field: 'articles_id', type: 'uuid' },
+          languages_code: { field: 'languages_code', type: 'string' },
+          title: { field: 'title', type: 'string' },
+        },
+      },
+      categories: {
+        collection: 'categories',
+        primary_key: 'id',
+        fields: {
+          id: { field: 'id', type: 'uuid' },
+          parent_id: { field: 'parent_id', type: 'uuid' },
+          status: { field: 'status', type: 'string' },
+        },
+      },
+      yuncms_users: {
+        collection: 'yuncms_users',
+        primary_key: 'id',
+        system: true,
+        fields: {
+          id: { field: 'id', type: 'uuid' },
+          email: { field: 'email', type: 'string' },
+          status: { field: 'status', type: 'string' },
+          password_hash: { field: 'password_hash', type: 'string' },
+        },
+      },
+    },
+    relations: [
+      { many_collection: 'articles_translations', many_field: 'articles_id', one_collection: 'articles', one_field: 'id' },
+      { many_collection: 'articles', many_field: 'author_id', one_collection: 'yuncms_users', one_field: 'id' },
+      { many_collection: 'articles', many_field: 'category_id', one_collection: 'categories', one_field: 'id' },
+      { many_collection: 'categories', many_field: 'parent_id', one_collection: 'categories', one_field: 'id' },
+    ],
+  };
+
+  const childSchema = attachSchemaSnapshot(
+    relationalSnapshot.collections.articles_translations,
+    relationalSnapshot,
+  );
+
+  const singleHop = compileFilter({
+    articles_id: { status: { _eq: 'published' } },
+  }, childSchema);
+  assert.equal(
+    singleHop.sql,
+    ' WHERE (EXISTS (SELECT 1 FROM `articles` AS `__yrel_1` WHERE `__yrel_1`.`id` = `articles_translations`.`articles_id` AND ((`__yrel_1`.`status` = ?))))',
+  );
+  assert.deepEqual(singleHop.params, ['published']);
+
+  const mixedMultiHop = compileFilter({
+    articles_id: {
+      _nnull: true,
+      _or: [
+        { status: { _eq: 'published' } },
+        { author_id: { email: { _ends_with: '@example.com' } } },
+      ],
+    },
+  }, childSchema);
+  assert.match(mixedMultiHop.sql, /`articles_id` IS NOT NULL AND EXISTS \(SELECT 1 FROM `articles` AS `__yrel_1`/);
+  assert.match(mixedMultiHop.sql, /EXISTS \(SELECT 1 FROM `yuncms_users` AS `__yrel_2` WHERE `__yrel_2`\.`id` = `__yrel_1`\.`author_id`/);
+  assert.deepEqual(mixedMultiHop.params, ['published', '%@example.com']);
+
+  const categorySchema = attachSchemaSnapshot(
+    relationalSnapshot.collections.categories,
+    relationalSnapshot,
+  );
+  const selfJoin = compileFilter({
+    parent_id: { status: { _eq: 'published' } },
+  }, categorySchema);
+  assert.match(
+    selfJoin.sql,
+    /EXISTS \(SELECT 1 FROM \(SELECT \* FROM `categories` LIMIT 18446744073709551615\) AS `__yrel_1` WHERE `__yrel_1`\.`id` = `categories`\.`parent_id`/,
+  );
+
+  assert.throws(
+    () => compileFilter({
+      articles_id: { author_id: { password_hash: { _starts_with: '$scrypt' } } },
+    }, childSchema),
+    (error) => error.code === 'INVALID_QUERY' && error.path === 'filter.articles_id.author_id.password_hash',
+  );
+
+  assert.throws(
+    () => compileFilter({
+      title: { status: { _eq: 'published' } },
+    }, childSchema),
+    (error) => error.code === 'INVALID_QUERY' && error.path === 'filter.title.status' && /Unknown filter operator/.test(error.message),
+  );
+
+  assert.throws(
+    () => compileFilter({
+      articles_id: { _sql: '1=1' },
+    }, childSchema),
+    (error) => error.code === 'INVALID_QUERY' && error.path === 'filter.articles_id._sql',
+  );
+
+  const fourHops = {
+    parent_id: { parent_id: { parent_id: { parent_id: { status: { _eq: 'published' } } } } },
+  };
+  assert.equal(compileFilter(fourHops, categorySchema).params.length, 1);
+
+  const fiveHops = {
+    parent_id: fourHops,
+  };
+  assert.throws(
+    () => compileFilter(fiveHops, categorySchema),
+    (error) => error.code === 'INVALID_QUERY' && /Filter relation depth cannot exceed/.test(error.message),
+  );
+
+  const flatCost = queryCost({ limit: 10, filter: { status: { _eq: 'published' } } });
+  const relCost = queryCost({ limit: 10, filter: { articles_id: { category_id: { status: { _eq: 'published' } } } } });
+  assert.equal(relCost - flatCost, 2 * 50 + 2 * 100);
+  assert.throws(
+    () => assertQueryCost({ limit: 500, filter: fourHops }, { maxCost: 600 }),
+    (error) => error.code === 'QUERY_COST_LIMIT',
+  );
 });

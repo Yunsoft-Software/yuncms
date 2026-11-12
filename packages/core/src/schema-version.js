@@ -1,3 +1,11 @@
+import { dispatchAfterCommit } from './transaction.js';
+
+let localSchemaMutationEpoch = 0;
+
+export function currentLocalSchemaEpoch() {
+  return localSchemaMutationEpoch;
+}
+
 export async function readSchemaVersion(database) {
   const [rows] = await database.query('SELECT version FROM yuncms_schema_state WHERE id = 1 LIMIT 1');
   if (!rows?.[0]) {
@@ -16,6 +24,10 @@ export async function incrementSchemaVersion(database) {
     error.code = 'SCHEMA_STATE_MISSING';
     throw error;
   }
+  localSchemaMutationEpoch += 1;
+  await dispatchAfterCommit(database, () => {
+    localSchemaMutationEpoch += 1;
+  });
 
   return readSchemaVersion(database);
 }

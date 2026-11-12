@@ -1,6 +1,6 @@
 import { BaseService } from './base-service.js';
 import { PermissionsService } from './permissions-service.js';
-import { SchemaCache } from '../schema.js';
+import { attachSchemaSnapshot, SchemaCache } from '../schema.js';
 import { ItemsService } from './items-service.js';
 import { NATIVE_REFERENCE_TARGETS } from '../native-reference.js';
 import { compileFilter } from '../query.js';
@@ -39,7 +39,7 @@ export class StudioSchemaService extends BaseService {
       const filters = [{ [entry.primary_key]: { _in: ids } }];
       if (read.filter) filters.push(read.filter);
       if (permission.filter) filters.push(permission.filter);
-      const compiled = compileFilter({ _and: filters }, entry, { dynamicVariables: items.dynamicVariables() });
+      const compiled = compileFilter({ _and: filters }, attachSchemaSnapshot(entry, schema), { dynamicVariables: items.dynamicVariables() });
       const [rows] = await this.database.query(`SELECT ${quoteIdentifier(entry.primary_key)} AS record_key FROM ${quoteIdentifier(entry.collection)}${compiled.sql}`, compiled.params);
       for (const row of rows) {
         const key = ids.find(id => String(id).toLowerCase() === String(row.record_key).toLowerCase());

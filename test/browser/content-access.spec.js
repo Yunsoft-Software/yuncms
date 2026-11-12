@@ -147,3 +147,144 @@ test('closing an inspector during a real blocking Flow update keeps it closed wh
     await expect(row).toContainText('review'); await expect(page.getByRole('dialog')).toHaveCount(0);
   } finally { await request.delete(`/flows/${flow.id}?revision=${flow.revision}`, { headers: adminHeaders }); await request.delete(`/items/${collection}/${record.id}`, { headers: adminHeaders }); }
 });
+
+test('issue 122: Studio saves M2O relational permission filters and enforces parent-scoped Public reads and row capabilities', async ({ browser, page, request }) => {
+  const admin = await session(request, 'flows-admin@example.test');
+  const adminHeaders = { authorization: `Bearer ${admin.access_token}` };
+  const suffix = crypto.randomUUID().replaceAll('-', '').slice(0, 8);
+  const parentCollection = `m2o_art_${suffix}`;
+  const childCollection = `m2o_tr_${suffix}`;
+  let staffRole = null;
+  let staffUser = null;
+  let pubPerm = null;
+  let staffContext = null;
+
+  try {
+    expect((await request.post('/schema/collections', { headers: adminHeaders, data: { collection: parentCollection } })).status()).toBe(201);
+    expect((await request.post(`/schema/collections/${parentCollection}/fields`, {
+      headers: adminHeaders,
+      data: { field: 'status', type: 'string', required: true },
+    })).status()).toBe(201);
+
+    expect((await request.post('/schema/collections', { headers: adminHeaders, data: { collection: childCollection } })).status()).toBe(201);
+    for (const field of [
+      { field: 'articles_id', type: 'uuid', required: false },
+      { field: 'slug', type: 'string', required: true },
+      { field: 'title', type: 'string', required: true },
+    ]) {
+      expect((await request.post(`/schema/collections/${childCollection}/fields`, { headers: adminHeaders, data: field })).status()).toBe(201);
+    }
+
+    expect((await request.post('/schema/relations/m2o', {
+      headers: adminHeaders,
+      data: { manyCollection: childCollection, manyField: 'articles_id', oneCollection: parentCollection, onDelete: 'SET NULL' },
+    })).status()).toBe(201);
+
+    const pubArticle = (await (await request.post(`/items/${parentCollection}`, { headers: adminHeaders, data: { status: 'published' } })).json()).data;
+    const draftArticle = (await (await request.post(`/items/${parentCollection}`, { headers: adminHeaders, data: { status: 'draft' } })).json()).data;
+    const pubTr = (await (await request.post(`/items/${childCollection}`, {
+      headers: adminHeaders,
+      data: { articles_id: pubArticle.id, slug: 'pub-tr', title: 'Published child row' },
+    })).json()).data;
+    const draftTr = (await (await request.post(`/items/${childCollection}`, {
+      headers: adminHeaders,
+      data: { articles_id: draftArticle.id, slug: 'draft-tr', title: 'Draft child row' },
+    })).json()).data;
+
+    const rolesRes = await request.get('/roles', { headers: adminHeaders });
+    const publicRole = (await rolesRes.json()).data.find((entry) => entry.public);
+    expect(publicRole).toBeTruthy();
+
+    const createdPubPermRes = await request.post('/permissions', {
+      headers: adminHeaders,
+      data: { role: publicRole.id, collection: childCollection, action: 'read', fields: ['id', 'articles_id', 'slug', 'title'] },
+    });
+    expect(createdPubPermRes.status()).toBe(201);
+    pubPerm = (await createdPubPermRes.json()).data;
+
+    // Configure the M2O relational filter through Studio's real Roles & Permissions Advanced JSON editor.
+    await open(page, request, 'flows-admin@example.test', `/#/roles/${publicRole.id}/permissions/${childCollection}/read`);
+    const rowFilterCard = page.locator('#advanced-permission-form .permission-rule-builder-card').first();
+    await expect(rowFilterCard).toBeVisible();
+    await rowFilterCard.getByRole('button', { name: 'Advanced JSON', exact: true }).click();
+    const rawTextarea = rowFilterCard.getByLabel('Advanced JSON', { exact: true });
+    await rawTextarea.fill(JSON.stringify({ articles_id: { status: { _eq: 'published' } } }, null, 2));
+    const savingPatch = page.waitForResponse(
+      (response) => response.url().endsWith(`/permissions/${pubPerm.id}`) && response.request().method() === 'PATCH',
+    );
+    await page.getByRole('button', { name: 'Save rules', exact: true }).click();
+    expect((await savingPatch).status()).toBe(200);
+    await expect(page.locator('.notice-banner')).toBeVisible();
+    await expect(rowFilterCard.locator('.rule-builder-raw-notice')).toBeVisible();
+
+    // Anonymous Public reads only see the published parent's child row; draft child row returns 404.
+    const anonListRes = await request.get(`/items/${childCollection}`, { headers: {} });
+    expect(anonListRes.status()).toBe(200);
+    expect((await anonListRes.json()).data.map((row) => row.id)).toEqual([pubTr.id]);
+    expect((await request.get(`/items/${childCollection}/${pubTr.id}`, { headers: {} })).status()).toBe(200);
+    expect((await request.get(`/items/${childCollection}/${draftTr.id}`, { headers: {} })).status()).toBe(404);
+
+    // Scoped staff role with unrestricted read and relational update/delete filters hides Edit/Delete on draft child rows in Studio.
+    staffRole = (await (await request.post('/roles', {
+      headers: adminHeaders,
+      data: { name: `M2O Staff ${suffix}` },
+    })).json()).data;
+    await request.post('/permissions', {
+      headers: adminHeaders,
+      data: { role: staffRole.id, collection: childCollection, action: 'read' },
+    });
+    for (const action of ['update', 'delete']) {
+      await request.post('/permissions', {
+        headers: adminHeaders,
+        data: {
+          role: staffRole.id,
+          collection: childCollection,
+          action,
+          filter: { articles_id: { status: { _eq: 'published' } } },
+        },
+      });
+    }
+    const staffEmail = `m2o-staff-${suffix}@example.test`;
+    staffUser = (await (await request.post('/users', {
+      headers: adminHeaders,
+      data: { email: staffEmail, password: 'Browser-flow-fixture-123!', role: staffRole.id, status: 'active' },
+    })).json()).data;
+
+    staffContext = await browser.newContext({ baseURL: new URL(page.url()).origin });
+    const staffPage = await staffContext.newPage();
+    const staffHeaders = await open(staffPage, request, staffEmail, `/#/content/${childCollection}`);
+    const pubRow = recordRow(staffPage, pubTr.id);
+    const draftRow = recordRow(staffPage, draftTr.id);
+    await expect(pubRow).toBeVisible();
+    await expect(draftRow).toBeVisible();
+    await expect(pubRow.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
+    await expect(pubRow.getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
+    await expect(draftRow.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
+    await expect(draftRow.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
+    expect((await request.patch(`/items/${childCollection}/${draftTr.id}`, {
+      headers: staffHeaders,
+      data: { title: 'Blocked draft edit' },
+    })).status()).toBe(404);
+    expect((await request.delete(`/items/${childCollection}/${draftTr.id}`, {
+      headers: staffHeaders,
+    })).status()).toBe(404);
+    expect((await request.patch(`/items/${childCollection}/${pubTr.id}`, {
+      headers: staffHeaders,
+      data: { title: 'Allowed published edit' },
+    })).status()).toBe(200);
+  } finally {
+    if (staffContext) await staffContext.close();
+    if (pubPerm) await request.delete(`/permissions/${pubPerm.id}`, { headers: adminHeaders });
+    if (staffUser) await request.delete(`/users/${staffUser.id}`, { headers: adminHeaders });
+    if (staffRole) {
+      const perms = (await (await request.get('/permissions', { headers: adminHeaders })).json()).data ?? [];
+      for (const perm of perms.filter((entry) => entry.role === staffRole.id)) {
+        await request.delete(`/permissions/${perm.id}`, { headers: adminHeaders });
+      }
+      await request.delete(`/roles/${staffRole.id}`, { headers: adminHeaders });
+    }
+    await request.delete(`/schema/relations/m2o/${childCollection}/articles_id`, { headers: adminHeaders });
+    await request.delete(`/schema/collections/${childCollection}?destructive=true`, { headers: adminHeaders });
+    await request.delete(`/schema/collections/${parentCollection}?destructive=true`, { headers: adminHeaders });
+  }
+});

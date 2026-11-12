@@ -186,3 +186,66 @@ test('permission metadata accepts supported dynamic values but rejects unsupport
   );
   assert.equal(database.calls.length, 0);
 });
+
+test('permission filter accepts M2O relational predicates while prospective write validation keeps scalar-only rules', async () => {
+  const relationalSchema = {
+    version: 1,
+    collections: {
+      articles: {
+        collection: 'articles',
+        primary_key: 'id',
+        fields: {
+          id: { field: 'id', type: 'uuid' },
+          status: { field: 'status', type: 'string' },
+        },
+      },
+      articles_translations: {
+        collection: 'articles_translations',
+        primary_key: 'id',
+        fields: {
+          id: { field: 'id', type: 'uuid' },
+          articles_id: { field: 'articles_id', type: 'uuid' },
+          title: { field: 'title', type: 'string' },
+        },
+      },
+    },
+    relations: [
+      {
+        many_collection: 'articles_translations',
+        many_field: 'articles_id',
+        one_collection: 'articles',
+        one_field: 'id',
+      },
+    ],
+  };
+
+  const database = databaseWithPermission();
+  const service = new PermissionsService({
+    database,
+    schema: relationalSchema,
+    accountability: createSystemAccountability(),
+  });
+
+  await assert.rejects(
+    service.createOne({
+      role: 'role-1',
+      collection: 'articles_translations',
+      action: 'read',
+      filter: { articles_id: { status: { _eq: 'published' } } },
+    }),
+    (error) => error.code === 'ROLE_NOT_FOUND',
+  );
+  assert.equal(database.calls.length, 1, 'valid relational row filter should pass schema compilation and reach role lookup');
+
+  database.calls.length = 0;
+  await assert.rejects(
+    service.createOne({
+      role: 'role-1',
+      collection: 'articles_translations',
+      action: 'create',
+      validation: { articles_id: { status: { _eq: 'published' } } },
+    }),
+    (error) => error.code === 'INVALID_QUERY' && error.path === 'filter.articles_id.status',
+  );
+  assert.equal(database.calls.length, 0, 'prospective write validation must reject unhydrated relational traversal');
+});

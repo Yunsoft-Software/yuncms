@@ -84,18 +84,36 @@ export function resolveDynamicVariable(value, context = {}, { allowUnresolved = 
   return value;
 }
 
+const MAX_VALUE_DEPTH = 24;
+
 export function resolveDynamicVariables(value, context = {}, options = {}) {
   const path = options.path ?? 'filter';
+  const depth = options.depth ?? 0;
+  if (depth > MAX_VALUE_DEPTH) {
+    throw dynamicVariableError('INVALID_QUERY', 'Filter value nesting exceeds maximum depth', path);
+  }
   if (Array.isArray(value)) {
+    if (value.length > 1_000) {
+      throw dynamicVariableError('INVALID_QUERY', 'Filter array exceeds maximum length', path);
+    }
     return value.map((entry, index) => resolveDynamicVariables(entry, context, {
       ...options,
       path: `${path}.${index}`,
+      depth: depth + 1,
     }));
   }
   if (value && typeof value === 'object' && !(value instanceof Date)) {
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [
+    const entries = Object.entries(value);
+    if (entries.length > 1_000) {
+      throw dynamicVariableError('INVALID_QUERY', 'Filter object exceeds maximum key count', path);
+    }
+    return Object.fromEntries(entries.map(([key, entry]) => [
       key,
-      resolveDynamicVariables(entry, context, { ...options, path: `${path}.${key}` }),
+      resolveDynamicVariables(entry, context, {
+        ...options,
+        path: `${path}.${key}`,
+        depth: depth + 1,
+      }),
     ]));
   }
   return resolveDynamicVariable(value, context, options);

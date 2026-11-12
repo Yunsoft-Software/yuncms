@@ -4,16 +4,24 @@ import { validateNativeReferenceWrites } from '../native-reference-access.js';
 import { assertIdentifier, quoteIdentifier } from '../identifier.js';
 import { enforcePermissionValidation } from '../permission-validation.js';
 import {
+  assertFilterBudget,
   assertQueryCost,
   compileAggregate,
   compileFilter,
   compileSearch,
   compileSelectFields,
   compileSort,
+  isRelationalFilterKey,
   parseItemsQuery,
   QUERY_LIMITS,
 } from '../query.js';
-import { SchemaCache } from '../schema.js';
+import {
+  attachSchemaSnapshot,
+  lookupManyToOneRelation,
+  relationTargetSchema,
+  SchemaCache,
+  SCHEMA_SNAPSHOT,
+} from '../schema.js';
 import { isSystemManagedField, systemMutationEntries } from '../system-fields.js';
 import { dispatchAfterCommit, transactionContext, withTransaction } from '../transaction.js';
 import { contentTracking, parseItemRevision, readItemRevision, advanceItemRevision, assertItemRevision, restrictMutationToKeys } from '../content-state.js';
@@ -42,7 +50,7 @@ function parseMetadata(value) {
 
 function schemaForFields(schema, allowedFields) {
   if (allowedFields == null) return schema;
-  return {
+  const scoped = {
     ...schema,
     fields: Object.fromEntries(
       allowedFields
@@ -50,6 +58,9 @@ function schemaForFields(schema, allowedFields) {
         .map((field) => [field, schema.fields[field]]),
     ),
   };
+  return schema?.[SCHEMA_SNAPSHOT]
+    ? attachSchemaSnapshot(scoped, schema[SCHEMA_SNAPSHOT])
+    : scoped;
 }
 
 function normalizeFields(fields) {
@@ -181,11 +192,11 @@ export class ItemsService extends BaseService {
         `System collection ${this.collection} must be accessed through its dedicated service`,
       );
     }
-    return collectionSchema;
+    return attachSchemaSnapshot(collectionSchema, snapshot);
   }
 
-  async resolvePermission(action) {
-    const permissions = new PermissionsService({
+  #permissionsService() {
+    return new PermissionsService({
       accountability: this.accountability,
       database: this.database,
       schema: this.schema,
@@ -195,7 +206,10 @@ export class ItemsService extends BaseService {
       permissionCache: this.permissionCache,
       requestId: this.requestId,
     });
-    return permissions.resolve(action, this.collection);
+  }
+
+  async resolvePermission(action) {
+    return this.#permissionsService().resolve(action, this.collection);
   }
 
   dynamicVariables(now = new Date()) {
@@ -243,9 +257,90 @@ export class ItemsService extends BaseService {
     return entries;
   }
 
-  compileActionFilters(userFilter, permissionFilter, userSchema, fullSchema, search = null, dynamicVariables = this.dynamicVariables()) {
-    const permissionSql = compileFilter(permissionFilter, fullSchema, { dynamicVariables });
-    const userSql = compileFilter(userFilter, userSchema, { dynamicVariables });
+  async #resolveUserFilterRelationScopes(userFilter, userSchema, fullSchema) {
+    if (!userFilter) return null;
+    assertFilterBudget(userFilter);
+    const snapshot = this.schema ?? fullSchema?.[SCHEMA_SNAPSHOT] ?? null;
+    if (!snapshot) return null;
+    const scopes = new Map();
+    let permissions = null;
+
+    const stack = [{ node: userFilter, currentSchema: userSchema, path: 'filter', relationDepth: 0 }];
+    while (stack.length > 0) {
+      const { node, currentSchema, path, relationDepth } = stack.pop();
+      if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
+
+      const nextFrames = [];
+      for (const [key, value] of Object.entries(node)) {
+        if (key === '_and' || key === '_or') {
+          if (Array.isArray(value)) {
+            for (let index = 0; index < value.length; index += 1) {
+              nextFrames.push({
+                node: value[index],
+                currentSchema,
+                path: `${path}.${key}.${index}`,
+                relationDepth,
+              });
+            }
+          }
+          continue;
+        }
+        if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+        if (!currentSchema?.fields?.[key]) continue;
+        const relationalEntries = Object.entries(value).filter(([subKey]) => isRelationalFilterKey(subKey));
+        if (relationalEntries.length === 0) continue;
+        const relation = lookupManyToOneRelation(snapshot, currentSchema.collection, key);
+        if (!relation) continue;
+        const nextRelationDepth = relationDepth + 1;
+        if (nextRelationDepth > QUERY_LIMITS.maxRelationDepth) {
+          throw serviceError(
+            'INVALID_QUERY',
+            `Filter relation depth cannot exceed ${QUERY_LIMITS.maxRelationDepth}`,
+            `${path}.${key}`,
+          );
+        }
+        const baseTargetSchema = relationTargetSchema(snapshot, relation.one_collection);
+        if (!baseTargetSchema) continue;
+
+        let scope = scopes.get(relation.one_collection);
+        if (!scope) {
+          permissions ??= this.#permissionsService();
+          const targetPermission = await permissions.resolve('read', relation.one_collection);
+          scope = {
+            schema: schemaForFields(baseTargetSchema, targetPermission.fields),
+            permissionFilter: targetPermission.filter ?? null,
+          };
+          scopes.set(relation.one_collection, scope);
+        }
+        nextFrames.push({
+          node: Object.fromEntries(relationalEntries),
+          currentSchema: scope.schema,
+          path: `${path}.${key}`,
+          relationDepth: nextRelationDepth,
+        });
+      }
+
+      for (let index = nextFrames.length - 1; index >= 0; index -= 1) {
+        stack.push(nextFrames[index]);
+      }
+    }
+
+    if (scopes.size === 0) return null;
+    return (relation) => scopes.get(relation.one_collection) ?? null;
+  }
+
+  async compileActionFilters(userFilter, permissionFilter, userSchema, fullSchema, search = null, dynamicVariables = this.dynamicVariables()) {
+    const snapshot = this.schema ?? fullSchema?.[SCHEMA_SNAPSHOT] ?? null;
+    const resolveRelatedScope = await this.#resolveUserFilterRelationScopes(userFilter, userSchema, fullSchema);
+    const permissionSql = compileFilter(permissionFilter, fullSchema, {
+      dynamicVariables,
+      schemaSnapshot: snapshot,
+    });
+    const userSql = compileFilter(userFilter, userSchema, {
+      dynamicVariables,
+      schemaSnapshot: snapshot,
+      resolveRelatedScope,
+    });
     const searchSql = compileSearch(search, userSchema);
     return combineCompiledFilters(permissionSql, userSql, searchSql);
   }
@@ -285,7 +380,7 @@ export class ItemsService extends BaseService {
     const query = await this.normalizeReadQuery(rawQuery);
     const permission = await this.resolvePermission('read');
     const accessSchema = schemaForFields(schema, permission.fields);
-    const filter = this.compileActionFilters(
+    const filter = await this.compileActionFilters(
       query.filter,
       permission.filter,
       accessSchema,
@@ -448,7 +543,7 @@ export class ItemsService extends BaseService {
     const primaryKey = schema.primary_key;
     const dynamicVariables = this.dynamicVariables();
     const filter = combineCompiledFilters(
-      this.compileActionFilters(query.filter, permission.filter, accessSchema, schema, query.search, dynamicVariables),
+      await this.compileActionFilters(query.filter, permission.filter, accessSchema, schema, query.search, dynamicVariables),
       compileFilter({ [primaryKey]: { _eq: id } }, schema),
     );
     const [rows] = await this.database.query(
@@ -648,6 +743,7 @@ export class ItemsService extends BaseService {
     if (!filterInput || typeof filterInput !== 'object' || Array.isArray(filterInput) || Object.keys(filterInput).length === 0) {
       throw serviceError('FILTER_REQUIRED', 'updateMany requires an explicit non-empty filter');
     }
+    assertFilterBudget(filterInput);
 
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('update');
@@ -660,7 +756,7 @@ export class ItemsService extends BaseService {
     const dynamicVariables = this.dynamicVariables(now);
     const entries = mergeSystemEntries(callerEntries, schema, this.accountability, 'update', now);
     const effectiveChanges = Object.fromEntries(entries);
-    const filter = this.compileActionFilters(filterInput, permission.filter, accessSchema, schema, null, dynamicVariables);
+    const filter = await this.compileActionFilters(filterInput, permission.filter, accessSchema, schema, null, dynamicVariables);
     const table = quoteIdentifier(this.collection, 'collection name');
 
     let versionedRows = [];
@@ -724,6 +820,7 @@ export class ItemsService extends BaseService {
     if (!filterInput || typeof filterInput !== 'object' || Array.isArray(filterInput) || Object.keys(filterInput).length === 0) {
       throw serviceError('FILTER_REQUIRED', 'deleteMany requires an explicit non-empty filter');
     }
+    assertFilterBudget(filterInput);
 
     const schema = await this.getCollectionSchema();
     const permission = await this.resolvePermission('delete');
@@ -733,7 +830,8 @@ export class ItemsService extends BaseService {
     if (!effectiveFilter || typeof effectiveFilter !== 'object' || Array.isArray(effectiveFilter) || Object.keys(effectiveFilter).length === 0) {
       throw serviceError('FILTER_REQUIRED', 'deleteMany hook result must preserve a non-empty filter');
     }
-    const filter = this.compileActionFilters(effectiveFilter, permission.filter, accessSchema, schema);
+    assertFilterBudget(effectiveFilter);
+    const filter = await this.compileActionFilters(effectiveFilter, permission.filter, accessSchema, schema);
     const table = quoteIdentifier(this.collection, 'collection name');
     let versionedRows = [];
     if (contentTracking(schema).tracked) {

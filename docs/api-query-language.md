@@ -29,7 +29,7 @@ Unauthenticated requests use the Public role. Public access is deny-by-default u
 | Parameter | Purpose | Important limits |
 | --- | --- | --- |
 | `fields` | Select scalar fields and project relations | 100 field tokens; 20 relation nodes; depth 4 |
-| `filter` | JSON filter tree | depth 8; 100 filter nodes; 100 values per `_in`/`_nin` |
+| `filter` | JSON filter tree | depth 8; 100 filter nodes; 4 M2O relation hops; 100 values per `_in`/`_nin` |
 | `search` | Search readable `string`/`text` fields | 200 characters |
 | `sort` | Comma-separated sort fields | 20 fields |
 | `aggregate` | `count`, `countDistinct`, `sum`, `avg`, `min`, `max` | 20 aggregate field entries |
@@ -308,7 +308,38 @@ A caller filter never replaces the role's row filter. YunCMS combines the permis
 
 ### Relation filtering
 
-Filters currently target scalar fields of the collection being queried. Relation-path filters such as `author_id.name` are not accepted.
+Filters may traverse declared many-to-one (M2O) and one-to-one source fields (including M2M junction foreign-key fields) using nested JSON objects up to 4 relational hops (`maxRelationDepth = 4`), within the 8-level filter depth, 100-node budget and query-cost limit:
+
+```json
+{
+  "articles_id": {
+    "status": { "_eq": "published" }
+  }
+}
+```
+
+Scalar operators and relational predicates on the same M2O field are combined with `AND`, and nested `_and` / `_or` groups are supported inside related objects:
+
+```json
+{
+  "articles_id": {
+    "_nnull": true,
+    "_or": [
+      { "status": { "_eq": "published" } },
+      { "author_id": { "status": { "_eq": "active" } } }
+    ]
+  }
+}
+```
+
+YunCMS compiles each M2O hop into a parameterized `EXISTS` subquery (wrapping self-referential targets safely so `UPDATE` and `DELETE` statements also succeed on MySQL). Dotted string keys such as `"author_id.name"` are not used; write nested JSON objects instead.
+
+Authorization and safety rules:
+
+- Filter depth and node budgets are checked iteratively before any permission or relation metadata lookup; oversized or deeply nested filter payloads fail with HTTP 400 `INVALID_QUERY`.
+- For caller-supplied `filter` parameters (`GET /items/:collection`, `updateMany`, `deleteMany`), the caller must be allowed to read the source M2O field, must hold `read` permission on each traversed target collection (`403 FORBIDDEN` otherwise), may only reference readable target fields (`400 INVALID_QUERY` otherwise), and has the target collection's own `read` row filter enforced inside the `EXISTS` subquery.
+- Native `yuncms_users` references only expose safe user columns (sensitive columns such as `password_hash` are never filterable).
+- Virtual reverse aliases (O2M / M2M target arrays) are not filterable directly on the parent; filter child or junction collections through their M2O fields instead.
 
 ## Search
 
