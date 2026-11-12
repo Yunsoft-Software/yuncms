@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiRequest } from '../api.js';
 import { Pagination, RuleBuilder, paginateClientItems, useConfirmDialog } from '../components/index.js';
@@ -119,6 +119,7 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
+  const loadedPermissionKeyRef = useRef('');
 
   async function load(preferredRole = selectedRoleId) {
     setLoading(true);
@@ -296,10 +297,11 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
     setError('');
     setNotice('');
     try {
+      let nextNotice = '';
       if (existing) {
         await apiRequest(`/permissions/${encodeURIComponent(existing.id)}`, { method: 'DELETE' });
         if (advancedPermission?.id === existing.id) setAdvancedPermission(null);
-        setNotice(t('roles.accessRemoved', { action: actionLabel(action, t), collection: collectionName }));
+        nextNotice = t('roles.accessRemoved', { action: actionLabel(action, t), collection: collectionName });
       } else {
         await apiRequest('/permissions', {
           method: 'POST',
@@ -312,9 +314,10 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
             validation: null,
           },
         });
-        setNotice(t('roles.accessGranted', { action: actionLabel(action, t), collection: collectionName }));
+        nextNotice = t('roles.accessGranted', { action: actionLabel(action, t), collection: collectionName });
       }
       await load(selectedRole.id);
+      setNotice(nextNotice);
     } catch (requestError) {
       setError(requestError.message || t('roles.permissionUpdateError'));
     } finally {
@@ -322,11 +325,11 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
     }
   }
 
-  async function loadPermissionEditor(permission) {
+  async function loadPermissionEditor(permission, { clearNotice = false } = {}) {
     const collection = collections.find((entry) => entry.collection === permission.collection);
     if (!collection) return;
     setError('');
-    setNotice('');
+    if (clearNotice) setNotice('');
     try {
       const fieldResponse = canUseAdvancedPermission(collection)
         ? await apiRequest(`/schema/collections/${encodeURIComponent(permission.collection)}/fields`)
@@ -350,8 +353,15 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
   }
 
   useEffect(() => {
-    if (route.view !== 'permission' || !route.roleId || !route.collection || !route.action || loading) return;
-    const permission = permissionIndex.get(permissionKey(route.roleId, route.collection, route.action));
+    if (route.view !== 'permission' || !route.roleId || !route.collection || !route.action) {
+      loadedPermissionKeyRef.current = '';
+      return;
+    }
+    if (loading) return;
+    const nextKey = permissionKey(route.roleId, route.collection, route.action);
+    const clearNotice = loadedPermissionKeyRef.current !== nextKey;
+    loadedPermissionKeyRef.current = nextKey;
+    const permission = permissionIndex.get(nextKey);
     loadPermissionEditor(permission || {
       id: null,
       role: route.roleId,
@@ -360,7 +370,7 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
       fields: null,
       filter: null,
       validation: null,
-    });
+    }, { clearNotice });
   }, [loading, permissionIndex, route.action, route.collection, route.roleId, route.view]);
 
   function toggleAdvancedField(fieldName) {
@@ -394,8 +404,8 @@ export function RolesPermissionsScreen({ route = {}, onNavigate }) {
           validation,
         },
       });
-      setNotice(t('roles.advancedSaved'));
       await load(selectedRoleId);
+      setNotice(t('roles.advancedSaved'));
     } catch (requestError) {
       setError(requestError instanceof SyntaxError
         ? t('roles.invalidJson')

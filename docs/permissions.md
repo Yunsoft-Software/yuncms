@@ -11,7 +11,7 @@ YunCMS authorization is role-based and enforced inside services, not only in Stu
 3. Find the collection/resource in the permission matrix.
 4. Turn on `Read`, `Create`, `Update` or `Delete` for simple unrestricted action access.
 5. Open the permission page only when the action needs field, row or write restrictions.
-6. Save the restriction and test it with a real account assigned to the role.
+6. Save the restriction (Studio refreshes the routed permission rule in place while keeping the confirmation banner visible until you leave that permission page) and test it with a real account assigned to the role.
 
 The matrix keeps the four actions in stable columns for every collection. Each cell communicates one of the useful states:
 

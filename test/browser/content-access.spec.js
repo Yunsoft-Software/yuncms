@@ -288,3 +288,66 @@ test('issue 122: Studio saves M2O relational permission filters and enforces par
     await request.delete(`/schema/collections/${parentCollection}?destructive=true`, { headers: adminHeaders });
   }
 });
+
+test('issue 124: Studio routed permission editor preserves toggle and rule save notices across index reloads', async ({ page, request }) => {
+  const admin = await session(request, 'flows-admin@example.test');
+  const adminHeaders = { authorization: `Bearer ${admin.access_token}` };
+  const suffix = crypto.randomUUID().replaceAll('-', '').slice(0, 8);
+  let role = null;
+
+  try {
+    const roleRes = await request.post('/roles', {
+      headers: adminHeaders,
+      data: { name: `Notice Guard ${suffix}` },
+    });
+    expect(roleRes.status()).toBe(201);
+    role = (await roleRes.json()).data;
+
+    await open(page, request, 'flows-admin@example.test', `/#/roles/${role.id}/permissions/${collection}/read`);
+    const masterCheckbox = page.locator('.permission-master-switch input[type="checkbox"]');
+    await expect(masterCheckbox).not.toBeChecked();
+
+    const createdPermRes = page.waitForResponse(
+      (response) => response.url().endsWith('/permissions') && response.request().method() === 'POST',
+    );
+    const reloadedFieldsAfterToggle = page.waitForResponse(
+      (response) => response.url().endsWith(`/schema/collections/${collection}/fields`) && response.request().method() === 'GET',
+    );
+    await page.locator('.permission-master-switch .permission-toggle').click();
+    const createdPerm = (await (await createdPermRes).json()).data;
+    await reloadedFieldsAfterToggle;
+    await expect(masterCheckbox).toBeChecked();
+    await expect(page.locator('.notice-banner')).toHaveText(`Read access granted for ${collection}`);
+    await expect(page.locator('#advanced-permission-form')).toBeVisible();
+
+    await page.getByLabel('Allow all fields', { exact: true }).uncheck();
+    await page.locator('.field-choice').filter({ hasText: 'title · string' }).locator('input[type="checkbox"]').check();
+
+    const savedPermRes = page.waitForResponse(
+      (response) => response.url().endsWith(`/permissions/${createdPerm.id}`) && response.request().method() === 'PATCH',
+    );
+    const reloadedFieldsAfterSave = page.waitForResponse(
+      (response) => response.url().endsWith(`/schema/collections/${collection}/fields`) && response.request().method() === 'GET',
+    );
+    await page.getByRole('button', { name: 'Save rules', exact: true }).click();
+    expect((await savedPermRes).status()).toBe(200);
+    await reloadedFieldsAfterSave;
+    await expect(page.locator('.notice-banner')).toHaveText('Advanced permission rules saved');
+
+    const storedPerms = (await (await request.get('/permissions', { headers: adminHeaders })).json()).data ?? [];
+    const storedReadPerm = storedPerms.find((entry) => entry.id === createdPerm.id);
+    expect(storedReadPerm?.fields).toEqual(['title']);
+
+    await page.goto(`/#/roles/${role.id}/permissions/${collection}/update`);
+    await expect(page.locator('.permission-detail-heading h2')).toContainText('Update');
+    await expect(page.locator('.notice-banner')).toHaveCount(0);
+  } finally {
+    if (role) {
+      const perms = (await (await request.get('/permissions', { headers: adminHeaders })).json()).data ?? [];
+      for (const perm of perms.filter((entry) => entry.role === role.id)) {
+        await request.delete(`/permissions/${perm.id}`, { headers: adminHeaders });
+      }
+      await request.delete(`/roles/${role.id}`, { headers: adminHeaders });
+    }
+  }
+});

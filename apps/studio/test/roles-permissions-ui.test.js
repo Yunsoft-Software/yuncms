@@ -28,3 +28,10 @@ test('permission matrix includes only explicit system resources and marks protec
   assert.match(source, /roles\.protected/);
   assert.match(source, /roles\.systemAccessHint/);
 });
+
+test('saving or toggling a routed permission preserves its confirmation notice across permissionIndex reload', () => {
+  assert.match(source, /const loadedPermissionKeyRef = useRef\(''\)/);
+  assert.match(source, /const clearNotice = loadedPermissionKeyRef\.current !== nextKey/);
+  assert.match(source, /if \(clearNotice\) setNotice\(''\)/);
+  assert.match(source, /await load\(selectedRoleId\);\s*setNotice\(t\('roles\.advancedSaved'\)\)/);
+});
