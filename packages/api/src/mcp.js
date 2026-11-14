@@ -10,6 +10,7 @@ import {
 import * as z from 'zod/v4';
 
 import { serviceOptionsFromRequest } from './service-options.js';
+import { declaredFieldChoices } from './schema-choices.js';
 
 export const MCP_REQUEST_LIMITS = Object.freeze({
   maxToolInputElements: 10_000,
@@ -159,6 +160,7 @@ export async function describeReadableCollection(req, collection) {
     : readPermission.fields.filter((field) => schema.fields?.[field]);
   const fields = visibleFields.map((field) => {
     const metadata = schema.fields[field];
+    const choices = declaredFieldChoices(metadata);
     const relation = snapshot.relationByManyField?.get(`${collection}.${field}`) ?? null;
     const readableRelation = relation && !isAccountabilityCollectionDenied(req.accountability, relation.one_collection);
     return {
@@ -167,6 +169,7 @@ export async function describeReadableCollection(req, collection) {
       type: metadata.type,
       required: Boolean(metadata.required),
       readonly: Boolean(metadata.readonly),
+      ...(choices !== undefined ? { choices } : {}),
       ...(readableRelation ? {
         relation: {
           collection: relation.one_collection,
@@ -222,7 +225,7 @@ export function registerMcpTools(server, req, {
 
   server.registerTool('schema.describe_collection', {
     title: 'Describe a YunCMS collection',
-    description: 'Describe fields, direct relations and allowed CRUD actions for a readable collection.',
+    description: 'Describe fields, declared choice values and labels, direct relations and allowed CRUD actions for a readable collection.',
     inputSchema: z.object({ collection: collectionSchema }),
     annotations: { readOnlyHint: true, destructiveHint: false },
   }, wrap(async ({ collection }) => describeReadableCollection(req, collection)));

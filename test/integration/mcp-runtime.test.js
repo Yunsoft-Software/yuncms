@@ -151,6 +151,7 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
       { field: 'status', type: 'string', required: true },
       { field: 'secret', type: 'string', required: false },
       { field: 'author_id', type: 'uuid', required: false },
+      { field: 'category', type: 'string', options: {choices:[{value:'new',text:'New'},{value:'done',text:'Completed'}],private_setting:'DO_NOT_EXPOSE'} },
     ]) {
       await fields.createOne(collection, definition);
     }
@@ -215,7 +216,7 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
       role: roleId,
       collection,
       action: 'read',
-      fields: ['id', 'title', 'note', 'author_id'],
+      fields: ['id', 'title', 'note', 'author_id', 'category'],
       filter: { status: { _eq: 'published' } },
     });
     await permissions.createOne({
@@ -325,7 +326,9 @@ test('official MCP v2 client preserves real MySQL RBAC, guards, limits and write
       name: 'schema.describe_collection',
       arguments: { collection },
     }));
-    assert.deepEqual(described.data.fields.map((field) => field.field), ['id', 'title', 'note', 'author_id']);
+    assert.deepEqual(described.data.fields.map((field) => field.field), ['id', 'title', 'note', 'author_id', 'category']);
+    assert.deepEqual(described.data.fields.find(field=>field.field==='category').choices,[{value:'new',label:'New'},{value:'done',label:'Completed'}]);
+    assert.equal(JSON.stringify(described).includes('DO_NOT_EXPOSE'),false);
     assert.deepEqual(described.data.capabilities, {
       read: true,
       create: false,

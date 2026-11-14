@@ -66,6 +66,15 @@ Lists non-system collections the current identity may read.
 
 Returns the readable collection shape, direct relation metadata and whether create/update/delete are allowed for the current identity.
 
+Fields with explicitly declared choices include `choices: [{ "value": "done",
+"label": "Completed" }]`. Values retain their original JSON type and spelling;
+use `value`, rather than the display label, in item writes. Both an `options`
+array and `options.choices` entries (`value` with `text` or `label`) are supported.
+Only these values and labels are exposed, never the rest of the interface
+configuration. Fields without declared choices omit this property; status
+defaults are not inferred. Unreadable fields remain excluded. The native AI
+`schema_describe_collection` tool returns the same field descriptors.
+
 ```json
 {
   "collection": "articles"

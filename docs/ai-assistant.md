@@ -6,6 +6,12 @@ YunCMS Studio includes a built-in **AI** chat screen. Users open it directly fro
 
 The assistant can inspect the current YunCMS schema and records using the **same authenticated user, role and permission rules** as the rest of YunCMS.
 
+Schema inspection includes explicitly declared field choices with exact stored
+values and display labels, using the same descriptors as
+[`schema.describe_collection`](mcp.md#schemadescribe_collection). Hidden fields
+and other interface configuration are excluded. A choice label may differ from
+its stored value; record writes must use the stored value.
+
 ## Configure from Studio
 
 Provider configuration is managed from **AI → Settings**. YunCMS does not require `AI_*` environment variables for the assistant.

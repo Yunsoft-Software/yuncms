@@ -16,7 +16,7 @@ import {createAiRouter} from '../../packages/api/src/routes/ai.js';
 
 // Real native SQL/auth/permissions/hooks/executor over HTTP. No provider is
 // substituted: the probe invokes the actual native tool executor directly.
-export async function createAiCollectionFixture(){
+export async function createAiCollectionFixture({businessFields=[],memberFields=['id','title']}={}){
  assert.equal(process.env.YUNCMS_TEST_MYSQL,'1');assert.equal(process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE,'1');
  const config=loadConfig(process.env);assert.match(config.database.database,/(test|ci|dev)/i);
  const pool=createDatabasePool(config.database),system=createSystemAccountability(),options={database:pool,accountability:system};
@@ -27,6 +27,7 @@ export async function createAiCollectionFixture(){
  await collections.createOne({collection:names.config,hidden:true});await fields.createOne(names.config,{field:'secret',type:'string'});
  await collections.createOne({collection:names.business});
  await fields.createOne(names.business,{field:'title',type:'string'});await fields.createOne(names.business,{field:'config_ref',type:'uuid'});
+ for(const definition of businessFields)await fields.createOne(names.business,definition);
  await new services.RelationsService(options).createM2O({manyCollection:names.business,manyField:'config_ref',oneCollection:names.config,onDelete:'SET NULL'});
  const privateRow=await new services.ItemsService(names.config,options).createOne({secret:'ONLY_CONFIG_'+nonce});
  const businessRow=await new services.ItemsService(names.business,options).createOne({title:'Business before',config_ref:privateRow.id});
@@ -35,7 +36,7 @@ export async function createAiCollectionFixture(){
  const password='NativeFence-'+nonce+'-Password!';
  const admin=await users.createOne({email:'fence-admin-'+nonce+'@example.test',password,role:adminRole.id});
  const member=await users.createOne({email:'fence-reader-'+nonce+'@example.test',password,role:memberRole.id});
- await new services.PermissionsService(options).createOne({role:memberRole.id,collection:names.business,action:'read',fields:['id','title'],filter:null});
+ await new services.PermissionsService(options).createOne({role:memberRole.id,collection:names.business,action:'read',fields:memberFields,filter:null});
  let policy=[names.config];
  const emitter=new HookEmitter();emitter.registerFilter('ai.tools.policy',payload=>({...payload,denied_collections:policy}));
  registerInternalAudit({emitter,services,database:pool,logger:console});
