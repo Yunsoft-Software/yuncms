@@ -1,6 +1,6 @@
 {
   "name": "@yunsoft/yuncms-core",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Core services, schema, authentication, permissions and storage primitives for YunCMS.",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1100.0",
-    "@yunsoft/yuncms-extensions-sdk": "2.1.0",
+    "@yunsoft/yuncms-extensions-sdk": "2.1.1",
     "mysql2": "3.23.2",
     "nodemailer": "10.1.4"
   },
