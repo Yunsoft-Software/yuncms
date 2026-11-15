@@ -86,3 +86,11 @@ Do not add compatibility behavior merely to imitate another product. New behavio
 6. Commit with a short descriptive message.
 
 - Flow coverage must use pure logic or real execution: never mock/stub the database, services, HTTP/HTTPS, SMTP, script processes, scheduler clocks or browser network. Use guarded disposable MySQL, native APIs and actual Playwright interactions; report executed results. Preserve unrelated legacy test coverage.
+
+## Mandatory issue check immediately before publication
+
+- Immediately before publishing any YunCMS version to npm, GitHub or Docker, review the current open issues in `Yunsoft-Software/yuncms`. An issue review performed only at the start of development is not sufficient; repeat it after validation and before publication.
+- Reproduce reported problems and distinguish confirmed YunCMS defects from configuration/integration errors and feature requests. Use the existing issue instead of opening a duplicate; feature requests still follow the admission rules above.
+- Do not publish while a confirmed YunCMS defect remains unresolved. Fix it on `dev`, add the corresponding regression coverage and user-facing documentation, then rebuild and repeat the affected validation and required release gates before checking issues again.
+- Record which issues are fixed in the release and the actual verification results. A successful build or an issue title alone does not prove that a reported problem is resolved. If a required reproduction or validation is blocked, report that limitation explicitly instead of treating it as a pass.
+- Never delete or weaken tests, suppress warnings, or substitute mocked acceptance to bypass this publication gate.
