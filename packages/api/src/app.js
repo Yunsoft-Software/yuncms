@@ -215,7 +215,13 @@ export function createApp({
   const apiRateLimit = createApiRateLimit(config, rateLimitStore, logger);
   if (apiRateLimit) app.use(apiRateLimit);
 
-  const featurePolicy = createFeaturePolicy(config.features ?? {});
+  const featurePolicy = createFeaturePolicy({
+    ...(config.features?.domain === undefined ? {
+      publicUrl: config.auth?.publicUrl,
+      studioOrigin: config.server?.studioOrigin,
+    } : {}),
+    ...config.features,
+  });
   app.use(createAuthenticationMiddleware({ pool, config, logger, services, schemaCache, permissionCache, emitter, storage, featurePolicy }));
   const requestEvents = createRequestEvents(emitter);
   if (requestEvents) app.use(requestEvents);

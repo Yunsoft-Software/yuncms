@@ -9,6 +9,9 @@
 .white-label-upgrade p { margin: 6px 0 0; }
 .white-label-upgrade a { max-width: 100%; }
 .settings-feature-page > .page-header { margin-bottom: 0; }
+.settings-feature-page .panel-heading { flex-wrap: wrap; align-items: flex-start; }
+.settings-feature-page .panel-heading > div { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.settings-feature-page .panel-heading .settings-license-meta { margin-top: 6px; font-size: 13px; color: var(--yun-ink-muted); line-height: 1.5; }
 .settings-feature-list { display: grid; min-width: 0; }
 .settings-feature-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--yun-line); min-width: 0; }
 .settings-feature-row:last-child { border-bottom: 0; }

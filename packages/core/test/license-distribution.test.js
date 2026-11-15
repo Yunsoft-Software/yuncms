@@ -10,6 +10,10 @@ test('mixed distribution retains MIT and identifies only explicitly marked new P
   assert.ok(license.includes(mit.trim())); assert.ok(license.includes(commercial.trim()));
   assert.match(license, /Previously released MIT versions, including 0\.1\.47, retain their MIT grants/);
   assert.match(commercial, /one-time purchase grants perpetual use/);
+  assert.match(commercial, /purchased term entitlement \(such as monthly or annual\) grants use[\s\S]*through the expiration time stated in that\s+entitlement/);
+  assert.match(commercial, /previously released MIT and perpetual commercial grants remain unchanged/);
+  assert.match(commercial, /missing, expired or unverifiable\s+Premium entitlement/);
+  assert.match(commercial, /one-time or term software license/);
   for (const name of ['core', 'api']) {
     assert.equal(await read(`packages/${name}/LICENSE`), license);
     assert.match(await read(`packages/${name}/README.md`), /MIT Community code and explicitly marked commercial Premium/);

@@ -62,11 +62,24 @@ export class FeaturesService extends BaseService {
 
   async activate(token) {
     if (!this.accountability.admin && !this.accountability.system) throw featureError('FORBIDDEN', 'Only administrators may install a license');
-    const policy = this.policy.withToken(token);
+    const normalized = typeof token === 'string' ? token.trim() : '';
+    if (!normalized || normalized.split('.').length !== 3) {
+      throw featureError('INVALID_LICENSE', 'Paste the full three-part signed entitlement token (JWT), not a short license reference key');
+    }
+    const baseline = this.policy.licenseStatus();
+    if (!baseline.domain && !baseline.configuredDomain) {
+      throw featureError('INVALID_LICENSE', 'Configure AUTH_PUBLIC_URL, STUDIO_ORIGIN or YUNCMS_LICENSE_DOMAIN with this installation hostname before activating a license');
+    }
+    const policy = this.policy.withToken(normalized);
     if (policy.licenseStatus().status !== 'active') throw featureError('INVALID_LICENSE', 'The license signature, product, domain, instance or validity is not accepted');
     await withTransaction(this.database, async database => {
+      const [rows] = await database.query('SELECT token FROM yuncms_license_state WHERE id = 1 FOR UPDATE');
+      const currentPolicy = rows[0]?.token ? this.policy.withToken(rows[0].token) : this.policy;
+      if (!currentPolicy.canReplaceWith(normalized)) {
+        throw featureError('INVALID_LICENSE', 'An older or superseded entitlement token cannot replace the current license');
+      }
       await database.query(`INSERT INTO yuncms_license_state (id, token, updated_by) VALUES (1, ?, ?)
-        ON DUPLICATE KEY UPDATE token = VALUES(token), updated_by = VALUES(updated_by)`, [token, this.accountability.user ?? null]);
+        ON DUPLICATE KEY UPDATE token = VALUES(token), updated_by = VALUES(updated_by)`, [normalized, this.accountability.user ?? null]);
       await new AuditService({ ...this, database }).record({ action: 'features.activate', payload: policy.licenseStatus() });
     });
     return this.readStatus();

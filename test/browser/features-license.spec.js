@@ -7,8 +7,8 @@ async function open(page, request, path = '/#/features', email = 'flows-admin@ex
   await page.addInitScript(data => { sessionStorage.setItem('yuncms.studio.session', JSON.stringify(data)); localStorage.setItem('yuncms.studio.locale', 'en'); }, session);
   await page.goto(path); return { authorization: `Bearer ${session.access_token}` };
 }
-async function license(request, headers) {
-  const response = await request.post('/extensions/flow-fixture/features/license-token', { headers });
+async function license(request, headers, patch) {
+  const response = await request.post('/extensions/flow-fixture/features/license-token', { headers, ...(patch ? { data: patch } : {}) });
   expect(response.status()).toBe(200); return (await response.json()).data;
 }
 
@@ -179,6 +179,87 @@ test('Premium administrator history restores a native revision through the same 
     if (record) await request.delete(`/items/${collection}/${record.id}`, { headers });
     await request.patch(`/schema/collections/${collection}`, { headers, data: { metadata: config.metadata } });
     await request.patch('/studio-settings', { headers, data: { theme: priorTheme } });
+    await request.post('/extensions/flow-fixture/features/reset', { headers });
+  }
+});
+
+test('Studio activates 1-month and renewed 12-month term licenses on auto-resolved installation domain, guides JWT input and rejects short keys, bad signatures, wrong domains, expired tokens and stale replay', async ({ page, request }) => {
+  const headers = await open(page, request);
+  await request.post('/extensions/flow-fixture/features/reset', { headers });
+  await page.reload();
+  try {
+    await expect(page.locator('body')).not.toContainText('One payment per production domain');
+    await expect(page.locator('.settings-feature-page')).toContainText('Domain-bound monthly, annual or perpetual entitlement');
+    await expect(page.locator('.settings-feature-page .status-pill')).toHaveText('Not activated');
+    await expect(page.locator('.settings-license-meta')).toContainText('Installation domain: browser.example.test. Paste the signed entitlement token (JWT), not the short license key.');
+
+    const licenseInput = page.getByLabel('Signed license', { exact: true });
+    await expect(licenseInput).toHaveAttribute('placeholder', 'eyJhbGciOiJFZERTQSIs...');
+
+    // Short portal reference licenseKey is rejected with explicit JWT guidance
+    await licenseInput.fill('YCMS-2026-PORTAL-SHORT-KEY');
+    await page.getByRole('button', { name: 'Activate license', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('three-part signed entitlement token (JWT)');
+    await expect(page.getByRole('checkbox', { name: 'Content history', exact: true })).toBeDisabled();
+
+    const now = Math.floor(Date.now() / 1000);
+    // Bad key/signature, wrong-domain and expired JWTs are all rejected in Studio without unlocking Premium
+    const wrongKeyToken = await license(request, headers, { billingModel: 'monthly_term', periodMonths: 1, exp: now + 30 * 86400 });
+    const tamperedSigToken = wrongKeyToken.slice(0, -6) + (wrongKeyToken.endsWith('AAAAAA') ? 'BBBBBB' : 'AAAAAA');
+    const wrongDomainToken = await license(request, headers, { allowedHosts: ['wrong.example.test'], billingModel: 'monthly_term', periodMonths: 1, exp: now + 30 * 86400 });
+    const expiredToken = await license(request, headers, { billingModel: 'monthly_term', periodMonths: 1, iat: now - 7200, nbf: now - 7200, exp: now - 60 });
+    for (const rejected of [tamperedSigToken, wrongDomainToken, expiredToken]) {
+      await licenseInput.fill(rejected);
+      await page.getByRole('button', { name: 'Activate license', exact: true }).click();
+      await expect(page.getByRole('alert')).toBeVisible();
+      await expect(page.getByRole('checkbox', { name: 'Content history', exact: true })).toBeDisabled();
+    }
+
+    // Activate 1-month monthly_term token
+    const monthlyV1 = await license(request, headers, {
+      sub: 'browser-term-license', licenseId: 'browser-term-license',
+      billingModel: 'monthly_term', periodMonths: 1, entitlementVersion: 1,
+      iat: now, exp: now + 30 * 86400, capabilities: { contentHistory: true, whiteLabel: true },
+    });
+    await licenseInput.fill(monthlyV1);
+    await page.getByRole('button', { name: 'Activate license', exact: true }).click();
+    await expect(licenseInput).toHaveValue('');
+    await expect(page.locator('.settings-feature-page .status-pill')).toHaveText('Active');
+    await expect(page.locator('.settings-license-meta')).toContainText('browser.example.test · Monthly (1 month) · Valid until');
+    await expect(page.getByRole('checkbox', { name: 'Content history', exact: true })).toBeEnabled();
+    await expect(page.getByRole('checkbox', { name: 'White-label branding', exact: true })).toBeEnabled();
+
+    // Upgrade/renew in Studio to 12-month annual token (entitlementVersion: 2)
+    const annualV2 = await license(request, headers, {
+      sub: 'browser-term-license', licenseId: 'browser-term-license',
+      billingModel: 'monthly_term', periodMonths: 12, entitlementVersion: 2,
+      iat: now + 1, exp: now + 365 * 86400, capabilities: { contentHistory: true, whiteLabel: true },
+    });
+    await licenseInput.fill(annualV2);
+    await page.getByRole('button', { name: 'Activate license', exact: true }).click();
+    await expect(page.locator('.settings-license-meta')).toContainText('browser.example.test · Annual (12 months) · Valid until');
+
+    // Replaying older unexpired v1 token in Studio is rejected and keeps Annual v2 active
+    await licenseInput.fill(monthlyV1);
+    await page.getByRole('button', { name: 'Activate license', exact: true }).click();
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.locator('.settings-license-meta')).toContainText('browser.example.test · Annual (12 months) · Valid until');
+
+    // Turkish Studio locale renders localized annual term summary without legacy one-payment copy
+    const trPage = await page.context().newPage();
+    try {
+      const sessionJson = await page.evaluate(() => sessionStorage.getItem('yuncms.studio.session'));
+      await trPage.addInitScript(data => {
+        sessionStorage.setItem('yuncms.studio.session', data);
+        localStorage.setItem('yuncms.studio.locale', 'tr');
+      }, sessionJson);
+      await trPage.goto('/#/features');
+      await expect(trPage.locator('.settings-license-meta')).toContainText('browser.example.test · Yıllık (12 ay)');
+      await expect(trPage.locator('body')).not.toContainText('Üretim domaini başına tek ödeme');
+    } finally {
+      await trPage.close();
+    }
+  } finally {
     await request.post('/extensions/flow-fixture/features/reset', { headers });
   }
 });

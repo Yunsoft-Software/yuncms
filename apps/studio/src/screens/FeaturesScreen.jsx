@@ -3,9 +3,10 @@ import { apiRequest } from '../api.js';
 import { useI18n } from '../i18n.js';
 import { useStudioSettings } from '../contexts/StudioSettingsContext.jsx';
 import { PremiumUpsell } from '../components/index.js';
+import { formatLicenseSummary } from '../license-summary.js';
 
 export function FeaturesScreen() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { settings, refreshSettings } = useStudioSettings();
   const [collections, setCollections] = useState([]), [selected, setSelected] = useState('');
   const [status, setStatus] = useState(null), [token, setToken] = useState('');
@@ -65,8 +66,9 @@ export function FeaturesScreen() {
         <label className="checkbox-label"><input type="checkbox" aria-label={t('features.recording')} checked={selectedCollection?.metadata?.contentTracking?.history === true} disabled={busy || !status.features.contentHistory.enabled} onChange={event => saveHistory(event.target.checked)} />{t('features.recording')}</label>
       </section>}
       <form className="panel form-panel" onSubmit={event => { event.preventDefault(); change('/features/license', { token: token.trim() }); }}>
-        <div className="panel-heading"><div><h2>{t('features.license')}</h2><p>{t('features.perpetual')}</p></div><span className="status-pill">{t(`features.${status.license?.status ?? 'missing'}`)}</span></div>
-        <label className="field-label">{t('features.token')}<textarea value={token} onChange={event => setToken(event.target.value)} rows={4} spellCheck={false} autoComplete="off" disabled={busy} /></label>
+        <div className="panel-heading"><div><h2>{t('features.license')}</h2><p>{t('features.perpetual')}</p>
+          {formatLicenseSummary(status.license, { locale, t }) && <p className="settings-license-meta">{formatLicenseSummary(status.license, { locale, t })}</p>}</div><span className="status-pill">{t(`features.${status.license?.status ?? 'missing'}`)}</span></div>
+        <label className="field-label">{t('features.token')}<textarea aria-label={t('features.token')} placeholder="eyJhbGciOiJFZERTQSIs..." value={token} onChange={event => setToken(event.target.value)} rows={4} spellCheck={false} autoComplete="off" disabled={busy} /></label>
         <div className="form-actions"><button className="primary-button" type="submit" disabled={busy || !token.trim()}>{t('features.activate')}</button></div>
       </form>
     </>}

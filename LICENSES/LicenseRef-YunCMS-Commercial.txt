@@ -29,7 +29,11 @@ Subject to a valid entitlement issued or expressly authorized by Yunsoft
 Software, you may use, reproduce and modify Premium Components internally to
 operate the features, production site and associated environments identified by
 that entitlement. A YunCMS Premium one-time purchase grants perpetual use for
-its licensed production domain without a mandatory recurring license fee.
+its licensed production domain without a mandatory recurring license fee. A
+purchased term entitlement (such as monthly or annual) grants use for its
+licensed production domain through the expiration time stated in that
+entitlement, after which Premium Components deactivate unless renewed;
+previously released MIT and perpetual commercial grants remain unchanged.
 The canonical domain and its www alias are one site; the CMS API hostname used
 only for that same site does not require an additional site license. Independent
 production sites/domains require their own entitlements. Local development and
@@ -62,11 +66,11 @@ container distributions or other legally required locations.
 5. Customer data and operational continuity
 Your content and other customer data remain yours. Community features, native
 security protections, access to your data and ordinary export/backup rights are
-not conditional on a Premium purchase. A missing or unverifiable Premium
-entitlement does not authorize deletion of data or shutdown of Community
-functionality. Paid remote services and third-party providers retain their own
-availability, charging and data-processing terms. No unlimited hosted AI usage
-is included in a one-time software license.
+not conditional on a Premium purchase. A missing, expired or unverifiable
+Premium entitlement does not authorize deletion of data or shutdown of
+Community functionality. Paid remote services and third-party providers retain
+their own availability, charging and data-processing terms. No unlimited hosted
+AI usage is included in a one-time or term software license.
 
 6. Restrictions applying only to Premium Components
 Except as expressly granted above or required by applicable law, you may not

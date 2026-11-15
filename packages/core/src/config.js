@@ -1,5 +1,6 @@
 import { loadEnvFile } from 'node:process';
 import { totpKey } from './auth/totp.js';
+import { resolveLicenseDomain } from './features.js';
 
 export const DEFAULT_SERVER_PORT = 3008;
 
@@ -66,7 +67,12 @@ export function loadConfig(env = process.env) {
     features: {
       token: readString(env.YUNCMS_LICENSE_TOKEN, '') || null,
       publicKey: readString(env.YUNCMS_LICENSE_PUBLIC_KEY, '') || null,
-      domain: readString(env.YUNCMS_LICENSE_DOMAIN, '') || null,
+      domain: resolveLicenseDomain({
+        domain: readString(env.YUNCMS_LICENSE_DOMAIN, ''),
+        publicUrl: readString(env.AUTH_PUBLIC_URL, ''),
+        yuncmsPublicUrl: readString(env.YUNCMS_PUBLIC_URL, ''),
+        studioOrigin,
+      }),
       instanceId: readString(env.YUNCMS_LICENSE_INSTANCE_ID, '') || null,
       disabled: readString(env.YUNCMS_FEATURES_DISABLED, '').split(',').map(value => value.trim()).filter(Boolean),
     },

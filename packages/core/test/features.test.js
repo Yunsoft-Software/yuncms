@@ -1,8 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { createHash, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
 import { loadConfig } from '../src/config.js';
-import { createFeaturePolicy, effectiveFeatureState, verifyFeatureLicense } from '../src/features.js';
+import {
+  OFFICIAL_LICENSE_KEY_ID,
+  OFFICIAL_LICENSE_PUBLIC_KEY,
+  createFeaturePolicy,
+  effectiveFeatureState,
+  resolveLicenseDomain,
+  verifyFeatureLicense,
+} from '../src/features.js';
 import { parseItemRevision, assertItemRevision, contentTracking, restrictMutationToKeys } from '../src/content-state.js';
 import { historyRestoreValues } from '../src/premium/content-revisions-service.js';
 import { historySnapshot } from '../src/premium/history-recorder.js';
@@ -94,6 +101,66 @@ test('expiry and operator disable cannot be reversed by an administrator feature
   assert.throws(() => createFeaturePolicy({ disabled: ['typo'] }), { code: 'INVALID_FEATURE' });
 });
 
+test('monthly_term 1-month and 12-month tokens, dedicated API/staging hosts, instance binding and anti-replay replacement rules', () => {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const monthExp = nowSec + 30 * 86400;
+  const yearExp = nowSec + 365 * 86400;
+  const monthly = token({
+    sub: 'lic-term-1', licenseId: 'lic-term-1', billingModel: 'monthly_term', periodMonths: 1,
+    entitlementVersion: 1, iat: nowSec, exp: monthExp, activatedInstanceId: 'node-prod-1',
+    allowedHosts: ['example.com', 'www.example.com', 'api.example.com'],
+    stagingHosts: ['staging.example.com', 'dev.example.com', 'localhost', '127.0.0.1'],
+    capabilities: { contentHistory: true, whiteLabel: true },
+  });
+  for (const domain of ['example.com', 'www.example.com', 'api.example.com', 'staging.example.com', 'dev.example.com', 'localhost', '127.0.0.1']) {
+    const policy = createFeaturePolicy({ token: `  ${monthly}\n`, publicKey, domain, instanceId: 'node-prod-1' });
+    assert.equal(policy.describe('contentHistory').allowed, true);
+    assert.equal(policy.describe('whiteLabel').allowed, true);
+    assert.deepEqual(policy.licenseStatus(), {
+      status: 'active',
+      domain,
+      licenseId: 'lic-term-1',
+      billingModel: 'monthly_term',
+      periodMonths: 1,
+      expiresAt: new Date(monthExp * 1000).toISOString(),
+      entitlementVersion: 1,
+    });
+  }
+  // Missing or wrong instanceId must fail even if token is otherwise valid or expired.
+  assert.equal(verifyFeatureLicense({ token: monthly, publicKey, domain: 'example.com' }).status, 'invalid');
+  assert.equal(verifyFeatureLicense({ token: monthly, publicKey, domain: 'example.com', instanceId: 'node-prod-2' }).status, 'invalid');
+  const expiredWrongDomain = token({ billingModel: 'monthly_term', periodMonths: 1, exp: nowSec - 60, allowedHosts: ['other.example.com'], stagingHosts: [] });
+  assert.equal(verifyFeatureLicense({ token: expiredWrongDomain, publicKey, domain: 'example.com' }).status, 'invalid');
+  assert.equal(verifyFeatureLicense({ token: token({ exp: 'not-an-integer' }), publicKey, domain: 'example.com' }).status, 'invalid');
+  assert.equal(verifyFeatureLicense({ token: token({ periodMonths: 12 }), publicKey, domain: 'example.com' }).status, 'invalid');
+  assert.equal(verifyFeatureLicense({ token: token({ billingModel: 'monthly_term', periodMonths: 0, exp: monthExp }), publicKey, domain: 'example.com' }).status, 'invalid');
+  assert.equal(verifyFeatureLicense({ token: token({ entitlementVersion: 0 }), publicKey, domain: 'example.com' }).status, 'invalid');
+  assert.equal(verifyFeatureLicense({ token: token({ status: 'expired', billingModel: 'monthly_term', periodMonths: 1, exp: nowSec - 5 }), publicKey, domain: 'example.com' }).status, 'expired');
+
+  const annualRenewal = token({
+    sub: 'lic-term-1', licenseId: 'lic-term-1', billingModel: 'monthly_term', periodMonths: 12,
+    entitlementVersion: 2, iat: nowSec + 5, exp: yearExp, activatedInstanceId: 'node-prod-1',
+    allowedHosts: ['example.com', 'www.example.com', 'api.example.com'],
+    capabilities: { contentHistory: true, whiteLabel: true },
+  });
+  const initialPolicy = createFeaturePolicy({ publicKey, domain: 'example.com', instanceId: 'node-prod-1' });
+  assert.equal(initialPolicy.canReplaceWith(monthly), true);
+  const v1Policy = initialPolicy.withToken(monthly);
+  assert.equal(v1Policy.canReplaceWith(monthly), true);
+  assert.equal(v1Policy.canReplaceWith(annualRenewal), true);
+  const v2Policy = initialPolicy.withToken(annualRenewal);
+  assert.equal(v2Policy.licenseStatus().periodMonths, 12);
+  assert.equal(v2Policy.licenseStatus().entitlementVersion, 2);
+  // Stale v1 token replay over active v2 renewal is rejected.
+  assert.equal(v2Policy.canReplaceWith(monthly), false);
+  // Earlier iat / shorter expiry for same version is rejected.
+  const sameVersionOlder = token({
+    sub: 'lic-term-1', licenseId: 'lic-term-1', billingModel: 'monthly_term', periodMonths: 1,
+    entitlementVersion: 2, iat: nowSec, exp: monthExp, activatedInstanceId: 'node-prod-1',
+  });
+  assert.equal(v2Policy.canReplaceWith(sameVersionOlder), false);
+});
+
 test('revision parsing preserves full unsigned BIGINT and rejects ambiguous or unsafe values', () => {
   for (const value of [0, 1, '0', '9007199254740993', '18446744073709551615']) assert.equal(parseItemRevision(value), String(value));
   for (const value of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, '01', '-1', '1e2', '18446744073709551616', {}, []]) {
@@ -114,8 +181,56 @@ test('tracked bulk mutations target only their locked keys even under read commi
   assert.throws(() => restrictMutationToKeys({ sql: '', params: [] }, 'id;DELETE', ['key']));
 });
 
-test('license configuration defaults to Community and maps each optional server setting explicitly', () => {
+test('license configuration defaults to official Yunsoft public trust anchor, resolves non-local public URLs safely and preserves explicit overrides', () => {
+  const officialKey = createPublicKey(OFFICIAL_LICENSE_PUBLIC_KEY);
+  assert.equal(officialKey.asymmetricKeyType, 'ed25519');
+  const computedKid = createHash('sha256').update(officialKey.export({ type: 'spki', format: 'der' })).digest('hex').slice(0, 16);
+  assert.equal(computedKid, OFFICIAL_LICENSE_KEY_ID);
+  assert.equal(OFFICIAL_LICENSE_KEY_ID, '1cbcc4d3173d0c15');
+
+  // Default localhost configuration keeps domain null so stagingHosts (localhost/127.0.0.1) never unlock an unconfigured server.
   assert.deepEqual(loadConfig({}).features, { token: null, publicKey: null, domain: null, instanceId: null, disabled: [] });
-  const features = loadConfig({ YUNCMS_LICENSE_TOKEN: 'signed', YUNCMS_LICENSE_PUBLIC_KEY: 'public', YUNCMS_LICENSE_DOMAIN: 'example.test', YUNCMS_LICENSE_INSTANCE_ID: 'instance', YUNCMS_FEATURES_DISABLED: 'mcp, flowScripts' }).features;
+  for (const localUrl of [
+    'http://localhost:3008',
+    'http://127.0.0.1:3008',
+    'http://0.0.0.0:3008',
+    'http://[::1]:3008',
+    'http://192.168.1.20:3008',
+    'http://app.localhost:3008',
+    'http://cms.local:3008',
+    'http://mysql:3008',
+    'https://user:pass@cms.example.com',
+    'https://cms.example.com?override=1',
+  ]) {
+    assert.equal(resolveLicenseDomain({ AUTH_PUBLIC_URL: localUrl, STUDIO_ORIGIN: localUrl }), null);
+  }
+
+  // Real non-local public origins resolve installation domain automatically without YUNCMS_LICENSE_DOMAIN.
+  assert.equal(loadConfig({ AUTH_PUBLIC_URL: 'https://cms.example.com' }).features.domain, 'cms.example.com');
+  assert.equal(loadConfig({ AUTH_PUBLIC_URL: 'http://localhost:3008', STUDIO_ORIGIN: 'https://studio.example.com:8443' }).features.domain, 'studio.example.com');
+  assert.equal(loadConfig({ YUNCMS_PUBLIC_URL: 'https://münchen.de' }).features.domain, 'xn--mnchen-3ya.de');
+  assert.deepEqual(createFeaturePolicy({ AUTH_PUBLIC_URL: 'https://cms.example.com' }).licenseStatus(), {
+    status: 'missing',
+    configuredDomain: 'cms.example.com',
+  });
+
+  // Explicit YUNCMS_LICENSE_DOMAIN and YUNCMS_LICENSE_PUBLIC_KEY overrides retain strict precedence and fail closed when invalid.
+  const features = loadConfig({
+    AUTH_PUBLIC_URL: 'https://cms.example.com',
+    YUNCMS_LICENSE_TOKEN: 'signed',
+    YUNCMS_LICENSE_PUBLIC_KEY: 'public',
+    YUNCMS_LICENSE_DOMAIN: 'example.test',
+    YUNCMS_LICENSE_INSTANCE_ID: 'instance',
+    YUNCMS_FEATURES_DISABLED: 'mcp, flowScripts',
+  }).features;
   assert.deepEqual(features, { token: 'signed', publicKey: 'public', domain: 'example.test', instanceId: 'instance', disabled: ['mcp', 'flowScripts'] });
+
+  const invalidDomainOverride = createFeaturePolicy({ AUTH_PUBLIC_URL: 'https://example.com', YUNCMS_LICENSE_DOMAIN: 'https://bad:443', publicKey, token: token() });
+  assert.equal(invalidDomainOverride.licenseStatus().status, 'invalid');
+
+  // Default trust anchor rejects tokens signed by untrusted keys even if header.kid spoofs 1cbcc4d3173d0c15.
+  const spoofedKidToken = token({}, { kid: OFFICIAL_LICENSE_KEY_ID });
+  assert.equal(verifyFeatureLicense({ token: spoofedKidToken, domain: 'example.com' }).status, 'invalid');
+  assert.equal(verifyFeatureLicense({ token: spoofedKidToken, publicKey: '', domain: 'example.com' }).status, 'invalid');
+  assert.equal(verifyFeatureLicense({ token: token(), publicKey: 'invalid-pem', domain: 'example.com' }).status, 'invalid');
 });

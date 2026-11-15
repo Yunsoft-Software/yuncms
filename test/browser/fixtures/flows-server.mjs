@@ -27,9 +27,9 @@ import { McpSettingsStore } from '../../../packages/api/src/mcp/settings-store.j
 
 if (process.env.YUNCMS_TEST_MYSQL !== '1' || process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE !== '1') throw Error('Browser acceptance requires an explicitly authorized disposable MySQL database');
 const licenseKeys = generateKeyPairSync('ed25519');
-const config = loadConfig({ ...process.env, AUTH_PUBLIC_URL: `http://127.0.0.1:${Number(process.env.YUNCMS_BROWSER_PORT ?? 34074)}`, AUTH_TOTP_KEY: process.env.AUTH_TOTP_KEY || randomBytes(32).toString('hex'), API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', AUTH_ACTION_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
+const config = loadConfig({ ...process.env, AUTH_PUBLIC_URL: `http://127.0.0.1:${Number(process.env.YUNCMS_BROWSER_PORT ?? 34074)}`, YUNCMS_PUBLIC_URL: 'https://browser.example.test', YUNCMS_LICENSE_DOMAIN: '', AUTH_TOTP_KEY: process.env.AUTH_TOTP_KEY || randomBytes(32).toString('hex'), API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', AUTH_ACTION_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
 if (!/(test|ci|dev)/i.test(config.database.database)) throw Error('Browser fixture requires a disposable test/ci/dev database');
-config.features = { ...config.features, publicKey: licenseKeys.publicKey.export({ type: 'spki', format: 'pem' }), domain: 'browser.example.test' };
+config.features = { ...config.features, publicKey: licenseKeys.publicKey.export({ type: 'spki', format: 'pem' }) };
 const pool = createDatabasePool({ ...config.database, connectionLimit: 5 }), accountability = createSystemAccountability();
 const root = await mkdtemp(join(tmpdir(), 'yuncms-flows-browser-'));
 const logPath = join(root, 'server.jsonl'), logStream = createWriteStream(logPath, { flags: 'a' });
@@ -126,13 +126,14 @@ try {
     await pool.query('DELETE FROM yuncms_feature_settings');
     res.status(204).end();
   });
-  fixture.post('/features/license-token', (_req, res) => {
+  fixture.post('/features/license-token', (req, res) => {
     const now = Math.floor(Date.now() / 1000);
+    const patch = req.body && typeof req.body === 'object' ? req.body : {};
     const header = Buffer.from(JSON.stringify({ alg: 'EdDSA', crv: 'Ed25519', typ: 'YUNSOFT-ENTITLEMENT+JWT',
       kid: createHash('sha256').update(licenseKeys.publicKey.export({ type: 'spki', format: 'der' })).digest('hex').slice(0, 16) })).toString('base64url');
     const payload = Buffer.from(JSON.stringify({ iss: 'yunsoft-commerce', sub: 'browser-disposable-license', productCode: 'yuncms_premium',
       status: 'active', billingModel: 'one_time_perpetual', iat: now, nbf: now - 1, exp: null,
-      allowedHosts: ['browser.example.test'], capabilities: { contentHistory: true } })).toString('base64url');
+      allowedHosts: ['browser.example.test'], capabilities: { contentHistory: true }, ...patch })).toString('base64url');
     res.json({ data: `${header}.${payload}.${sign(null, Buffer.from(`${header}.${payload}`), licenseKeys.privateKey).toString('base64url')}` });
   });
   fixture.post('/ai/deny', (_req, res) => { allowAiGeneration = false; res.status(204).end(); });

@@ -66,7 +66,14 @@ export { createServiceRegistry } from './services/service-registry.js';
 export { createCoreServiceRegistry } from './services/core-services.js';
 export { FeaturesService } from './services/features-service.js';
 export { ContentRevisionsService } from './premium/content-revisions-service.js';
-export { FEATURE_CATALOG, createFeaturePolicy, verifyFeatureLicense } from './features.js';
+export {
+  FEATURE_CATALOG,
+  OFFICIAL_LICENSE_KEY_ID,
+  OFFICIAL_LICENSE_PUBLIC_KEY,
+  createFeaturePolicy,
+  resolveLicenseDomain,
+  verifyFeatureLicense,
+} from './features.js';
 export { AuthService } from './services/auth-service.js';
 export { AuthTokensService } from './services/auth-tokens-service.js';
 export { TotpService } from './services/totp-service.js';

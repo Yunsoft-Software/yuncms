@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { brandStudioMessage } from '../src/premium/white-label.js';
 import { translate, DICTIONARIES, hasTranslation } from '../src/localization.js';
 import { normalizeStudioSettings, resolveStudioLogo, resolveStudioFavicon, studioDocumentTitle } from '../src/studio-settings.js';
+import { formatLicenseSummary } from '../src/license-summary.js';
 import { premiumContactUrl } from '../src/upgrade-link.js';
 
 const branding = { white_label_enabled: true, white_label_available: true, premium: true, brand_name: 'Acme Workspace' };
@@ -27,10 +28,32 @@ test('translated UI templates preserve customer values and literal brand-name pl
   assert.equal(translate('en', 'appearance.copyright', { year: 2026 }, { ...branding, brand_name: '{year} Client' }), '© 2026 {year} Client. All rights reserved.');
 });
 test('white-label and Premium discovery translations exist in all supported languages', () => {
-  for (const locale of Object.keys(DICTIONARIES)) for (const key of ['whiteLabel','whiteLabelHint','getPremium','resetAppearance','manageFeatures','default_disabled','brandNameFallback','neutralFavicon','noBrandImage','clearBrandImage','settingsAdminOnly']) {
+  for (const locale of Object.keys(DICTIONARIES)) for (const key of ['whiteLabel','whiteLabelHint','getPremium','resetAppearance','manageFeatures','default_disabled','brandNameFallback','neutralFavicon','noBrandImage','clearBrandImage','settingsAdminOnly','planPerpetual','planMonthly','planAnnual','planTerm','summaryPerpetual','summaryActiveTerm','summaryExpired','summaryReadyDomain','summaryMissingDomain']) {
     assert.equal(hasTranslation(locale, 'features.' + key), true);
     const message = translate(locale, 'features.' + key); assert.ok(message); assert.notEqual(message, 'features.' + key);
   }
+  assert.doesNotMatch(translate('en', 'features.perpetual'), /one payment/i);
+  assert.doesNotMatch(translate('tr', 'features.perpetual'), /tek ödeme/i);
+});
+test('license summary formats monthly, annual, perpetual and expired entitlements without vendor leakage', () => {
+  const tEn = (key, values) => translate('en', key, values, branding);
+  const tTr = (key, values) => translate('tr', key, values);
+  assert.equal(formatLicenseSummary(null, { locale: 'en', t: tEn }), '');
+  const missingUnconfigured = formatLicenseSummary({ status: 'missing' }, { locale: 'en', t: tEn });
+  assert.equal(missingUnconfigured, 'Set AUTH_PUBLIC_URL or STUDIO_ORIGIN to your site URL before activating a signed entitlement token (JWT).');
+  assert.doesNotMatch(missingUnconfigured, /yuncms|yunsoft/i);
+  const missingReady = formatLicenseSummary({ status: 'missing', configuredDomain: 'cms.example.com' }, { locale: 'en', t: tEn });
+  assert.equal(missingReady, 'Installation domain: cms.example.com. Paste the signed entitlement token (JWT), not the short license key.');
+  assert.doesNotMatch(missingReady, /yuncms|yunsoft/i);
+  assert.equal(formatLicenseSummary({ status: 'missing', configuredDomain: 'ornek.com.tr' }, { locale: 'tr', t: tTr }), 'Kurulum alan adı: ornek.com.tr. Kısa lisans anahtarını değil, imzalı yetki belgesini (JWT) yapıştırın.');
+  assert.equal(formatLicenseSummary({ status: 'active', domain: 'example.com', billingModel: 'one_time_perpetual', expiresAt: null }, { locale: 'en', t: tEn }), 'example.com · Perpetual');
+  const activeMonthly = formatLicenseSummary({ status: 'active', domain: 'example.com', billingModel: 'monthly_term', periodMonths: 1, expiresAt: '2026-12-15T00:00:00.000Z' }, { locale: 'en', t: tEn });
+  assert.match(activeMonthly, /^example\.com · Monthly \(1 month\) · Valid until /);
+  assert.doesNotMatch(activeMonthly, /yuncms|yunsoft/i);
+  const activeAnnualTr = formatLicenseSummary({ status: 'active', domain: 'ornek.com.tr', billingModel: 'monthly_term', periodMonths: 12, expiresAt: '2027-11-15T00:00:00.000Z' }, { locale: 'tr', t: tTr });
+  assert.match(activeAnnualTr, /^ornek\.com\.tr · Yıllık \(12 ay\) · .+ tarihine kadar geçerli$/);
+  const expiredSummary = formatLicenseSummary({ status: 'expired', domain: 'example.com', billingModel: 'monthly_term', periodMonths: 1, expiresAt: '2026-10-01T00:00:00.000Z' }, { locale: 'en', t: tEn });
+  assert.match(expiredSummary, /Expired on .*renewed signed license/);
 });
 test('upgrade links point to the bilingual Yunsoft contact pages with the Premium campaign', () => {
   const campaign = '?utm_source=studio&utm_medium=yuncms&utm_campaign=yuncms-premium';
@@ -56,4 +79,7 @@ test('authentication captions and new Flow run examples follow the effective cus
   assert.match(brand, /white_label_enabled \? settings.brand_name : 'YunCMS'/);
   const flows = readFileSync(new URL('../src/screens/FlowsScreen.jsx', import.meta.url), 'utf8');
   assert.match(flows, /name: settings.white_label_enabled \? settings.brand_name : 'YunCMS'/);
+  const features = readFileSync(new URL('../src/screens/FeaturesScreen.jsx', import.meta.url), 'utf8');
+  assert.match(features, /formatLicenseSummary\(status\.license,\s*\{\s*locale,\s*t\s*\}\)/);
+  assert.match(features, /<textarea aria-label=\{t\('features\.token'\)\}[^>]*placeholder="eyJhbGciOiJFZERTQSIs\.\.\."/);
 });

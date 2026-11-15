@@ -9,14 +9,18 @@ including 0.1.47, retain their original permissions. The complete distribution
 contains both MIT and proprietary components and must not be described as wholly
 MIT or wholly open source.
 
-A YunCMS Premium purchase is a one-time, perpetual license per production site
-domain. Its www alias and an API hostname serving only that same site are part
-of the site, while independent production sites need separate entitlements.
-Development/staging hosts and instance transfers must be included in the issued
-entitlement. Moving servers does not require buying the same site license again;
-request a replacement entitlement from Yunsoft for a domain/instance transfer.
-YunPanel is a separate product with its own subscription. Provider AI charges,
-managed hosting and support are not included in a YunCMS software license.
+YunCMS Premium entitlements are bound to a production site domain and may be
+issued as monthly (1-month) or annual (12-month) term licenses
+(`billingModel: monthly_term`) or as one-time perpetual licenses
+(`billingModel: one_time_perpetual`; existing perpetual grants remain valid).
+Its www alias and an API hostname serving only that same site are part of the
+site when listed in the signed entitlement, while independent production sites
+need separate entitlements. Development/staging hosts and instance transfers
+must be included in the issued entitlement. Renewals and server/domain
+transfers produce a replacement signed entitlement that an administrator
+installs without rebuilding or restarting. YunPanel is a separate product with
+its own subscription. Provider AI charges, managed hosting and support are not
+included in a YunCMS software license.
 
 ## White-label branding and Community identity
 
@@ -50,32 +54,54 @@ from changing its presentation.
 
 ## Configure trust
 
-Configure these values on the server, never in the browser bundle:
+Official YunCMS distributions include the Yunsoft Commerce Ed25519 public trust
+anchor (`kid: 1cbcc4d3173d0c15`) by default and derive the installation hostname
+from your configured non-local public URL (`AUTH_PUBLIC_URL`, `YUNCMS_PUBLIC_URL`
+or `STUDIO_ORIGIN`). On a standard production deployment where `AUTH_PUBLIC_URL`
+or `STUDIO_ORIGIN` already names your HTTPS site origin, no extra `.env` license
+variables are needed before pasting your signed entitlement in Studio. Optional
+server overrides are configured on the server, never in the browser bundle:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `YUNCMS_LICENSE_PUBLIC_KEY` | unset | Trusted Yunsoft Ed25519 public key in PEM form; literal `\n` is accepted. Obtain the public key through a verified Yunsoft channel. Never configure a private signing key here. |
-| `YUNCMS_LICENSE_DOMAIN` | unset | Exact licensed production or staging hostname, without scheme, path or port. |
+| `YUNCMS_LICENSE_PUBLIC_KEY` | official Yunsoft Ed25519 public key | Optional override Ed25519 public key in PEM form; literal `\n` is accepted. When set, only this key is trusted. Never configure a private signing key here. |
+| `YUNCMS_LICENSE_DOMAIN` | derived from non-local `AUTH_PUBLIC_URL` / `YUNCMS_PUBLIC_URL` / `STUDIO_ORIGIN` | Explicit licensed production or staging hostname, without scheme, path or port. Required when testing on `localhost` / `127.0.0.1` or when the licensed hostname differs from the configured public URL. |
 | `YUNCMS_LICENSE_INSTANCE_ID` | unset | Required when the entitlement is bound to a particular instance. |
-| `YUNCMS_LICENSE_TOKEN` | unset | Optional signed entitlement, used when no license has been installed in the database. |
+| `YUNCMS_LICENSE_TOKEN` | unset | Optional signed entitlement JWT, used when no license has been installed in the database. |
 | `YUNCMS_FEATURES_DISABLED` | empty | Comma-separated operator deny list of catalog keys. An unknown key rejects configuration. |
 
-The configured domain is explicit; an untrusted request Host header cannot choose
-a licensed domain. Verification checks Ed25519 signature, trusted key identifier,
-issuer `yunsoft-commerce`, product `yuncms_premium`, active status, time, hostname
-and optional instance. Only explicitly true signed capability keys grant Premium
-rights. A perpetual entitlement has `billingModel: one_time_perpetual` and
-`exp: null`. Verification is local and does not call a licensing server on every
-request. Temporarily losing internet access does not expire a perpetual grant.
-The deployment operator controls its trusted configuration; this is not a
-sandbox against trusted server code or administrators modifying MIT source.
+The installation domain is resolved strictly from explicit server configuration;
+untrusted HTTP `Host` / `X-Forwarded-Host` headers and host claims inside the
+submitted token are never used to choose the server's own domain. Loopback, IP
+literals and single-label local hostnames (such as `localhost` or `127.0.0.1`)
+are never auto-derived from `AUTH_PUBLIC_URL` or `STUDIO_ORIGIN`, so `stagingHosts`
+cannot unlock an unconfigured production server. Verification checks Ed25519
+signature, trusted key identifier, issuer `yunsoft-commerce`, product
+`yuncms_premium`, status, time (`nbf`, `iat`, `exp`), hostname (`allowedHosts`
+and `stagingHosts`) and optional `activatedInstanceId`. Only explicitly true
+signed capability keys grant Premium rights. A perpetual entitlement has
+`billingModel: one_time_perpetual` and `exp: null`; a term entitlement has
+`billingModel: monthly_term` with a required integer `exp` (and optional
+`periodMonths`, such as `1` or `12`). Verification is local and does not call a
+licensing server on every request. Temporarily losing internet access does not
+revoke a valid signed grant before its `exp`. When a term entitlement passes
+`exp`, `license.status` becomes `expired` and Premium features deactivate cleanly
+while preserving Community CRUD, auth, RBAC, files, stored revisions and saved
+branding until a renewed signed entitlement is installed. The deployment operator
+controls its trusted configuration; this is not a sandbox against trusted server
+code or administrators modifying MIT source.
 
 ## Manage an installation
 
 ![Features and license in YunCMS Studio](assets/screenshots/studio-features.png)
 
-An administrator opens **Settings → Features and license**, installs the signed
-token, and enables or disables authorized features. A database-installed token
+An administrator opens **Settings → Features and license**, confirms the
+displayed installation domain, pastes the full three-part signed entitlement
+token (`YUNSOFT-ENTITLEMENT+JWT`, starting with `eyJ...` — not the short human
+`licenseKey` reference from the customer portal), and enables or disables
+authorized features. If the server is still using a local default URL without an
+explicit domain, Studio prompts the administrator to set `AUTH_PUBLIC_URL`,
+`STUDIO_ORIGIN` or `YUNCMS_LICENSE_DOMAIN` first. A database-installed token
 takes precedence over the environment token and applies without rebuilding or
 restarting. Tokens are never returned by the API. Do not include them in logs,
 screenshots or support tickets. Back up the database and preserve trusted server
@@ -99,10 +125,14 @@ future mutations; it does not reconstruct changes made while recording was off.
 ### REST and services
 
 * `GET /features`: authenticated users receive effective features; only
-  administrators receive a non-secret license status.
+  administrators receive a non-secret license status (`status`, `configuredDomain`
+  when not yet activated, and `domain`, `licenseId`, `billingModel`,
+  `periodMonths`, `expiresAt` and `entitlementVersion` when verified).
 * `PATCH /features/:feature` with `{ "enabled": false }`: administrator only.
-* `POST /features/license` with `{ "token": "<signed entitlement>" }`:
-  administrator only; signature/domain/instance validation precedes persistence.
+* `POST /features/license` with `{ "token": "<signed entitlement JWT>" }`:
+  administrator only; requires a configured installation domain and a three-part
+  signed JWT (short portal reference keys are rejected); signature, domain,
+  instance, active validity and anti-rollback version checks precede persistence.
 
 These correspond to `FeaturesService.readStatus()`, `.update(name, { enabled })`,
 `.activate(token)` and `.assertEnabled(name)`. Pass the deployment's `featurePolicy`
