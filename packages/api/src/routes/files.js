@@ -2,6 +2,7 @@ import { pipeline } from 'node:stream/promises';
 import express from 'express';
 
 import { evaluateRangeRequest } from '../byte-range.js';
+import { fileContentCacheControl, privateFileContentCache } from '../file-cache.js';
 import { serviceOptionsFromRequest } from '../service-options.js';
 
 function filesService(req) {
@@ -80,6 +81,7 @@ async function pipeStreamToResponse(stream, res, req = null) {
 }
 
 function clearFileHeaders(res) {
+  res.set('cache-control', fileContentCacheControl());
   res.removeHeader('accept-ranges');
   res.removeHeader('content-type');
   res.removeHeader('content-disposition');
@@ -127,8 +129,11 @@ export function createFilesRouter({ maxUploadBytes = 25 * 1024 * 1024 } = {}) {
     res.json({ data });
   });
 
+  router.use('/:id/content', privateFileContentCache);
+
   router.head('/:id/content', async (req, res) => {
     const info = await filesService(req).readContentInfo(req.params.id);
+    res.set('cache-control', fileContentCacheControl(req.accountability));
     res.set('etag', info.etag);
     if (info.modifiedAt) {
       res.set('last-modified', info.modifiedAt.toUTCString());
@@ -146,6 +151,7 @@ export function createFilesRouter({ maxUploadBytes = 25 * 1024 * 1024 } = {}) {
   router.get('/:id/content', async (req, res) => {
     const service = filesService(req);
     const info = await service.readContentInfo(req.params.id);
+    res.set('cache-control', fileContentCacheControl(req.accountability));
 
     res.set('etag', info.etag);
     if (info.modifiedAt) {

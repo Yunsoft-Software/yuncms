@@ -100,6 +100,7 @@ const FAST_TESTS = [
   'packages/api/test/automations.test.js',
   'packages/api/test/flows.test.js',
   'packages/api/test/byte-range.test.js',
+  'packages/api/test/file-cache.test.js',
   'packages/api/test/error-response.test.js',
   'packages/api/test/extension-discovery-matrix.test.js',
   'packages/api/test/extensions.test.js',

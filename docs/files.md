@@ -193,6 +193,34 @@ Built-in storage drivers stream downloads through the YunCMS API. This keeps the
   - Strong entity tags (`ETag`) use the provider's valid RFC 9110 strong ETag when available.
   - Otherwise, YunCMS generates a native strong ETag based on the unique file ID, safe integer byte size, and modification timestamp in milliseconds: `"<id>-<sizeHex>-<mtimeMsHex>"`. Representation `Last-Modified` headers use standard HTTP-date second precision.
 
+### Permission-aware HTTP caching
+
+`/files/:id/content` uses `Cache-Control: private, no-store` for authenticated
+requests and denied/missing file responses. This applies to GET, HEAD, partial
+content, conditional responses and unsatisfiable ranges. Each new request must
+pass current native authorization; an earlier successful download must not let
+a browser reuse private bytes after role revocation or a change of user.
+
+After an unauthenticated request passes an intentional Public role Files read
+grant, the response uses `Cache-Control: public, no-cache, must-revalidate`.
+Browsers and shared caches may store that public representation, but must
+revalidate it with the origin before every reuse, including after a public
+grant is removed. Authorized conditional requests can still return 304;
+revoked requests cannot validate the old representation. Content responses
+vary on `Authorization` and `Cookie`, preserving any existing `Vary` entries.
+
+YunCMS's native download endpoint is `/files/:id/content`; `/assets/:id` is not
+a native Files alias. A consumer proxy or extension mapping an asset URL to
+this endpoint must preserve its authorization, cache and `Vary` headers.
+Studio's versioned JavaScript/CSS assets have their own static cache policy.
+
+These headers govern subsequent requests, not bytes already downloaded by a
+client. Previously stored responses from an older deployment cannot receive
+new headers until the browser contacts the server. When upgrading an affected
+deployment, invalidate any proxy/CDN copies and refresh or version existing
+client download URLs once to avoid reusing an old heuristically fresh entry.
+Do not configure a proxy/CDN to override native private or revalidation policy.
+
 ### Media CORS contract
 
 For web browsers loading media (such as audio, video, or streamed documents) across origins from the configured Studio/client origin (`STUDIO_ORIGIN`):

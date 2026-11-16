@@ -14,6 +14,7 @@ import { createAuditRouter } from './routes/audit.js';
 import { createFeaturesRouter } from './routes/features.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createFilesRouter } from './routes/files.js';
+import { privateFileContentCache } from './file-cache.js';
 import { createItemsRouter } from './routes/items.js';
 import { createPermissionsRouter } from './routes/permissions.js';
 import { createRolesRouter } from './routes/roles.js';
@@ -222,6 +223,8 @@ export function createApp({
     } : {}),
     ...config.features,
   });
+  // Authentication failures must not leave a cacheable private download reply.
+  app.use('/files/:id/content', privateFileContentCache);
   app.use(createAuthenticationMiddleware({ pool, config, logger, services, schemaCache, permissionCache, emitter, storage, featurePolicy }));
   const requestEvents = createRequestEvents(emitter);
   if (requestEvents) app.use(requestEvents);
