@@ -72,6 +72,14 @@ System-managed and custom system-extension fields remain visually distinct from 
 | `json` | `JSON` | structured JSON data |
 | `uuid` | `CHAR(36)` | UUID values, relations and Files-backed controls |
 
+### JSON numbers and exact integers
+
+Numbers in a `json` field are returned as JavaScript numbers, including nested
+values. They can round outside JavaScript's safe integer range (±9,007,199,254,740,991).
+Use a `bigint` field for an exact SQL integer or store an exact integer as an
+explicit decimal string inside a JSON document. YunCMS returns SQL `bigint`
+values as decimal strings and preserves JSON values already stored as strings.
+
 ### String length
 
 `string` defaults to 255 characters and supports lengths from 1 to 4096.

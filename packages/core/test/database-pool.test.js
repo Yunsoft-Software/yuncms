@@ -22,6 +22,29 @@ test('createDatabasePool configures timezone Z and dateStrings DATE by default',
   }
 });
 
+test('database pool decodes JSON numbers separately from exact SQL BIGINT strings', async () => {
+  const pool = createDatabasePool({ host: '127.0.0.1', database: 'yuncms_test', user: 'root' });
+
+  try {
+    const { typeCast, supportBigNumbers, bigNumberStrings } = pool.pool.config.connectionConfig;
+    assert.equal(supportBigNumbers, true);
+    assert.equal(bigNumberStrings, true);
+    const next = () => assert.fail('JSON should use the pool decoder');
+    const string = (encoding) => {
+      assert.equal(encoding, 'utf8');
+      return '[9007199254740993,"9007199254740993","Türkçe"]';
+    };
+    const expected = [9007199254740992, '9007199254740993', 'Türkçe'];
+    assert.deepEqual(typeCast({ type: 'JSON', string }, next), expected);
+    assert.deepEqual(typeCast({ type: 'BLOB', extendedFormat: 'json', string }, next), expected);
+    assert.equal(typeCast({ type: 'JSON', string: () => null }, next), null);
+    assert.equal(typeCast({ type: 'LONGLONG' }, () => '9223372036854775807'), '9223372036854775807');
+    assert.equal(typeCast({ type: 'BLOB' }, () => '[1,2]'), '[1,2]');
+  } finally {
+    await closeDatabasePool(pool);
+  }
+});
+
 test('createDatabasePool queues SET SESSION time_zone on connection event', async () => {
   const pool = createDatabasePool({
     host: '127.0.0.1',

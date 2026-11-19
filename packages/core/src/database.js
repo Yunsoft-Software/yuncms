@@ -18,6 +18,14 @@ export function createDatabasePool(config) {
     keepAliveInitialDelay: 0,
     supportBigNumbers: true,
     bigNumberStrings: true,
+    typeCast(field, next) {
+      // Keep SQL BIGINT handling separate from JavaScript JSON number semantics.
+      if (field.type === 'JSON' || field.extendedFormat === 'json') {
+        const json = field.string('utf8');
+        return json === null ? null : JSON.parse(json);
+      }
+      return next();
+    },
     multipleStatements: false,
     ssl: config.ssl ? { minVersion: 'TLSv1.2' } : undefined,
   });

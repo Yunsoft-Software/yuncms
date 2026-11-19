@@ -157,7 +157,9 @@ test('Studio creates every supported field type through native schema writes and
       await editor.locator(`[data-field="value_${field}"] input, [data-field="value_${field}"] textarea`).fill(value);
     }
     await editor.locator('[data-field="value_boolean"] input').check();
-    await editor.locator('[data-field="value_json"] textarea').fill('{"native":true,"list":[1,"Türkçe"]}');
+    const jsonField = editor.locator('[data-field="value_json"] textarea');
+    const jsonDocument = { native: true, list: [1, 'Türkçe'], maximum: 9223372036854776000 };
+    await jsonField.fill(JSON.stringify(jsonDocument));
     await editor.locator('[data-field="value_richtext"] [contenteditable=true]').fill('Native rich text');
     mediaFile = await mutation(page, '/files', 'POST', () => editor.locator('[data-field="value_image"] input[type=file]').setInputFiles({ name: collection + '.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#2563eb"/></svg>') }));
     await expect(editor.locator('[data-field="value_image"] select')).toHaveValue(mediaFile.id);
@@ -168,12 +170,20 @@ test('Studio creates every supported field type through native schema writes and
     expect(saved).toMatchObject({ value_string: 'Native Unicode — Türkçe العربية 日本語', value_text: 'First line\nSecond line', value_integer: 42, value_date: '2026-11-04', value_uuid: '11111111-1111-4111-8111-111111111111', value_image: mediaFile.id, value_file: mediaFile.id });
     expect(String(saved.value_bigint)).toBe('9007199254740993');
     expect(Number(saved.value_decimal)).toBe(1234.56); expect([true, 1]).toContain(saved.value_boolean);
-    expect(typeof saved.value_json === 'string' ? JSON.parse(saved.value_json) : saved.value_json).toEqual({ native: true, list: [1, 'Türkçe'] });
+    expect(saved.value_json).toEqual(jsonDocument);
     expect(saved.value_richtext).toContain('Native rich text');
     await expect(page).toHaveURL(new RegExp(`#/content/${collection}$`));
     await page.goto(`/#/content/${collection}/${record.id}`);
     await expect(editor.locator('[data-field="value_bigint"] input')).toHaveValue('9007199254740993');
     await expect(editor.locator('[data-field="value_date"] input')).toHaveValue('2026-11-04');
+    await expect.poll(async () => JSON.parse(await jsonField.inputValue())).toEqual(jsonDocument);
+    const updatedJson = { ...JSON.parse(await jsonField.inputValue()), native: false };
+    await jsonField.fill(JSON.stringify(updatedJson));
+    await mutation(page, `/items/${collection}/${record.id}`, 'PATCH', () => editor.locator('.form-actions button[type=submit]').click());
+    const updated = await request.get(`/items/${collection}/${record.id}`, { headers });
+    expect(updated.ok()).toBe(true);
+    expect((await updated.json()).data.value_json).toEqual(updatedJson);
+    await page.goto(`/#/content/${collection}/${record.id}`);
     for (const field of ['datetime', 'timestamp']) await expect(editor.locator(`[data-field="value_${field}"] input`)).toHaveValue(/2026-11-04T12:30/);
     for (const field of ['file', 'image']) {
       const control = editor.locator(`[data-field="value_${field}"]`);
