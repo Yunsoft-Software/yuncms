@@ -1,7 +1,7 @@
 {
-  "yuncmsVersion": "2.1.2",
+  "yuncmsVersion": "2.1.3",
   "capturedAt": "2026-11-04",
-  "source": "Studio workflow screenshots with synthetic data. Revalidated for 2.1.2: Studio source is unchanged from 2.1.1; original capture dates and source details are retained below.",
+  "source": "Studio workflow screenshots with synthetic data. Revalidated for 2.1.3: Studio application source is unchanged from 2.1.2. Original capture dates and source details are retained below.",
   "files": [
     "studio-content.png",
     "studio-data-model.png",
@@ -25,7 +25,7 @@
     "studio-flows-import.png",
     "studio-features.png"
   ],
-  "verifiedAt": "2026-11-18",
+  "verifiedAt": "2026-11-20",
   "flowCaptures": {
     "capturedAt": "2026-11-04",
     "source": "Playwright Chromium against the production Studio build and real disposable MySQL/API, with synthetic users and records. Captures wait for fonts and loaded images and finish native CSS animations.",
