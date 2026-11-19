@@ -4,7 +4,7 @@ import { isAccountabilityCollectionDenied } from '../accountability.js';
 import { assertPermissionValidationRule } from '../permission-validation.js';
 import { compileFilter } from '../query.js';
 import { attachSchemaSnapshot, SchemaCache } from '../schema.js';
-import { dispatchAfterCommit } from '../transaction.js';
+import { dispatchAfterCommit, transactionContext } from '../transaction.js';
 import {
   assertSystemPermissionPayload,
   assertSystemResourceAction,
@@ -14,6 +14,7 @@ import { BaseService } from './base-service.js';
 
 const ACTIONS = new Set(['create', 'read', 'update', 'delete']);
 const defaultSchemaCache = new SchemaCache();
+const inProcessCacheGenerations = new WeakMap();
 
 function parseJson(value, fallback = null) {
   if (value == null) return fallback;
@@ -103,6 +104,15 @@ export class PermissionsService extends BaseService {
     }));
   }
 
+  async #invalidateCache() {
+    const cache = this.permissionCache;
+    if (!cache) return;
+    await dispatchAfterCommit(this.database, async () => {
+      inProcessCacheGenerations.set(cache, (inProcessCacheGenerations.get(cache) ?? 0) + 1);
+      await cache.clear();
+    });
+  }
+
   async #collectionSchema(collection) {
     const snapshot = this.schema ?? await this.schemaCache.get(this.database);
     const collectionSchema = snapshot.collections?.[collection];
@@ -121,9 +131,15 @@ export class PermissionsService extends BaseService {
     if (isAccountabilityCollectionDenied(this.accountability, collection)) {
       throw forbidden(`Access to ${collection} is restricted for this request`);
     }
+    // A managed connection reads its own grant writes without sharing its
+    // uncommitted or earlier snapshot with other requests.
+    const cache = transactionContext(this.database) ? null : this.permissionCache;
+    const sharedGeneration = cache?.readGeneration ? await cache.readGeneration() : undefined;
+    const generation = cache && (inProcessCacheGenerations.get(cache) ?? 0);
     const key = cacheKey(this.accountability, action, collection);
-    if (this.permissionCache) {
-      const cached = await this.permissionCache.get(key);
+    const cacheKeyForRead = sharedGeneration === undefined ? `${generation}:${key}` : key;
+    if (cache && sharedGeneration !== null) {
+      const cached = await cache.get(cacheKeyForRead, { generation: sharedGeneration });
       if (cached !== undefined) return cached;
     }
 
@@ -184,7 +200,11 @@ export class PermissionsService extends BaseService {
       };
     }
 
-    if (this.permissionCache) await this.permissionCache.set(key, permission);
+    // Keep a fill tied to the generation it read, even if the database query
+    // overlapped a commit and completed after the cache was invalidated.
+    if (cache && sharedGeneration !== null) {
+      await cache.set(cacheKeyForRead, permission, { generation: sharedGeneration });
+    }
     return permission;
   }
 
@@ -264,7 +284,7 @@ export class PermissionsService extends BaseService {
         validation == null ? null : JSON.stringify(validation),
       ],
     );
-    if (this.permissionCache) await this.permissionCache.clear();
+    await this.#invalidateCache();
     const permission = await this.readOne(id);
     await this.action('permissions.create', { key: id, item: permission });
     return permission;
@@ -318,7 +338,7 @@ export class PermissionsService extends BaseService {
       `UPDATE yuncms_permissions SET ${assignments.join(', ')} WHERE id = ?`,
       params,
     );
-    if (this.permissionCache) await this.permissionCache.clear();
+    await this.#invalidateCache();
     const permission = await this.readOne(id);
     await this.action('permissions.update', {
       key: id,
@@ -341,7 +361,7 @@ export class PermissionsService extends BaseService {
       error.code = 'PERMISSION_NOT_FOUND';
       throw error;
     }
-    if (this.permissionCache) await this.permissionCache.clear();
+    await this.#invalidateCache();
     await this.action('permissions.delete', { key: id, before });
     return true;
   }

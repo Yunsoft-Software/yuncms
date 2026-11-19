@@ -49,6 +49,13 @@ Core rules:
 - endpoint extensions that use request service options inherit the same accountability and permission cache;
 - generic Items access never becomes an unguarded path into internal system tables.
 
+When an extension changes permissions in a native managed transaction, separate
+requests continue using the committed rules while the transaction is open.
+Authorization inside the transaction uses its own database snapshot. Once the
+change completes successfully, new requests resolve the committed rule even
+when a concurrent read started before the change. Rolling back preserves the
+previous rule for other requests.
+
 ## Roles
 
 Roles can be created and managed from Studio or through:

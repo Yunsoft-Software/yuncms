@@ -51,7 +51,16 @@ test('real MySQL/HTTP file cache policy covers GET/HEAD/206/304/416, revocation,
         }
       });
     }
-    await f.setReaderGrant(false);
+    const readCommittedGrant = async () => {
+      const responses = await Promise.all(paths.map(path => wireRequest(f.origin, path, f.tokens.reader)));
+      for (const response of responses) {
+        assert.equal(response.status, 200);
+        assert.deepEqual(response.bytes, f.bytes);
+      }
+    };
+    await f.withPendingReaderGrant(false, { commit: false }, readCommittedGrant);
+    await readCommittedGrant();
+    await f.withPendingReaderGrant(false, { commit: true }, readCommittedGrant);
     for (const path of paths) {
       const invalid = await wireRequest(f.origin, path, 'invalid-native-token');
       assert.equal(invalid.status, 401); assertPolicy(invalid, 'private, no-store');

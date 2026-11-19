@@ -36,7 +36,13 @@ test('default browser cache rechecks private grants across actors, fresh session
       expect(initial.status).toBe(200); expect(initial.hash).toBe(hash);
       validators.set(path, initial);
     }
-    await f.setReaderGrant(false);
+    await f.withPendingReaderGrant(false, { commit: true }, async () => {
+      const responses = await Promise.all(paths.map(path => read(path, f.tokens.reader)));
+      for (const response of responses) {
+        expect(response.status).toBe(200);
+        expect(response.hash).toBe(hash);
+      }
+    });
     const fresh = await f.login('reader'); expect(fresh).not.toBe(f.tokens.reader);
     for (const token of [f.tokens.reader, fresh, f.tokens.other]) {
       for (const path of paths) {

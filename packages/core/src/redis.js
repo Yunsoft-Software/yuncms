@@ -227,13 +227,22 @@ export class RedisCacheStore {
     return value == null ? '0' : String(value);
   }
 
-  async #key(key) {
-    return `${this.prefix}${this.namespace}:${await this.#generation()}:${String(key)}`;
+  async readGeneration() {
+    try {
+      return await this.#generation();
+    } catch (error) {
+      this.logger?.warn?.('Redis cache generation read failed; falling back to source of truth', { code: error?.code });
+      return null;
+    }
   }
 
-  async get(key) {
+  async #key(key, generation) {
+    return `${this.prefix}${this.namespace}:${generation ?? await this.#generation()}:${String(key)}`;
+  }
+
+  async get(key, { generation } = {}) {
     try {
-      const raw = await this.client.command('GET', await this.#key(key));
+      const raw = await this.client.command('GET', await this.#key(key, generation));
       if (raw == null) return undefined;
       const parsed = JSON.parse(raw);
       if (!parsed || parsed.v !== 1 || !Object.hasOwn(parsed, 'value')) return undefined;
@@ -244,10 +253,10 @@ export class RedisCacheStore {
     }
   }
 
-  async set(key, value, { ttlMs = this.ttlMs } = {}) {
+  async set(key, value, { ttlMs = this.ttlMs, generation } = {}) {
     try {
       const payload = JSON.stringify({ v: 1, value });
-      await this.client.command('SET', await this.#key(key), payload, 'PX', ttlMs);
+      await this.client.command('SET', await this.#key(key, generation), payload, 'PX', ttlMs);
     } catch (error) {
       this.logger?.warn?.('Redis cache write failed; continuing without cache', { code: error?.code });
     }

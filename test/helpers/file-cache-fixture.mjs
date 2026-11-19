@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { fork } from 'node:child_process';
+import { once } from 'node:events';
 import { mkdtemp, rm, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -92,19 +93,45 @@ export async function createFileCacheFixture() {
       return r.body.data;
     };
     const file = await upload('private-cache', bytes), neighbor = await upload('neighbor-cache', neighborBytes);
+    const readerFilter = enabled => enabled ? { _or: [ownFilesFilter, { id: { _eq: file.id } }] } : ownFilesFilter;
+    const assertPersistedReaderFilter = async filter => {
+      const [[row]] = await database.query('SELECT filter FROM yuncms_permissions WHERE id = ?', [readerPermission.id]);
+      const actual = typeof row.filter === 'string' ? JSON.parse(row.filter) : row.filter;
+      assert.deepEqual(actual, filter);
+    };
     const setReaderGrant = async enabled => {
-      const filter = enabled ? { _or: [ownFilesFilter, { id: { _eq: file.id } }] } : ownFilesFilter;
+      const filter = readerFilter(enabled);
       const r = await request('/permissions/' + readerPermission.id, { token: tokens.owner, method: 'PATCH', body: { filter } });
       assert.equal(r.status, 200);
-      const [rows] = await database.query('SELECT filter FROM yuncms_permissions WHERE id = ?', [readerPermission.id]);
-      const actual = typeof rows[0].filter === 'string' ? JSON.parse(rows[0].filter) : rows[0].filter;
-      assert.deepEqual(actual, filter);
+      await assertPersistedReaderFilter(filter);
+    };
+    const withPendingReaderGrant = async (enabled, { commit }, readWhileHeld) => {
+      const filter = readerFilter(enabled);
+      const send = async (message, phase) => {
+        const response = once(server, 'message', { signal: AbortSignal.timeout(15000) });
+        server.send(message);
+        const [result] = await response;
+        assert.equal(result.phase, phase, result.message);
+        return result;
+      };
+      await send({
+        type: 'hold-permission-write', permissionId: readerPermission.id, filter,
+        reader: { user: actors.reader.id, role: actors.reader.role },
+      }, 'permission-write-held');
+      try {
+        await readWhileHeld();
+      } finally {
+        const finished = await send({ type: 'finish-permission-write', commit }, 'permission-write-finished');
+        assert.equal(finished.committed, commit);
+        assert.deepEqual(finished.filter, filter, 'The transaction sees its own permission change');
+      }
+      if (commit) await assertPersistedReaderFilter(filter);
     };
     const publicGrant = async () => {
       const [[role]] = await database.query('SELECT id FROM yuncms_roles WHERE public = 1');
       return permission(role.id, { id: { _eq: neighbor.id } });
     };
-    return { origin, studioOrigin: config.server.studioOrigin, database, actors, tokens, file, neighbor, bytes, neighborBytes, request, login, setReaderGrant, publicGrant,
+    return { origin, studioOrigin: config.server.studioOrigin, database, actors, tokens, file, neighbor, bytes, neighborBytes, request, login, setReaderGrant, withPendingReaderGrant, publicGrant,
       async restart() { const previousPid = server.pid; await stop(); await start(); return { previousPid, currentPid: server.pid }; },
       async close() {
         try { await stop(); await database.end(); await root.query('DROP DATABASE `' + dbName + '`'); }

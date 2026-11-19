@@ -30,8 +30,12 @@ test('redis permission cache uses generation invalidation rather than key scans'
   const cacheB = new RedisCacheStore({ client, prefix: 'yuncms:test:' });
   await cacheA.set('role:articles:read', { fields: ['title'] });
   assert.deepEqual(await cacheB.get('role:articles:read'), { fields: ['title'] });
+  const previousGeneration = await cacheB.readGeneration();
   await cacheA.clear();
+  await cacheB.set('role:articles:read', { fields: ['title'] }, { generation: previousGeneration });
   assert.equal(await cacheB.get('role:articles:read'), undefined);
+  await cacheA.set('role:articles:read', { fields: ['summary'] });
+  assert.deepEqual(await cacheB.get('role:articles:read'), { fields: ['summary'] });
 });
 
 test('redis fixed window hashes raw identities in keys', async () => {
