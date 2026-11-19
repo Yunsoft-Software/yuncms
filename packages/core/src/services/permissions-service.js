@@ -108,7 +108,9 @@ export class PermissionsService extends BaseService {
     const cache = this.permissionCache;
     if (!cache) return;
     await dispatchAfterCommit(this.database, async () => {
-      inProcessCacheGenerations.set(cache, (inProcessCacheGenerations.get(cache) ?? 0) + 1);
+      if (typeof cache.readGeneration !== 'function') {
+        inProcessCacheGenerations.set(cache, (inProcessCacheGenerations.get(cache) ?? 0) + 1);
+      }
       await cache.clear();
     });
   }
@@ -134,10 +136,10 @@ export class PermissionsService extends BaseService {
     // A managed connection reads its own grant writes without sharing its
     // uncommitted or earlier snapshot with other requests.
     const cache = transactionContext(this.database) ? null : this.permissionCache;
-    const sharedGeneration = cache?.readGeneration ? await cache.readGeneration() : undefined;
-    const generation = cache && (inProcessCacheGenerations.get(cache) ?? 0);
+    const sharedGeneration = typeof cache?.readGeneration === 'function' ? await cache.readGeneration() : undefined;
     const key = cacheKey(this.accountability, action, collection);
-    const cacheKeyForRead = sharedGeneration === undefined ? `${generation}:${key}` : key;
+    const cacheKeyForRead = cache && sharedGeneration === undefined
+      ? `${inProcessCacheGenerations.get(cache) ?? 0}:${key}` : key;
     if (cache && sharedGeneration !== null) {
       const cached = await cache.get(cacheKeyForRead, { generation: sharedGeneration });
       if (cached !== undefined) return cached;

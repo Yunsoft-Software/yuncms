@@ -15,6 +15,8 @@ export function isCacheStore(store) {
 }
 
 export class MemoryCacheStore {
+  #generation = 0;
+
   constructor({
     ttlMs = 30_000,
     maxEntries = 5_000,
@@ -48,7 +50,12 @@ export class MemoryCacheStore {
     }
   }
 
-  async get(key) {
+  readGeneration() {
+    return this.#generation;
+  }
+
+  async get(key, { generation = this.#generation } = {}) {
+    if (generation !== this.#generation) return undefined;
     const entry = this.entries.get(String(key));
     if (!entry) return undefined;
     if (entry.expiresAt <= this.now()) {
@@ -58,7 +65,8 @@ export class MemoryCacheStore {
     return entry.value;
   }
 
-  async set(key, value, { ttlMs = this.ttlMs } = {}) {
+  async set(key, value, { ttlMs = this.ttlMs, generation = this.#generation } = {}) {
+    if (generation !== this.#generation) return value;
     if (!Number.isInteger(ttlMs) || ttlMs < 1) throw cacheError('Cache entry ttlMs must be a positive integer');
     const normalizedKey = String(key);
     const timestamp = this.now();
@@ -76,6 +84,7 @@ export class MemoryCacheStore {
   }
 
   async clear() {
+    this.#generation++;
     this.entries.clear();
   }
 

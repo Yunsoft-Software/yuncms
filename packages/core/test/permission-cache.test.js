@@ -93,3 +93,16 @@ test('permission mutations clear a shared cache before future authorization deci
   await service.deleteOne('permission-1');
   assert.equal(cleared, true);
 });
+
+test('late memory cache fills cannot restore old entries or change the public cache key', async () => {
+  const cache = new MemoryCacheStore();
+  const key = 'role-1:projects:read';
+  await cache.set(key, 'previous');
+  const generation = cache.readGeneration();
+  await cache.clear();
+  await cache.set(key, 'previous', { generation });
+  assert.equal(await cache.get(key), undefined);
+  await cache.set(key, 'current');
+  assert.equal(await cache.get(key), 'current');
+  assert.equal(await cache.get(key, { generation }), undefined);
+});
