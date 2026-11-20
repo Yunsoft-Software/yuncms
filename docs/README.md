@@ -81,6 +81,7 @@ Follow [Getting Started](getting-started.md) from an empty directory to a runnin
 - [Database operations](database.md) — MySQL requirements, backup concerns and database-level behavior.
 - [Security](security.md) — authentication, authorization, headers, rate limiting, pressure control, request ids and secret handling.
 - [Production readiness](production-readiness.md) — operator verification gates, test profiles, acceptance boundaries, and environment readiness requirements.
+- [npm release tag maintenance](npm-release-tags.md) — maintainer setup and use of the CircleCI workflow for temporary npm release tags.
 - [Architecture](architecture.md) — technical reference for operators and extension/integration authors who need to understand the service boundaries.
 
 ## Fast API examples

@@ -1,0 +1,40 @@
+version: 2.1
+
+parameters:
+  clean-npm-release-tags:
+    type: boolean
+    default: false
+  npm-release-version:
+    type: string
+    default: ''
+
+jobs:
+  npm-release-tag-cleanup:
+    docker:
+      - image: cimg/node:24.21.0
+    environment:
+      YUNCMS_NPM_RELEASE_VERSION: << pipeline.parameters.npm-release-version >>
+    steps:
+      - checkout
+      - run:
+          name: Check the published release tags
+          command: node scripts/npm-release-tags.mjs check "$YUNCMS_NPM_RELEASE_VERSION"
+      - run:
+          name: Remove temporary tags with npm Trusted Publishing
+          command: |
+            npm install --prefix "$HOME/.local/yuncms-npm-cli" --registry=https://registry.npmjs.org --ignore-scripts --no-audit --no-fund npm@11.21.0
+            export PATH="$HOME/.local/yuncms-npm-cli/node_modules/.bin:$PATH"
+            export NPM_ID_TOKEN="$(circleci run oidc get --claims '{"aud":"npm:registry.npmjs.org"}')"
+            node scripts/npm-release-tags.mjs remove "$YUNCMS_NPM_RELEASE_VERSION"
+
+workflows:
+  npm-release-tags:
+    when: << pipeline.parameters.clean-npm-release-tags >>
+    jobs:
+      - npm-release-tag-cleanup:
+          context: yuncms-npm-dist-tags
+          filters:
+            branches:
+              only: main
+            tags:
+              ignore: /.*/
