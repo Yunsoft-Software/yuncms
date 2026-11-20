@@ -14,6 +14,7 @@ import {
   loadConfig,
   PermissionsService,
   RolesService,
+  StudioSchemaService,
   UsersService,
 } from '@yunsoft/yuncms-core';
 
@@ -166,15 +167,23 @@ test('real MySQL creates Directus-style accountability fields and delegates boun
       },
     });
     contentReadPermissionId = contentReadPermission.id;
+    const delegatedAccountability = createAccountability({ user: actorId, role: customRoleId });
+    const delegatedSchema = new StudioSchemaService({ database: pool, accountability: delegatedAccountability });
+    const readableFields = await delegatedSchema.readFields(collection);
+    assert.deepEqual(readableFields.map(field => field.field).sort(), ['created_by', 'id', 'published_at', 'title']);
+    const readableActor = readableFields.find(field => field.field === 'created_by');
+    assert.equal(Boolean(readableActor.readonly), true);
+    assert.equal(parseMetadata(readableActor.schema_metadata).systemManaged, true);
     const firstActorRows = await new ItemsService(collection, {
       database: pool,
-      accountability: createAccountability({ user: actorId, role: customRoleId }),
+      accountability: delegatedAccountability,
     }).readMany({ sort: 'title' });
     const secondActorRows = await new ItemsService(collection, {
       database: pool,
       accountability: createAccountability({ user: secondActorId, role: customRoleId }),
     }).readMany({ sort: 'title' });
     assert.deepEqual(firstActorRows.map((row) => row.title), ['Changed']);
+    assert.deepEqual(Object.keys(firstActorRows[0]).sort(), ['created_by', 'id', 'published_at', 'title']);
     assert.deepEqual(secondActorRows.map((row) => row.title), ['Second actor']);
 
     const permission = await permissions.createOne({

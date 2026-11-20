@@ -12,8 +12,8 @@ test.beforeAll(async ({ request }) => {
   expect(response.status()).toBe(200); session = (await response.json()).data;
   headers = { authorization: `Bearer ${session.access_token}` };
 });
-async function open(page, path) {
-  await page.addInitScript(value => { sessionStorage.setItem('yuncms.studio.session', JSON.stringify(value)); localStorage.setItem('yuncms.studio.locale', 'en'); }, session);
+async function open(page, path, auth = session) {
+  await page.addInitScript(value => { sessionStorage.setItem('yuncms.studio.session', JSON.stringify(value)); localStorage.setItem('yuncms.studio.locale', 'en'); }, auth);
   await page.goto('/#' + path);
 }
 async function confirm(page) { const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible(); await dialog.locator('.danger-button').click(); }
@@ -23,6 +23,98 @@ async function mutation(page, path, method, action) {
   expect(response.ok(), `${method} ${path}: HTTP ${response.status()}`).toBe(true);
   return response.status() === 204 ? null : (await response.json()).data;
 }
+
+test('configured accountability fields can be selected on desktop and mobile and read in record forms', async ({ page, request, browser }) => {
+  const suffix = crypto.randomUUID().replaceAll('-', '').slice(0, 10);
+  const collection = `browser_audit_${suffix}`;
+  const schemaPath = `/schema/collections/${collection}`;
+  const itemsPath = `/items/${collection}`;
+  const contentPath = `/content/${collection}`;
+  const managed = ['created_at', 'updated_at', 'created_by', 'updated_by'];
+  const option = (view, field) => view.locator('.data-view-column-list label').filter({
+    has: view.locator('small').getByText(field, { exact: true }),
+  }).getByRole('checkbox');
+  const group = view => view.getByRole('group', { name: 'Accountability fields', exact: true });
+  const getData = async (response, status) => {
+    expect(response.status()).toBe(status);
+    return (await response.json()).data;
+  };
+  let readerPage, role, reader;
+  try {
+    expect((await request.post('/schema/collections', { headers, data: { collection, systemFields: managed } })).status()).toBe(201);
+    for (const field of ['title', ...Array.from({ length: 8 }, (_, index) => `detail_${index + 1}`)]) {
+      expect((await request.post(`${schemaPath}/fields`, { headers, data: { field, type: 'string' } })).status()).toBe(201);
+    }
+    const record = await getData(await request.post(itemsPath, { headers, data: { title: 'Audit record' } }), 201);
+    const rowPath = `${itemsPath}/${record.id}`;
+    expect(record.created_by).toBe(session.user.id);
+    expect(record.updated_by).toBe(session.user.id);
+
+    await open(page, contentPath);
+    const row = page.locator('.content-row-open').filter({ hasText: 'Audit record' });
+    await expect(row).toBeVisible();
+    await page.locator('.data-view-options-trigger').click();
+    for (const field of [...managed, 'detail_8']) {
+      await expect(option(page, field)).toBeVisible();
+      await expect(option(page, field)).not.toBeChecked();
+      if (managed.includes(field)) await option(page, field).check();
+    }
+    await page.keyboard.press('Escape');
+    for (const field of managed) await expect(page.locator(`th[title="${field}"]`)).toBeVisible();
+    for (const field of managed.slice(0, 2)) await expect(row.locator(`time[datetime="${record[field]}"]`).first()).toBeVisible();
+    await expect(row.getByText(session.user.id, { exact: true })).toHaveCount(2);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileRow = page.locator('.mobile-record-card').filter({ hasText: 'Audit record' });
+    for (const field of managed) await expect(mobileRow.getByText(field, { exact: true })).toBeVisible();
+    await mobileRow.getByRole('button', { name: 'Quick edit', exact: true }).click();
+    const inspector = page.getByRole('dialog');
+    await expect(group(inspector).locator('[data-field]')).toHaveCount(4);
+    await expect(group(inspector).locator('input, textarea, select, [contenteditable=true]')).toHaveCount(0);
+    await page.goto(`/#${contentPath}/${record.id}`);
+    const editor = page.locator('.record-editor');
+    for (const field of managed.slice(0, 2)) await expect(group(editor).locator(`[data-field="${field}"] time`)).toHaveAttribute('datetime', record[field]);
+    for (const field of managed.slice(2)) await expect(group(editor).locator(`[data-field="${field}"]`)).toContainText(session.user.id);
+    await editor.locator('[data-field="title"] input').fill('Edited audit record');
+    const patch = page.waitForRequest(req => new URL(req.url()).pathname === rowPath && req.method() === 'PATCH');
+    await mutation(page, rowPath, 'PATCH', () => editor.getByRole('button', { name: 'Save record', exact: true }).click());
+    const submitted = (await patch).postDataJSON();
+    expect(submitted.title).toBe('Edited audit record');
+    for (const field of managed) expect(Object.hasOwn(submitted, field)).toBe(false);
+    await page.goto(`/#${contentPath}/new`);
+    await expect(editor.locator('[data-field="title"] input')).toBeVisible();
+    await expect(group(editor)).toHaveCount(0);
+
+    role = await getData(await request.post('/roles', { headers, data: { name: `Audit reader ${suffix}` } }), 201);
+    reader = await getData(await request.post('/users', { headers, data: { email: `${suffix}@audit.example.test`, password, role: role.id } }), 201);
+    const readable = ['id', 'title', 'created_at', 'updated_by'];
+    expect((await request.post('/permissions', { headers, data: { role: role.id, collection, action: 'read', fields: readable } })).status()).toBe(201);
+    const auth = await getData(await request.post('/auth/login', { data: { email: reader.email, password } }), 200);
+    const readerHeaders = { authorization: `Bearer ${auth.access_token}` };
+    const allowedFields = await getData(await request.get(`/studio-navigation/collections/${collection}/fields`, { headers: readerHeaders }), 200);
+    expect(allowedFields.map(field => field.field).sort()).toEqual(readable.toSorted());
+    const allowedRecord = await getData(await request.get(rowPath, { headers: readerHeaders }), 200);
+    expect(Object.keys(allowedRecord).sort()).toEqual(readable.toSorted());
+    readerPage = await browser.newPage();
+    await open(readerPage, contentPath, auth);
+    await expect(readerPage.locator('.content-row-open').filter({ hasText: 'Edited audit record' })).toBeVisible();
+    await readerPage.locator('.data-view-options-trigger').click();
+    await expect(option(readerPage, 'created_at')).toBeVisible();
+    await expect(option(readerPage, 'updated_by')).toBeVisible();
+    await expect(option(readerPage, 'updated_at')).toHaveCount(0);
+    await expect(option(readerPage, 'created_by')).toHaveCount(0);
+    await readerPage.goto(`/#${contentPath}/${record.id}`);
+    await expect(group(readerPage).locator('[data-field]')).toHaveCount(2);
+    await expect(group(readerPage).locator('[data-field="created_at"] time')).toHaveAttribute('datetime', allowedRecord.created_at);
+    await expect(group(readerPage).locator('[data-field="updated_by"]')).toContainText(allowedRecord.updated_by);
+    await expect(readerPage.getByRole('button', { name: 'Save record', exact: true })).toHaveCount(0);
+  } finally {
+    await readerPage?.close();
+    if (reader) await request.delete(`/users/${reader.id}`, { headers });
+    if (role) await request.delete(`/roles/${role.id}`, { headers });
+    await request.delete(`${schemaPath}?destructive=true`, { headers });
+  }
+});
 
 test('native file upload, preview, metadata editing, download and confirmed deletion preserve the actual bytes', async ({ page, request }, info) => {
   const name = `workflow-${crypto.randomUUID()}.svg`;

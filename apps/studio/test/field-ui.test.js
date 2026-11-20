@@ -73,7 +73,7 @@ test('normal fields keep separate display name, API key and physical options', (
   );
 });
 
-test('content table prioritizes project and file fields over managed accountability fields', () => {
+test('content column choices keep all readable fields while defaults prioritize project fields', () => {
   const managed = JSON.stringify({ systemManaged: true });
   const fields = [
     { field: 'id', type: 'uuid', readonly: true },
@@ -86,6 +86,9 @@ test('content table prioritizes project and file fields over managed accountabil
     { field: 'published_at', type: 'timestamp' },
     { field: 'cover_image', type: 'uuid', interface: 'image' },
     { field: 'attachment', type: 'uuid', interface: 'file' },
+    { field: 'category', type: 'string' },
+    { field: 'summary', type: 'text' },
+    { field: 'order_number', type: 'integer' },
     { field: 'internal_note', type: 'text', hidden: true },
   ];
 
@@ -96,8 +99,13 @@ test('content table prioritizes project and file fields over managed accountabil
     'published_at',
     'cover_image',
     'attachment',
+    'category',
+    'summary',
+    'order_number',
     'created_at',
     'updated_at',
+    'created_by',
+    'updated_by',
   ]);
   assert.deepEqual(defaultContentColumnKeys(contentTableFields(fields)), [
     'title',
@@ -105,7 +113,7 @@ test('content table prioritizes project and file fields over managed accountabil
     'published_at',
     'cover_image',
     'attachment',
-    'created_at',
+    'category',
   ]);
 });
 

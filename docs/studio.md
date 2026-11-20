@@ -114,7 +114,7 @@ Studio distinguishes calendar dates from temporal instants:
 
 Search uses readable text fields in the current collection. Filters can be added without keeping the full filter builder permanently open, and active filters remain visible as removable chips.
 
-The **View** control lets you choose which table columns are visible and switch between compact, comfortable and relaxed row density. Studio initially shows the first six useful table columns to keep row actions readable; any additional managed or project fields remain available from **View**. At least one table column remains visible.
+The **View** control lets you choose which table columns are visible and switch between compact, comfortable and relaxed row density. Studio initially shows up to six useful table columns on desktop and a four-field preview on mobile. **View → Columns** lists readable, non-hidden fields, including configured `created_at`, `updated_at`, `created_by` and `updated_by` fields. Mobile record cards show your explicit column selection. At least one table column remains visible.
 
 Column sorting is applied through the normal Items API query behavior. These presentation controls do not change collection schema or stored records.
 
@@ -134,7 +134,7 @@ editor; list clipping never truncates stored content.
 4. Select related records where the field uses a relation picker.
 5. Save.
 
-Required fields and write-field restrictions are validated by the API. System fields such as creation/update timestamps and users are filled automatically when configured for the collection.
+Required fields and write-field restrictions are validated by the API. System fields such as creation/update timestamps and users are filled automatically when configured for the collection. Existing records show their readable accountability fields as read-only values in the inspector and full editor.
 
 New record and nested relation forms initialize explicit schema defaults,
 including `draft`, boolean `true`/`false` and numeric `0`. Select fields without

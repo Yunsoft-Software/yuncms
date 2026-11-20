@@ -51,6 +51,7 @@ import {
   isReadOnlyField,
   isRichTextField,
   isSelectDropdownField,
+  isSystemManagedField,
   selectChoicesForField,
 } from '../field-ui.js';
 import { useI18n } from '../i18n.js';
@@ -213,11 +214,13 @@ function RecordForm({
   capabilities = null,
   historyEnabled = false,
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const action = record?.id ? 'update' : 'create';
   const canSave = canWriteContent(capabilities, action, record?.id ?? null);
   const allowedFieldsKey = JSON.stringify(capabilities?.[action]?.fields);
   const editable = useMemo(() => canSave ? contentWritableFields(fields, capabilities, action, isReadOnlyField) : fields.filter(field => !isReadOnlyField(field)), [fields, allowedFieldsKey, action, canSave]);
+  const accountabilityFields = record ? fields.filter(field => !field.hidden
+    && isSystemManagedField(field) && Object.hasOwn(record, field.field)) : [];
   const recordValuesKey = contentRecordValuesKey(record, editable);
   const initialValues = () => Object.fromEntries(editable.map(field => [field.field, inputValueForField(field, record?.[field.field])]));
   const [values, setValues] = useState(initialValues);
@@ -453,6 +456,17 @@ function RecordForm({
         </fieldset>
       )}
 
+      {accountabilityFields.length > 0 && (
+        <fieldset className="form-grid record-form-grid" aria-label={t('collectionBuilder.accountability')}>
+          {accountabilityFields.map(field => (
+            <div className="field-label" data-field={field.field} key={field.field}>
+              <span>{fieldLabel(field)}</span>
+              {renderValue(field, record, relationLookups, t, locale)}
+            </div>
+          ))}
+        </fieldset>
+      )}
+
       {nestedRelations.length > 0 && (
         <NestedRelationsEditor
           nestedRelations={nestedRelations}
@@ -536,7 +550,7 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
   const [editingRecord, setEditingRecord] = useState(null);
   const [inspectedRecord, setInspectedRecord] = useState(null);
   const [selectedRecordIds, setSelectedRecordIds] = useState(() => new Set());
-  const [visibleColumnKeys, setVisibleColumnKeys] = useState([]);
+  const [selectedColumnKeys, setSelectedColumnKeys] = useState(null);
   const [density, setDensity] = useState('comfortable');
   const [loadedRecordKey, setLoadedRecordKey] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -682,7 +696,7 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
   useEffect(() => {
     setInspectedRecord(null);
     setSelectedRecordIds(new Set());
-    setVisibleColumnKeys([]);
+    setSelectedColumnKeys(null);
     setSearchInput('');
     setSearch('');
     setFilters([]);
@@ -806,9 +820,8 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
       ...physicalTableFields.slice(idIndex + 1),
     ];
   }, [physicalTableFields, virtualColumns]);
-  useEffect(() => {
-    setVisibleColumnKeys(defaultContentColumnKeys(tableFields, 6, relationLookups));
-  }, [tableFields, relationLookups]);
+  const defaultColumnKeys = useMemo(() => defaultContentColumnKeys(tableFields, 6, relationLookups), [tableFields, relationLookups]);
+  const visibleColumnKeys = selectedColumnKeys ?? defaultColumnKeys;
   const visibleTableFields = useMemo(
     () => tableFields.filter((field) => visibleColumnKeys.includes(field.field)),
     [tableFields, visibleColumnKeys],
@@ -816,8 +829,9 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
   const flexibleColumnKey = flexibleContentColumnKey(visibleTableFields, relationLookups);
   const mobileRecordFields = useMemo(() => {
     const preferred = visibleTableFields.filter((field) => field.field !== 'id');
-    return (preferred.length > 0 ? preferred : visibleTableFields).slice(0, 4);
-  }, [visibleTableFields]);
+    const mobileFields = preferred.length > 0 ? preferred : visibleTableFields;
+    return selectedColumnKeys === null ? mobileFields.slice(0, 4) : mobileFields;
+  }, [visibleTableFields, selectedColumnKeys]);
   const filterableFields = useMemo(() => fields.filter((field) => !field.hidden && field.type !== 'json'), [fields]);
   const selectedFilterField = filterableFields.find((field) => field.field === filterDraft.field) ?? null;
   const filterOperators = operatorsForField(selectedFilterField, relationLookups[filterDraft.field]);
@@ -846,7 +860,8 @@ export function ContentScreen({ collection, collectionLabel = '', collections = 
   }
 
   function toggleVisibleColumn(fieldKey) {
-    setVisibleColumnKeys((current) => {
+    setSelectedColumnKeys((selection) => {
+      const current = selection ?? defaultColumnKeys;
       if (current.includes(fieldKey)) {
         if (current.length <= 1) return current;
         return current.filter((key) => key !== fieldKey);

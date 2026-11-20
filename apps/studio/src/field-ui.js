@@ -124,12 +124,12 @@ export function isSystemManagedField(field) {
   return value === true || value === 1;
 }
 
-export function contentTableFields(fields = [], limit = 8) {
+export function contentTableFields(fields = []) {
   const visible = fields.filter((field) => !field.hidden);
   const primary = visible.filter((field) => field.field === 'id' || fieldSchemaMetadata(field).primaryKey === true);
   const content = visible.filter((field) => !primary.includes(field) && !isSystemManagedField(field));
   const managed = visible.filter((field) => !primary.includes(field) && isSystemManagedField(field));
-  return [...primary, ...content, ...managed].slice(0, limit);
+  return [...primary, ...content, ...managed];
 }
 
 export function defaultContentColumnKeys(fields = [], limit = 6, relationLookups = {}) {
