@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import express from 'express';
 import {
   bootstrapDatabase, CollectionsService, createCoreServiceRegistry, createDatabasePool, createStorageRegistry,
@@ -27,7 +28,15 @@ import { McpSettingsStore } from '../../../packages/api/src/mcp/settings-store.j
 
 if (process.env.YUNCMS_TEST_MYSQL !== '1' || process.env.YUNCMS_TEST_DB_ALLOW_DESTRUCTIVE !== '1') throw Error('Browser acceptance requires an explicitly authorized disposable MySQL database');
 const licenseKeys = generateKeyPairSync('ed25519');
-const config = loadConfig({ ...process.env, AUTH_PUBLIC_URL: `http://127.0.0.1:${Number(process.env.YUNCMS_BROWSER_PORT ?? 34074)}`, YUNCMS_PUBLIC_URL: 'https://browser.example.test', YUNCMS_LICENSE_DOMAIN: '', AUTH_TOTP_KEY: process.env.AUTH_TOTP_KEY || randomBytes(32).toString('hex'), API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', AUTH_ACTION_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
+const offerHits = [];
+const offerServer = createServer((req, res) => {
+  offerHits.push({ method: req.method, url: req.url, referer: req.headers.referer ?? null });
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+  res.end('<!doctype html><html><head><title>Yunsoft Local Premium Offer</title></head><body><h1>3-Month Premium Offer</h1><p>Verified email subscription target.</p></body></html>');
+});
+await new Promise(resolve => offerServer.listen(0, '127.0.0.1', resolve));
+const localOfferUrl = `http://127.0.0.1:${offerServer.address().port}/premium-offer`;
+const config = loadConfig({ ...process.env, AUTH_PUBLIC_URL: `http://127.0.0.1:${Number(process.env.YUNCMS_BROWSER_PORT ?? 34074)}`, YUNCMS_PUBLIC_URL: 'https://browser.example.test', YUNCMS_LICENSE_DOMAIN: '', YUNCMS_PREMIUM_OFFER_URL: process.env.YUNCMS_PREMIUM_OFFER_URL ?? localOfferUrl, AUTH_TOTP_KEY: process.env.AUTH_TOTP_KEY || randomBytes(32).toString('hex'), API_RATE_LIMIT_ENABLED: '0', AUTH_LOGIN_RATE_MAX: '200', AUTH_ACTION_RATE_MAX: '200', PRESSURE_LIMIT_ENABLED: '0', FLOWS_SCRIPTS_ENABLED: '1' });
 if (!/(test|ci|dev)/i.test(config.database.database)) throw Error('Browser fixture requires a disposable test/ci/dev database');
 config.features = { ...config.features, publicKey: licenseKeys.publicKey.export({ type: 'spki', format: 'pem' }) };
 const pool = createDatabasePool({ ...config.database, connectionLimit: 5 }), accountability = createSystemAccountability();
@@ -46,6 +55,7 @@ async function close() {
   await automationWorker?.stop();
   await runtime?.stop();
   if (server) await new Promise(resolve => server.close(resolve));
+  await new Promise(resolve => offerServer.close(resolve));
   await network?.close();
   for (const id of userIds) await pool.query('DELETE FROM yuncms_flows WHERE user_created = ?', [id]);
   for (const id of userIds) await pool.query('DELETE FROM yuncms_ai_automations WHERE run_as = ?', [id]);
@@ -124,7 +134,11 @@ try {
   fixture.post('/features/reset', async (_req, res) => {
     await pool.query('DELETE FROM yuncms_license_state');
     await pool.query('DELETE FROM yuncms_feature_settings');
+    offerHits.length = 0;
     res.status(204).end();
+  });
+  fixture.get('/features/offer-probe', (_req, res) => {
+    res.json({ data: { url: localOfferUrl, hits: [...offerHits] } });
   });
   fixture.post('/features/license-token', (req, res) => {
     const now = Math.floor(Date.now() / 1000);

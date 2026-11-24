@@ -37,8 +37,12 @@ test('mixed distribution retains MIT and identifies only explicitly marked new P
 
 test('source and Docker examples expose the same optional license settings with empty defaults', async () => {
   const compose = await read('compose.yaml');
-  for (const key of ['YUNCMS_LICENSE_TOKEN', 'YUNCMS_LICENSE_PUBLIC_KEY', 'YUNCMS_LICENSE_DOMAIN', 'YUNCMS_LICENSE_INSTANCE_ID', 'YUNCMS_FEATURES_DISABLED']) {
+  for (const key of ['YUNCMS_LICENSE_TOKEN', 'YUNCMS_LICENSE_PUBLIC_KEY', 'YUNCMS_LICENSE_DOMAIN', 'YUNCMS_LICENSE_INSTANCE_ID', 'YUNCMS_FEATURES_DISABLED', 'YUNCMS_PREMIUM_OFFER_URL']) {
     for (const file of ['.env.example', 'docker.env.example']) assert.ok((await read(file)).includes(`\n${key}=\n`));
     assert.ok(compose.includes(`${key}: \${${key}:-}`));
+  }
+  const migrations = await readdir(new URL('packages/core/src/migrations/', root));
+  for (const file of migrations) {
+    assert.doesNotMatch(await read(`packages/core/src/migrations/${file}`), /campaign|promo_code|newsletter_subscri/i);
   }
 });

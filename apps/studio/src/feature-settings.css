@@ -12,6 +12,8 @@
 .settings-feature-page .panel-heading { flex-wrap: wrap; align-items: flex-start; }
 .settings-feature-page .panel-heading > div { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
 .settings-feature-page .panel-heading .settings-license-meta { margin-top: 6px; font-size: 13px; color: var(--yun-ink-muted); line-height: 1.5; }
+.premium-offer-panel .settings-license-meta { margin: 0; font-size: 13px; color: var(--yun-ink-muted); line-height: 1.5; }
+.premium-offer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .settings-feature-list { display: grid; min-width: 0; }
 .settings-feature-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--yun-line); min-width: 0; }
 .settings-feature-row:last-child { border-bottom: 0; }

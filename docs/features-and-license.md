@@ -69,6 +69,7 @@ server overrides are configured on the server, never in the browser bundle:
 | `YUNCMS_LICENSE_INSTANCE_ID` | unset | Required when the entitlement is bound to a particular instance. |
 | `YUNCMS_LICENSE_TOKEN` | unset | Optional signed entitlement JWT, used when no license has been installed in the database. |
 | `YUNCMS_FEATURES_DISABLED` | empty | Comma-separated operator deny list of catalog keys. An unknown key rejects configuration. |
+| `YUNCMS_PREMIUM_OFFER_URL` | unset | Optional explicit Yunsoft Website URL for the no-card 3-month Premium verified-email offer. Must be `https://` (or loopback `http://` for local verification) without embedded credentials. When unset, no offer link or prompt is shown and no hardcoded target is invented. |
 
 The installation domain is resolved strictly from explicit server configuration;
 untrusted HTTP `Host` / `X-Forwarded-Host` headers and host claims inside the
@@ -80,16 +81,33 @@ signature, trusted key identifier, issuer `yunsoft-commerce`, product
 `yuncms_premium`, status, time (`nbf`, `iat`, `exp`), hostname (`allowedHosts`
 and `stagingHosts`) and optional `activatedInstanceId`. Only explicitly true
 signed capability keys grant Premium rights. A perpetual entitlement has
-`billingModel: one_time_perpetual` and `exp: null`; a term entitlement has
-`billingModel: monthly_term` with a required integer `exp` (and optional
-`periodMonths`, such as `1` or `12`). Verification is local and does not call a
-licensing server on every request. Temporarily losing internet access does not
-revoke a valid signed grant before its `exp`. When a term entitlement passes
-`exp`, `license.status` becomes `expired` and Premium features deactivate cleanly
-while preserving Community CRUD, auth, RBAC, files, stored revisions and saved
-branding until a renewed signed entitlement is installed. The deployment operator
-controls its trusted configuration; this is not a sandbox against trusted server
-code or administrators modifying MIT source.
+`billingModel: one_time_perpetual` and `exp: null`. A term entitlement has
+`billingModel: monthly_term` with a required integer `exp` and optional positive
+integer `periodMonths`, such as `1`, `3` or `12`. The administrator license
+status displays the signed `exp` as an ISO-8601 `expiresAt` value.
+Verification is local. A valid term entitlement works offline until its `exp`.
+After expiry, Premium features deactivate and Community CRUD, authentication,
+RBAC, files, stored revisions and saved branding remain available. A renewed
+signed entitlement restores the features it grants.
+The deployment operator controls trusted configuration and server code.
+
+### Optional three-month Premium offer
+
+This section describes the source build. Set `YUNCMS_PREMIUM_OFFER_URL` to the
+approved Yunsoft Website campaign URL to show the offer.
+
+- In interactive `yuncms init`, the prompt appears after database and administrator setup. Choose yes to print the configured link. The default is no, and CI and non-interactive sessions skip the prompt.
+- In **Settings → Features and license**, an administrator can reveal or skip the offer. Choosing the Website link opens a separate tab without a referrer or installation data.
+- Complete email subscription and verify ownership of the installation domain on the Yunsoft Website. The offer requires no credit card. The Website manages eligibility, duplicate applications and the signed entitlement. Back in Studio, paste the signed JWT into the existing license form. A three-month grant uses `monthly_term` and `periodMonths: 3`.
+
+#### İsteğe bağlı üç aylık Premium teklifi
+
+Bu bölüm kaynak derlemeyi anlatır. Teklifi göstermek için
+`YUNCMS_PREMIUM_OFFER_URL` ayarına Yunsoft Website’in onaylı kampanya adresini girin.
+
+- Etkileşimli `yuncms init` komutu, veritabanı ve yönetici kurulumu tamamlandıktan sonra bağlantıyı gösterme seçeneği sunar. Varsayılan yanıt hayırdır. CI ve etkileşimsiz oturumlar bu adımı atlar.
+- **Ayarlar → Özellikler ve lisans** bölümünde yönetici teklifi açabilir veya atlayabilir. Website bağlantısı, yönlendiren adresi veya kurulum bilgisini aktarmadan ayrı bir sekmede açılır.
+- Kredi kartsız teklif için e-posta aboneliğini ve kurulum alan adı doğrulamasını Yunsoft Website’de tamamlayın. Başvuru, tekrar kullanım kontrolleri ve imzalı hak Website’de yönetilir. Aldığınız JWT’yi Studio’daki mevcut lisans alanına yapıştırın. Üç aylık hak `monthly_term` ve `periodMonths: 3` kullanır.
 
 ## Manage an installation
 

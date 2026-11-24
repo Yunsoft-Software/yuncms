@@ -10,6 +10,7 @@ export function FeaturesScreen() {
   const { settings, refreshSettings } = useStudioSettings();
   const [collections, setCollections] = useState([]), [selected, setSelected] = useState('');
   const [status, setStatus] = useState(null), [token, setToken] = useState('');
+  const [offerState, setOfferState] = useState('idle');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   useEffect(() => {
     let active = true;
@@ -65,6 +66,25 @@ export function FeaturesScreen() {
         <label className="field-label">{t('features.collection')}<select aria-label={t('features.collection')} value={selected} onChange={event => setSelected(event.target.value)} disabled={busy}>{collections.map(row => <option key={row.collection} value={row.collection}>{row.name || row.collection}</option>)}</select></label>
         <label className="checkbox-label"><input type="checkbox" aria-label={t('features.recording')} checked={selectedCollection?.metadata?.contentTracking?.history === true} disabled={busy || !status.features.contentHistory.enabled} onChange={event => saveHistory(event.target.checked)} />{t('features.recording')}</label>
       </section>}
+      {status.premiumOffer?.url && !settings.premium && !settings.white_label_enabled && offerState !== 'skipped' && (
+        <section className="panel form-panel premium-offer-panel" aria-label={t('features.offerTitle')}>
+          <div className="panel-heading"><div><h2>{t('features.offerTitle')}</h2><p>{t('features.offerDescription')}</p></div></div>
+          {offerState === 'opted_in' ? (
+            <>
+              <div className="form-actions premium-offer-actions">
+                <a className="premium-upsell" href={status.premiumOffer.url} target="_blank" rel="noopener noreferrer">{t('features.offerOpenLink')} ↗</a>
+                <button className="secondary-button" type="button" onClick={() => setOfferState('skipped')}>{t('features.offerSkip')}</button>
+              </div>
+              <p className="settings-license-meta">{t('features.offerPrivacyNote')}</p>
+            </>
+          ) : (
+            <div className="form-actions premium-offer-actions">
+              <button className="secondary-button" type="button" onClick={() => setOfferState('opted_in')}>{t('features.offerOptIn')}</button>
+              <button className="secondary-button" type="button" onClick={() => setOfferState('skipped')}>{t('features.offerSkip')}</button>
+            </div>
+          )}
+        </section>
+      )}
       <form className="panel form-panel" onSubmit={event => { event.preventDefault(); change('/features/license', { token: token.trim() }); }}>
         <div className="panel-heading"><div><h2>{t('features.license')}</h2><p>{t('features.perpetual')}</p>
           {formatLicenseSummary(status.license, { locale, t }) && <p className="settings-license-meta">{formatLicenseSummary(status.license, { locale, t })}</p>}</div><span className="status-pill">{t(`features.${status.license?.status ?? 'missing'}`)}</span></div>

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -10,6 +11,7 @@ import {
   FieldsService, LocalStorageDriver, loadConfig, OFFICIAL_LICENSE_KEY_ID, PermissionsService, RolesService, UsersService,
 } from '@yunsoft/yuncms-core';
 import { createApp } from '../../packages/api/src/app.js';
+import { runInitCommand } from '../../packages/cli/src/init-command.js';
 
 test('real MySQL/HTTP: monthly_term (1m/12m), perpetual, host/instance binding, expiry continuity, renewal persistence and anti-replay under native RBAC', {
   skip: process.env.YUNCMS_TEST_MYSQL !== '1', timeout: 90_000,
@@ -455,6 +457,218 @@ test('real MySQL/HTTP: monthly_term (1m/12m), perpetual, host/instance binding, 
         assert.equal(replayOld.body.errors[0].code, 'INVALID_LICENSE');
       } finally {
         await cleanDomain.close();
+      }
+    });
+
+    await t.test('optional 3-month Premium offer (local safe target, zero outbound requests, admin-only) and monthly_term periodMonths=3 activation/expiry + native CLI init opt-in/skip', async () => {
+      await database.query('DELETE FROM yuncms_license_state');
+      const offerHits = [];
+      const offerServer = createServer((req, res) => {
+        offerHits.push({ method: req.method, url: req.url, referer: req.headers.referer ?? null });
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end('<!doctype html><title>Local Premium Offer</title><h1>3-month Premium Offer</h1>');
+      });
+      await new Promise(resolve => offerServer.listen(0, '127.0.0.1', resolve));
+      const localOfferUrl = `http://127.0.0.1:${offerServer.address().port}/premium-offer`;
+
+      const runOfferServer = async envOverrides => {
+        const offerConfig = loadConfig({
+          DB_HOST: baseConfig.database.host,
+          DB_PORT: String(baseConfig.database.port),
+          DB_DATABASE: dbName,
+          DB_USER: baseConfig.database.user,
+          DB_PASSWORD: baseConfig.database.password,
+          API_RATE_LIMIT_ENABLED: '0',
+          PRESSURE_LIMIT_ENABLED: '0',
+          AUTH_PUBLIC_URL: 'https://cms.clean.example.test',
+          YUNCMS_LICENSE_PUBLIC_KEY: publicKey,
+          ...envOverrides,
+        });
+        const offerApp = createApp({
+          pool: database,
+          storage,
+          config: offerConfig,
+          logger: { error() {}, warn() {}, info() {} },
+        });
+        const srv = await new Promise(resolve => { const s = offerApp.listen(0, '127.0.0.1', () => resolve(s)); });
+        const url = 'http://127.0.0.1:' + srv.address().port;
+        const call = async (path, { method = 'GET', token, body } = {}) => {
+          const response = await fetch(url + path, {
+            method,
+            headers: {
+              ...(token ? { authorization: 'Bearer ' + token } : {}),
+              ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+            },
+            body: body === undefined ? undefined : JSON.stringify(body),
+          });
+          const text = await response.text();
+          return { status: response.status, body: text ? JSON.parse(text) : null };
+        };
+        const close = async () => {
+          const done = new Promise(resolve => srv.close(resolve));
+          srv.closeAllConnections();
+          await done;
+        };
+        return { call, close };
+      };
+
+      try {
+        // 1) Default (unset YUNCMS_PREMIUM_OFFER_URL) omits premiumOffer completely
+        const withoutOffer = await runOfferServer({});
+        try {
+          const adminRes = await withoutOffer.call('/features', { token: adminToken });
+          assert.equal(adminRes.status, 200);
+          assert.equal(Object.hasOwn(adminRes.body.data, 'premiumOffer'), false);
+        } finally {
+          await withoutOffer.close();
+        }
+
+        // 2) Configured safe local target: admin sees exact URL before activation, non-admin never sees it,
+        //    zero outbound HTTP calls occur, and activating periodMonths=3 hides premiumOffer and unlocks Premium.
+        const withOffer = await runOfferServer({ YUNCMS_PREMIUM_OFFER_URL: localOfferUrl });
+        try {
+          const editorRes = await withOffer.call('/features', { token: editorToken });
+          assert.equal(editorRes.status, 200);
+          assert.equal(Object.hasOwn(editorRes.body.data, 'premiumOffer'), false);
+          assert.equal(Object.hasOwn(editorRes.body.data, 'license'), false);
+
+          const adminBefore = await withOffer.call('/features', { token: adminToken });
+          assert.equal(adminBefore.status, 200);
+          assert.deepEqual(adminBefore.body.data.premiumOffer, { url: localOfferUrl });
+          assert.equal(offerHits.length, 0);
+
+          const now = Math.floor(Date.now() / 1000);
+          const exp3m = now + 90 * 86400;
+          const iso3m = new Date(exp3m * 1000).toISOString();
+
+          // Reject a missing exp, wrong domain, tampered signature, or expired 3-month token.
+          for (const rejected of [
+            signToken({ billingModel: 'monthly_term', periodMonths: 3, exp: null, expiresAt: iso3m, activatedInstanceId: null, allowedHosts: ['cms.clean.example.test'] }),
+            signToken({ billingModel: 'monthly_term', periodMonths: 3, exp: exp3m, expiresAt: iso3m, activatedInstanceId: null, allowedHosts: ['wrong.example.test'], stagingHosts: [] }),
+            signToken({ billingModel: 'monthly_term', periodMonths: 3, exp: now - 30, iat: now - 3600, nbf: now - 3600, activatedInstanceId: null, allowedHosts: ['cms.clean.example.test'] }),
+            signToken({ billingModel: 'monthly_term', periodMonths: 3, exp: exp3m, activatedInstanceId: null, allowedHosts: ['cms.clean.example.test'] }, { signingKey: wrongKeys.privateKey }),
+          ]) {
+            const badRes = await withOffer.call('/features/license', { method: 'POST', token: adminToken, body: { token: rejected } });
+            assert.equal(badRes.status, 400);
+            assert.equal(badRes.body.errors[0].code, 'INVALID_LICENSE');
+          }
+
+          // Activate valid Website 3-month monthly_term token
+          const threeMonthToken = signToken({
+            sub: 'lic-promo-3m',
+            licenseId: 'lic-promo-3m',
+            billingModel: 'monthly_term',
+            periodMonths: 3,
+            entitlementVersion: 1,
+            iat: now,
+            nbf: now - 1,
+            exp: exp3m,
+            expiresAt: iso3m,
+            activatedInstanceId: null,
+            allowedHosts: ['cms.clean.example.test'],
+            stagingHosts: ['staging.clean.example.test'],
+            capabilities: { contentHistory: true, whiteLabel: true },
+          });
+          const activateRes = await withOffer.call('/features/license', {
+            method: 'POST',
+            token: adminToken,
+            body: { token: threeMonthToken },
+          });
+          assert.equal(activateRes.status, 200);
+          assert.equal(activateRes.body.data.license.status, 'active');
+          assert.equal(activateRes.body.data.license.billingModel, 'monthly_term');
+          assert.equal(activateRes.body.data.license.periodMonths, 3);
+          assert.equal(activateRes.body.data.license.expiresAt, iso3m);
+          assert.equal(activateRes.body.data.features.contentHistory.enabled, true);
+          assert.equal(activateRes.body.data.features.whiteLabel.allowed, true);
+          assert.equal(Object.hasOwn(activateRes.body.data, 'premiumOffer'), false);
+
+          // Simulate expiry of 3-month entitlement -> Premium closes, Community CRUD stays intact
+          const expired3m = signToken({
+            sub: 'lic-promo-3m', licenseId: 'lic-promo-3m', billingModel: 'monthly_term',
+            periodMonths: 3, entitlementVersion: 1, iat: now - 7200, nbf: now - 7200, exp: now - 15,
+            expiresAt: new Date((now - 15) * 1000).toISOString(),
+            activatedInstanceId: null, allowedHosts: ['cms.clean.example.test'],
+          });
+          await database.query('UPDATE yuncms_license_state SET token = ? WHERE id = 1', [expired3m]);
+          const expiredStatus = await withOffer.call('/features', { token: adminToken });
+          assert.equal(expiredStatus.body.data.license.status, 'expired');
+          assert.equal(expiredStatus.body.data.license.periodMonths, 3);
+          assert.equal(expiredStatus.body.data.features.contentHistory.enabled, false);
+          assert.equal((await withOffer.call(`/items/${collection}/${createdArticleId}`, { token: editorToken })).status, 200);
+        } finally {
+          await withOffer.close();
+        }
+
+        // 3) Real native CLI `runInitCommand` against disposable MySQL DB: skip & opt-in work cleanly with ZERO campaign tables & ZERO outbound calls
+        const initDbName = 'yuncms_test_init_offer_' + randomBytes(5).toString('hex');
+        const initDir = await mkdtemp(join(tmpdir(), 'yuncms-cli-init-offer-'));
+        await rootPool.query('CREATE DATABASE `' + initDbName + '`');
+        try {
+          const skipLineAnswers = [
+            baseConfig.database.host,
+            String(baseConfig.database.port),
+            initDbName,
+            baseConfig.database.user,
+            'false',
+            'init-admin@demo.example',
+            'n',
+          ];
+          const initPass = 'Disposable-Init-' + randomBytes(8).toString('hex') + '!';
+          const skipSecretAnswers = [baseConfig.database.password, initPass, initPass];
+          const skipLogs = [];
+          const firstInit = await runInitCommand({
+            cwd: initDir,
+            env: { YUNCMS_PREMIUM_OFFER_URL: localOfferUrl },
+            isTTY: true,
+            output: { log(msg) { skipLogs.push(msg); } },
+            prompts: {
+              async line() { return skipLineAnswers.shift(); },
+              async secret() { return skipSecretAnswers.shift(); },
+            },
+          });
+          assert.equal(firstInit.existingAdmin, false);
+          assert.deepEqual(firstInit.premiumOffer, { configured: true, optedIn: false, url: null });
+          assert.equal(skipLogs.join('\n').includes(localOfferUrl), false);
+          const envContent = await readFile(join(initDir, '.env'), 'utf8');
+          assert.ok(envContent.includes(`YUNCMS_PREMIUM_OFFER_URL="${localOfferUrl}"`));
+
+          // Second run (existing admin) with explicit opt-in ('y') shows exact URL without leaking admin email or calling Website
+          const optLogs = [];
+          const secondInit = await runInitCommand({
+            cwd: initDir,
+            env: {
+              DB_HOST: baseConfig.database.host,
+              DB_PORT: String(baseConfig.database.port),
+              DB_DATABASE: initDbName,
+              DB_USER: baseConfig.database.user,
+              DB_PASSWORD: baseConfig.database.password,
+              DB_SSL: 'false',
+              YUNCMS_PREMIUM_OFFER_URL: localOfferUrl,
+            },
+            isTTY: true,
+            output: { log(msg) { optLogs.push(msg); } },
+            prompts: {
+              async line() { return 'y'; },
+              async secret() { throw new Error('unexpected secret prompt'); },
+            },
+          });
+          assert.equal(secondInit.existingAdmin, true);
+          assert.deepEqual(secondInit.premiumOffer, { configured: true, optedIn: true, url: localOfferUrl });
+          assert.ok(optLogs.join('\n').includes(localOfferUrl));
+
+          // Verify zero campaign tables exist in MySQL schema
+          const [tables] = await rootPool.query('SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?', [initDbName]);
+          for (const row of tables) {
+            assert.doesNotMatch(row.TABLE_NAME, /campaign|promo|newsletter/i);
+          }
+          assert.equal(offerHits.length, 0);
+        } finally {
+          await rootPool.query('DROP DATABASE IF EXISTS `' + initDbName + '`');
+          await rm(initDir, { recursive: true, force: true });
+        }
+      } finally {
+        await new Promise(resolve => offerServer.close(resolve));
       }
     });
 

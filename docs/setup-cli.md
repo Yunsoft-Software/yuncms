@@ -56,6 +56,10 @@ Rerunning `init` reuses the existing `.env`, safely checks migrations again and 
 
 After successful interactive initialization, the CLI prints optional GitHub-star, Yunsoft project-help and GitHub Sponsors links. These links are suppressed for non-TTY output and CI runs. `yuncms help` includes them explicitly; normal server and maintenance output does not add repeated promotional messages.
 
+When `YUNCMS_PREMIUM_OFFER_URL` is configured, interactive `init` offers to print
+the Website address for Yunsoft's three-month Premium offer. The default is no.
+See [Features and licensing](features-and-license.md#optional-three-month-premium-offer).
+
 For a guided walkthrough of the generated files and first Studio workflow, continue with [Getting Started](getting-started.md).
 
 ## Recommended long-lived installation

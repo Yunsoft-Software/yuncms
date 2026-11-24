@@ -263,3 +263,110 @@ test('Studio activates 1-month and renewed 12-month term licenses on auto-resolv
     await request.post('/extensions/flow-fixture/features/reset', { headers });
   }
 });
+
+test('Studio optional 3-month Premium offer respects opt-in and activates a signed three-month term in EN and TR', async ({ page, context, browser, request }) => {
+  const headers = await open(page, request);
+  await request.post('/extensions/flow-fixture/features/reset', { headers });
+  await page.reload();
+  let trPage;
+  try {
+    const probeBefore = (await (await request.get('/extensions/flow-fixture/features/offer-probe', { headers })).json()).data;
+    expect(probeBefore.hits).toEqual([]);
+
+    const offerPanel = page.locator('.premium-offer-panel');
+    await expect(offerPanel).toBeVisible();
+    await expect(offerPanel).toContainText('Optional 3-month Premium offer');
+    await expect(offerPanel.locator('a[href]')).toHaveCount(0);
+    await captureStudio(page, offerPanel, { path: test.info().outputPath('premium-offer-en.png') });
+    trPage = await browser.newPage({ baseURL: new URL(page.url()).origin });
+    const sessionJson = await page.evaluate(() => sessionStorage.getItem('yuncms.studio.session'));
+    await trPage.addInitScript(data => {
+      sessionStorage.setItem('yuncms.studio.session', data);
+      localStorage.setItem('yuncms.studio.locale', 'tr');
+    }, sessionJson);
+    await trPage.goto('/#/features');
+    const trOffer = trPage.getByRole('region', { name: 'İsteğe bağlı 3 aylık Premium teklifi', exact: true });
+    await expect(trOffer).toBeVisible();
+    await expect(trOffer.locator('a[href]')).toHaveCount(0);
+    await captureStudio(trPage, trOffer, { path: test.info().outputPath('premium-offer-tr.png') });
+
+    // 1) Skip hides panel cleanly with ZERO requests to the local offer server
+    await offerPanel.getByRole('button', { name: 'Skip', exact: true }).click();
+    await expect(offerPanel).toHaveCount(0);
+    const probeAfterSkip = (await (await request.get('/extensions/flow-fixture/features/offer-probe', { headers })).json()).data;
+    expect(probeAfterSkip.hits).toEqual([]);
+
+    // 2) Reload and explicitly opt in: reveals external link with rel="noopener noreferrer", zero background fetch
+    await page.reload();
+    await expect(offerPanel).toBeVisible();
+    await offerPanel.getByRole('button', { name: 'View Website offer link', exact: true }).click();
+    const offerLink = offerPanel.getByRole('link', { name: /Continue to Yunsoft Website/ });
+    await expect(offerLink).toBeVisible();
+    await expect(offerLink).toHaveAttribute('href', probeBefore.url);
+    await expect(offerLink).toHaveAttribute('rel', 'noopener noreferrer');
+    const probeBeforeClick = (await (await request.get('/extensions/flow-fixture/features/offer-probe', { headers })).json()).data;
+    expect(probeBeforeClick.hits).toEqual([]);
+
+    // 3) User explicitly clicks link -> opens local safe target with NO Referer and NO query string
+    const [offerPopup] = await Promise.all([
+      context.waitForEvent('page'),
+      offerLink.click(),
+    ]);
+    await offerPopup.waitForLoadState('domcontentloaded');
+    await expect(offerPopup.locator('h1')).toHaveText('3-Month Premium Offer');
+    await offerPopup.close();
+
+    const probeAfterClick = (await (await request.get('/extensions/flow-fixture/features/offer-probe', { headers })).json()).data;
+    expect(probeAfterClick.hits).toHaveLength(1);
+    expect(probeAfterClick.hits[0].url).toBe('/premium-offer');
+    expect(probeAfterClick.hits[0].referer).toBeNull();
+
+    // 4) Activate real Website 3-month monthly_term (periodMonths=3, exp + matching expiresAt) JWT in Studio
+    const now = Math.floor(Date.now() / 1000);
+    const exp3m = now + 90 * 86400;
+    const iso3m = new Date(exp3m * 1000).toISOString();
+    const threeMonthToken = await license(request, headers, {
+      sub: 'browser-promo-3m',
+      licenseId: 'browser-promo-3m',
+      billingModel: 'monthly_term',
+      periodMonths: 3,
+      entitlementVersion: 1,
+      iat: now,
+      nbf: now - 1,
+      exp: exp3m,
+      expiresAt: iso3m,
+      capabilities: { contentHistory: true, whiteLabel: true },
+    });
+
+    const licenseInput = page.getByLabel('Signed license', { exact: true });
+    await licenseInput.fill(threeMonthToken);
+    await page.getByRole('button', { name: 'Activate license', exact: true }).click();
+    await expect(licenseInput).toHaveValue('');
+    await expect(page.locator('.settings-feature-page .status-pill')).toHaveText('Active');
+    await expect(page.locator('.settings-license-meta')).toContainText('browser.example.test · Term (3 months) · Valid until');
+    await expect(offerPanel).toHaveCount(0);
+    await expect(page.getByRole('checkbox', { name: 'Content history', exact: true })).toBeEnabled();
+    await expect(page.getByRole('checkbox', { name: 'White-label branding', exact: true })).toBeEnabled();
+    await captureStudio(page, licenseInput.locator('xpath=ancestor::form'), { path: test.info().outputPath('premium-license-en.png') });
+
+    // 5) Turkish locale displays the localized term after activation.
+    await trPage.reload();
+    await expect(trPage.locator('.settings-license-meta')).toContainText('browser.example.test · Dönemlik (3 ay)');
+    await expect(trOffer).toHaveCount(0);
+    const trLicense = trPage.getByLabel('İmzalı lisans', { exact: true });
+    await captureStudio(trPage, trLicense.locator('xpath=ancestor::form'), { path: test.info().outputPath('premium-license-tr.png') });
+
+    // 6) Non-admin staff never sees offer panel or license settings
+    const staffPage = await context.newPage();
+    try {
+      await open(staffPage, request, '/#/features', 'flows-staff@example.test');
+      await expect(staffPage.locator('.premium-offer-panel')).toHaveCount(0);
+      await expect(staffPage.getByRole('alert')).toBeVisible();
+    } finally {
+      await staffPage.close();
+    }
+  } finally {
+    await trPage?.close();
+    await request.post('/extensions/flow-fixture/features/reset', { headers });
+  }
+});

@@ -1,6 +1,6 @@
 import { loadEnvFile } from 'node:process';
 import { totpKey } from './auth/totp.js';
-import { resolveLicenseDomain } from './features.js';
+import { resolveLicenseDomain, resolvePremiumOfferUrl } from './features.js';
 
 export const DEFAULT_SERVER_PORT = 3008;
 
@@ -75,6 +75,7 @@ export function loadConfig(env = process.env) {
       }),
       instanceId: readString(env.YUNCMS_LICENSE_INSTANCE_ID, '') || null,
       disabled: readString(env.YUNCMS_FEATURES_DISABLED, '').split(',').map(value => value.trim()).filter(Boolean),
+      premiumOfferUrl: resolvePremiumOfferUrl(readString(env.YUNCMS_PREMIUM_OFFER_URL, '')),
     },
     ai: {
       providerObservationsEnabled: readBoolean(env.AI_PROVIDER_OBSERVATIONS_ENABLED, false),

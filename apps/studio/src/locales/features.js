@@ -99,3 +99,83 @@ const licenseTerms = {
  'zh-CN': ['永久', '月度（1 个月）', '年度（12 个月）', '期限许可证', '{domain} · {plan}', '{domain} · {plan} · 有效期至 {date}', '{domain} · {plan} · 已于 {date} 过期。请安装续期后的签名许可证以恢复 Premium 功能。', '安装域名：{domain}。请粘贴签名授权令牌（JWT），而非简短许可证密钥。', '激活签名授权令牌（JWT）前，请先将 AUTH_PUBLIC_URL 或 STUDIO_ORIGIN 设置为你的站点 URL。'],
 };
 for (const [locale, texts] of Object.entries(licenseTerms)) ['planPerpetual','planMonthly','planAnnual','planTerm','summaryPerpetual','summaryActiveTerm','summaryExpired','summaryReadyDomain','summaryMissingDomain'].forEach((key, i) => { FEATURE_LOCALES[locale][`features.${key}`] = texts[i]; });
+
+const multiMonthPlans = {
+  en: 'Term ({months} months)',
+  tr: 'Dönemlik ({months} ay)',
+  es: 'Temporal ({months} meses)',
+  de: 'Laufzeit ({months} Monate)',
+  fr: 'Durée ({months} mois)',
+  'pt-BR': 'Período ({months} meses)',
+  ja: '期間（{months}か月）',
+  'zh-CN': '期限（{months} 个月）',
+};
+for (const [locale, text] of Object.entries(multiMonthPlans)) FEATURE_LOCALES[locale]['features.planMonths'] = text;
+
+const premiumOffer = {
+  en: [
+    'Optional 3-month Premium offer',
+    'No credit card required. Complete verified email subscription directly on the Yunsoft Website, then paste your signed entitlement token (JWT) below. YunCMS does not send your email, license key or installation details.',
+    'View Website offer link',
+    'Skip',
+    'Continue to Yunsoft Website',
+    'Opens externally without sending referral or installation data.',
+  ],
+  tr: [
+    'İsteğe bağlı 3 aylık Premium teklifi',
+    'Kredi kartı gerekmez. Doğrulanmış e-posta aboneliğini doğrudan Yunsoft Web Sitesi üzerinde tamamlayıp aldığınız imzalı yetki belgesini (JWT) aşağıya yapıştırın. YunCMS e-posta, lisans anahtarı veya kurulum bilginizi aktarmaz.',
+    'Web sitesi teklif bağlantısını göster',
+    'Atla',
+    'Yunsoft Web Sitesine Git',
+    'Yönlendiren adres veya kurulum verisi göndermeden harici olarak açılır.',
+  ],
+  es: [
+    'Oferta opcional de 3 meses de Premium',
+    'Sin tarjeta de crédito. Completa la suscripción con correo verificado directamente en el sitio web de Yunsoft y pega aquí tu token de derecho firmado (JWT). YunCMS no envía tu correo, clave ni datos de instalación.',
+    'Mostrar enlace de la oferta',
+    'Omitir',
+    'Continuar al sitio web de Yunsoft',
+    'Se abre externamente sin enviar datos de referencia ni de instalación.',
+  ],
+  de: [
+    'Optionales 3-Monats-Premium-Angebot',
+    'Keine Kreditkarte erforderlich. Schließen Sie das verifizierte E-Mail-Abo direkt auf der Yunsoft-Website ab und fügen Sie das signierte Berechtigungs-Token (JWT) unten ein. YunCMS sendet keine E-Mail-, Schlüssel- oder Installationsdaten.',
+    'Website-Angebotslink anzeigen',
+    'Überspringen',
+    'Weiter zur Yunsoft-Website',
+    'Wird extern ohne Referrer- oder Installationsdaten geöffnet.',
+  ],
+  fr: [
+    'Offre Premium optionnelle de 3 mois',
+    'Aucune carte bancaire requise. Effectuez l’inscription par e-mail vérifié directement sur le site Yunsoft, puis collez votre jeton de droit signé (JWT) ci-dessous. YunCMS n’envoie ni e-mail, ni clé, ni information d’installation.',
+    'Afficher le lien de l’offre',
+    'Ignorer',
+    'Continuer vers le site Yunsoft',
+    'S’ouvre en externe sans envoyer de référent ni de données d’installation.',
+  ],
+  'pt-BR': [
+    'Oferta opcional de 3 meses de Premium',
+    'Não exige cartão de crédito. Conclua a assinatura com e-mail verificado diretamente no site da Yunsoft e cole seu token de direito assinado (JWT) abaixo. O YunCMS não envia seu e-mail, chave ou dados da instalação.',
+    'Mostrar link da oferta',
+    'Pular',
+    'Ir para o site da Yunsoft',
+    'Abre externamente sem enviar dados de referência ou da instalação.',
+  ],
+  ja: [
+    '任意の 3 か月間 Premium オファー',
+    'クレジットカード不要です。Yunsoft ウェブサイトでメール認証付き登録を完了し、発行された署名付き利用権トークン（JWT）を下に貼り付けてください。YunCMS からメール・キー・インストール情報は送信されません。',
+    'ウェブサイトのオファーリンクを表示',
+    'スキップ',
+    'Yunsoft ウェブサイトへ進む',
+    '参照元やインストール情報を送信せずに外部リンクを開きます。',
+  ],
+  'zh-CN': [
+    '可选 3 个月 Premium 体验优惠',
+    '无需信用卡。请直接在 Yunsoft 网站完成已验证邮箱订阅，并将获得的签名授权令牌（JWT）粘贴到下方。YunCMS 不会发送您的邮箱、密钥或安装信息。',
+    '显示网站优惠链接',
+    '跳过',
+    '前往 Yunsoft 网站',
+    '在外部打开，不附带来源或安装数据。',
+  ],
+};
+for (const [locale, texts] of Object.entries(premiumOffer)) ['offerTitle','offerDescription','offerOptIn','offerSkip','offerOpenLink','offerPrivacyNote'].forEach((key, i) => { FEATURE_LOCALES[locale][`features.${key}`] = texts[i]; });

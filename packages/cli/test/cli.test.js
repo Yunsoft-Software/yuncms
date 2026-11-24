@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { createServer } from 'node:http';
 
 import { assertSupportedNode, runCli } from '../src/cli.js';
 import { serializeEnv } from '../src/env-file.js';
-import { collectEnvironment } from '../src/init-command.js';
+import { collectEnvironment, offerOptionalPremiumSubscription, parseOptInResponse } from '../src/init-command.js';
 import { runStartCommand } from '../src/start-command.js';
 
 test('node guard accepts only node 24 baseline', () => {
@@ -149,4 +150,82 @@ test('unknown commands fail closed', async () => {
     runCli(['graphql'], { output: { log() {} }, env: {} }),
     (error) => error.code === 'UNKNOWN_CLI_COMMAND',
   );
+});
+
+test('optional 3-month Premium offer in init skips by default, never phones home and only displays an explicitly configured safe URL on opt-in', async () => {
+  for (const yes of ['y', 'Y', 'yes', 'YES', 'e', 'evet']) assert.equal(parseOptInResponse(yes), true);
+  for (const no of ['', 'n', 'no', 'h', 'hayir', 'maybe', null, undefined]) assert.equal(parseOptInResponse(no), false);
+
+  // Unconfigured default: zero prompts, zero output, no hardcoded URL invented
+  let prompted = false;
+  const unconfiguredLogs = [];
+  const unconfigured = await offerOptionalPremiumSubscription({
+    env: {},
+    prompts: { async line() { prompted = true; return 'y'; } },
+    output: { log(msg) { unconfiguredLogs.push(msg); } },
+    isTTY: true,
+  });
+  assert.deepEqual(unconfigured, { configured: false, optedIn: false, url: null });
+  assert.equal(prompted, false);
+  assert.deepEqual(unconfiguredLogs, []);
+
+  // Safe local loopback target probe: verify ZERO outbound network requests on skip, CI and opt-in
+  const hits = [];
+  const server = createServer((req, res) => {
+    hits.push({ method: req.method, url: req.url });
+    res.writeHead(200, { 'content-type': 'text/plain' });
+    res.end('ok');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const localOfferUrl = `http://127.0.0.1:${server.address().port}/premium-offer`;
+
+  try {
+    // CI/non-TTY skips silently without prompting
+    const ciResult = await offerOptionalPremiumSubscription({
+      env: { CI: 'true', YUNCMS_PREMIUM_OFFER_URL: localOfferUrl },
+      prompts: { async line() { throw new Error('must not prompt in CI'); } },
+      output: { log() {} },
+      isTTY: true,
+    });
+    assert.deepEqual(ciResult, { configured: true, optedIn: false, url: null });
+
+    // Interactive skip (default n)
+    const skipLogs = [];
+    const skipResult = await offerOptionalPremiumSubscription({
+      env: { YUNCMS_PREMIUM_OFFER_URL: localOfferUrl },
+      prompts: { async line(_msg, opts) { assert.equal(opts.defaultValue, 'n'); return opts.defaultValue; } },
+      output: { log(msg) { skipLogs.push(msg); } },
+      isTTY: true,
+    });
+    assert.deepEqual(skipResult, { configured: true, optedIn: false, url: null });
+    assert.deepEqual(skipLogs, []);
+
+    // Interactive explicit opt-in displays exact configured URL without transmitting email/key/install info
+    const optInLogs = [];
+    const optInResult = await offerOptionalPremiumSubscription({
+      env: { YUNCMS_PREMIUM_OFFER_URL: localOfferUrl, AUTH_PUBLIC_URL: 'https://tenant.example.test' },
+      prompts: { async line() { return 'y'; } },
+      output: { log(msg) { optInLogs.push(msg); } },
+      isTTY: true,
+    });
+    assert.deepEqual(optInResult, { configured: true, optedIn: true, url: localOfferUrl });
+    const printed = optInLogs.join('\n');
+    assert.ok(printed.includes(localOfferUrl));
+    assert.doesNotMatch(printed, /tenant\.example\.test/);
+    assert.match(printed, /did not send your email, license key or installation details/i);
+    assert.equal(hits.length, 0);
+
+    // Unsafe URL fails closed
+    await assert.rejects(
+      offerOptionalPremiumSubscription({
+        env: { YUNCMS_PREMIUM_OFFER_URL: 'http://yunsoft.com/insecure' },
+        prompts: { async line() { return 'y'; } },
+        output: { log() {} },
+        isTTY: true,
+      }),
+      { code: 'INVALID_CONFIGURATION' },
+    );
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
 });

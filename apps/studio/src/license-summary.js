@@ -29,7 +29,9 @@ export function formatLicenseSummary(license, { locale = 'en', t } = {}) {
       ? t('features.planMonthly')
       : license.periodMonths === 12
         ? t('features.planAnnual')
-        : t('features.planTerm');
+        : Number.isSafeInteger(license.periodMonths) && license.periodMonths > 1
+          ? t('features.planMonths', { months: license.periodMonths })
+          : t('features.planTerm');
   const date = formatUtcDate(license.expiresAt, locale);
   if (license.status === 'expired' && date) {
     return t('features.summaryExpired', { domain: license.domain, plan, date });

@@ -28,14 +28,14 @@ test('translated UI templates preserve customer values and literal brand-name pl
   assert.equal(translate('en', 'appearance.copyright', { year: 2026 }, { ...branding, brand_name: '{year} Client' }), '© 2026 {year} Client. All rights reserved.');
 });
 test('white-label and Premium discovery translations exist in all supported languages', () => {
-  for (const locale of Object.keys(DICTIONARIES)) for (const key of ['whiteLabel','whiteLabelHint','getPremium','resetAppearance','manageFeatures','default_disabled','brandNameFallback','neutralFavicon','noBrandImage','clearBrandImage','settingsAdminOnly','planPerpetual','planMonthly','planAnnual','planTerm','summaryPerpetual','summaryActiveTerm','summaryExpired','summaryReadyDomain','summaryMissingDomain']) {
+  for (const locale of Object.keys(DICTIONARIES)) for (const key of ['whiteLabel','whiteLabelHint','getPremium','resetAppearance','manageFeatures','default_disabled','brandNameFallback','neutralFavicon','noBrandImage','clearBrandImage','settingsAdminOnly','planPerpetual','planMonthly','planAnnual','planMonths','planTerm','summaryPerpetual','summaryActiveTerm','summaryExpired','summaryReadyDomain','summaryMissingDomain','offerTitle','offerDescription','offerOptIn','offerSkip','offerOpenLink','offerPrivacyNote']) {
     assert.equal(hasTranslation(locale, 'features.' + key), true);
     const message = translate(locale, 'features.' + key); assert.ok(message); assert.notEqual(message, 'features.' + key);
   }
   assert.doesNotMatch(translate('en', 'features.perpetual'), /one payment/i);
   assert.doesNotMatch(translate('tr', 'features.perpetual'), /tek ödeme/i);
 });
-test('license summary formats monthly, annual, perpetual and expired entitlements without vendor leakage', () => {
+test('license summary formats monthly, multi-month (3m), annual, perpetual and expired entitlements without vendor leakage', () => {
   const tEn = (key, values) => translate('en', key, values, branding);
   const tTr = (key, values) => translate('tr', key, values);
   assert.equal(formatLicenseSummary(null, { locale: 'en', t: tEn }), '');
@@ -50,10 +50,17 @@ test('license summary formats monthly, annual, perpetual and expired entitlement
   const activeMonthly = formatLicenseSummary({ status: 'active', domain: 'example.com', billingModel: 'monthly_term', periodMonths: 1, expiresAt: '2026-12-15T00:00:00.000Z' }, { locale: 'en', t: tEn });
   assert.match(activeMonthly, /^example\.com · Monthly \(1 month\) · Valid until /);
   assert.doesNotMatch(activeMonthly, /yuncms|yunsoft/i);
+  const activeThreeMonthEn = formatLicenseSummary({ status: 'active', domain: 'example.com', billingModel: 'monthly_term', periodMonths: 3, expiresAt: '2027-02-24T00:00:00.000Z' }, { locale: 'en', t: tEn });
+  assert.match(activeThreeMonthEn, /^example\.com · Term \(3 months\) · Valid until /);
+  assert.doesNotMatch(activeThreeMonthEn, /yuncms|yunsoft/i);
+  const activeThreeMonthTr = formatLicenseSummary({ status: 'active', domain: 'ornek.com.tr', billingModel: 'monthly_term', periodMonths: 3, expiresAt: '2027-02-24T00:00:00.000Z' }, { locale: 'tr', t: tTr });
+  assert.match(activeThreeMonthTr, /^ornek\.com\.tr · Dönemlik \(3 ay\) · .+ tarihine kadar geçerli$/);
+  const activeGenericTerm = formatLicenseSummary({ status: 'active', domain: 'example.com', billingModel: 'monthly_term', periodMonths: null, expiresAt: '2027-02-24T00:00:00.000Z' }, { locale: 'en', t: tEn });
+  assert.match(activeGenericTerm, /^example\.com · Term license · Valid until /);
   const activeAnnualTr = formatLicenseSummary({ status: 'active', domain: 'ornek.com.tr', billingModel: 'monthly_term', periodMonths: 12, expiresAt: '2027-11-15T00:00:00.000Z' }, { locale: 'tr', t: tTr });
   assert.match(activeAnnualTr, /^ornek\.com\.tr · Yıllık \(12 ay\) · .+ tarihine kadar geçerli$/);
-  const expiredSummary = formatLicenseSummary({ status: 'expired', domain: 'example.com', billingModel: 'monthly_term', periodMonths: 1, expiresAt: '2026-10-01T00:00:00.000Z' }, { locale: 'en', t: tEn });
-  assert.match(expiredSummary, /Expired on .*renewed signed license/);
+  const expiredSummary = formatLicenseSummary({ status: 'expired', domain: 'example.com', billingModel: 'monthly_term', periodMonths: 3, expiresAt: '2026-10-01T00:00:00.000Z' }, { locale: 'en', t: tEn });
+  assert.match(expiredSummary, /Term \(3 months\) · Expired on .*renewed signed license/);
 });
 test('upgrade links point to the bilingual Yunsoft contact pages with the Premium campaign', () => {
   const campaign = '?utm_source=studio&utm_medium=yuncms&utm_campaign=yuncms-premium';
@@ -82,4 +89,6 @@ test('authentication captions and new Flow run examples follow the effective cus
   const features = readFileSync(new URL('../src/screens/FeaturesScreen.jsx', import.meta.url), 'utf8');
   assert.match(features, /formatLicenseSummary\(status\.license,\s*\{\s*locale,\s*t\s*\}\)/);
   assert.match(features, /<textarea aria-label=\{t\('features\.token'\)\}[^>]*placeholder="eyJhbGciOiJFZERTQSIs\.\.\."/);
+  assert.match(features, /status\.premiumOffer\?\.url && !settings\.premium && !settings\.white_label_enabled/);
+  assert.match(features, /href=\{status\.premiumOffer\.url\}[^>]*rel="noopener noreferrer"/);
 });

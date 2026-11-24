@@ -66,6 +66,30 @@ function nonLocalOriginHostname(rawUrl) {
   return host;
 }
 
+export function resolvePremiumOfferUrl(rawUrl) {
+  if (rawUrl === undefined || rawUrl === null) return null;
+  if (typeof rawUrl !== 'string') {
+    throw featureError('INVALID_CONFIGURATION', 'YUNCMS_PREMIUM_OFFER_URL must be an https URL or a local loopback http URL without credentials');
+  }
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+  if (/[\r\n\0]/.test(trimmed)) {
+    throw featureError('INVALID_CONFIGURATION', 'YUNCMS_PREMIUM_OFFER_URL must be an https URL or a local loopback http URL without credentials');
+  }
+  let parsed;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw featureError('INVALID_CONFIGURATION', 'YUNCMS_PREMIUM_OFFER_URL must be an https URL or a local loopback http URL without credentials');
+  }
+  const host = parsed.hostname.toLowerCase();
+  const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1';
+  if (parsed.username || parsed.password || (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback))) {
+    throw featureError('INVALID_CONFIGURATION', 'YUNCMS_PREMIUM_OFFER_URL must be an https URL or a local loopback http URL without credentials');
+  }
+  return parsed.toString();
+}
+
 export function resolveLicenseDomain(input = {}) {
   const explicit = input.domain ?? input.YUNCMS_LICENSE_DOMAIN;
   if (explicit !== undefined && explicit !== null && (typeof explicit !== 'string' || explicit.trim() !== '')) {
@@ -163,8 +187,10 @@ export function createFeaturePolicy(input = process.env) {
     publicKey: input.publicKey ?? input.YUNCMS_LICENSE_PUBLIC_KEY,
     domain: resolveLicenseDomain(input),
     instanceId: input.instanceId ?? input.YUNCMS_LICENSE_INSTANCE_ID,
+    premiumOfferUrl: resolvePremiumOfferUrl(input.premiumOfferUrl ?? input.YUNCMS_PREMIUM_OFFER_URL),
   };
   return Object.freeze({
+    premiumOfferUrl: configuration.premiumOfferUrl,
     withToken(token) {
       return createFeaturePolicy({ ...configuration, token, disabled });
     },

@@ -10,6 +10,7 @@ import {
   findExistingAdmin,
   loadConfig,
   pingDatabase,
+  resolvePremiumOfferUrl,
 } from '@yunsoft/yuncms-core';
 
 import { writeEnvFile } from './env-file.js';
@@ -55,12 +56,50 @@ async function collectAdmin(prompts) {
   return { email, password };
 }
 
+export function parseOptInResponse(answer) {
+  const normalized = String(answer ?? '').trim().toLowerCase();
+  return ['y', 'yes', 'e', 'evet'].includes(normalized);
+}
+
+export async function offerOptionalPremiumSubscription({
+  env = process.env,
+  prompts = null,
+  output = console,
+  isTTY = Boolean(process.stdin.isTTY && process.stdout.isTTY),
+  interactive = null,
+} = {}) {
+  const url = resolvePremiumOfferUrl(env.YUNCMS_PREMIUM_OFFER_URL);
+  if (!url) {
+    return { configured: false, optedIn: false, url: null };
+  }
+  const canPrompt = interactive ?? (Boolean(prompts) && !env.CI && isTTY);
+  if (!canPrompt || !prompts) {
+    return { configured: true, optedIn: false, url: null };
+  }
+
+  const answer = await prompts.line(
+    "Optional: view Yunsoft's 3-month no-card Premium offer (verified email subscription on Yunsoft Website)? (y/N)",
+    { defaultValue: 'n' },
+  );
+  if (!parseOptInResponse(answer)) {
+    return { configured: true, optedIn: false, url: null };
+  }
+
+  output.log?.('\nOptional 3-month Premium offer (no credit card; complete verified email subscription directly on Yunsoft Website):');
+  output.log?.(`  ${url}`);
+  output.log?.('YunCMS did not send your email, license key or installation details. After receiving your signed entitlement token (JWT), paste it in Studio under Settings -> Features and license.');
+  return { configured: true, optedIn: true, url };
+}
+
 export async function runInitCommand({
   env = process.env,
   cwd = process.cwd(),
   output = console,
-  prompts = createInteractivePrompts(),
+  prompts,
+  isTTY = Boolean(process.stdin.isTTY && process.stdout.isTTY),
 } = {}) {
+  const hasExplicitPrompts = Boolean(prompts);
+  const activePrompts = prompts ?? createInteractivePrompts();
   const envPath = join(cwd, '.env');
   const workingEnv = { ...env };
   const scaffold = await ensureProjectScaffold({ cwd });
@@ -71,7 +110,11 @@ export async function runInitCommand({
 
   if (!existsSync(envPath)) {
     output.log?.('YunCMS setup: database configuration');
-    const collected = await collectEnvironment(prompts);
+    const collected = await collectEnvironment(activePrompts);
+    const configuredOfferUrl = resolvePremiumOfferUrl(workingEnv.YUNCMS_PREMIUM_OFFER_URL);
+    if (configuredOfferUrl) {
+      collected.YUNCMS_PREMIUM_OFFER_URL = configuredOfferUrl;
+    }
     const config = loadConfig(collected);
     void config;
     await writeEnvFile(envPath, collected);
@@ -105,17 +148,31 @@ export async function runInitCommand({
       output.log?.(`Administrator already exists: ${existingAdmin.email}`);
       output.log?.(`YunCMS API: http://${config.server.host}:${config.server.port}`);
       output.log?.(`YunCMS Studio: ${config.server.studioOrigin}`);
-      return { bootstrap, admin: existingAdmin, existingAdmin: true };
+      const premiumOffer = await offerOptionalPremiumSubscription({
+        env: workingEnv,
+        prompts: activePrompts,
+        output,
+        isTTY,
+        interactive: !workingEnv.CI && (hasExplicitPrompts || isTTY),
+      });
+      return { bootstrap, admin: existingAdmin, existingAdmin: true, premiumOffer };
     }
 
     output.log?.('YunCMS setup: first administrator');
-    const adminInput = await collectAdmin(prompts);
+    const adminInput = await collectAdmin(activePrompts);
     const admin = await createInitialAdmin(pool, adminInput);
     output.log?.(`Created administrator: ${admin.email}`);
     output.log?.(`YunCMS API: http://${config.server.host}:${config.server.port}`);
     output.log?.(`YunCMS Studio: ${config.server.studioOrigin}`);
+    const premiumOffer = await offerOptionalPremiumSubscription({
+      env: workingEnv,
+      prompts: activePrompts,
+      output,
+      isTTY,
+      interactive: !workingEnv.CI && (hasExplicitPrompts || isTTY),
+    });
 
-    return { bootstrap, admin, existingAdmin: false };
+    return { bootstrap, admin, existingAdmin: false, premiumOffer };
   } finally {
     await closeDatabasePool(pool);
   }

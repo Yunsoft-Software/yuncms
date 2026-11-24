@@ -427,5 +427,5 @@ for discovery, setup, challenges, recovery, limits and session rotation.
 
 ## Features and licensing
 
-See [Features and licensing](features-and-license.md#configure-trust) for the five
-license/feature configuration variables, defaults and trusted-key contract.
+See [Features and licensing](features-and-license.md#configure-trust) for the six
+license/feature configuration variables (including optional `YUNCMS_PREMIUM_OFFER_URL`), defaults and trusted-key contract.

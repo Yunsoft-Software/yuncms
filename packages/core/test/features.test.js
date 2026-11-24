@@ -8,6 +8,7 @@ import {
   createFeaturePolicy,
   effectiveFeatureState,
   resolveLicenseDomain,
+  resolvePremiumOfferUrl,
   verifyFeatureLicense,
 } from '../src/features.js';
 import { parseItemRevision, assertItemRevision, contentTracking, restrictMutationToKeys } from '../src/content-state.js';
@@ -189,7 +190,7 @@ test('license configuration defaults to official Yunsoft public trust anchor, re
   assert.equal(OFFICIAL_LICENSE_KEY_ID, '1cbcc4d3173d0c15');
 
   // Default localhost configuration keeps domain null so stagingHosts (localhost/127.0.0.1) never unlock an unconfigured server.
-  assert.deepEqual(loadConfig({}).features, { token: null, publicKey: null, domain: null, instanceId: null, disabled: [] });
+  assert.deepEqual(loadConfig({}).features, { token: null, publicKey: null, domain: null, instanceId: null, disabled: [], premiumOfferUrl: null });
   for (const localUrl of [
     'http://localhost:3008',
     'http://127.0.0.1:3008',
@@ -222,8 +223,9 @@ test('license configuration defaults to official Yunsoft public trust anchor, re
     YUNCMS_LICENSE_DOMAIN: 'example.test',
     YUNCMS_LICENSE_INSTANCE_ID: 'instance',
     YUNCMS_FEATURES_DISABLED: 'mcp, flowScripts',
+    YUNCMS_PREMIUM_OFFER_URL: 'https://yunsoft.com/premium-offer',
   }).features;
-  assert.deepEqual(features, { token: 'signed', publicKey: 'public', domain: 'example.test', instanceId: 'instance', disabled: ['mcp', 'flowScripts'] });
+  assert.deepEqual(features, { token: 'signed', publicKey: 'public', domain: 'example.test', instanceId: 'instance', disabled: ['mcp', 'flowScripts'], premiumOfferUrl: 'https://yunsoft.com/premium-offer' });
 
   const invalidDomainOverride = createFeaturePolicy({ AUTH_PUBLIC_URL: 'https://example.com', YUNCMS_LICENSE_DOMAIN: 'https://bad:443', publicKey, token: token() });
   assert.equal(invalidDomainOverride.licenseStatus().status, 'invalid');
@@ -233,4 +235,92 @@ test('license configuration defaults to official Yunsoft public trust anchor, re
   assert.equal(verifyFeatureLicense({ token: spoofedKidToken, domain: 'example.com' }).status, 'invalid');
   assert.equal(verifyFeatureLicense({ token: spoofedKidToken, publicKey: '', domain: 'example.com' }).status, 'invalid');
   assert.equal(verifyFeatureLicense({ token: token(), publicKey: 'invalid-pem', domain: 'example.com' }).status, 'invalid');
+});
+
+test('Website 3-month monthly_term honors signed exp and can be replaced with paid terms', () => {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const threeMonthExp = nowSec + 90 * 86400;
+  const isoExp = new Date(threeMonthExp * 1000).toISOString();
+  const threeMonthIsoMs = new Date(threeMonthExp * 1000 + 450).toISOString();
+
+  // Accepts monthly_term + periodMonths=3 with integer exp alone OR with matching ISO expiresAt
+  for (const extra of [{}, { expiresAt: isoExp }, { expiresAt: threeMonthIsoMs }]) {
+    const promo = token({
+      sub: 'lic-promo-3m',
+      licenseId: 'lic-promo-3m',
+      billingModel: 'monthly_term',
+      periodMonths: 3,
+      entitlementVersion: 1,
+      iat: nowSec,
+      nbf: nowSec - 1,
+      exp: threeMonthExp,
+      capabilities: { contentHistory: true, whiteLabel: true },
+      ...extra,
+    });
+    const policy = createFeaturePolicy({ token: promo, publicKey, domain: 'example.com' });
+    assert.deepEqual(policy.licenseStatus(), {
+      status: 'active',
+      domain: 'example.com',
+      licenseId: 'lic-promo-3m',
+      billingModel: 'monthly_term',
+      periodMonths: 3,
+      expiresAt: isoExp,
+      entitlementVersion: 1,
+    });
+    assert.equal(policy.describe('contentHistory').allowed, true);
+    assert.equal(policy.describe('whiteLabel').allowed, true);
+  }
+
+  // Perpetual with optional expiresAt: null remains backward compatible
+  assert.equal(verifyFeatureLicense({ token: token({ expiresAt: null }), publicKey, domain: 'example.com' }).status, 'active');
+
+  const missingExp = token({ billingModel: 'monthly_term', periodMonths: 3, exp: null, expiresAt: isoExp });
+  assert.equal(verifyFeatureLicense({ token: missingExp, publicKey, domain: 'example.com' }).status, 'invalid');
+
+  const expiredThreeMonth = token({
+    sub: 'lic-promo-3m', licenseId: 'lic-promo-3m', billingModel: 'monthly_term',
+    periodMonths: 3, iat: nowSec - 7200, nbf: nowSec - 7200, exp: nowSec - 30,
+    expiresAt: isoExp,
+  });
+  const expiredVerified = verifyFeatureLicense({ token: expiredThreeMonth, publicKey, domain: 'example.com' });
+  assert.equal(expiredVerified.status, 'expired');
+  assert.equal(expiredVerified.periodMonths, 3);
+  assert.equal(expiredVerified.expiresAt, new Date((nowSec - 30) * 1000).toISOString());
+  assert.deepEqual(expiredVerified.capabilities, {});
+
+  // Upgrading from 3-month promo license to a paid 12-month or perpetual license succeeds
+  const activePromo = createFeaturePolicy({ publicKey, domain: 'example.com' }).withToken(token({
+    sub: 'lic-promo-3m', licenseId: 'lic-promo-3m', billingModel: 'monthly_term',
+    periodMonths: 3, entitlementVersion: 1, iat: nowSec, exp: threeMonthExp,
+  }));
+  const paidAnnual = token({
+    sub: 'lic-paid-annual', licenseId: 'lic-paid-annual', billingModel: 'monthly_term',
+    periodMonths: 12, entitlementVersion: 1, iat: nowSec + 1, exp: nowSec + 365 * 86400,
+  });
+  assert.equal(activePromo.canReplaceWith(paidAnnual), true);
+  assert.equal(activePromo.canReplaceWith(token({ sub: 'lic-paid-perp', licenseId: 'lic-paid-perp' })), true);
+});
+
+test('optional YUNCMS_PREMIUM_OFFER_URL stays empty by default, validates safe targets and fails closed on unsafe URLs', () => {
+  assert.equal(resolvePremiumOfferUrl(undefined), null);
+  assert.equal(resolvePremiumOfferUrl(''), null);
+  assert.equal(resolvePremiumOfferUrl('   '), null);
+  assert.equal(resolvePremiumOfferUrl('https://yunsoft.com/tr/premium-teklifi'), 'https://yunsoft.com/tr/premium-teklifi');
+  assert.equal(resolvePremiumOfferUrl('http://127.0.0.1:4123/offer'), 'http://127.0.0.1:4123/offer');
+  assert.equal(resolvePremiumOfferUrl('http://localhost:4123/offer'), 'http://localhost:4123/offer');
+  assert.equal(resolvePremiumOfferUrl('http://[::1]:4123/offer'), 'http://[::1]:4123/offer');
+
+  for (const unsafe of [
+    'http://yunsoft.com/offer',
+    'javascript:alert(1)',
+    'data:text/html,hello',
+    'https://user:pass@yunsoft.com/offer',
+    'https://yunsoft.com/offer\nInjected: 1',
+    'not-a-url',
+    1234,
+  ]) {
+    assert.throws(() => resolvePremiumOfferUrl(unsafe), { code: 'INVALID_CONFIGURATION' });
+  }
+  assert.equal(createFeaturePolicy({}).premiumOfferUrl, null);
+  assert.equal(createFeaturePolicy({ YUNCMS_PREMIUM_OFFER_URL: 'http://127.0.0.1:4123/offer' }).withToken('unused').premiumOfferUrl, 'http://127.0.0.1:4123/offer');
 });

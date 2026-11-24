@@ -72,6 +72,7 @@ export {
   OFFICIAL_LICENSE_PUBLIC_KEY,
   createFeaturePolicy,
   resolveLicenseDomain,
+  resolvePremiumOfferUrl,
   verifyFeatureLicense,
 } from './features.js';
 export { AuthService } from './services/auth-service.js';

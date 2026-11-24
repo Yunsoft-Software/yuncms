@@ -28,7 +28,12 @@ export class FeaturesService extends BaseService {
       const policy = currentPolicy.describe(name);
       features[name] = effectiveFeatureState(policy, overrides.get(name));
     }
-    return { features, license: this.accountability.admin || this.accountability.system ? currentPolicy.licenseStatus() : undefined };
+    const isAdmin = Boolean(this.accountability.admin || this.accountability.system);
+    const license = isAdmin ? currentPolicy.licenseStatus() : undefined;
+    const premiumOffer = isAdmin && currentPolicy.premiumOfferUrl && license?.status !== 'active'
+      ? { url: currentPolicy.premiumOfferUrl }
+      : undefined;
+    return { features, license, ...(premiumOffer ? { premiumOffer } : {}) };
   }
 
   async readFeature(name, { policy = null } = {}) {
