@@ -6,6 +6,15 @@ This is the user, administrator, operator and integration reference for YunCMS. 
 
 Follow [Getting Started](getting-started.md) from an empty directory to a running Studio, first collection, restricted role and authenticated API request.
 
+## Versioned release guides (`YunCMS 2.1.3`)
+
+Distribution-ready bilingual user and installation guides verified against the published `YunCMS 2.1.3` release (`v2.1.3`, commit `818019ea00312f3a0b465b5f99759d2e13021371`), with localized browser screenshots captured from a clean npm installation using synthetic data:
+
+| Language | Guides (`YunCMS 2.1.3`) | Manifest |
+| --- | --- | --- |
+| English (`en`) | [Overview](yuncms-docs-2.1.3/locales/en/overview.md) · [Installation](yuncms-docs-2.1.3/locales/en/installation.md) · [CLI & Config](yuncms-docs-2.1.3/locales/en/setup-cli.md) · [Studio](yuncms-docs-2.1.3/locales/en/studio-guide.md) · [Data & RBAC](yuncms-docs-2.1.3/locales/en/data-and-access.md) · [Licensing & Ops](yuncms-docs-2.1.3/locales/en/licensing-and-operations.md) | [yuncms-docs-2.1.3/manifest.json](yuncms-docs-2.1.3/manifest.json) |
+| Türkçe (`tr`) | [Genel Bakış](yuncms-docs-2.1.3/locales/tr/overview.md) · [Kurulum](yuncms-docs-2.1.3/locales/tr/installation.md) · [CLI & Yapılandırma](yuncms-docs-2.1.3/locales/tr/setup-cli.md) · [Studio](yuncms-docs-2.1.3/locales/tr/studio-guide.md) · [Veri & İzinler](yuncms-docs-2.1.3/locales/tr/data-and-access.md) · [Lisanslama & Operasyon](yuncms-docs-2.1.3/locales/tr/licensing-and-operations.md) | [yuncms-docs-2.1.3/manifest.json](yuncms-docs-2.1.3/manifest.json) |
+
 <p align="center">
   <img src="assets/screenshots/studio-content.png" alt="YunCMS Content workspace" width="100%">
 </p>

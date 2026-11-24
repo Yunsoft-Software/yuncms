@@ -1,0 +1,357 @@
+{
+  "schemaVersion": 1,
+  "product": "yuncms",
+  "version": "2.1.3",
+  "sourceRepo": "Yunsoft-Software/yuncms",
+  "sourceCommit": "818019ea00312f3a0b465b5f99759d2e13021371",
+  "verifiedAt": "2026-11-24T19:36:19.644Z",
+  "defaultPage": "overview",
+  "locales": {
+    "tr": {
+      "title": "YunCMS 2.1.3 Dokümantasyonu",
+      "summary": "Yayımlanan YunCMS 2.1.3 sürümü için resmi Türkçe kurulum, CLI, Studio, veri modeli, izinler, REST API ve lisanslama kılavuzları.",
+      "sections": [
+        {
+          "id": "installation-and-setup",
+          "title": "Kurulum ve Başlangıç",
+          "pages": [
+            "overview",
+            "installation",
+            "setup-cli"
+          ]
+        },
+        {
+          "id": "studio-and-administration",
+          "title": "Studio, Erişim ve Operasyon",
+          "pages": [
+            "studio-guide",
+            "data-and-access",
+            "licensing-and-operations"
+          ]
+        }
+      ]
+    },
+    "en": {
+      "title": "YunCMS 2.1.3 Documentation",
+      "summary": "Official English installation, CLI, Studio, data model, permissions, REST API and licensing guides for the published YunCMS 2.1.3 release.",
+      "sections": [
+        {
+          "id": "installation-and-setup",
+          "title": "Installation and Setup",
+          "pages": [
+            "overview",
+            "installation",
+            "setup-cli"
+          ]
+        },
+        {
+          "id": "studio-and-administration",
+          "title": "Studio, Access and Operations",
+          "pages": [
+            "studio-guide",
+            "data-and-access",
+            "licensing-and-operations"
+          ]
+        }
+      ]
+    }
+  },
+  "pages": [
+    {
+      "slug": "overview",
+      "section": "installation-and-setup",
+      "order": 1,
+      "locales": {
+        "tr": {
+          "title": "YunCMS 2.1.3 Genel Bakış",
+          "summary": "YunCMS 2.1.3 sürüm kapsamı, yayımlanan paketler, mimari özet ve kılavuz haritası.",
+          "file": "locales/tr/overview.md"
+        },
+        "en": {
+          "title": "YunCMS 2.1.3 Overview",
+          "summary": "YunCMS 2.1.3 release scope, published packages, architecture overview and guide index.",
+          "file": "locales/en/overview.md"
+        }
+      }
+    },
+    {
+      "slug": "installation",
+      "section": "installation-and-setup",
+      "order": 2,
+      "locales": {
+        "tr": {
+          "title": "Kurulum Kılavuzu (YunCMS 2.1.3)",
+          "summary": "Node.js 24 LTS, MySQL 8, sabit npm kurulumu, npx ve Docker Compose ile YunCMS 2.1.3 kurulumu.",
+          "file": "locales/tr/installation.md"
+        },
+        "en": {
+          "title": "Installation Guide (YunCMS 2.1.3)",
+          "summary": "Install YunCMS 2.1.3 with Node.js 24 LTS, MySQL 8, pinned npm, npx or Docker Compose.",
+          "file": "locales/en/installation.md"
+        }
+      }
+    },
+    {
+      "slug": "setup-cli",
+      "section": "installation-and-setup",
+      "order": 3,
+      "locales": {
+        "tr": {
+          "title": "CLI, Yapılandırma ve Güncelleme (YunCMS 2.1.3)",
+          "summary": "init, bootstrap, start, backup, restore, update komutları ve temel .env yapılandırma değişkenleri.",
+          "file": "locales/tr/setup-cli.md"
+        },
+        "en": {
+          "title": "CLI, Configuration and Upgrades (YunCMS 2.1.3)",
+          "summary": "Reference for init, bootstrap, start, backup, restore, update commands and core .env settings.",
+          "file": "locales/en/setup-cli.md"
+        }
+      }
+    },
+    {
+      "slug": "studio-guide",
+      "section": "studio-and-administration",
+      "order": 4,
+      "locales": {
+        "tr": {
+          "title": "Studio Kullanım Kılavuzu (YunCMS 2.1.3)",
+          "summary": "YunCMS 2.1.3 Studio arayüzü: içerik yönetimi, dosyalar, mobil görünüm, dil seçimi, marka ve otomasyon araçları.",
+          "file": "locales/tr/studio-guide.md"
+        },
+        "en": {
+          "title": "Using YunCMS Studio (YunCMS 2.1.3)",
+          "summary": "Operate YunCMS 2.1.3 Studio: content workspace, Files library, mobile navigation, localization, branding and automation tools.",
+          "file": "locales/en/studio-guide.md"
+        }
+      }
+    },
+    {
+      "slug": "data-and-access",
+      "section": "studio-and-administration",
+      "order": 5,
+      "locales": {
+        "tr": {
+          "title": "Veri Modeli, İzinler ve REST API (YunCMS 2.1.3)",
+          "summary": "MySQL koleksiyonları, ilişkiler, JSON sayı koruması, rol tabanlı erişim denetimi ve REST sorgu dili.",
+          "file": "locales/tr/data-and-access.md"
+        },
+        "en": {
+          "title": "Data Model, Permissions and REST API (YunCMS 2.1.3)",
+          "summary": "MySQL collections, relations, JSON number handling, deny-by-default RBAC and REST query language.",
+          "file": "locales/en/data-and-access.md"
+        }
+      }
+    },
+    {
+      "slug": "licensing-and-operations",
+      "section": "studio-and-administration",
+      "order": 6,
+      "locales": {
+        "tr": {
+          "title": "Özellikler, Lisanslama ve Üretim Operasyonları (YunCMS 2.1.3)",
+          "summary": "Ortak Community/Premium dağıtımı, imzalı yetki belgesi doğrulaması, özellik denetimleri ve üretim hazırlık adımları.",
+          "file": "locales/tr/licensing-and-operations.md"
+        },
+        "en": {
+          "title": "Features, Licensing and Production Operations (YunCMS 2.1.3)",
+          "summary": "Shared Community/Premium distribution, signed entitlement verification, feature controls and production readiness.",
+          "file": "locales/en/licensing-and-operations.md"
+        }
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "id": "studio-login-en",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "en",
+      "file": "assets/en/studio-login.png",
+      "sha256": "f542aaf5352270f67692bc20d810fbb7f93aa12db2847f5f912287150b593564",
+      "alt": "YunCMS 2.1.3 Studio English sign-in screen",
+      "caption": "YunCMS 2.1.3 Studio sign-in screen in English with language selector and email/password form.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: en, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-content-en",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "en",
+      "file": "assets/en/studio-content.png",
+      "sha256": "2de87e33b86ac97c2033812efa3ed8652ccd0b1e829708f6a79477e02d950a49",
+      "alt": "YunCMS 2.1.3 Studio English Content workspace showing synthetic product records",
+      "caption": "YunCMS 2.1.3 Content workspace in English displaying synthetic Products records, search, sorting, filters and pagination.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: en, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-data-model-en",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "en",
+      "file": "assets/en/studio-data-model.png",
+      "sha256": "082d09636cac4b9b7a7e36cbcc8514909fa187af49634bc9dbc70e562fa4a30d",
+      "alt": "YunCMS 2.1.3 Studio English Data Model screen with folders and visibility toggles",
+      "caption": "YunCMS 2.1.3 Data Model in English with a Catalog folder, project collections, singleton toggle and hidden-collection indicator.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: en, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-files-en",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "en",
+      "file": "assets/en/studio-files.png",
+      "sha256": "c6c3974af1335efe09b2ec9c4d70f05bbb79be3d946e41f2b50a38910ab39cd0",
+      "alt": "YunCMS 2.1.3 Studio English Files gallery with synthetic product illustrations",
+      "caption": "YunCMS 2.1.3 Files gallery in English displaying four synthetic local PNG assets and media category filters.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: en, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-permissions-en",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "en",
+      "file": "assets/en/studio-permissions.png",
+      "sha256": "aa989fcbe427c8b27027017e320e53cdfc525ad3c1995b4c966decd9065a004b",
+      "alt": "YunCMS 2.1.3 Studio English Roles and Permissions matrix for Content Editor role",
+      "caption": "YunCMS 2.1.3 collection permission matrix in English showing scoped read/create/update grants for a synthetic Content Editor role.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: en, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-features-en",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "en",
+      "file": "assets/en/studio-features.png",
+      "sha256": "af5273fb79c0937e22e3f2e258e235c68f6c010388d4589e2a6e518241261498",
+      "alt": "YunCMS 2.1.3 Studio English Features and license screen",
+      "caption": "YunCMS 2.1.3 Features and license screen in English showing Community controls, Premium feature gates and the signed JWT activation form.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: en, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-mobile-content-en",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "en",
+      "file": "assets/en/studio-mobile-content.png",
+      "sha256": "f1cddd68503376b2e159e136827ff87901d11538be5c6ca204a43262a5cbb5bd",
+      "alt": "YunCMS 2.1.3 Studio English mobile Content cards",
+      "caption": "YunCMS 2.1.3 responsive mobile Content view in English at 390x844 showing record cards and bottom workspace navigation.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: en, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-mobile-menu-en",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "en",
+      "file": "assets/en/studio-mobile-menu.png",
+      "sha256": "a99bf063edcacad87979710c89654ffb17f68262ff60f7e5c3db2a3b7f21c1a0",
+      "alt": "YunCMS 2.1.3 Studio English mobile navigation drawer",
+      "caption": "YunCMS 2.1.3 responsive mobile navigation drawer in English at 390x844 showing collection navigation and synthetic account info.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: en, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-login-tr",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "tr",
+      "file": "assets/tr/studio-login.png",
+      "sha256": "ad7483a9c2b0fcfd457b956d35b5c50ef0a311181c11dc753623c92524a48759",
+      "alt": "YunCMS 2.1.3 Studio Türkçe giriş ekranı",
+      "caption": "YunCMS 2.1.3 Studio Türkçe giriş ekranı: dil seçici ile e-posta ve şifre oturum formu.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: tr, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-content-tr",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "tr",
+      "file": "assets/tr/studio-content.png",
+      "sha256": "b8b448540fb56fd1ea26e4c7186200977909fa2ded34e08cb5831fd8756fe3c0",
+      "alt": "YunCMS 2.1.3 Studio Türkçe İçerik çalışma alanı ve sentetik ürün kayıtları",
+      "caption": "YunCMS 2.1.3 Türkçe İçerik çalışma alanı: sentetik ürün kayıtları, arama, sıralama, filtreleme ve sayfalama.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: tr, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-data-model-tr",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "tr",
+      "file": "assets/tr/studio-data-model.png",
+      "sha256": "f0b1477037b6563e560bed8051ea4d4cbd481c30b1c9d6edffce5dfb89cbb3ba",
+      "alt": "YunCMS 2.1.3 Studio Türkçe Veri Modeli ekranı",
+      "caption": "YunCMS 2.1.3 Türkçe Veri Modeli görünümü: klasörler, proje koleksiyonları, tekil kayıt ve gizlilik denetimleri.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: tr, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-files-tr",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "tr",
+      "file": "assets/tr/studio-files.png",
+      "sha256": "8b153c40dc41207a83eaf7f5c84303c2ec7a969170c0d0e091b426516377fa59",
+      "alt": "YunCMS 2.1.3 Studio Türkçe Dosyalar galerisi",
+      "caption": "YunCMS 2.1.3 Türkçe Dosyalar galerisi: dört adet sentetik yerel PNG varlığı ve medya türü filtreleri.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: tr, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-permissions-tr",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "tr",
+      "file": "assets/tr/studio-permissions.png",
+      "sha256": "1d98822ca7831a58a7cc4d1ab636d35a04ae3db7949112180a542369a91b9de3",
+      "alt": "YunCMS 2.1.3 Studio Türkçe Roller ve İzinler matrisi",
+      "caption": "YunCMS 2.1.3 Türkçe koleksiyon izin matrisi: sentetik Content Editor rolü için kapsamlı okuma, oluşturma ve güncelleme hakları.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: tr, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-features-tr",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "tr",
+      "file": "assets/tr/studio-features.png",
+      "sha256": "a7eff4b4d458d484648b00a7661ab3562926f21384c72274e8c6c30ff85a58bb",
+      "alt": "YunCMS 2.1.3 Studio Türkçe Özellikler ve lisans ekranı",
+      "caption": "YunCMS 2.1.3 Türkçe Özellikler ve lisans ekranı: Community anahtarları, Premium kapıları ve imzalı JWT lisans etkinleştirme formu.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: tr, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-mobile-content-tr",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "tr",
+      "file": "assets/tr/studio-mobile-content.png",
+      "sha256": "db79253befeb9f7b0d4949d62cc3bad00d08ee0666fde394feaeb7cd583611c7",
+      "alt": "YunCMS 2.1.3 Studio Türkçe mobil İçerik kartları",
+      "caption": "YunCMS 2.1.3 Türkçe mobil İçerik görünümü (390x844): uyarlanabilir kayıt kartları ve alt çalışma alanı çubuğu.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: tr, synthetic data only).",
+      "sanitized": true
+    },
+    {
+      "id": "studio-mobile-menu-tr",
+      "product": "yuncms",
+      "version": "2.1.3",
+      "locale": "tr",
+      "file": "assets/tr/studio-mobile-menu.png",
+      "sha256": "48b629b070a170af49801cb21e8472211b07196c77754a055d1b662924f277d6",
+      "alt": "YunCMS 2.1.3 Studio Türkçe mobil gezinme çekmecesi",
+      "caption": "YunCMS 2.1.3 Türkçe mobil gezinme çekmecesi (390x844): koleksiyon listesi ve sentetik oturum bilgisi.",
+      "capturedFrom": "Isolated clean npm install of @yunsoft/yuncms@2.1.3 running on localhost with MySQL 8.4.11 (Studio locale: tr, synthetic data only).",
+      "sanitized": true
+    }
+  ]
+}

@@ -57,6 +57,9 @@ Do not add compatibility behavior merely to imitate another product. New behavio
 - Document only behavior implemented on `main`; avoid branch names, temporary status language, implementation plans, and stale release checklists in usage guides.
 - Every public endpoint, query option, configuration variable, permission boundary, Studio workflow, CLI command, storage option and extension contract should be discoverable from the documentation index.
 - When behavior changes, update the matching user guide in the same development pass.
+- Update code, regression tests, Turkish (TR) and English (EN) documentation, and affected Studio screenshots in parallel in the same development pass. Keep both languages, screenshots, manifests, and test evidence aligned to the same version.
+- Capture screenshots for released guides from the exact published build with synthetic or sanitized data. Describe unreleased behavior in development documentation until it ships.
+
 - Internal plans and blocked-environment notes must not be added to `main` as `plan.md`, `todo.md`, roadmap documents, or release scratchpads.
 
 ## Testing

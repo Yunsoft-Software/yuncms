@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, lstatSync, readdirSync, readFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../../..');
@@ -51,4 +52,123 @@ test('AI documentation is consistently English and documents every Studio langua
   assert.match(guide, /falls back to English/);
   assert.match(readme, /\[Localization\]\(docs\/studio-customization\.md#localization\)/);
   assert.match(documentationIndex, /\[Localization\]\(studio-customization\.md#localization\)/);
+});
+
+test('versioned bilingual documentation bundle satisfies Website importer contract and AGENTS.md rules', () => {
+  const workspace = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+  const bundleRoot = resolve(root, `docs/yuncms-docs-${workspace.version}`);
+  const manifestPath = resolve(bundleRoot, 'manifest.json');
+  assert.equal(existsSync(manifestPath), true, `Missing bundle manifest: ${manifestPath}`);
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+  // Exact schema contract
+  assert.deepEqual(Object.keys(manifest).sort(), [
+    'defaultPage', 'locales', 'pages', 'product', 'schemaVersion',
+    'screenshots', 'sourceCommit', 'sourceRepo', 'verifiedAt', 'version',
+  ]);
+  assert.equal(manifest.schemaVersion, 1);
+  assert.equal(manifest.product, 'yuncms');
+  assert.equal(manifest.version, workspace.version);
+  assert.match(manifest.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
+  assert.notEqual(manifest.version, 'latest');
+  assert.equal(manifest.sourceRepo, 'Yunsoft-Software/yuncms');
+  assert.match(manifest.sourceCommit, /^[0-9a-f]{40}$/);
+  assert.match(manifest.verifiedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/);
+
+  // No symlinks anywhere inside the bundle
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir)) {
+      const full = resolve(dir, entry);
+      const st = lstatSync(full);
+      assert.equal(st.isSymbolicLink(), false, `Symlink forbidden in docs bundle: ${full}`);
+      if (st.isDirectory()) walk(full);
+    }
+  };
+  walk(bundleRoot);
+
+  // Locales and identical TR/EN slug sets
+  assert.deepEqual(Object.keys(manifest.locales).sort(), ['en', 'tr']);
+  const trSlugs = manifest.locales.tr.sections.flatMap(s => s.pages);
+  const enSlugs = manifest.locales.en.sections.flatMap(s => s.pages);
+  assert.deepEqual(trSlugs, enSlugs);
+  assert.ok(trSlugs.includes(manifest.defaultPage));
+  assert.deepEqual(manifest.locales.tr.sections.map(s => s.id), manifest.locales.en.sections.map(s => s.id));
+
+  const pageSlugs = manifest.pages.map(p => p.slug);
+  assert.deepEqual([...pageSlugs].sort(), [...enSlugs].sort());
+  const validSlugs = new Set(pageSlugs);
+
+  // Screenshots manifest verification
+  const screenshotsByFile = new Map();
+  const screenshotsById = new Map();
+  for (const shot of manifest.screenshots) {
+    assert.deepEqual(Object.keys(shot).sort(), [
+      'alt', 'caption', 'capturedFrom', 'file', 'id', 'locale', 'product', 'sanitized', 'sha256', 'version',
+    ]);
+    assert.equal(shot.product, 'yuncms');
+    assert.equal(shot.version, manifest.version);
+    assert.ok(['en', 'tr'].includes(shot.locale));
+    assert.equal(shot.sanitized, true);
+    assert.match(shot.file, new RegExp(`^assets/${shot.locale}/[a-z0-9-]+\\.(?:png|webp)$`));
+    assert.equal(shot.file.includes('..'), false);
+    const abs = resolve(bundleRoot, shot.file);
+    assert.equal(relative(bundleRoot, abs).startsWith('..'), false);
+    const bytes = readFileSync(abs);
+    if (shot.file.endsWith('.png')) {
+      assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], shot.file);
+    } else {
+      assert.equal(bytes.toString('ascii', 0, 4), 'RIFF', shot.file);
+      assert.equal(bytes.toString('ascii', 8, 12), 'WEBP', shot.file);
+    }
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), shot.sha256, shot.file);
+    assert.match(shot.id, /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/);
+    assert.ok(!screenshotsById.has(shot.id), `Duplicate screenshot ID: ${shot.id}`);
+    screenshotsByFile.set(shot.file, shot);
+    screenshotsById.set(shot.id, shot);
+  }
+
+  // Validate every TR/EN markdown page: version visibility, internal links, locale-scoped images, no secrets, no dev campaign copy
+  const referencedImages = new Set();
+  for (const page of manifest.pages) {
+    for (const locale of ['tr', 'en']) {
+      const meta = page.locales[locale];
+      assert.equal(meta.file, `locales/${locale}/${page.slug}.md`);
+      const abs = resolve(bundleRoot, meta.file);
+      assert.equal(relative(bundleRoot, abs).startsWith('..'), false);
+      const md = readFileSync(abs, 'utf8');
+      assert.ok(md.includes(`YunCMS ${manifest.version}`), `${meta.file} must visibly display version`);
+      assert.doesNotMatch(md, /YUNCMS_PREMIUM_OFFER_URL|BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{20,}/);
+      assert.doesNotMatch(md, /kredi kartsız|no credit card/i, `${meta.file} must stay separate from unreleased campaign work`);
+
+      // Images must stay strictly inside bundle and match locale
+      for (const match of md.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) {
+        const imgHref = match[1];
+        const registered = imgHref.startsWith('screenshot:')
+          ? screenshotsById.get(imgHref.slice('screenshot:'.length))
+          : screenshotsByFile.get(imgHref.replace(/^\.\//, ''));
+        assert.ok(registered, `${meta.file} references unregistered image: ${imgHref}`);
+        assert.equal(registered.locale, locale, `${meta.file} must reference ${locale} screenshots only`);
+        referencedImages.add(registered.file);
+      }
+
+      // Internal page links must use doc:<slug> or ./<slug>
+      for (const match of md.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/g)) {
+        const href = match[1];
+        if (/^https?:\/\//.test(href)) continue;
+        const m = href.match(/^(?:doc:|\.\/)([a-z0-9-]+)$/);
+        assert.ok(m && validSlugs.has(m[1]), `${meta.file} has invalid internal link: ${href}`);
+      }
+    }
+  }
+  for (const file of screenshotsByFile.keys()) {
+    assert.ok(referencedImages.has(file), `Unreferenced bundle screenshot: ${file}`);
+  }
+
+  // Linked from repo docs index and README, and AGENTS.md enforces parallel TR/EN + screenshot alignment
+  const readme = readFileSync(resolve(root, 'README.md'), 'utf8');
+  const docsIndex = readFileSync(resolve(root, 'docs/README.md'), 'utf8');
+  const agents = readFileSync(resolve(root, 'AGENTS.md'), 'utf8');
+  assert.ok(readme.includes(`docs/yuncms-docs-${workspace.version}/manifest.json`));
+  assert.ok(docsIndex.includes(`yuncms-docs-${workspace.version}/manifest.json`));
+  assert.match(agents, /Turkish \(TR\) and English \(EN\) documentation.*Studio screenshots.*in parallel.*same version/i);
 });

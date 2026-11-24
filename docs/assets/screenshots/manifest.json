@@ -1,7 +1,40 @@
 {
   "yuncmsVersion": "2.1.3",
-  "capturedAt": "2026-11-04",
-  "source": "Studio workflow screenshots with synthetic data. Revalidated for 2.1.3: Studio application source is unchanged from 2.1.2. Original capture dates and source details are retained below.",
+  "capturedAt": "2026-11-24",
+  "source": "Core Studio and edition screenshots freshly captured on 2026-11-24 from a clean isolated npm install of published @yunsoft/yuncms@2.1.3 against localhost MySQL 8.4.11 with synthetic data only. Flow capture provenance from 2026-11-04 is retained honestly below.",
+  "publishedRelease": {
+    "version": "2.1.3",
+    "gitTag": "v2.1.3",
+    "gitCommit": "818019ea00312f3a0b465b5f99759d2e13021371",
+    "githubReleaseUrl": "https://github.com/Yunsoft-Software/yuncms/releases/tag/v2.1.3",
+    "bilingualDocsBundle": "docs/yuncms-docs-2.1.3/manifest.json",
+    "npmPackages": {
+      "@yunsoft/yuncms": {
+        "version": "2.1.3",
+        "tarball": "https://registry.npmjs.org/@yunsoft/yuncms/-/yuncms-2.1.3.tgz",
+        "integrity": "sha512-2K0TmuBFsDahbrbmeL7vTrOHIXk3aiKI5EaOfJBR4/ngCw/Zy68ico4D+Rpq8ZuyWlJOKznV9qE6ItoPUcCltQ=="
+      },
+      "@yunsoft/yuncms-api": {
+        "version": "2.1.3",
+        "tarball": "https://registry.npmjs.org/@yunsoft/yuncms-api/-/yuncms-api-2.1.3.tgz",
+        "integrity": "sha512-D8TzKpgCf/Ri1R4LoZnCIpTJ4k0dz22fk54FjKgRlowHO6kNpBlJiclSDbqCleeaUWgm/DvooyrY3H53ROcNIA=="
+      },
+      "@yunsoft/yuncms-core": {
+        "version": "2.1.3",
+        "tarball": "https://registry.npmjs.org/@yunsoft/yuncms-core/-/yuncms-core-2.1.3.tgz",
+        "integrity": "sha512-zgw7ctvUo9sJc5E5C1OA3ykHUqfkcZzmoj54B1R194vW6FE+/q3KsJLDUxzn6fZgm8Zo0HNU2x/GjGtPmr9sXw=="
+      },
+      "@yunsoft/yuncms-extensions-sdk": {
+        "version": "2.1.3",
+        "tarball": "https://registry.npmjs.org/@yunsoft/yuncms-extensions-sdk/-/yuncms-extensions-sdk-2.1.3.tgz",
+        "integrity": "sha512-kSoc/Xw4rhid01M9idIu0h/1iLJu751iqg7GNg0Kg4lSEJ/+vbN3wisfW/nlNs+TiHVvhBS7iAPNf+X0Mc4e9w=="
+      }
+    },
+    "studioAssetsSha256": {
+      "index-CD65Zr0v.js": "379da85223f49ddd6a32a09360ef6c6ecb705664b75569a1d91daa1b41995f75",
+      "index-CsfDmVQ1.css": "78207aaeac97bc3304958a8bc6698d3a3faef431780ec2953546f9b55689afe4"
+    }
+  },
   "files": [
     "studio-content.png",
     "studio-data-model.png",
@@ -25,7 +58,7 @@
     "studio-flows-import.png",
     "studio-features.png"
   ],
-  "verifiedAt": "2026-11-20",
+  "verifiedAt": "2026-11-24",
   "flowCaptures": {
     "capturedAt": "2026-11-04",
     "source": "Playwright Chromium against the production Studio build and real disposable MySQL/API, with synthetic users and records. Captures wait for fonts and loaded images and finish native CSS animations.",
@@ -165,60 +198,61 @@
     }
   },
   "studioCaptures": {
-    "capturedAt": "2026-11-04",
+    "capturedAt": "2026-11-24",
+    "source": "Playwright Chromium against a clean isolated npm install of published @yunsoft/yuncms@2.1.3 and localhost MySQL 8.4.11 with synthetic catalog records, synthetic files and synthetic roles.",
     "captures": {
       "studio-content.png": {
-        "capturedAt": "2026-11-04",
-        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "capturedAt": "2026-11-24",
+        "scenario": "Published @yunsoft/yuncms@2.1.3 Studio (locale: en) with synthetic Products catalog and categories",
         "width": 1680,
         "height": 1050,
-        "sha256": "021b1af01ad2b2a541909a572aad4242758f4c4ccb913998e442b3290a280fd5"
+        "sha256": "2de87e33b86ac97c2033812efa3ed8652ccd0b1e829708f6a79477e02d950a49"
       },
       "studio-data-model.png": {
-        "capturedAt": "2026-11-04",
-        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "capturedAt": "2026-11-24",
+        "scenario": "Published @yunsoft/yuncms@2.1.3 Studio (locale: en) Data Model with Catalog folder, collections and hidden collection",
         "width": 1680,
         "height": 1050,
-        "sha256": "309e56f641989a00563c2d8c6f6eb02910b8319798ed8aee87095c104d269e77"
+        "sha256": "082d09636cac4b9b7a7e36cbcc8514909fa187af49634bc9dbc70e562fa4a30d"
       },
       "studio-files.png": {
-        "capturedAt": "2026-11-04",
-        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "capturedAt": "2026-11-24",
+        "scenario": "Published @yunsoft/yuncms@2.1.3 Studio (locale: en) Files gallery with synthetic local PNG assets",
         "width": 1680,
         "height": 1050,
-        "sha256": "86d8e76f3774b254805ed73f3f6c9c376ae3a83afb8e4ca1c6d956e119af3a65"
+        "sha256": "c6c3974af1335efe09b2ec9c4d70f05bbb79be3d946e41f2b50a38910ab39cd0"
       },
       "studio-permissions.png": {
-        "capturedAt": "2026-11-04",
-        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "capturedAt": "2026-11-24",
+        "scenario": "Published @yunsoft/yuncms@2.1.3 Studio (locale: en) Roles & Permissions matrix for synthetic Content Editor role",
         "width": 1680,
         "height": 1050,
-        "sha256": "49c48dcb24206360bd737efb7ca7350bc0520c1ff6a39e09376d1f8409e80517"
+        "sha256": "aa989fcbe427c8b27027017e320e53cdfc525ad3c1995b4c966decd9065a004b"
       },
       "studio-mobile-content.png": {
-        "capturedAt": "2026-11-04",
-        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "capturedAt": "2026-11-24",
+        "scenario": "Published @yunsoft/yuncms@2.1.3 Studio (locale: en) mobile Content cards at 390x844",
         "width": 390,
         "height": 844,
-        "sha256": "5486f78733d3013d04891788ea68850928a7b8896a2d98d5becbdf1445d3060e"
+        "sha256": "f1cddd68503376b2e159e136827ff87901d11538be5c6ca204a43262a5cbb5bd"
       },
       "studio-mobile-menu.png": {
-        "capturedAt": "2026-11-04",
-        "scenario": "Authenticated native Studio with synthetic multilingual content and relationships",
+        "capturedAt": "2026-11-24",
+        "scenario": "Published @yunsoft/yuncms@2.1.3 Studio (locale: en) mobile navigation drawer at 390x844",
         "width": 390,
         "height": 844,
-        "sha256": "459470198116eab441416bab50ba0418e296bca0705b9fb619ca7865f2a22665"
+        "sha256": "a99bf063edcacad87979710c89654ffb17f68262ff60f7e5c3db2a3b7f21c1a0"
       }
     }
   },
   "editionCaptures": {
     "studio-features.png": {
-      "sourceCommit": "2d2fe7da67f9a6eeb260b9f4e162de1b8a0af853",
-      "capturedAt": "2026-11-05",
+      "sourceCommit": "818019ea00312f3a0b465b5f99759d2e13021371",
+      "capturedAt": "2026-11-24",
       "engine": "Chromium",
-      "sha256": "f2b022886d0e9d1e78b8a353ebb905541a774b20191fb77520e1657b9b67d7af",
+      "sha256": "af5273fb79c0937e22e3f2e258e235c68f6c010388d4589e2a6e518241261498",
       "width": 1680,
-      "height": 1050
+      "height": 1464
     }
   }
 }
