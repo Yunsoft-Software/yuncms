@@ -1,0 +1,381 @@
+{
+  "schemaVersion": 1,
+  "product": "yuncms",
+  "version": "2.1.4",
+  "sourceRepo": "Yunsoft-Software/yuncms",
+  "sourceCommit": "6bb66f3fdfefe2f27bde7c2d96f9c494d1c2c45e",
+  "verifiedAt": "2026-11-25T00:05:50.369Z",
+  "defaultPage": "overview",
+  "locales": {
+    "tr": {
+      "title": "YunCMS 2.1.4 Dokümantasyonu",
+      "summary": "Yayımlanan YunCMS 2.1.4 sürümü için resmi Türkçe kurulum, CLI, Studio, veri modeli, izinler, REST API ve lisanslama kılavuzları.",
+      "sections": [
+        {
+          "id": "installation-and-setup",
+          "title": "Kurulum ve Başlangıç",
+          "pages": [
+            "overview",
+            "installation",
+            "setup-cli"
+          ]
+        },
+        {
+          "id": "studio-and-administration",
+          "title": "Studio, Erişim ve Operasyon",
+          "pages": [
+            "studio-guide",
+            "data-and-access",
+            "licensing-and-operations"
+          ]
+        }
+      ]
+    },
+    "en": {
+      "title": "YunCMS 2.1.4 Documentation",
+      "summary": "Official English installation, CLI, Studio, data model, permissions, REST API and licensing guides for the published YunCMS 2.1.4 release.",
+      "sections": [
+        {
+          "id": "installation-and-setup",
+          "title": "Installation and Setup",
+          "pages": [
+            "overview",
+            "installation",
+            "setup-cli"
+          ]
+        },
+        {
+          "id": "studio-and-administration",
+          "title": "Studio, Access and Operations",
+          "pages": [
+            "studio-guide",
+            "data-and-access",
+            "licensing-and-operations"
+          ]
+        }
+      ]
+    }
+  },
+  "pages": [
+    {
+      "slug": "overview",
+      "section": "installation-and-setup",
+      "order": 1,
+      "locales": {
+        "tr": {
+          "title": "YunCMS 2.1.4 Genel Bakış",
+          "summary": "YunCMS 2.1.4 sürüm kapsamı, yayımlanan paketler, mimari özet ve kılavuz haritası.",
+          "file": "locales/tr/overview.md"
+        },
+        "en": {
+          "title": "YunCMS 2.1.4 Overview",
+          "summary": "YunCMS 2.1.4 release scope, published packages, architecture overview and guide index.",
+          "file": "locales/en/overview.md"
+        }
+      }
+    },
+    {
+      "slug": "installation",
+      "section": "installation-and-setup",
+      "order": 2,
+      "locales": {
+        "tr": {
+          "title": "Kurulum Kılavuzu (YunCMS 2.1.4)",
+          "summary": "Node.js 24 LTS, MySQL 8, sabit npm kurulumu, npx ve Docker Compose ile YunCMS 2.1.4 kurulumu.",
+          "file": "locales/tr/installation.md"
+        },
+        "en": {
+          "title": "Installation Guide (YunCMS 2.1.4)",
+          "summary": "Install YunCMS 2.1.4 with Node.js 24 LTS, MySQL 8, pinned npm, npx or Docker Compose.",
+          "file": "locales/en/installation.md"
+        }
+      }
+    },
+    {
+      "slug": "setup-cli",
+      "section": "installation-and-setup",
+      "order": 3,
+      "locales": {
+        "tr": {
+          "title": "CLI, Yapılandırma ve Güncelleme (YunCMS 2.1.4)",
+          "summary": "init, bootstrap, start, backup, restore, update komutları ve temel .env yapılandırma değişkenleri.",
+          "file": "locales/tr/setup-cli.md"
+        },
+        "en": {
+          "title": "CLI, Configuration and Upgrades (YunCMS 2.1.4)",
+          "summary": "Reference for init, bootstrap, start, backup, restore, update commands and core .env settings.",
+          "file": "locales/en/setup-cli.md"
+        }
+      }
+    },
+    {
+      "slug": "studio-guide",
+      "section": "studio-and-administration",
+      "order": 4,
+      "locales": {
+        "tr": {
+          "title": "Studio Kullanım Kılavuzu (YunCMS 2.1.4)",
+          "summary": "YunCMS 2.1.4 Studio arayüzü: içerik yönetimi, dosyalar, mobil görünüm, dil seçimi, marka ve otomasyon araçları.",
+          "file": "locales/tr/studio-guide.md"
+        },
+        "en": {
+          "title": "Using YunCMS Studio (YunCMS 2.1.4)",
+          "summary": "Operate YunCMS 2.1.4 Studio: content workspace, Files library, mobile navigation, localization, branding and automation tools.",
+          "file": "locales/en/studio-guide.md"
+        }
+      }
+    },
+    {
+      "slug": "data-and-access",
+      "section": "studio-and-administration",
+      "order": 5,
+      "locales": {
+        "tr": {
+          "title": "Veri Modeli, İzinler ve REST API (YunCMS 2.1.4)",
+          "summary": "MySQL koleksiyonları, ilişkiler, JSON sayı koruması, rol tabanlı erişim denetimi ve REST sorgu dili.",
+          "file": "locales/tr/data-and-access.md"
+        },
+        "en": {
+          "title": "Data Model, Permissions and REST API (YunCMS 2.1.4)",
+          "summary": "MySQL collections, relations, JSON number handling, deny-by-default RBAC and REST query language.",
+          "file": "locales/en/data-and-access.md"
+        }
+      }
+    },
+    {
+      "slug": "licensing-and-operations",
+      "section": "studio-and-administration",
+      "order": 6,
+      "locales": {
+        "tr": {
+          "title": "Özellikler, Lisanslama ve Üretim Operasyonları (YunCMS 2.1.4)",
+          "summary": "Ortak Community/Premium dağıtımı, imzalı yetki belgesi doğrulaması, özellik denetimleri ve üretim hazırlık adımları.",
+          "file": "locales/tr/licensing-and-operations.md"
+        },
+        "en": {
+          "title": "Features, Licensing and Production Operations (YunCMS 2.1.4)",
+          "summary": "Shared Community/Premium distribution, signed entitlement verification, feature controls and production readiness.",
+          "file": "locales/en/licensing-and-operations.md"
+        }
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "id": "studio-login-en",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "en",
+      "file": "assets/en/studio-login.png",
+      "sha256": "4b1d632a5817e5428102d1a91d478a3ea7dce5928e9550274378075cab5e2fb2",
+      "alt": "YunCMS 2.1.4 Studio English sign-in screen",
+      "caption": "YunCMS 2.1.4 Studio sign-in screen in English with language selector and email/password form.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale en, /.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-content-en",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "en",
+      "file": "assets/en/studio-content.png",
+      "sha256": "f3a9dc0f1c259e8691c7f6900d44efcd167c4075c1c893995ee87925d194ca9d",
+      "alt": "YunCMS 2.1.4 Studio English Content workspace showing synthetic product records",
+      "caption": "YunCMS 2.1.4 Content workspace in English displaying synthetic Products records, search, sorting, filters and pagination.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale en, /#/content/articles.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-data-model-en",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "en",
+      "file": "assets/en/studio-data-model.png",
+      "sha256": "99bf21cc8000c8376a0bd4fa79cdf246a2e0093a1d6e0be0daec5397e00605d6",
+      "alt": "YunCMS 2.1.4 Studio English Data Model screen with folders and visibility toggles",
+      "caption": "YunCMS 2.1.4 Data Model in English with a Catalog folder, project collections, singleton toggle and hidden-collection indicator.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale en, /#/data-model.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-files-en",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "en",
+      "file": "assets/en/studio-files.png",
+      "sha256": "3142d6431ad3b8bd3479059b563ee627e77e83579492432b370169afde92ffc3",
+      "alt": "YunCMS 2.1.4 Studio English Files gallery with synthetic product illustrations",
+      "caption": "YunCMS 2.1.4 Files gallery in English displaying four synthetic local PNG assets and media category filters.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale en, /#/files.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-permissions-en",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "en",
+      "file": "assets/en/studio-permissions.png",
+      "sha256": "97ad1a20673bd15122e570eb6503e6cb0416d7aed4d77c78bca95df733526df9",
+      "alt": "Studio roles list",
+      "caption": "Studio roles list",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale en, /#/roles.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-features-en",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "en",
+      "file": "assets/en/studio-features.png",
+      "sha256": "59e477ab42812ddb20a58af6ce5f7261f936c004f7178057bbb4cff0e08a2991",
+      "alt": "Features, license and optional Premium offer",
+      "caption": "Features, license and optional Premium offer",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale en, /#/features.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-mobile-content-en",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "en",
+      "file": "assets/en/studio-mobile-content.png",
+      "sha256": "64b8f14c4f68ca49f5997c8f2fb16abcab2503b8ea1729a75b0c245e91f5a41c",
+      "alt": "YunCMS 2.1.4 Studio English mobile Content cards",
+      "caption": "YunCMS 2.1.4 responsive mobile Content view in English at 390x844 showing record cards and bottom workspace navigation.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale en, /#/content/articles.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-mobile-menu-en",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "en",
+      "file": "assets/en/studio-mobile-menu.png",
+      "sha256": "27159a33383c3b18c3e141e867e983a6ba555dab98ccc8592348b90fa3c782ce",
+      "alt": "YunCMS 2.1.4 Studio English mobile navigation drawer",
+      "caption": "YunCMS 2.1.4 responsive mobile navigation drawer in English at 390x844 showing collection navigation and synthetic account info.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale en, /#/content/articles.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-login-tr",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "tr",
+      "file": "assets/tr/studio-login.png",
+      "sha256": "1a37829f261ad9959b2716588c8f2982f818e022e3776549d3181de63dd68980",
+      "alt": "YunCMS 2.1.4 Studio Türkçe giriş ekranı",
+      "caption": "YunCMS 2.1.4 Studio Türkçe giriş ekranı: dil seçici ile e-posta ve şifre oturum formu.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale tr, /.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-content-tr",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "tr",
+      "file": "assets/tr/studio-content.png",
+      "sha256": "deaa490fef67984f7181a6839ae75a0f6c9f6cfb1f0741ef34349874836270a8",
+      "alt": "YunCMS 2.1.4 Studio Türkçe İçerik çalışma alanı ve sentetik ürün kayıtları",
+      "caption": "YunCMS 2.1.4 Türkçe İçerik çalışma alanı: sentetik ürün kayıtları, arama, sıralama, filtreleme ve sayfalama.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale tr, /#/content/articles.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-data-model-tr",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "tr",
+      "file": "assets/tr/studio-data-model.png",
+      "sha256": "6f1401c94c4f32091fe3cf5728028c5b02a9ab71666c9bf72d471c5a6a4ba86f",
+      "alt": "YunCMS 2.1.4 Studio Türkçe Veri Modeli ekranı",
+      "caption": "YunCMS 2.1.4 Türkçe Veri Modeli görünümü: klasörler, proje koleksiyonları, tekil kayıt ve gizlilik denetimleri.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale tr, /#/data-model.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-files-tr",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "tr",
+      "file": "assets/tr/studio-files.png",
+      "sha256": "2d15c34c6fa82f8db1b3198e2c429ae3f8253f6b350d3d5032585485dfd9326f",
+      "alt": "YunCMS 2.1.4 Studio Türkçe Dosyalar galerisi",
+      "caption": "YunCMS 2.1.4 Türkçe Dosyalar galerisi: dört adet sentetik yerel PNG varlığı ve medya türü filtreleri.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale tr, /#/files.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-permissions-tr",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "tr",
+      "file": "assets/tr/studio-permissions.png",
+      "sha256": "9bcb0436aba5cdca96ff81b8e3123164fb6ca5812675b731e2fdc24a0adf6cc4",
+      "alt": "Studio rol listesi",
+      "caption": "Studio rol listesi",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale tr, /#/roles.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-features-tr",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "tr",
+      "file": "assets/tr/studio-features.png",
+      "sha256": "18991fbeae3c998c8e1dbbddafc13c35f743b38dd3250f7b71e825d15f403f78",
+      "alt": "Özellikler, lisans ve isteğe bağlı Premium teklifi",
+      "caption": "Özellikler, lisans ve isteğe bağlı Premium teklifi",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale tr, /#/features.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-mobile-content-tr",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "tr",
+      "file": "assets/tr/studio-mobile-content.png",
+      "sha256": "a3057e63388ab317c37010959e0a17cb866604552de6f8246ee303dc0992796d",
+      "alt": "YunCMS 2.1.4 Studio Türkçe mobil İçerik kartları",
+      "caption": "YunCMS 2.1.4 Türkçe mobil İçerik görünümü (390x844): uyarlanabilir kayıt kartları ve alt çalışma alanı çubuğu.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale tr, /#/content/articles.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-mobile-menu-tr",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "tr",
+      "file": "assets/tr/studio-mobile-menu.png",
+      "sha256": "bcc1bd3dc202b14723bf85867a1116965d63efe3d16b8c2c59089a2e7a0d5164",
+      "alt": "YunCMS 2.1.4 Studio Türkçe mobil gezinme çekmecesi",
+      "caption": "YunCMS 2.1.4 Türkçe mobil gezinme çekmecesi (390x844): koleksiyon listesi ve sentetik oturum bilgisi.",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale tr, /#/content/articles.",
+      "sanitized": true
+    },
+    {
+      "id": "studio-accountability-en",
+      "file": "assets/en/studio-accountability.png",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "en",
+      "alt": "Studio table with the four managed fields selected",
+      "caption": "Studio table with the four managed fields selected",
+      "sanitized": true,
+      "sha256": "330230b57f47027c146a4b16cf2d8aa68bf31a30aa7597aedeaee5ecefb54d2a",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale en, /#/content/articles."
+    },
+    {
+      "id": "studio-accountability-tr",
+      "file": "assets/tr/studio-accountability.png",
+      "product": "yuncms",
+      "version": "2.1.4",
+      "locale": "tr",
+      "alt": "Dört sistem alanının seçildiği Studio tablosu",
+      "caption": "Dört sistem alanının seçildiği Studio tablosu",
+      "sanitized": true,
+      "sha256": "12c60da7c6a0f41bf28e9c0296210923b5fc41baf6b1eecbe3bb2c4f90bc14b7",
+      "capturedFrom": "YunCMS 2.1.4 release tarballs, Chromium 156.0.8078.4, synthetic fixture, locale tr, /#/content/articles."
+    }
+  ]
+}

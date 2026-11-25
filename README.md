@@ -26,7 +26,7 @@ Website: [https://yunsoft.com](https://yunsoft.com)
 
 **Building with YunCMS?** [Yunsoft can help with your project, integration or migration](https://yunsoft.com/contact?utm_source=github&utm_medium=yuncms&utm_campaign=yuncms-services). If YunCMS helps you, [give the repository a star](https://github.com/Yunsoft-Software/yuncms) or [sponsor YunCMS](https://github.com/sponsors/Yunsoft-Software).
 
-> **Current published release:** `YunCMS 2.1.3` (`v2.1.3`). Use the managed backup/update flow and verify your database, storage, proxy and authentication configuration before exposing a production installation. Distribution-ready bilingual guides for `2.1.3`: **[English (`en`)](docs/yuncms-docs-2.1.3/locales/en/overview.md)** · **[Türkçe (`tr`)](docs/yuncms-docs-2.1.3/locales/tr/overview.md)** · **[Version manifest](docs/yuncms-docs-2.1.3/manifest.json)**.
+> **Current published release:** `YunCMS 2.1.4` (`v2.1.4`). Use the managed backup/update flow and verify your database, storage, proxy and authentication configuration before exposing a production installation. Distribution-ready bilingual guides for `2.1.4`: **[English (`en`)](docs/yuncms-docs-2.1.4/locales/en/overview.md)** · **[Türkçe (`tr`)](docs/yuncms-docs-2.1.4/locales/tr/overview.md)** · **[Version manifest](docs/yuncms-docs-2.1.4/manifest.json)**.
 
 ## Community
 
@@ -491,7 +491,7 @@ The complete user/operator/integrator index is **[docs/README.md](docs/README.md
 ## Getting started and administration
 
 - **[Documentation index](docs/README.md)**
-- **[YunCMS 2.1.3 Versioned Guides — English (`en`)](docs/yuncms-docs-2.1.3/locales/en/overview.md)** & **[Türkçe (`tr`)](docs/yuncms-docs-2.1.3/locales/tr/overview.md)** ([bundle manifest](docs/yuncms-docs-2.1.3/manifest.json))
+- **[YunCMS 2.1.4 Versioned Guides — English (`en`)](docs/yuncms-docs-2.1.4/locales/en/overview.md)** & **[Türkçe (`tr`)](docs/yuncms-docs-2.1.4/locales/tr/overview.md)** ([bundle manifest](docs/yuncms-docs-2.1.4/manifest.json))
 - **[Installation Options](docs/installation.md)**
 - **[Getting Started](docs/getting-started.md)**
 - **[Setup and CLI](docs/setup-cli.md)**
