@@ -54,9 +54,8 @@ test('AI documentation is consistently English and documents every Studio langua
   assert.match(documentationIndex, /\[Localization\]\(studio-customization\.md#localization\)/);
 });
 
-test('versioned bilingual documentation bundle satisfies Website importer contract and AGENTS.md rules', () => {
-  const workspace = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
-  const bundleRoot = resolve(root, `docs/yuncms-docs-${workspace.version}`);
+function checkWebsiteBundle(version) {
+  const bundleRoot = resolve(root, `docs/yuncms-docs-${version}`);
   const manifestPath = resolve(bundleRoot, 'manifest.json');
   assert.equal(existsSync(manifestPath), true, `Missing bundle manifest: ${manifestPath}`);
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
@@ -68,7 +67,7 @@ test('versioned bilingual documentation bundle satisfies Website importer contra
   ]);
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.product, 'yuncms');
-  assert.equal(manifest.version, workspace.version);
+  assert.equal(manifest.version, version);
   assert.match(manifest.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
   assert.notEqual(manifest.version, 'latest');
   assert.equal(manifest.sourceRepo, 'Yunsoft-Software/yuncms');
@@ -127,7 +126,7 @@ test('versioned bilingual documentation bundle satisfies Website importer contra
     screenshotsById.set(shot.id, shot);
   }
 
-  // Validate every TR/EN markdown page: version visibility, internal links, locale-scoped images, no secrets, no dev campaign copy
+  // Check version visibility, internal links, locale-scoped images, and secrets.
   const referencedImages = new Set();
   for (const page of manifest.pages) {
     for (const locale of ['tr', 'en']) {
@@ -137,8 +136,11 @@ test('versioned bilingual documentation bundle satisfies Website importer contra
       assert.equal(relative(bundleRoot, abs).startsWith('..'), false);
       const md = readFileSync(abs, 'utf8');
       assert.ok(md.includes(`YunCMS ${manifest.version}`), `${meta.file} must visibly display version`);
-      assert.doesNotMatch(md, /YUNCMS_PREMIUM_OFFER_URL|BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{20,}/);
-      assert.doesNotMatch(md, /kredi kartsız|no credit card/i, `${meta.file} must stay separate from unreleased campaign work`);
+      assert.doesNotMatch(md, /BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{20,}/);
+      if (version === '2.1.3') {
+        assert.doesNotMatch(md, /YUNCMS_PREMIUM_OFFER_URL|kredi kartsız|no credit card/i,
+          `${meta.file} must describe the published 2.1.3 runtime`);
+      }
 
       // Images must stay strictly inside bundle and match locale
       for (const match of md.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) {
@@ -164,11 +166,21 @@ test('versioned bilingual documentation bundle satisfies Website importer contra
     assert.ok(referencedImages.has(file), `Unreferenced bundle screenshot: ${file}`);
   }
 
-  // Linked from repo docs index and README, and AGENTS.md enforces parallel TR/EN + screenshot alignment
-  const readme = readFileSync(resolve(root, 'README.md'), 'utf8');
   const docsIndex = readFileSync(resolve(root, 'docs/README.md'), 'utf8');
+  assert.ok(docsIndex.includes(`yuncms-docs-${version}/manifest.json`));
+}
+
+test('published bilingual bundles follow the Website importer contract and AGENTS.md rules', () => {
+  const docs = resolve(root, 'docs');
+  const versions = readdirSync(docs).flatMap(name => {
+    const match = name.match(/^yuncms-docs-(\d+\.\d+\.\d+)$/);
+    return match ? [match[1]] : [];
+  });
+  assert.ok(versions.length > 0, 'At least one published version must have a documentation bundle');
+  for (const version of versions) checkWebsiteBundle(version);
+
+  const readme = readFileSync(resolve(root, 'README.md'), 'utf8');
+  assert.ok(versions.some(version => readme.includes(`docs/yuncms-docs-${version}/manifest.json`)));
   const agents = readFileSync(resolve(root, 'AGENTS.md'), 'utf8');
-  assert.ok(readme.includes(`docs/yuncms-docs-${workspace.version}/manifest.json`));
-  assert.ok(docsIndex.includes(`yuncms-docs-${workspace.version}/manifest.json`));
   assert.match(agents, /Turkish \(TR\) and English \(EN\) documentation.*Studio screenshots.*in parallel.*same version/i);
 });

@@ -93,8 +93,8 @@ The deployment operator controls trusted configuration and server code.
 
 ### Optional three-month Premium offer
 
-This section describes the source build. Set `YUNCMS_PREMIUM_OFFER_URL` to the
-approved Yunsoft Website campaign URL to show the offer.
+Set `YUNCMS_PREMIUM_OFFER_URL` to the approved Yunsoft Website campaign URL to
+show the offer.
 
 - In interactive `yuncms init`, the prompt appears after database and administrator setup. Choose yes to print the configured link. The default is no, and CI and non-interactive sessions skip the prompt.
 - In **Settings → Features and license**, an administrator can reveal or skip the offer. Choosing the Website link opens a separate tab without a referrer or installation data.
@@ -102,8 +102,7 @@ approved Yunsoft Website campaign URL to show the offer.
 
 #### İsteğe bağlı üç aylık Premium teklifi
 
-Bu bölüm kaynak derlemeyi anlatır. Teklifi göstermek için
-`YUNCMS_PREMIUM_OFFER_URL` ayarına Yunsoft Website’in onaylı kampanya adresini girin.
+Teklifi göstermek için `YUNCMS_PREMIUM_OFFER_URL` ayarına Yunsoft Website’in onaylı kampanya adresini girin.
 
 - Etkileşimli `yuncms init` komutu, veritabanı ve yönetici kurulumu tamamlandıktan sonra bağlantıyı gösterme seçeneği sunar. Varsayılan yanıt hayırdır. CI ve etkileşimsiz oturumlar bu adımı atlar.
 - **Ayarlar → Özellikler ve lisans** bölümünde yönetici teklifi açabilir veya atlayabilir. Website bağlantısı, yönlendiren adresi veya kurulum bilgisini aktarmadan ayrı bir sekmede açılır.
